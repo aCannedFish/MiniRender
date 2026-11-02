@@ -4,7 +4,11 @@
 /CMakeUserPresets.json
 /.cache/
 /.idea/
-/.vscode/
+/.vscode/*
+!/.vscode/settings.json
+!/.vscode/c_cpp_properties.json
+!/.vscode/extensions.json
+!/.vscode/tasks.json
 .DS_Store
 *.user
 *.log

@@ -1,0 +1,28 @@
+{
+  "cmake.useCMakePresets": "always",
+  "cmake.configureOnOpen": true,
+  "cmake.copyCompileCommands": "${workspaceFolder}/build/compile_commands.json",
+  "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+  "C_Cpp.default.cppStandard": "c++20",
+  "C_Cpp.intelliSenseEngine": "default",
+  "C_Cpp.errorSquiggles": "enabled",
+  "C_Cpp.clang_format_style": "file",
+  "clangd.enable": false,
+  "files.associations": {
+    "*.hpp": "cpp",
+    "*.vert": "glsl",
+    "*.frag": "glsl",
+    "*.comp": "glsl"
+  },
+  "files.exclude": {
+    "**/.DS_Store": true
+  },
+  "search.exclude": {
+    "build/**": true,
+    "work/**": true,
+    "outputs/**": true
+  },
+  "[cpp]": {
+    "editor.defaultFormatter": "ms-vscode.cpptools"
+  }
+}
