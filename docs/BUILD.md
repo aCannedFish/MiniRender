@@ -31,20 +31,20 @@ build/macos-core-debug/minirender_cli --test-pattern /tmp/minirender-pattern.ppm
 ```sh
 cmake --preset macos-desktop-debug
 cmake --build --preset macos-desktop-debug
-build/macos-desktop-debug/src/app/desktop/minirender_desktop --validation
+build/macos-desktop-debug/src/app/desktop/minirender_desktop.app/Contents/MacOS/minirender_desktop --validation
 ```
 
-Qt 提供工作台和原生窗口，项目的 `VulkanViewport` 管理设备与交换链。A0 画面中，近处是两色棋盘纹理，远处是红色三角形。近处先绘制，正确的深度测试应保留中心纹理。
+Qt 提供工作台和原生窗口，项目的 `VulkanViewport` 管理设备与交换链。默认打开 studio 场景与编辑工作台，使用方法见 VIEWPORT.md。A0 棋盘/深度诊断仍由 --smoke 参数运行。
 
 GPU 验证使用实际窗口、缩放和交换链回读：
 
 ```sh
-python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirender_desktop
+python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirender_desktop.app
 ```
 
 结果写入 `outputs/a0/gpu-smoke.png` 和同目录日志。脚本检查退出码、像素检查成功和销毁之后的零 Validation 错误。日志缺失、超时、不能回读或缺少 Validation Layer 都是失败，不是跳过。
 
-着色器在构建时编译并嵌入程序，因此可从其他工作目录运行。窗口右侧的说明面板和截图按钮属于 A0；场景树、材质编辑等尚未实现。
+着色器在构建时编译并嵌入程序，因此可从其他工作目录运行。场景编辑、相机交互和材质参数面板已在 A1.2 加入；阴影与 HDR 后处理继续在后续检查点实现。
 
 ## Windows
 

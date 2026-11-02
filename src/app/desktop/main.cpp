@@ -1,4 +1,6 @@
+#include "scene_smoke.hpp"
 #include "vulkan_viewport.hpp"
+#include "workbench.hpp"
 
 #include <QApplication>
 #include <QCommandLineParser>
@@ -53,13 +55,15 @@ int main(int argc, char** argv) {
     QApplication application(argc, argv);
     QApplication::setApplicationName("MiniRender");
     QCommandLineParser parser;
-    parser.setApplicationDescription("MiniRender A0 — Vulkan texture and depth diagnostics");
+    parser.setApplicationDescription("MiniRender — Vulkan scene workbench");
     parser.addHelpOption();
     parser.addOption({"smoke", "Run resize/readback checks and save a PNG.", "output"});
     parser.addOption({"validation", "Require Vulkan Validation Layers."});
+    parser.addOption({"scene", "Open a scene JSON file.", "path"});
+    parser.addOption({"scene-smoke", "Run scene editing and GPU checks.", "directory"});
     parser.process(application);
     const bool smoke = parser.isSet("smoke");
-    const bool validation = parser.isSet("validation") || smoke;
+    const bool validation = parser.isSet("validation") || smoke || parser.isSet("scene-smoke");
     std::atomic_int validation_errors = 0;
     int result = 0;
 
@@ -85,38 +89,23 @@ int main(int argc, char** argv) {
     }
 
     {
-        QMainWindow window;
-        window.setWindowTitle("MiniRender — A0 基础验证");
-        auto* viewport = new VulkanViewport;
-        viewport->setVulkanInstance(&instance);
-        auto* container = QWidget::createWindowContainer(viewport, &window);
-        container->setMinimumSize(320, 240);
-        window.setCentralWidget(container);
-
-        auto* dock = new QDockWidget("验证内容", &window);
-        auto* description = new QLabel("<h3>Vulkan 基础验证</h3>"
-                                       "<p>棋盘：SRGB 纹理上传与采样</p>"
-                                       "<p>红边：远处三角形</p>"
-                                       "<p>中心：深度测试保留近处纹理</p>"
-                                       "<p>缩放窗口可检查交换链重建。</p>"
-                                       "<p>场景编辑与离线渲染将在后续检查点加入。</p>",
-                                       dock);
-        description->setMargin(16);
-        description->setWordWrap(true);
-        dock->setWidget(description);
-        window.addDockWidget(Qt::RightDockWidgetArea, dock);
-        auto* toolbar = window.addToolBar("工具");
-        auto* save = toolbar->addAction("保存视口 PNG");
-        QObject::connect(save, &QAction::triggered, &window, [&] {
-            if (!viewport->isValid() || !viewport->supportsGrab()) {
-                QMessageBox::warning(&window, "无法截图", "当前交换链不支持图像回读。");
-                return;
+        Workbench window(&instance, smoke);
+        auto* viewport = window.viewport();
+        if (!smoke) {
+            const QString scene_path =
+                parser.isSet("scene")
+                    ? parser.value("scene")
+                    : QCoreApplication::applicationDirPath() + "/scenes/studio.json";
+            try {
+                window.load_scene_file(scene_path);
+            } catch (const std::exception& error) {
+                qCritical() << error.what();
+                return 1;
             }
-            const auto path = QFileDialog::getSaveFileName(&window, "保存视口", {}, "PNG (*.png)");
-            if (!path.isEmpty() && !viewport->grab().save(path)) {
-                QMessageBox::warning(&window, "保存失败", "无法写入图像文件。");
-            }
-        });
+        }
+        if (parser.isSet("scene-smoke")) {
+            start_scene_smoke(window, parser.value("scene-smoke"));
+        }
 
         int ticks = 0;
         bool resized = false;
@@ -171,7 +160,9 @@ int main(int argc, char** argv) {
                 application.exit(passed ? 0 : 1);
             }
         });
-        window.resize(960, 640);
+        if (smoke) {
+            window.resize(960, 640);
+        }
         window.show();
         timer.start();
         result = application.exec();

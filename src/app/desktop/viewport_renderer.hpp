@@ -1,0 +1,13 @@
+#pragma once
+
+// 视口中的渲染算法只管理自身资源，窗口控制设备、交换链、帧 fence 和呈现。
+// 首版提供诊断与真实场景两种实现；二者都在 startNextFrame 中录制并提交一帧。
+class ViewportRenderer {
+  public:
+    virtual ~ViewportRenderer() = default;
+    virtual void initResources() = 0;
+    virtual void initSwapChainResources() = 0;
+    virtual void releaseSwapChainResources() = 0;
+    virtual void releaseResources() = 0;
+    virtual void startNextFrame() = 0;
+};

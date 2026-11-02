@@ -1,18 +1,19 @@
 #pragma once
 
+#include "viewport_renderer.hpp"
 #include "vulkan_viewport.hpp"
 
 // A0 的真实 GPU 诊断管线：上传棋盘纹理、两层三角形、深度测试与回读。
 // VulkanViewport 拥有 device/swapchain；此类拥有 texture/descriptor/pipeline/staging，
 // 并在 VulkanViewport 指定的释放阶段销毁。后续场景管线复用这些资源生命周期约定。
-class DiagnosticRenderer final {
+class DiagnosticRenderer final : public ViewportRenderer {
   public:
     explicit DiagnosticRenderer(VulkanViewport* window);
-    void initResources();
-    void initSwapChainResources();
-    void releaseSwapChainResources();
-    void releaseResources();
-    void startNextFrame();
+    void initResources() override;
+    void initSwapChainResources() override;
+    void releaseSwapChainResources() override;
+    void releaseResources() override;
+    void startNextFrame() override;
 
   private:
     void create_texture();

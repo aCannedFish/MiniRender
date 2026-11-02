@@ -27,6 +27,7 @@ endif()
 add_library(minirender_core
     src/core/image.cpp
     src/scene/scene.cpp
+    src/scene/editor.cpp
     src/assets/obj_loader.cpp
     src/assets/scene_io.cpp)
 target_include_directories(minirender_core PUBLIC include)
