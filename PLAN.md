@@ -37,7 +37,7 @@ MiniRender 是面向图形学学习的小型渲染引擎，集成 GAMES101 大�
 | 构建 | CMake、Ninja、CMake Presets |
 | 本机编译器 | Apple Clang，arm64 |
 | Windows 编译器 | Visual Studio 2022 / MSVC，x64 |
-| UI | Qt 6 Widgets，嵌入 QVulkanWindow |
+| UI | Qt 6 Widgets，嵌入 QWindow 与自有 Vulkan 交换链 |
 | 实时图形 | Vulkan 1.2 基础能力，GLSL 编译为 SPIR-V |
 | 本机图形运行时 | Vulkan Loader + MoltenVK，经 Metal 执行 |
 | Windows 图形运行时 | NVIDIA 原生 Vulkan 驱动 |
@@ -45,7 +45,7 @@ MiniRender 是面向图形学学习的小型渲染引擎，集成 GAMES101 大�
 | NVIDIA 渲染 | CUDA + OptiX，独立可选构建目标 |
 | 文档 | Markdown，公式使用 LaTeX |
 
-Qt 负责窗口及交换链生命周期，项目编写离屏渲染、管线、着色器、资源绑定与同步。核心算法不得依赖 Qt 类型。只保留平台初始化、资源定位与 SDK 查找等必要适配。
+Qt 负责窗口及平台 surface，项目管理 Vulkan device、交换链、同步、离屏渲染和管线。A0 实测发现 QVulkanWindow 呈现同步问题后改用薄 QWindow 适配层，依据见 docs/FOUNDATION.md。核心算法不得依赖 Qt 类型。只保留平台初始化、资源定位与 SDK 查找等必要适配。
 
 本机保留 Vulkan portability 设备枚举，并按设备报告启用所需的 portability subset。启用功能前检查支持情况；不依赖几何着色器、硬件曲面细分、CUDA 互操作、Vulkan Ray Tracing 或厂商专有扩展。Loop 细分在 CPU 执行，SSAO 和 SDF 使用基础图形管线。线框调试采用三角形边线绘制，不强制要求非实心光栅模式。
 
@@ -149,7 +149,7 @@ SDF 作为独立模式，不要求与三角网格共享阴影和离线求交。�
 
 | 阶段 | 内容 | 退出条件 | 状态 |
 | --- | --- | --- | --- |
-| A0 基础 | CMake 目标隔离、CPU CLI、测试入口、Qt、Vulkan/MoltenVK 冒烟测试；固定依赖 | 无 CUDA 环境可构建；Vulkan 三角形、纹理显示、深度附件、窗口缩放运行；初始化无 Validation 错误 | 计划 |
+| A0 基础 | CMake 目标隔离、CPU CLI、测试入口、Qt、Vulkan/MoltenVK 冒烟测试；固定依赖 | 无 CUDA 环境可构建；Vulkan 三角形、纹理显示、深度附件、窗口缩放运行；初始化无 Validation 错误 | 本机通过；见 docs/checkpoints/A0.md |
 | A1 场景 | 场景/资产读写、相机、选中、参数编辑、保存恢复；实时深度、基础 PBR、阴影、HDR 与 FXAA | 可从文件加载和编辑场景，保存重开一致 | 计划 |
 | A2 路径追踪 | BVH、多线程、基础材质、面积光、环境光、MIS、薄透镜、任务取消 | UI/CLI 结果一致，采样测试通过，保存线性参考图 | 计划 |
 | A3 实时效果 | 深度/法线缓冲、SSAO、滤波、IBL 与调试视图 | AO 各阶段可检查，窗口/相机变化无错误；通过本机 GPU 回归 | 计划 |
@@ -224,7 +224,7 @@ Windows 阶段不重新组织场景格式和算法模块。确需平台修复时
 1. main 保存可复现的基线。空仓库首次提交初始化计划与仓库入口；此后功能使用 codex/<阶段>-<主题> 分支。
 2. 开始任务前检查 status、当前分支和 origin，fetch 远端；已有未提交改动先识别归属，不覆盖、不擅自 stash 或 reset。
 3. 按独立功能提交，提交消息说明具体行为。只暂存本次任务相关文件，提交前检查 staged diff 与必要测试。
-4. 每个可验证阶段及时推送远端功能分支，建立 PR，写明功能、测试、平台和未验证项。通过约定检查后合入 main；PR 尚未合并时准确标注状态。
+4. 每完成一个 CKPT 即提交并推送远端功能分支，建立 PR，写明功能、测试、平台和未验证项。通过约定检查后合入 main；PR 尚未合并时准确标注状态。
 5. 不强制推送共享分支，不改写已发布历史，不把另一台设备的本地副本当作独立项目。
 6. 换机前提交、推送、检查远端 SHA；新机 clone/fetch 并检出记录的标签或分支，不复制 build 目录和二进制。
 7. 发生分叉先检查双方提交；main 默认使用 pull --ff-only，不能快进时显式处理，不覆盖远端变化。

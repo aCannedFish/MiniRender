@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""运行真实桌面 GPU 验证并保存日志，超时或任何验证错误都返回失败。
+
+独立进程超时不依赖 Qt event loop，能够捕获渲染提交阻塞主线程的情况。
+只有 GPU 窗口运行、图像像素、缩放、资源释放均通过，才能认定 A0 验收通过。
+"""
+
+import argparse
+from pathlib import Path
+import subprocess
+import sys
+
+
+def main() -> int:
+    """从用户指定的可执行文件运行检查；输出路径与工作目录无关。"""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("executable", type=Path)
+    parser.add_argument("--output", type=Path, default=Path("outputs/a0"))
+    parser.add_argument("--timeout", type=float, default=35)
+    args = parser.parse_args()
+    output = args.output.resolve()
+    output.mkdir(parents=True, exist_ok=True)
+    with (output / "gpu-smoke.log").open("w", encoding="utf-8") as log:
+        try:
+            result = subprocess.run(
+                [str(args.executable.resolve()), "--smoke", str(output / "gpu-smoke.png")],
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                timeout=args.timeout,
+                check=False,
+            )
+            code = result.returncode
+        except subprocess.TimeoutExpired:
+            log.write("\nExternal watchdog: GPU smoke timed out.\n")
+            code = 124
+    text = (output / "gpu-smoke.log").read_text(encoding="utf-8")
+    print(text, end="")
+    if code == 0 and (
+        "GPU smoke PASS" not in text or "Vulkan validation errors: 0" not in text
+    ):
+        print("Missing verification evidence.", file=sys.stderr)
+        return 1
+    return code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

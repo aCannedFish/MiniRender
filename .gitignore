@@ -1,0 +1,10 @@
+/build/
+/work/
+/outputs/
+/CMakeUserPresets.json
+/.cache/
+/.idea/
+/.vscode/
+.DS_Store
+*.user
+*.log

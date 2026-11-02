@@ -1,0 +1,216 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "BUILD_TESTING": "ON",
+        "MINIRENDER_ENABLE_OPTIX": "OFF"
+      }
+    },
+    {
+      "name": "macos-core-debug",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "MINIRENDER_BUILD_DESKTOP": "OFF"
+      }
+    },
+    {
+      "name": "macos-core-release",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "MINIRENDER_BUILD_DESKTOP": "OFF"
+      }
+    },
+    {
+      "name": "macos-desktop-debug",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "MINIRENDER_BUILD_DESKTOP": "ON"
+      }
+    },
+    {
+      "name": "macos-desktop-release",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "MINIRENDER_BUILD_DESKTOP": "ON"
+      }
+    },
+    {
+      "name": "windows-core-debug",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "MINIRENDER_BUILD_DESKTOP": "OFF"
+      }
+    },
+    {
+      "name": "windows-core-release",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "MINIRENDER_BUILD_DESKTOP": "OFF"
+      }
+    },
+    {
+      "name": "windows-desktop-debug",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "MINIRENDER_BUILD_DESKTOP": "ON"
+      }
+    },
+    {
+      "name": "windows-desktop-release",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "MINIRENDER_BUILD_DESKTOP": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "macos-core-debug",
+      "configurePreset": "macos-core-debug"
+    },
+    {
+      "name": "macos-core-release",
+      "configurePreset": "macos-core-release"
+    },
+    {
+      "name": "macos-desktop-debug",
+      "configurePreset": "macos-desktop-debug"
+    },
+    {
+      "name": "macos-desktop-release",
+      "configurePreset": "macos-desktop-release"
+    },
+    {
+      "name": "windows-core-debug",
+      "configurePreset": "windows-core-debug"
+    },
+    {
+      "name": "windows-core-release",
+      "configurePreset": "windows-core-release"
+    },
+    {
+      "name": "windows-desktop-debug",
+      "configurePreset": "windows-desktop-debug"
+    },
+    {
+      "name": "windows-desktop-release",
+      "configurePreset": "windows-desktop-release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "macos-core-debug",
+      "configurePreset": "macos-core-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "macos-core-release",
+      "configurePreset": "macos-core-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "macos-desktop-debug",
+      "configurePreset": "macos-desktop-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "macos-desktop-release",
+      "configurePreset": "macos-desktop-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-core-debug",
+      "configurePreset": "windows-core-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-core-release",
+      "configurePreset": "windows-core-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-desktop-debug",
+      "configurePreset": "windows-desktop-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-desktop-release",
+      "configurePreset": "windows-desktop-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}
