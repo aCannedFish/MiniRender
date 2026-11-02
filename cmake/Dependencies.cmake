@@ -20,3 +20,18 @@ if(BUILD_TESTING)
         list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
     endif()
 endif()
+
+find_package(nlohmann_json 3.12.0 EXACT CONFIG QUIET)
+if(NOT nlohmann_json_FOUND)
+    set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(nlohmann_json
+        URL https://github.com/nlohmann/json/archive/refs/tags/v3.12.0.tar.gz
+        URL_HASH SHA256=4b92eb0c06d10683f7447ce9406cb97cd4b453be18d7279320f7b2f025c10187)
+    FetchContent_MakeAvailable(nlohmann_json)
+endif()
+
+set(TINYOBJLOADER_BUILD_TEST_LOADER OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(tinyobjloader
+    URL https://github.com/tinyobjloader/tinyobjloader/archive/refs/tags/v2.0.0rc13.tar.gz
+    URL_HASH SHA256=0feb92b838f8ce4aa6eb0ccc32dff30cb64a891e0ec3bde837fca49c78d44334)
+FetchContent_MakeAvailable(tinyobjloader)
