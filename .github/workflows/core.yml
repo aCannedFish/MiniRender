@@ -1,0 +1,23 @@
+name: Core
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure without Qt or GPU SDKs
+        run: cmake -S . -B build/ci -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DMINIRENDER_BUILD_DESKTOP=OFF -DMINIRENDER_ENABLE_OPTIX=OFF
+      - name: Build
+        run: cmake --build build/ci --config Release --parallel 3
+      - name: Test
+        run: ctest --test-dir build/ci -C Release --output-on-failure
