@@ -732,3 +732,11 @@ void VulkanViewport::keyPressEvent(QKeyEvent* event) {
     set_camera(minirender::move_camera(camera_, move * speed));
     event->accept();
 }
+
+void VulkanViewport::set_shadows_enabled(bool enabled) {
+    shadows_enabled_ = enabled;
+    requestUpdate();
+}
+bool VulkanViewport::shadows_enabled() const noexcept {
+    return shadows_enabled_;
+}

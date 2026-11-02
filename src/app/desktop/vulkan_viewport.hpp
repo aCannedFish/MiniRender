@@ -25,6 +25,8 @@ class VulkanViewport final : public QWindow {
     std::uint64_t scene_revision() const noexcept;
     const minirender::Camera& camera() const noexcept;
     void set_camera(const minirender::Camera& camera);
+    void set_shadows_enabled(bool enabled);
+    bool shadows_enabled() const noexcept;
     void set_exposure(float value);
     float exposure() const noexcept;
     void set_view_mode(int mode);
@@ -76,6 +78,7 @@ class VulkanViewport final : public QWindow {
     std::shared_ptr<const minirender::SceneSnapshot> scene_;
     minirender::Camera camera_;
     std::uint64_t scene_revision_ = 0;
+    bool shadows_enabled_ = true;
     float exposure_ = 0.0F;
     int view_mode_ = 0;
     QPointF mouse_origin_;

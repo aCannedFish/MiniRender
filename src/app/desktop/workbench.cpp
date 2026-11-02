@@ -3,6 +3,7 @@
 #include <minirender/assets/scene_io.hpp>
 
 #include <QAction>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDockWidget>
 #include <QDoubleSpinBox>
@@ -357,6 +358,12 @@ void Workbench::build_camera_panel() {
     layout->addRow("垂直 FOV / °", fov_);
     layout->addRow("曝光 / EV", exposure);
     layout->addRow("显示", mode);
+    auto* shadows = new QCheckBox("启用方向光阴影");
+    shadows->setObjectName("shadows_enabled");
+    shadows->setChecked(true);
+    layout->addRow(shadows);
+    connect(shadows, &QCheckBox::toggled, this,
+            [this](bool enabled) { viewport_->set_shadows_enabled(enabled); });
     const auto update = [this] {
         if (refreshing_) {
             return;
