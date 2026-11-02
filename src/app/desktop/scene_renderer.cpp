@@ -1,4 +1,5 @@
 #include "scene_renderer.hpp"
+#include <minirender/scene/shadow.hpp>
 
 #include <QFile>
 
@@ -27,9 +28,12 @@ struct alignas(16) FrameUniform {
     std::array<GpuLight, 8> lights;
     glm::ivec4 counts;
     glm::vec4 display;
+    std::array<glm::mat4, 8> shadow_view_projection;
+    glm::vec4 shadow_settings;
 };
 static_assert(offsetof(FrameUniform, lights) == 96);
-static_assert(sizeof(FrameUniform) == 384);
+static_assert(offsetof(FrameUniform, shadow_view_projection) == 384);
+static_assert(sizeof(FrameUniform) == 912);
 
 // shader module 只需存活到 pipeline 创建完成；异常路径同样释放。
 class Shader {
@@ -73,23 +77,28 @@ void SceneRenderer::initResources() {
     device_ = window_->device();
     uniforms_.create(device_, window_->physicalDevice(), sizeof(FrameUniform),
                      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-    VkDescriptorSetLayoutBinding binding{};
+    shadow_map_.create(*window_);
+    std::array<VkDescriptorSetLayoutBinding, 2> bindings{};
+    auto& binding = bindings[0];
     binding.binding = 0;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     binding.descriptorCount = 1;
     binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     VkDescriptorSetLayoutCreateInfo layout{};
     layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layout.bindingCount = 1;
-    layout.pBindings = &binding;
+    bindings[1] = {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT,
+                   nullptr};
+    layout.bindingCount = static_cast<std::uint32_t>(bindings.size());
+    layout.pBindings = bindings.data();
     check_vk(vkCreateDescriptorSetLayout(device_, &layout, nullptr, &descriptor_layout_),
              "scene descriptor layout");
-    VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1};
+    const std::array<VkDescriptorPoolSize, 2> sizes{
+        {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}, {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1}}};
     VkDescriptorPoolCreateInfo pool{};
     pool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool.maxSets = 1;
-    pool.poolSizeCount = 1;
-    pool.pPoolSizes = &size;
+    pool.poolSizeCount = static_cast<std::uint32_t>(sizes.size());
+    pool.pPoolSizes = sizes.data();
     check_vk(vkCreateDescriptorPool(device_, &pool, nullptr, &descriptor_pool_),
              "scene descriptor pool");
     VkDescriptorSetAllocateInfo allocate{};
@@ -107,8 +116,17 @@ void SceneRenderer::initResources() {
     write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     write.pBufferInfo = &buffer;
     vkUpdateDescriptorSets(device_, 1, &write, 0, nullptr);
+    const auto shadow_descriptor = shadow_map_.descriptor();
+    write.dstBinding = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    write.pBufferInfo = nullptr;
+    write.pImageInfo = &shadow_descriptor;
+    vkUpdateDescriptorSets(device_, 1, &write, 0, nullptr);
+    const VkPushConstantRange push{VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(std::int32_t)};
     VkPipelineLayoutCreateInfo pipeline_layout{};
     pipeline_layout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipeline_layout.pushConstantRangeCount = 1;
+    pipeline_layout.pPushConstantRanges = &push;
     pipeline_layout.setLayoutCount = 1;
     pipeline_layout.pSetLayouts = &descriptor_layout_;
     check_vk(vkCreatePipelineLayout(device_, &pipeline_layout, nullptr, &pipeline_layout_),
@@ -116,8 +134,17 @@ void SceneRenderer::initResources() {
 }
 
 void SceneRenderer::initSwapChainResources() {
-    const Shader vertex(device_, ":/shaders/scene.vert.spv");
-    const Shader fragment(device_, ":/shaders/scene.frag.spv");
+    pipeline_ = create_pipeline(false);
+    shadow_pipeline_ = create_pipeline(true);
+    window_->report_swapchain();
+}
+
+VkPipeline SceneRenderer::create_pipeline(bool shadow) {
+    const Shader vertex(device_, shadow ? ":/shaders/shadow.vert.spv" : ":/shaders/scene.vert.spv");
+    std::unique_ptr<Shader> fragment;
+    if (!shadow) {
+        fragment = std::make_unique<Shader>(device_, ":/shaders/scene.frag.spv");
+    }
     std::array<VkPipelineShaderStageCreateInfo, 2> stages{};
     for (auto& stage : stages) {
         stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -126,7 +153,7 @@ void SceneRenderer::initSwapChainResources() {
     stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
     stages[0].module = vertex.handle();
     stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    stages[1].module = fragment.handle();
+    stages[1].module = fragment ? fragment->handle() : VK_NULL_HANDLE;
     const VkVertexInputBindingDescription binding{0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX};
     const std::array<VkVertexInputAttributeDescription, 5> attributes{
         {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, position)},
@@ -138,7 +165,8 @@ void SceneRenderer::initSwapChainResources() {
     vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertex_input.vertexBindingDescriptionCount = 1;
     vertex_input.pVertexBindingDescriptions = &binding;
-    vertex_input.vertexAttributeDescriptionCount = static_cast<std::uint32_t>(attributes.size());
+    vertex_input.vertexAttributeDescriptionCount =
+        shadow ? 1 : static_cast<std::uint32_t>(attributes.size());
     vertex_input.pVertexAttributeDescriptions = attributes.data();
     VkPipelineInputAssemblyStateCreateInfo assembly{};
     assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -152,6 +180,9 @@ void SceneRenderer::initSwapChainResources() {
     raster.polygonMode = VK_POLYGON_MODE_FILL;
     raster.cullMode = VK_CULL_MODE_NONE;
     raster.lineWidth = 1;
+    raster.depthBiasEnable = shadow;
+    raster.depthBiasConstantFactor = 1.25F;
+    raster.depthBiasSlopeFactor = 1.75F;
     VkPipelineMultisampleStateCreateInfo multisample{};
     multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -164,7 +195,7 @@ void SceneRenderer::initSwapChainResources() {
     attachment.colorWriteMask = 0xF;
     VkPipelineColorBlendStateCreateInfo blend{};
     blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    blend.attachmentCount = 1;
+    blend.attachmentCount = shadow ? 0 : 1;
     blend.pAttachments = &attachment;
     const std::array<VkDynamicState, 2> states{VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
     VkPipelineDynamicStateCreateInfo dynamic{};
@@ -173,7 +204,7 @@ void SceneRenderer::initSwapChainResources() {
     dynamic.pDynamicStates = states.data();
     VkGraphicsPipelineCreateInfo pipeline{};
     pipeline.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipeline.stageCount = static_cast<std::uint32_t>(stages.size());
+    pipeline.stageCount = shadow ? 1 : static_cast<std::uint32_t>(stages.size());
     pipeline.pStages = stages.data();
     pipeline.pVertexInputState = &vertex_input;
     pipeline.pInputAssemblyState = &assembly;
@@ -184,10 +215,11 @@ void SceneRenderer::initSwapChainResources() {
     pipeline.pColorBlendState = &blend;
     pipeline.pDynamicState = &dynamic;
     pipeline.layout = pipeline_layout_;
-    pipeline.renderPass = window_->defaultRenderPass();
-    check_vk(vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipeline, nullptr, &pipeline_),
+    pipeline.renderPass = shadow ? shadow_map_.render_pass() : window_->defaultRenderPass();
+    VkPipeline result = VK_NULL_HANDLE;
+    check_vk(vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipeline, nullptr, &result),
              "scene pipeline");
-    window_->report_swapchain();
+    return result;
 }
 
 void SceneRenderer::upload_scene() {
@@ -220,6 +252,10 @@ void SceneRenderer::upload_scene() {
                          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         vertices_.write(vertices.data(), vertices.size() * sizeof(Vertex));
     }
+    for (std::size_t index = 0; index < window_->scene()->directional_lights.size(); ++index) {
+        shadow_matrices_[index] = minirender::directional_shadow_matrix(
+            *window_->scene(), window_->scene()->directional_lights[index].direction);
+    }
     scene_revision_ = window_->scene_revision();
 }
 
@@ -242,7 +278,39 @@ void SceneRenderer::update_uniforms() {
     }
     frame.counts.x = static_cast<int>(lights.size());
     frame.display = {window_->exposure(), static_cast<float>(window_->view_mode()), 0, 0};
+    frame.shadow_view_projection = shadow_matrices_;
+    frame.shadow_settings = {window_->shadows_enabled() ? 1.0F : 0.0F, 1.0F / ShadowMap::resolution,
+                             0, 0};
     uniforms_.write(&frame, sizeof(frame));
+}
+
+void SceneRenderer::render_shadow_maps(VkCommandBuffer command) {
+    shadow_map_.prepare(command);
+    if (!window_->shadows_enabled()) {
+        return;
+    }
+    const VkViewport viewport{
+        0, 0, static_cast<float>(ShadowMap::resolution), static_cast<float>(ShadowMap::resolution),
+        0, 1};
+    const VkRect2D scissor{{0, 0}, {ShadowMap::resolution, ShadowMap::resolution}};
+    for (std::int32_t light = 0;
+         light < static_cast<std::int32_t>(window_->scene()->directional_lights.size()); ++light) {
+        shadow_map_.begin(command, static_cast<std::uint32_t>(light));
+        vkCmdSetViewport(command, 0, 1, &viewport);
+        vkCmdSetScissor(command, 0, 1, &scissor);
+        vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, shadow_pipeline_);
+        vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
+                                &descriptor_, 0, nullptr);
+        vkCmdPushConstants(command, pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(light),
+                           &light);
+        if (vertex_count_ != 0) {
+            const VkDeviceSize offset = 0;
+            const auto buffer = vertices_.handle();
+            vkCmdBindVertexBuffers(command, 0, 1, &buffer, &offset);
+            vkCmdDraw(command, vertex_count_, 1, 0, 0);
+        }
+        vkCmdEndRenderPass(command);
+    }
 }
 
 void SceneRenderer::startNextFrame() {
@@ -250,6 +318,7 @@ void SceneRenderer::startNextFrame() {
         upload_scene();
     }
     update_uniforms();
+    render_shadow_maps(window_->currentCommandBuffer());
     const auto size = window_->swapChainImageSize();
     const VkExtent2D extent{static_cast<std::uint32_t>(size.width()),
                             static_cast<std::uint32_t>(size.height())};
@@ -288,14 +357,17 @@ void SceneRenderer::startNextFrame() {
 void SceneRenderer::releaseSwapChainResources() {
     if (device_ != VK_NULL_HANDLE) {
         vkDestroyPipeline(device_, pipeline_, nullptr);
+        vkDestroyPipeline(device_, shadow_pipeline_, nullptr);
     }
     pipeline_ = VK_NULL_HANDLE;
+    shadow_pipeline_ = VK_NULL_HANDLE;
 }
 
 void SceneRenderer::releaseResources() {
     releaseSwapChainResources();
     vertices_.release();
     uniforms_.release();
+    shadow_map_.release();
     if (device_ == VK_NULL_HANDLE) {
         return;
     }

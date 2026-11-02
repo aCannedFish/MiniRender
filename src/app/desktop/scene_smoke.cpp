@@ -1,8 +1,10 @@
 #include "scene_smoke.hpp"
 #include "workbench.hpp"
+#include <minirender/scene/editor.hpp>
 
 #include <QAction>
 #include <QApplication>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDebug>
 #include <QDir>
@@ -42,6 +44,75 @@ int changed_pixels(const QImage& a, const QImage& b) {
     return changed;
 }
 
+// 多光源时隔离第二盏灯，用 CPU 几何阴影射线核对可见地面上的 GPU 遮挡。
+// 丢弃边界附近样本，避免把 PCF 的部分覆盖与二值求交混为一谈。
+void verify_second_light_shadows(Workbench& window, const QImage& on, const QImage& off) {
+    const auto& scene = *window.viewport()->scene();
+    if (scene.directional_lights.size() < 2) {
+        return;
+    }
+    const auto& camera = window.viewport()->camera();
+    const auto matrix =
+        camera.projection_matrix(static_cast<float>(on.width()) / static_cast<float>(on.height())) *
+        camera.view_matrix();
+    const auto to_light = -glm::normalize(scene.directional_lights[1].direction);
+    int blocked = 0;
+    int blocked_matches = 0;
+    int lit = 0;
+    int lit_matches = 0;
+    for (int iz = -25; iz <= 25; ++iz) {
+        for (int ix = -25; ix <= 25; ++ix) {
+            const glm::vec3 point{static_cast<float>(ix) * 0.1F, 0, static_cast<float>(iz) * 0.1F};
+            const auto clip = matrix * glm::vec4(point, 1);
+            if (clip.w <= 0) {
+                continue;
+            }
+            const glm::vec2 uv = glm::vec2(clip) / clip.w * 0.5F + 0.5F;
+            if (uv.x <= 0.01F || uv.y <= 0.01F || uv.x >= 0.99F || uv.y >= 0.99F) {
+                continue;
+            }
+            if (minirender::pick_object(
+                    scene, camera.generate_ray(uv, static_cast<float>(on.width()) /
+                                                       static_cast<float>(on.height()))) !=
+                "ground") {
+                continue;
+            }
+            const auto occluded = [&](glm::vec3 offset) {
+                return minirender::pick_object(scene,
+                                               {point + offset + glm::vec3(0, 0.002F, 0), to_light})
+                    .has_value();
+            };
+            const bool expected = occluded(glm::vec3(0));
+            bool stable = true;
+            for (auto offset : {glm::vec3(0.03F, 0, 0), glm::vec3(-0.03F, 0, 0),
+                                glm::vec3(0, 0, 0.03F), glm::vec3(0, 0, -0.03F)}) {
+                stable = stable && occluded(offset) == expected;
+            }
+            if (!stable) {
+                continue;
+            }
+            const int x = static_cast<int>(uv.x * static_cast<float>(on.width()));
+            const int y = static_cast<int>(uv.y * static_cast<float>(on.height()));
+            const auto a = on.pixelColor(x, y);
+            const auto b = off.pixelColor(x, y);
+            const bool darker =
+                b.red() + b.green() + b.blue() > a.red() + a.green() + a.blue() + 15;
+            if (expected) {
+                ++blocked;
+                blocked_matches += darker;
+            } else {
+                ++lit;
+                lit_matches += !darker;
+            }
+        }
+    }
+    qInfo() << "Second-light geometry checks:" << blocked_matches << "/" << blocked << "blocked;"
+            << lit_matches << "/" << lit << "lit";
+    require(blocked >= 3 && lit >= 50, "Insufficient visible ground samples for shadow oracle");
+    require(blocked_matches * 100 >= blocked * 90 && lit_matches * 100 >= lit * 98,
+            "Second-light GPU shadows disagree with geometry rays");
+}
+
 struct SmokeState {
     int stage = 0;
     int ticks = 0;
@@ -49,6 +120,7 @@ struct SmokeState {
     float camera_distance = 0;
     QImage baseline;
     QImage edited;
+    QImage shadowed;
     minirender::Camera before_navigation;
 };
 
@@ -157,6 +229,33 @@ void start_scene_smoke(Workbench& window, const QString& directory) {
                 break;
             }
             case 8:
+                if (window.document().directional_lights.size() > 1) {
+                    auto* intensity = window.findChild<QDoubleSpinBox*>("light_intensity");
+                    intensity->setValue(0);
+                    QMetaObject::invokeMethod(intensity, "editingFinished", Qt::DirectConnection);
+                }
+                state->shadowed = capture("shadow-on");
+                window.findChild<QCheckBox*>("shadows_enabled")->setChecked(false);
+                break;
+            case 9: {
+                const auto unshadowed = capture("shadow-off");
+                require(unshadowed.size() == state->shadowed.size(), "Shadow compare sizes differ");
+                int darker = 0;
+                for (int y = 0; y < unshadowed.height(); ++y) {
+                    for (int x = 0; x < unshadowed.width(); ++x) {
+                        const auto a = state->shadowed.pixelColor(x, y);
+                        const auto b = unshadowed.pixelColor(x, y);
+                        darker +=
+                            b.red() + b.green() + b.blue() > a.red() + a.green() + a.blue() + 15;
+                    }
+                }
+                verify_second_light_shadows(window, state->shadowed, unshadowed);
+                qInfo() << "Shadow darkened pixels:" << darker;
+                require(darker > 200, "Shadow pass did not produce an occluded region");
+                window.findChild<QCheckBox*>("shadows_enabled")->setChecked(true);
+                break;
+            }
+            case 10:
                 capture("final");
                 timer->stop();
                 qInfo() << "Scene smoke PASS: material, transform, undo/redo, save/load, normals, "

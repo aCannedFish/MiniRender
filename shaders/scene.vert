@@ -1,4 +1,6 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
+#include "scene_frame.glsl"
 
 layout(location = 0) in vec3 in_position;
 layout(location = 1) in vec3 in_normal;
@@ -6,15 +8,7 @@ layout(location = 2) in vec3 in_color;
 layout(location = 3) in vec3 in_emission;
 layout(location = 4) in vec2 in_material;
 
-struct DirectionalLight { vec4 direction; vec4 radiance; };
-layout(binding = 0, std140) uniform Frame {
-    mat4 view_projection;
-    vec4 camera_position;
-    vec4 environment;
-    DirectionalLight lights[8];
-    ivec4 counts;
-    vec4 display;
-} frame;
+
 layout(location = 0) out vec3 world_position;
 layout(location = 1) out vec3 world_normal;
 layout(location = 2) out vec3 base_color;

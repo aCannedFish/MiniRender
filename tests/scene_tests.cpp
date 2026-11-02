@@ -1,5 +1,6 @@
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/scene/editor.hpp>
+#include <minirender/scene/shadow.hpp>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -206,4 +207,27 @@ TEST_CASE("World space picking selects the closest transformed object", "[pickin
     const Ray ray{{-0.65F, 0.5F, 4.0F}, {0, 0, -1}};
     REQUIRE(pick_object(*snapshot, ray) == "blue_cube");
     REQUIRE_FALSE(pick_object(*snapshot, {{0, 5, 0}, {0, 1, 0}}).has_value());
+}
+
+TEST_CASE("Directional shadow projection encloses visible geometry in Vulkan depth range",
+          "[shadow]") {
+    const auto snapshot = make_snapshot(load_scene(studio_file()));
+    for (auto direction : {glm::vec3(-1, -2, -1), glm::vec3(0, -1, 0), glm::vec3(1, 0, 0)}) {
+        const auto matrix = directional_shadow_matrix(*snapshot, direction);
+        for (const auto& instance : snapshot->instances) {
+            for (const auto position : instance.mesh->positions) {
+                const auto clip = matrix * instance.object_to_world * glm::vec4(position, 1);
+                const auto point = glm::vec3(clip) / clip.w;
+                REQUIRE(std::abs(point.x) <= 1.0F);
+                REQUIRE(std::abs(point.y) <= 1.0F);
+                REQUIRE(point.z >= 0.0F);
+                REQUIRE(point.z <= 1.0F);
+            }
+        }
+    }
+    auto moved_camera = *snapshot;
+    moved_camera.camera.position += glm::vec3(10, 0, 0);
+    REQUIRE(directional_shadow_matrix(moved_camera, {-1, -2, -1}) ==
+            directional_shadow_matrix(*snapshot, {-1, -2, -1}));
+    REQUIRE_THROWS_AS(directional_shadow_matrix(*snapshot, glm::vec3(0)), std::invalid_argument);
 }
