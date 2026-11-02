@@ -6,6 +6,7 @@
 """
 
 import argparse
+import plistlib
 from pathlib import Path
 import subprocess
 import sys
@@ -17,13 +18,24 @@ def main() -> int:
     parser.add_argument("executable", type=Path)
     parser.add_argument("--output", type=Path, default=Path("outputs/a0"))
     parser.add_argument("--timeout", type=float, default=35)
+    parser.add_argument("--scene", type=Path, help="Run scene editor checks instead of A0 diagnostics")
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
+    executable = args.executable.resolve()
+    if executable.is_dir() and executable.suffix == ".app":
+        with (executable / "Contents/Info.plist").open("rb") as file:
+            name = plistlib.load(file)["CFBundleExecutable"]
+        executable = executable / "Contents/MacOS" / name
+    arguments = [str(executable)]
+    if args.scene:
+        arguments += ["--scene", str(args.scene.resolve()), "--scene-smoke", str(output)]
+    else:
+        arguments += ["--smoke", str(output / "gpu-smoke.png")]
     with (output / "gpu-smoke.log").open("w", encoding="utf-8") as log:
         try:
             result = subprocess.run(
-                [str(args.executable.resolve()), "--smoke", str(output / "gpu-smoke.png")],
+                arguments,
                 stdout=log,
                 stderr=subprocess.STDOUT,
                 timeout=args.timeout,
@@ -35,9 +47,8 @@ def main() -> int:
             code = 124
     text = (output / "gpu-smoke.log").read_text(encoding="utf-8")
     print(text, end="")
-    if code == 0 and (
-        "GPU smoke PASS" not in text or "Vulkan validation errors: 0" not in text
-    ):
+    marker = "Scene smoke PASS" if args.scene else "GPU smoke PASS"
+    if code == 0 and (marker not in text or "Vulkan validation errors: 0" not in text):
         print("Missing verification evidence.", file=sys.stderr)
         return 1
     return code

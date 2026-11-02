@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 
 #include <fstream>
+#include <iterator>
 #include <stdexcept>
 
 namespace minirender {
@@ -29,6 +30,40 @@ std::filesystem::path path_from_utf8(const std::string& text) {
 std::string path_to_utf8(const std::filesystem::path& path) {
     const auto text = path.generic_u8string();
     return std::string(text.begin(), text.end());
+}
+
+// Windows 跨盘符无法生成相对路径。此时复制资产到新场景旁，仍保持场景可移动。
+// 不覆盖已有不同内容的文件；同内容复用，冲突时选择新的编号。
+std::filesystem::path portable_asset_path(const std::filesystem::path& source,
+                                          const std::filesystem::path& destination) {
+    const auto relative = std::filesystem::relative(source, destination);
+    if (!relative.empty()) {
+        return relative;
+    }
+    const auto assets = destination / "assets";
+    std::filesystem::create_directories(assets);
+    std::ifstream input(source, std::ios::binary);
+    if (!input) {
+        throw std::runtime_error("Cannot copy scene asset: " + path_to_utf8(source));
+    }
+    const std::string original((std::istreambuf_iterator<char>(input)), {});
+    for (unsigned index = 1;; ++index) {
+        const auto name = "mesh-" + std::to_string(index) + ".obj";
+        const auto candidate = assets / name;
+        if (std::filesystem::exists(candidate)) {
+            std::ifstream existing(candidate, std::ios::binary);
+            if (!existing) {
+                continue;
+            }
+            const std::string content((std::istreambuf_iterator<char>(existing)), {});
+            if (content != original) {
+                continue;
+            }
+        } else {
+            std::filesystem::copy_file(source, candidate);
+        }
+        return std::filesystem::path("assets") / name;
+    }
 }
 
 } // namespace
@@ -127,8 +162,8 @@ void save_scene(const SceneDocument& document, const std::filesystem::path& path
         if (mesh.source.empty()) {
             throw std::invalid_argument("Mesh must be exported before saving scene: " + mesh.id);
         }
-        const auto relative = std::filesystem::relative(document.asset_directory / mesh.source,
-                                                        destination_directory);
+        const auto relative =
+            portable_asset_path(document.asset_directory / mesh.source, destination_directory);
         json["meshes"].push_back({{"id", mesh.id}, {"source", path_to_utf8(relative)}});
     }
     for (const auto& object : document.objects) {

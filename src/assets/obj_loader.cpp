@@ -12,7 +12,8 @@ namespace minirender {
 MeshData load_obj(const std::filesystem::path& path) {
     std::ifstream stream(path, std::ios::binary);
     if (!stream) {
-        throw std::runtime_error("Cannot open OBJ: " + path.generic_string());
+        const auto utf8 = path.generic_u8string();
+        throw std::runtime_error("Cannot open OBJ: " + std::string(utf8.begin(), utf8.end()));
     }
     const std::string text((std::istreambuf_iterator<char>(stream)), {});
     tinyobj::ObjReaderConfig config;

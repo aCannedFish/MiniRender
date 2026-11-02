@@ -1,14 +1,16 @@
 #pragma once
 
+#include <minirender/scene/scene.hpp>
 #include <vulkan/vulkan.h>
 
 #include <QImage>
 #include <QWindow>
 
+#include <functional>
 #include <memory>
 #include <vector>
 
-class DiagnosticRenderer;
+class ViewportRenderer;
 
 // Qt 提供窗口与平台 surface，本类独占 Vulkan device、交换链和帧同步。
 // 首版仅允许一帧在 GPU 执行；呈现完成信号量按交换链图像分配，不能按 CPU 帧号复用。
@@ -17,6 +19,18 @@ class VulkanViewport final : public QWindow {
   public:
     VulkanViewport();
     ~VulkanViewport() override;
+
+    void set_scene(std::shared_ptr<const minirender::SceneSnapshot> scene);
+    const std::shared_ptr<const minirender::SceneSnapshot>& scene() const noexcept;
+    std::uint64_t scene_revision() const noexcept;
+    const minirender::Camera& camera() const noexcept;
+    void set_camera(const minirender::Camera& camera);
+    void set_exposure(float value);
+    float exposure() const noexcept;
+    void set_view_mode(int mode);
+    int view_mode() const noexcept;
+    std::function<void(const minirender::Camera&)> on_camera_changed;
+    std::function<void(const std::string&)> on_object_picked;
 
     bool isValid() const noexcept;
     VkDevice device() const noexcept;
@@ -42,6 +56,11 @@ class VulkanViewport final : public QWindow {
     bool event(QEvent* event) override;
     void exposeEvent(QExposeEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
+    void wheelEvent(QWheelEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
 
   private:
     void initialize();
@@ -53,7 +72,15 @@ class VulkanViewport final : public QWindow {
     void finish_readback();
     std::uint32_t memory_type(std::uint32_t bits, VkMemoryPropertyFlags flags) const;
 
-    std::unique_ptr<DiagnosticRenderer> renderer_;
+    std::unique_ptr<ViewportRenderer> renderer_;
+    std::shared_ptr<const minirender::SceneSnapshot> scene_;
+    minirender::Camera camera_;
+    std::uint64_t scene_revision_ = 0;
+    float exposure_ = 0.0F;
+    int view_mode_ = 0;
+    QPointF mouse_origin_;
+    QPointF last_mouse_;
+    bool dragged_ = false;
     VkPhysicalDevice physical_ = VK_NULL_HANDLE;
     VkPhysicalDeviceProperties properties_{};
     VkDevice device_ = VK_NULL_HANDLE;

@@ -1,13 +1,19 @@
 #include "vulkan_viewport.hpp"
 #include "diagnostic_renderer.hpp"
+#include "scene_renderer.hpp"
+#include <minirender/scene/editor.hpp>
 
 #include <QDebug>
+#include <QKeyEvent>
+#include <QMouseEvent>
 #include <QPlatformSurfaceEvent>
 #include <QTimer>
 #include <QVulkanInstance>
+#include <QWheelEvent>
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -109,7 +115,11 @@ void VulkanViewport::initialize() {
     VkSemaphoreCreateInfo semaphore{};
     semaphore.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     check(vkCreateSemaphore(device_, &semaphore, nullptr, &acquired_), "create acquire semaphore");
-    renderer_ = std::make_unique<DiagnosticRenderer>(this);
+    if (scene_) {
+        renderer_ = std::make_unique<SceneRenderer>(this);
+    } else {
+        renderer_ = std::make_unique<DiagnosticRenderer>(this);
+    }
     renderer_->initResources();
 }
 
@@ -591,4 +601,134 @@ void VulkanViewport::report_failure(const QString& error) {
 }
 QString VulkanViewport::failure() const {
     return failure_;
+}
+
+void VulkanViewport::set_scene(std::shared_ptr<const minirender::SceneSnapshot> scene) {
+    if (scene && scene->directional_lights.size() > 8) {
+        throw std::invalid_argument("Realtime preview supports at most 8 directional lights");
+    }
+    if (static_cast<bool>(scene_) != static_cast<bool>(scene) && device_ != VK_NULL_HANDLE) {
+        release();
+    }
+    scene_ = std::move(scene);
+    if (scene_) {
+        camera_ = scene_->camera;
+    }
+    ++scene_revision_;
+    requestUpdate();
+}
+const std::shared_ptr<const minirender::SceneSnapshot>& VulkanViewport::scene() const noexcept {
+    return scene_;
+}
+std::uint64_t VulkanViewport::scene_revision() const noexcept {
+    return scene_revision_;
+}
+const minirender::Camera& VulkanViewport::camera() const noexcept {
+    return camera_;
+}
+void VulkanViewport::set_camera(const minirender::Camera& camera) {
+    camera.validate();
+    camera_ = camera;
+    if (on_camera_changed) {
+        on_camera_changed(camera_);
+    }
+    requestUpdate();
+}
+void VulkanViewport::set_exposure(float value) {
+    exposure_ = value;
+    requestUpdate();
+}
+float VulkanViewport::exposure() const noexcept {
+    return exposure_;
+}
+void VulkanViewport::set_view_mode(int mode) {
+    view_mode_ = mode;
+    requestUpdate();
+}
+int VulkanViewport::view_mode() const noexcept {
+    return view_mode_;
+}
+
+void VulkanViewport::mousePressEvent(QMouseEvent* event) {
+    requestActivate();
+    mouse_origin_ = last_mouse_ = event->position();
+    dragged_ = false;
+    event->accept();
+}
+void VulkanViewport::mouseMoveEvent(QMouseEvent* event) {
+    if (!scene_) {
+        return;
+    }
+    const auto delta = event->position() - last_mouse_;
+    last_mouse_ = event->position();
+    if ((event->position() - mouse_origin_).manhattanLength() > 3.0) {
+        dragged_ = true;
+    }
+    const float dx = static_cast<float>(delta.x());
+    const float dy = static_cast<float>(delta.y());
+    const float distance = glm::length(camera_.target - camera_.position);
+    if (event->buttons().testFlag(Qt::MiddleButton) ||
+        (event->buttons().testFlag(Qt::LeftButton) &&
+         event->modifiers().testFlag(Qt::ShiftModifier))) {
+        set_camera(
+            minirender::pan_camera(camera_, {-dx * distance * 0.002F, dy * distance * 0.002F}));
+    } else if (event->buttons().testFlag(Qt::RightButton)) {
+        set_camera(minirender::rotate_camera(camera_, -dx * 0.005F, -dy * 0.005F, false));
+    } else if (event->buttons().testFlag(Qt::LeftButton) && dragged_) {
+        set_camera(minirender::rotate_camera(camera_, -dx * 0.005F, dy * 0.005F, true));
+    }
+    event->accept();
+}
+void VulkanViewport::mouseReleaseEvent(QMouseEvent* event) {
+    if (scene_ && event->button() == Qt::LeftButton && !dragged_ && width() > 0 && height() > 0) {
+        const glm::vec2 uv{static_cast<float>(event->position().x()) / static_cast<float>(width()),
+                           static_cast<float>(event->position().y()) /
+                               static_cast<float>(height())};
+        const auto selected = minirender::pick_object(
+            *scene_,
+            camera_.generate_ray(uv, static_cast<float>(width()) / static_cast<float>(height())));
+        if (on_object_picked) {
+            on_object_picked(selected.value_or(""));
+        }
+    }
+    event->accept();
+}
+void VulkanViewport::wheelEvent(QWheelEvent* event) {
+    if (scene_) {
+        set_camera(minirender::dolly_camera(
+            camera_, std::exp(-static_cast<float>(event->angleDelta().y()) / 1200.0F)));
+    }
+    event->accept();
+}
+void VulkanViewport::keyPressEvent(QKeyEvent* event) {
+    if (!scene_) {
+        return;
+    }
+    glm::vec3 move(0);
+    switch (event->key()) {
+    case Qt::Key_W:
+        move.z = 1;
+        break;
+    case Qt::Key_S:
+        move.z = -1;
+        break;
+    case Qt::Key_A:
+        move.x = -1;
+        break;
+    case Qt::Key_D:
+        move.x = 1;
+        break;
+    case Qt::Key_Q:
+        move.y = -1;
+        break;
+    case Qt::Key_E:
+        move.y = 1;
+        break;
+    default:
+        QWindow::keyPressEvent(event);
+        return;
+    }
+    const float speed = event->modifiers().testFlag(Qt::ShiftModifier) ? 0.3F : 0.1F;
+    set_camera(minirender::move_camera(camera_, move * speed));
+    event->accept();
 }

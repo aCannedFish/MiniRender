@@ -1,0 +1,70 @@
+#pragma once
+
+#include "vulkan_viewport.hpp"
+
+#include <QMainWindow>
+#include <minirender/scene/editor.hpp>
+
+class QTreeWidget;
+class QLineEdit;
+class QDoubleSpinBox;
+class QComboBox;
+class VectorField;
+
+// 桌面编辑控制器：控件编辑委托给 SceneEditor，渲染器只收到不可变快照。
+// file/undo/selection 都通过这里协调，不在 Vulkan 命令录制代码中读取控件。
+class Workbench final : public QMainWindow {
+  public:
+    explicit Workbench(QVulkanInstance* instance, bool diagnostic = false);
+    VulkanViewport* viewport() const noexcept;
+    const minirender::SceneDocument& document() const noexcept;
+    void load_scene_file(const QString& path);
+    void save_scene_file(const QString& path);
+    void select_object(const std::string& id);
+
+  private:
+    void build_object_panel();
+    void build_light_panel();
+    void build_camera_panel();
+    void refresh();
+    void refresh_properties();
+    void refresh_camera();
+    void perform_edit(const std::function<void(minirender::SceneDocument&)>& edit);
+    void edit_object_property(const std::function<void(minirender::SceneObject&)>& edit);
+    void edit_material_property(const std::function<void(minirender::Material&)>& edit);
+    void duplicate_object();
+    void delete_object();
+    void import_object();
+    void report_error(const std::exception& error);
+    minirender::SceneObject* selected(minirender::SceneDocument& scene) const;
+
+    VulkanViewport* viewport_ = nullptr;
+    minirender::SceneEditor editor_{minirender::SceneDocument{}};
+    QTreeWidget* tree_ = nullptr;
+    QTreeWidget* assets_ = nullptr;
+    QWidget* object_panel_ = nullptr;
+    QWidget* light_panel_ = nullptr;
+    QWidget* camera_panel_ = nullptr;
+    QLineEdit* object_name_ = nullptr;
+    VectorField* translation_ = nullptr;
+    VectorField* rotation_ = nullptr;
+    VectorField* scale_ = nullptr;
+    VectorField* base_color_ = nullptr;
+    VectorField* emission_ = nullptr;
+    QComboBox* material_kind_ = nullptr;
+    QDoubleSpinBox* roughness_ = nullptr;
+    QDoubleSpinBox* ior_ = nullptr;
+    QComboBox* light_selector_ = nullptr;
+    VectorField* light_direction_ = nullptr;
+    VectorField* light_color_ = nullptr;
+    QDoubleSpinBox* light_intensity_ = nullptr;
+    VectorField* camera_position_ = nullptr;
+    VectorField* camera_target_ = nullptr;
+    QDoubleSpinBox* fov_ = nullptr;
+    QAction* undo_ = nullptr;
+    QAction* redo_ = nullptr;
+    std::string selected_id_;
+    QString scene_path_;
+    bool refreshing_ = false;
+    bool diagnostic_ = false;
+};

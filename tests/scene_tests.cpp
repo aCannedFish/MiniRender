@@ -1,4 +1,5 @@
 #include <minirender/assets/scene_io.hpp>
+#include <minirender/scene/editor.hpp>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -133,6 +134,11 @@ TEST_CASE("Scene Save As preserves Unicode paths and model references", "[scene]
     REQUIRE(reloaded.objects.front().transform.rotation_degrees.y == Approx(23));
     REQUIRE(reloaded.meshes.front().source == model.filename());
     REQUIRE(reloaded.meshes.front().data->triangles.size() == 12);
+    REQUIRE(reloaded.meshes.back().data->triangles.size() == 2);
+    for (const auto& asset : reloaded.meshes) {
+        REQUIRE_FALSE(asset.source.empty());
+        REQUIRE(asset.source.is_relative());
+    }
     REQUIRE(reloaded.camera.vertical_fov_degrees == Approx(scene.camera.vertical_fov_degrees));
 }
 
@@ -159,4 +165,45 @@ TEST_CASE("Scene loader rejects unsupported format versions", "[scene][io]") {
     REQUIRE_THROWS_WITH(load_scene(temp.path / "future.json"),
                         "Scene " + (temp.path / "future.json").generic_string() +
                             ": Unsupported scene version");
+}
+
+TEST_CASE("Scene editor commits valid transactions and keeps invalid edits out of history",
+          "[editor]") {
+    SceneEditor editor(load_scene(studio_file()));
+    const auto original = editor.document().objects.front().transform.translation;
+    REQUIRE_THROWS(editor.edit([](auto& scene) { scene.objects.front().transform.scale.x = 0; }));
+    REQUIRE_FALSE(editor.can_undo());
+    editor.edit([](auto& scene) { scene.objects.front().transform.translation.x = 2; });
+    REQUIRE(editor.document().objects.front().transform.translation.x == 2);
+    REQUIRE(editor.undo());
+    REQUIRE(editor.document().objects.front().transform.translation == original);
+    REQUIRE(editor.redo());
+    REQUIRE(editor.document().objects.front().transform.translation.x == 2);
+    editor.undo();
+    editor.edit([](auto& scene) { scene.objects.front().name = "changed"; });
+    REQUIRE_FALSE(editor.can_redo());
+}
+
+TEST_CASE("Camera navigation preserves orbit target and produces finite views", "[camera]") {
+    Camera camera;
+    const auto orbit = rotate_camera(camera, 0.4F, 0.3F, true);
+    REQUIRE(orbit.target == camera.target);
+    REQUIRE(glm::length(orbit.position - orbit.target) ==
+            Approx(glm::length(camera.position - camera.target)));
+    const auto look = rotate_camera(camera, -0.2F, 1.5F, false);
+    REQUIRE(look.position == camera.position);
+    REQUIRE_NOTHROW(look.validate());
+    const auto dolly = dolly_camera(camera, 0.5F);
+    REQUIRE(glm::length(dolly.position - dolly.target) ==
+            Approx(glm::length(camera.position - camera.target) * 0.5F));
+    const auto moved = move_camera(camera, {1, 2, 3});
+    REQUIRE(glm::length((moved.target - moved.position) - (camera.target - camera.position)) <
+            1e-5F);
+}
+
+TEST_CASE("World space picking selects the closest transformed object", "[picking]") {
+    const auto snapshot = make_snapshot(load_scene(studio_file()));
+    const Ray ray{{-0.65F, 0.5F, 4.0F}, {0, 0, -1}};
+    REQUIRE(pick_object(*snapshot, ray) == "blue_cube");
+    REQUIRE_FALSE(pick_object(*snapshot, {{0, 5, 0}, {0, 1, 0}}).has_value());
 }
