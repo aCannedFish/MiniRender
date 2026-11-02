@@ -10,7 +10,7 @@ A0 使用 Apple M3 / macOS，Apple Clang 21.0.0、CMake 4.1.1、Ninja 1.12.1、Q
 brew install cmake ninja qt glslang molten-vk vulkan-loader vulkan-headers vulkan-validationlayers vulkan-tools
 ```
 
-GLM 1.0.3、Catch2 3.16.1 优先使用本机同版本包。缺失时 CMake 下载固定归档并验证 SHA256，定义见 `cmake/Dependencies.cmake`。CPU-only 配置不发现 Qt、Vulkan、CUDA 或 OptiX。
+GLM 1.0.3、Catch2 3.16.1、nlohmann/json 3.12.0 优先使用本机同版本包。缺失时 CMake 下载固定归档并验证 SHA256，定义见 `cmake/Dependencies.cmake`。tinyobjloader 2.0.0rc13 同样通过固定归档与 SHA256 下载。CPU-only 配置不发现 Qt、Vulkan、CUDA 或 OptiX。
 
 先执行 `vulkaninfo --summary`，确认真实 Apple GPU 与 `VK_LAYER_KHRONOS_validation`。如果受运行环境限制而无法访问 Metal，必须在允许访问 GPU 的本机进程中测试，不能用软件/模拟 ICD 代替。
 

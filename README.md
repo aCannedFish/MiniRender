@@ -12,3 +12,5 @@ A0 工程基础已在本机通过验收：CPU 图像模块、CLI、Qt/Vulkan 纹
 main 保存基线，后续开发通过功能分支和 PR 管理。构建和测试见 [构建说明](docs/BUILD.md)，代码阅读见 [基础实现](docs/FOUNDATION.md)。每完成一个 CKPT 即提交并 push，计划中的功能不代表已通过验收。
 
 VS Code 工作区配置见 [编辑器说明](docs/VSCODE.md)。请使用 desktop preset 生成包含 Qt/Vulkan 的编译参数。
+
+A1.1 场景数据层已通过本机测试，支持 OBJ、JSON 场景、相机/变换和只读快照。见 [场景说明](docs/SCENE.md) 与 [A1.1 验收](docs/checkpoints/A1.1.md)。A1 的场景预览与编辑界面仍在实现中。
