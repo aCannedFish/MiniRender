@@ -133,6 +133,11 @@ TEST_CASE("Scene Save As preserves Unicode paths and model references", "[scene]
     REQUIRE(reloaded.objects.front().transform.rotation_degrees.y == Approx(23));
     REQUIRE(reloaded.meshes.front().source == model.filename());
     REQUIRE(reloaded.meshes.front().data->triangles.size() == 12);
+    REQUIRE(reloaded.meshes.back().data->triangles.size() == 2);
+    for (const auto& asset : reloaded.meshes) {
+        REQUIRE_FALSE(asset.source.empty());
+        REQUIRE(asset.source.is_relative());
+    }
     REQUIRE(reloaded.camera.vertical_fov_degrees == Approx(scene.camera.vertical_fov_degrees));
 }
 
