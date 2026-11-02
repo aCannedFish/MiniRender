@@ -55,3 +55,25 @@ TEST_CASE("PPM writes sRGB bytes and supports Unicode filesystem paths", "[image
     REQUIRE(static_cast<unsigned char>(bytes[12]) == 118);
     REQUIRE(static_cast<unsigned char>(bytes[13]) == 255);
 }
+
+TEST_CASE("Float EXR round trip preserves HDR, negative values and Unicode filenames",
+          "[image][exr]") {
+    const auto path = std::filesystem::temp_directory_path() /
+                      std::filesystem::path(std::u8string(u8"minirender_HDR 图像.exr"));
+    Image source(3, 2);
+    source.at(0, 0) = {8.0F, 2.0F, 0.5F};
+    source.at(1, 0) = {-0.25F, 1000.0F, 0.001F};
+    source.at(2, 1) = {0.1F, 0.2F, 0.3F};
+    source.write_exr(path);
+    const auto decoded = Image::read_exr(path);
+    std::filesystem::remove(path);
+    REQUIRE(decoded.width() == source.width());
+    REQUIRE(decoded.height() == source.height());
+    for (std::size_t y = 0; y < source.height(); ++y) {
+        for (std::size_t x = 0; x < source.width(); ++x) {
+            REQUIRE(decoded.at(x, y) == source.at(x, y));
+        }
+    }
+    source.at(0, 0).r = std::numeric_limits<float>::quiet_NaN();
+    REQUIRE_THROWS_AS(source.write_exr(path), std::invalid_argument);
+}

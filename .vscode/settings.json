@@ -12,7 +12,8 @@
     "*.hpp": "cpp",
     "*.vert": "glsl",
     "*.frag": "glsl",
-    "*.comp": "glsl"
+    "*.comp": "glsl",
+    "*.glsl": "glsl"
   },
   "files.exclude": {
     "**/.DS_Store": true

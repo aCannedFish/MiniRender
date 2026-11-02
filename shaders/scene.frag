@@ -9,6 +9,7 @@ layout(location = 2) in vec3 base_color;
 layout(location = 3) in vec3 emission;
 layout(location = 4) in vec2 material;
 layout(location = 0) out vec4 color;
+layout(location = 1) out vec4 normal_output;
 layout(binding = 1) uniform sampler2DArray shadow_map;
 const float PI = 3.141592653589793;
 
@@ -48,10 +49,7 @@ void main() {
     vec3 n = normalize(world_normal);
     vec3 v = normalize(frame.camera_position.xyz - world_position);
     if (dot(n, v) < 0.0) { n = -n; }
-    if (frame.display.y > 0.5) {
-        color = vec4(n * 0.5 + 0.5, 1.0);
-        return;
-    }
+    normal_output = vec4(n, 1.0);
     float roughness = max(material.x, 0.045);
     float metallic = material.y;
     float alpha = roughness * roughness;
@@ -72,7 +70,5 @@ void main() {
         vec3 diffuse = (vec3(1.0) - f) * (1.0 - metallic) * base_color / PI;
         result += (diffuse + specular) * frame.lights[i].radiance.rgb * ndl * visibility(i, ndl);
     }
-    // 临时显示变换；A1.3 会移到独立的 HDR 后处理 pass。
-    result *= exp2(frame.display.x);
-    color = vec4(result / (vec3(1.0) + result), 1.0);
+    color = vec4(result, 1.0);
 }

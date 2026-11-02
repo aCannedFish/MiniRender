@@ -173,6 +173,19 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
         }
     });
 
+    auto* hdr_export = toolbar->addAction("导出 EXR");
+    hdr_export->setObjectName("export_hdr");
+    connect(hdr_export, &QAction::triggered, this, [this] {
+        const auto path = QFileDialog::getSaveFileName(this, "导出线性 HDR", {}, "OpenEXR (*.exr)");
+        if (!path.isEmpty()) {
+            try {
+                viewport_->grab_hdr().write_exr(native_path(path));
+            } catch (const std::exception& error) {
+                report_error(error);
+            }
+        }
+    });
+
     tree_ = new QTreeWidget;
     tree_->setObjectName("scene_tree");
     tree_->setHeaderLabel("物体");
@@ -352,12 +365,18 @@ void Workbench::build_camera_panel() {
     auto* exposure = spin(camera_panel_, "exposure", -10, 10, 0.25);
     auto* mode = new QComboBox;
     mode->setObjectName("view_mode");
-    mode->addItems({"直接光照", "法线"});
+    mode->addItems({"直接光照", "法线", "线性深度"});
     layout->addRow("位置", camera_position_);
     layout->addRow("目标", camera_target_);
     layout->addRow("垂直 FOV / °", fov_);
     layout->addRow("曝光 / EV", exposure);
     layout->addRow("显示", mode);
+    auto* fxaa = new QCheckBox("启用 FXAA");
+    fxaa->setObjectName("fxaa_enabled");
+    fxaa->setChecked(true);
+    layout->addRow(fxaa);
+    connect(fxaa, &QCheckBox::toggled, this,
+            [this](bool enabled) { viewport_->set_fxaa_enabled(enabled); });
     auto* shadows = new QCheckBox("启用方向光阴影");
     shadows->setObjectName("shadows_enabled");
     shadows->setChecked(true);

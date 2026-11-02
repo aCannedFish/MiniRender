@@ -10,7 +10,7 @@ A0 使用 Apple M3 / macOS，Apple Clang 21.0.0、CMake 4.1.1、Ninja 1.12.1、Q
 brew install cmake ninja qt glslang molten-vk vulkan-loader vulkan-headers vulkan-validationlayers vulkan-tools
 ```
 
-GLM 1.0.3、Catch2 3.16.1、nlohmann/json 3.12.0 优先使用本机同版本包。缺失时 CMake 下载固定归档并验证 SHA256，定义见 `cmake/Dependencies.cmake`。tinyobjloader 2.0.0rc13 同样通过固定归档与 SHA256 下载。CPU-only 配置不发现 Qt、Vulkan、CUDA 或 OptiX。
+GLM 1.0.3、Catch2 3.16.1、nlohmann/json 3.12.0 优先使用本机同版本包。缺失时 CMake 下载固定归档并验证 SHA256，定义见 `cmake/Dependencies.cmake`。tinyobjloader 2.0.0rc13 同样通过固定归档与 SHA256 下载。TinyEXR 1.0.12 与其 miniz 依赖以逐文件 SHA256 固定。CPU-only 配置不发现 Qt、Vulkan、CUDA 或 OptiX。
 
 先执行 `vulkaninfo --summary`，确认真实 Apple GPU 与 `VK_LAYER_KHRONOS_validation`。如果受运行环境限制而无法访问 Metal，必须在允许访问 GPU 的本机进程中测试，不能用软件/模拟 ICD 代替。
 
@@ -44,7 +44,7 @@ python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirend
 
 结果写入 `outputs/a0/gpu-smoke.png` 和同目录日志。脚本检查退出码、像素检查成功和销毁之后的零 Validation 错误。日志缺失、超时、不能回读或缺少 Validation Layer 都是失败，不是跳过。
 
-着色器在构建时编译并嵌入程序，因此可从其他工作目录运行。场景编辑、相机交互和材质参数面板已在 A1.2 加入；阴影与 HDR 后处理继续在后续检查点实现。
+着色器在构建时编译并嵌入程序，因此可从其他工作目录运行。场景编辑、相机交互和材质参数面板已在 A1.2 加入；阴影、HDR 后处理与 EXR 输出已分别在 A1.3/A1.4 加入。
 
 ## Windows
 
