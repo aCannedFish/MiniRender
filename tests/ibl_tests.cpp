@@ -73,6 +73,7 @@ TEST_CASE("IBL latlong agrees with path lighting across axes seams poles and rot
         }
     }
     SceneSnapshot scene{};
+    scene.environment = glm::vec3(0);
     scene.environment_texture = std::make_shared<const Texture>(image);
     Sampler random(409);
     for (const float rotation : {-360.0F, -90.0F, 0.0F, 90.0F, 370.0F}) {
