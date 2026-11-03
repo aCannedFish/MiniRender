@@ -5,6 +5,8 @@ layout(binding = 1) uniform sampler2D hdr_image;
 layout(binding = 2) uniform sampler2D normal_image;
 layout(binding = 3) uniform sampler2D depth_image;
 layout(binding = 4) uniform sampler2D wire_image;
+layout(binding = 5) uniform sampler2D raw_ao_image;
+layout(binding = 6) uniform sampler2D filtered_ao_image;
 layout(location = 0) in vec2 uv;
 layout(location = 0) out vec4 color;
 
@@ -98,6 +100,13 @@ vec3 fxaa(vec2 coordinate) {
 
 void main() {
     ivec2 pixel = clamp(ivec2(gl_FragCoord.xy), ivec2(0), textureSize(hdr_image, 0) - 1);
+    if (frame.display.y > 3.5) {
+        float ao = frame.display.y > 4.5 ? texelFetch(filtered_ao_image, pixel, 0).r
+                                         : texelFetch(raw_ao_image, pixel, 0).r;
+        // AO 调试值直接显示为灰度，不应用曝光、Reinhard 或第二次 sRGB 编码。
+        color = vec4(decode_srgb(vec3(ao)), 1.0);
+        return;
+    }
     if (frame.display.y > 2.5) {
         color = texelFetch(wire_image, pixel, 0);
         return;

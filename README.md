@@ -36,3 +36,5 @@ A2.3 已能通过 CLI 进行 CPU 路径追踪，支持三种采样模式、RR、
 A2.4a 已接入多线程 RenderSession、暂停/恢复/取消、实际采样进度和不可变预览，CLI 支持线程/tile/批次设置。见 [任务说明](docs/RENDER_SESSION.md) 与 [验收记录](docs/checkpoints/A2.4a.md)。
 
 A2.4b 已将任务接入 Qt 离线面板，包含真实进度、暂停/恢复/取消、场景过期提示、后台导出和 Vulkan 图像显示。UI/CLI 输出一致，A2 本机验收完成。见 [界面说明](docs/OFFLINE_UI.md) 与 [验收记录](docs/checkpoints/A2.4b.md)。
+
+A3.1 已加入 SSAO 半球采样、双边滤波、独立的环境漫反射合成，以及原始/滤波 AO 视图。右侧“实时”页可调整参数，实时 EXR 保留合成后的线性结果。见 [SSAO 说明](docs/SSAO.md) 与 [验收记录](docs/checkpoints/A3.1.md)。A3.2 的 IBL 仍待实现。

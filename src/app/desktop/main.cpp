@@ -2,6 +2,7 @@
 #include "offline_smoke.hpp"
 #include "parameter_smoke.hpp"
 #include "scene_smoke.hpp"
+#include "ssao_smoke.hpp"
 #include "texture_smoke.hpp"
 #include "vulkan_viewport.hpp"
 #include "wire_smoke.hpp"
@@ -81,12 +82,14 @@ int main(int argc, char** argv) {
     parser.addOption({"wire-smoke", "Verify wireframe depth and HDR isolation.", "directory"});
     parser.addOption(
         {"offline-smoke", "Verify CPU task controls and Vulkan display.", "directory"});
+    parser.addOption(
+        {"ssao-smoke", "Verify SSAO sampling, filtering and lighting isolation.", "directory"});
     parser.process(application);
     const bool smoke = parser.isSet("smoke");
     const bool validation = parser.isSet("validation") || smoke || parser.isSet("scene-smoke") ||
                             parser.isSet("texture-smoke") || parser.isSet("interaction-smoke") ||
                             parser.isSet("parameter-smoke") || parser.isSet("wire-smoke") ||
-                            parser.isSet("offline-smoke");
+                            parser.isSet("offline-smoke") || parser.isSet("ssao-smoke");
     std::atomic_int validation_errors = 0;
     int result = 0;
 
@@ -123,7 +126,8 @@ int main(int argc, char** argv) {
                 const bool regression =
                     parser.isSet("scene-smoke") || parser.isSet("texture-smoke") ||
                     parser.isSet("interaction-smoke") || parser.isSet("parameter-smoke") ||
-                    parser.isSet("wire-smoke") || parser.isSet("offline-smoke");
+                    parser.isSet("wire-smoke") || parser.isSet("offline-smoke") ||
+                    parser.isSet("ssao-smoke");
                 if (regression) {
                     window.load_scene_file(scene_path);
                 } else {
@@ -154,6 +158,9 @@ int main(int argc, char** argv) {
         }
         if (parser.isSet("offline-smoke")) {
             start_offline_smoke(window, parser.value("offline-smoke"));
+        }
+        if (parser.isSet("ssao-smoke")) {
+            start_ssao_smoke(window, parser.value("ssao-smoke"));
         }
 
         int ticks = 0;

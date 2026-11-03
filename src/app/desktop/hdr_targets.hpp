@@ -6,7 +6,7 @@
 
 #include <minirender/core/image.hpp>
 
-// 主场景的线性 HDR、法线和深度附件。尺寸跟随交换链，但与最终显示图像分开。
+// 主场景的线性 HDR、环境漫反射、法线和深度附件。尺寸跟随交换链。
 // HDR 为 RGBA32F，不依赖设备对 float32 线性过滤的可选支持。
 // 线框写入独立 UNORM 附件，读取主场景深度，保留 HDR 读回的原始辐射值。
 class HdrTargets {
@@ -25,9 +25,11 @@ class HdrTargets {
     VkImageView wire_view() const noexcept;
     VkRenderPass render_pass() const noexcept;
     VkImageView color_view() const noexcept;
+    VkImageView ambient_view() const noexcept;
     VkImageView normal_view() const noexcept;
     VkImageView depth_view() const noexcept;
-    void record_readback(VkCommandBuffer command);
+    // source 为空时读原始光照，否则读同尺寸 RGBA32F 合成结果。
+    void record_readback(VkCommandBuffer command, VkImage source = VK_NULL_HANDLE);
     minirender::Image readback(); // 调用方先等当前提交 fence。
 
   private:
@@ -35,6 +37,7 @@ class HdrTargets {
     VkPhysicalDevice physical_ = VK_NULL_HANDLE;
     VkExtent2D extent_{};
     GpuImage color_;
+    GpuImage ambient_;
     GpuImage normal_;
     GpuImage depth_;
     GpuImage wire_;

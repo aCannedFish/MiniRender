@@ -1,5 +1,6 @@
 #include "workbench.hpp"
 #include "offline_panel.hpp"
+#include "realtime_panel.hpp"
 
 #include <minirender/assets/scene_io.hpp>
 
@@ -292,10 +293,13 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     right_tabs->addTab(scroll_panel(camera_panel_), "相机");
     offline_ = new OfflinePanel(*viewport_, [this] { return editor_.snapshot(); }, this);
     right_tabs->addTab(scroll_panel(offline_), "离线");
-    viewport_->on_display_changed = [this](bool offline) {
+    auto* realtime = new RealtimePanel(*viewport_, this);
+    right_tabs->addTab(scroll_panel(realtime), "实时");
+    viewport_->on_display_changed = [this, realtime](bool offline) {
         findChild<QComboBox*>("view_mode")->setEnabled(!offline);
         findChild<QCheckBox*>("fxaa_enabled")->setEnabled(!offline);
         findChild<QCheckBox*>("shadows_enabled")->setEnabled(!offline);
+        realtime->setEnabled(!offline);
     };
     auto* inspector = new QDockWidget("属性", this);
     inspector->setMinimumWidth(340);
@@ -366,8 +370,7 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
                 return;
             }
             auto message =
-                QString(
-                    "%1 | %2 个物体 | 直接光照预览 | 左拖环绕 · 右拖转向 · 中拖平移 · WASDQE 移动")
+                QString("%1 | %2 个物体 | 实时预览 | 左拖环绕 · 右拖转向 · 中拖平移 · WASDQE 移动")
                     .arg(QString::fromUtf8(viewport_->physicalDeviceProperties()->deviceName))
                     .arg(editor_.document().objects.size());
             QStringList offline_features;
@@ -542,7 +545,7 @@ void Workbench::build_camera_panel() {
     focus_ = spin(camera_panel_, "focus_distance", 0.0001, 100000, 0.1);
     auto* mode = new QComboBox;
     mode->setObjectName("view_mode");
-    mode->addItems({"直接光照", "法线", "线性深度", "线框"});
+    mode->addItems({"光照合成", "法线", "线性深度", "线框", "原始 AO", "滤波 AO"});
     layout->addRow("位置", camera_position_);
     layout->addRow("目标", camera_target_);
     layout->addRow("垂直 FOV / °", fov_);

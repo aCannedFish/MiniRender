@@ -5,14 +5,15 @@
 #include "hdr_targets.hpp"
 #include "post_process.hpp"
 #include "shadow_map.hpp"
+#include "ssao_pass.hpp"
 #include "viewport_renderer.hpp"
 #include "vulkan_viewport.hpp"
 
 #include <limits>
 #include <map>
 
-// 三角网格的实时直接光照管线。使用场景快照，UI 修改通过 revision 发布。
-// 光照写入浮点 HDR；法线、深度与显示变换由独立后处理消费。
+// 三角网格的实时表面光照管线。使用场景快照，UI 修改通过 revision 发布。
+// 分开记录环境漫反射，经 SSAO 合成为线性 HDR，再执行显示变换。
 class SceneRenderer final : public ViewportRenderer {
   public:
     explicit SceneRenderer(VulkanViewport* window);
@@ -55,6 +56,7 @@ class SceneRenderer final : public ViewportRenderer {
     VkDevice device_ = VK_NULL_HANDLE;
     ShadowMap shadow_map_;
     HdrTargets targets_;
+    SsaoPass ssao_;
     PostProcess post_process_;
     bool capture_hdr_ = false;
     std::array<glm::mat4, 8> shadow_matrices_{};

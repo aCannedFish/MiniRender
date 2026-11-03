@@ -6,6 +6,7 @@
 """
 
 import argparse
+import os
 import plistlib
 from pathlib import Path
 import subprocess
@@ -18,6 +19,11 @@ def main() -> int:
     parser.add_argument("executable", type=Path)
     parser.add_argument("--output", type=Path, default=Path("outputs/a0"))
     parser.add_argument("--timeout", type=float, default=35)
+    parser.add_argument(
+        "--sync-validation",
+        action="store_true",
+        help="Enable synchronization validation in the Vulkan layer",
+    )
     parser.add_argument("--scene", type=Path, help="Run scene editor checks instead of A0 diagnostics")
     checks = parser.add_mutually_exclusive_group()
     checks.add_argument("--texture-check", action="store_true", help="Verify texture import and filtering")
@@ -27,6 +33,7 @@ def main() -> int:
     checks.add_argument(
         "--offline-check", action="store_true", help="Verify CPU task controls and Vulkan display"
     )
+    checks.add_argument("--ssao-check", action="store_true", help="Verify SSAO and lighting isolation")
     args = parser.parse_args()
     scene_check = (
         args.texture_check
@@ -34,6 +41,7 @@ def main() -> int:
         or args.parameter_check
         or args.wire_check
         or args.offline_check
+        or args.ssao_check
     )
     if scene_check and not args.scene:
         parser.error("Scene checks require --scene")
@@ -47,6 +55,7 @@ def main() -> int:
     mode = "GPU"
     option = "--smoke"
     for selected, candidate in [
+        (args.ssao_check, "SSAO"),
         (args.offline_check, "Offline"),
         (args.parameter_check, "Parameter"),
         (args.interaction_check, "Interaction"),
@@ -62,12 +71,18 @@ def main() -> int:
     else:
         arguments = [str(executable), option, str(output / "gpu-smoke.png")]
     with (output / "gpu-smoke.log").open("w", encoding="utf-8") as log:
+        environment = os.environ.copy()
+        if args.sync_validation:
+            environment["VK_LAYER_VALIDATE_SYNC"] = "1"
+            log.write("Synchronization validation: VK_LAYER_VALIDATE_SYNC=1\n")
+            log.flush()
         try:
             result = subprocess.run(
                 arguments,
                 stdout=log,
                 stderr=subprocess.STDOUT,
                 timeout=args.timeout,
+                env=environment,
                 check=False,
             )
             code = result.returncode
