@@ -7,15 +7,28 @@
 #include <chrono>
 #include <cmath>
 #include <iostream>
+#include <locale>
+#include <sstream>
 #include <stdexcept>
 #include <string_view>
+#include <type_traits>
 
 namespace {
 
 template <typename T> T number(std::string_view text) {
     T result{};
-    const auto parsed = std::from_chars(text.data(), text.data() + text.size(), result);
-    if (parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size()) {
+    bool valid = false;
+    if constexpr (std::is_floating_point_v<T>) {
+        // macOS 14 的 libc++ 尚无浮点 from_chars。固定 classic locale，避免系统小数格式影响 CLI。
+        std::istringstream input{std::string(text)};
+        input.imbue(std::locale::classic());
+        input >> std::noskipws >> result;
+        valid = static_cast<bool>(input) && input.peek() == std::char_traits<char>::eof();
+    } else {
+        const auto parsed = std::from_chars(text.data(), text.data() + text.size(), result);
+        valid = parsed.ec == std::errc{} && parsed.ptr == text.data() + text.size();
+    }
+    if (!valid) {
         throw std::invalid_argument("Invalid numeric render option: " + std::string(text));
     }
     return result;

@@ -65,8 +65,12 @@ if(BUILD_TESTING)
     set_tests_properties(cli_trace_normals PROPERTIES PASS_REGULAR_EXPRESSION "triangles: 26")
     add_test(NAME cli_path_render COMMAND minirender_cli --render
         "${PROJECT_SOURCE_DIR}/scenes/studio.json" "${CMAKE_CURRENT_BINARY_DIR}/路径 空格/cli-path"
-        --width 4 --height 4 --spp 4 --depth 3 --seed 9)
+        --width 4 --height 4 --spp 4 --depth 3 --seed 9 --exposure 0.5)
     set_tests_properties(cli_path_render PROPERTIES PASS_REGULAR_EXPRESSION "paths: 64")
+    add_test(NAME cli_invalid_exposure COMMAND minirender_cli --render
+        "${PROJECT_SOURCE_DIR}/scenes/studio.json" "${CMAKE_CURRENT_BINARY_DIR}/invalid-path"
+        --exposure 1oops)
+    set_tests_properties(cli_invalid_exposure PROPERTIES WILL_FAIL TRUE)
 endif()
 
 if(MINIRENDER_BUILD_DESKTOP)
