@@ -13,10 +13,11 @@
 
 namespace minirender {
 
-// 世界空间射线。direction 为单位向量，t 的单位为米。
+// CPU 世界空间射线。使用 double 保留光源采样方向和有限阴影线段的距离精度。
+// direction 为单位向量，t 的单位为米；网格存储和 GPU 数据仍采用 float。
 struct Ray {
-    glm::vec3 origin{0.0F};
-    glm::vec3 direction{0.0F, 0.0F, -1.0F};
+    glm::dvec3 origin{0.0};
+    glm::dvec3 direction{0.0, 0.0, -1.0};
 };
 
 // 面角属性独立于共享的位置索引，保留 UV 接缝和硬法线而不破坏几何拓扑。
@@ -66,10 +67,14 @@ struct Camera {
     float vertical_fov_degrees = 45.0F;
     float near_plane = 0.05F;
     float far_plane = 100.0F;
+    float aperture_radius = 0;
+    float focus_distance = 4;
     void validate() const;
     glm::mat4 view_matrix() const;
     glm::mat4 projection_matrix(float aspect) const;
-    Ray generate_ray(glm::vec2 pixel_uv, float aspect) const;
+    Ray generate_ray(glm::dvec2 pixel_uv, double aspect) const;
+    // focus_distance 沿相机 forward 测量。孔径为零时严格返回针孔射线。
+    Ray generate_lens_ray(glm::dvec2 pixel_uv, double aspect, glm::dvec2 lens_u) const;
 };
 
 enum class MaterialKind { diffuse, conductor, mirror, dielectric };

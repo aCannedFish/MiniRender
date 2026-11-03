@@ -1,0 +1,305 @@
+{
+  "version": 1,
+  "camera": {
+    "position": [
+      0,
+      1.25,
+      4.6
+    ],
+    "target": [
+      0,
+      1.2,
+      0
+    ],
+    "up": [
+      0,
+      1,
+      0
+    ],
+    "vertical_fov": 43,
+    "near": 0.05,
+    "far": 100,
+    "aperture_radius": 0.025,
+    "focus_distance": 4.7
+  },
+  "environment": [
+    0,
+    0,
+    0
+  ],
+  "materials": [
+    {
+      "id": "white",
+      "name": "漫反射白",
+      "kind": "diffuse",
+      "base_color": [
+        0.73,
+        0.73,
+        0.73
+      ],
+      "roughness": 0.5
+    },
+    {
+      "id": "red",
+      "name": "红墙",
+      "kind": "diffuse",
+      "base_color": [
+        0.65,
+        0.08,
+        0.04
+      ]
+    },
+    {
+      "id": "green",
+      "name": "绿墙",
+      "kind": "diffuse",
+      "base_color": [
+        0.1,
+        0.5,
+        0.12
+      ]
+    },
+    {
+      "id": "gold",
+      "name": "GGX 金属",
+      "kind": "conductor",
+      "base_color": [
+        0.95,
+        0.67,
+        0.3
+      ],
+      "roughness": 0.18
+    },
+    {
+      "id": "glass",
+      "name": "理想玻璃",
+      "kind": "dielectric",
+      "base_color": [
+        0.98,
+        1,
+        0.99
+      ],
+      "ior": 1.5
+    },
+    {
+      "id": "lamp",
+      "name": "双面面积光",
+      "kind": "diffuse",
+      "base_color": [
+        0,
+        0,
+        0
+      ],
+      "emission": [
+        14,
+        13,
+        11
+      ]
+    }
+  ],
+  "meshes": [
+    {
+      "id": "plane",
+      "source": "assets/plane.obj"
+    },
+    {
+      "id": "cube",
+      "source": "assets/cube.obj"
+    }
+  ],
+  "objects": [
+    {
+      "id": "floor",
+      "name": "floor",
+      "mesh": "plane",
+      "material": "white",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.5,
+          1,
+          1.5
+        ]
+      }
+    },
+    {
+      "id": "ceiling",
+      "name": "ceiling",
+      "mesh": "plane",
+      "material": "white",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0,
+          3,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.5,
+          1,
+          1.5
+        ]
+      }
+    },
+    {
+      "id": "back",
+      "name": "back",
+      "mesh": "plane",
+      "material": "white",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0,
+          1.5,
+          -1.5
+        ],
+        "rotation": [
+          90,
+          0,
+          0
+        ],
+        "scale": [
+          1.5,
+          1,
+          1.5
+        ]
+      }
+    },
+    {
+      "id": "left",
+      "name": "left",
+      "mesh": "plane",
+      "material": "red",
+      "visible": true,
+      "transform": {
+        "translation": [
+          -1.5,
+          1.5,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          -90
+        ],
+        "scale": [
+          1.5,
+          1,
+          1.5
+        ]
+      }
+    },
+    {
+      "id": "right",
+      "name": "right",
+      "mesh": "plane",
+      "material": "green",
+      "visible": true,
+      "transform": {
+        "translation": [
+          1.5,
+          1.5,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ],
+        "scale": [
+          1.5,
+          1,
+          1.5
+        ]
+      }
+    },
+    {
+      "id": "lamp",
+      "name": "lamp",
+      "mesh": "plane",
+      "material": "lamp",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0,
+          2.985,
+          -0.2
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.45,
+          1,
+          0.38
+        ]
+      }
+    },
+    {
+      "id": "gold_box",
+      "name": "gold_box",
+      "mesh": "cube",
+      "material": "gold",
+      "visible": true,
+      "transform": {
+        "translation": [
+          -0.6,
+          0.55,
+          -0.25
+        ],
+        "rotation": [
+          0,
+          18,
+          0
+        ],
+        "scale": [
+          0.65,
+          1.1,
+          0.65
+        ]
+      }
+    },
+    {
+      "id": "glass_box",
+      "name": "glass_box",
+      "mesh": "cube",
+      "material": "glass",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0.55,
+          0.43,
+          0.35
+        ],
+        "rotation": [
+          0,
+          -16,
+          0
+        ],
+        "scale": [
+          0.7,
+          0.86,
+          0.7
+        ]
+      }
+    }
+  ],
+  "directional_lights": []
+}

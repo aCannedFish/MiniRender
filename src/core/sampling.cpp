@@ -1,7 +1,6 @@
 #include <minirender/core/sampling.hpp>
 
 #include <algorithm>
-#include <bit>
 #include <cmath>
 #include <numbers>
 #include <stdexcept>
@@ -44,7 +43,8 @@ std::uint32_t Sampler::next_u32() {
     const auto previous = state_;
     state_ = previous * 6364136223846793005ULL + increment_;
     const auto shifted = static_cast<std::uint32_t>(((previous >> 18U) ^ previous) >> 27U);
-    return std::rotr(shifted, static_cast<int>(previous >> 59U));
+    const auto rotation = static_cast<std::uint32_t>(previous >> 59U);
+    return (shifted >> rotation) | (shifted << ((0U - rotation) & 31U));
 }
 double Sampler::next_1d() {
     const auto high = next_u32() >> 5U;

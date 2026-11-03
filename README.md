@@ -27,6 +27,8 @@ UI 交互修复见 [验证记录](docs/checkpoints/UI1.md)：属性布局、连�
 
 A1.6 已加入保留遮挡的线框视图，并完成场景编辑阶段验收，见 [验收记录](docs/checkpoints/A1.6.md)。该检查点还补充了 macOS Metal layer 的事务配置，修复连续运行中捕获到的呈现等待。
 
-A2.1 已加入 CPU 场景求交、SAH BVH 和法线诊断命令，见 [实现说明](docs/INTERSECTION.md) 与 [验收记录](docs/checkpoints/A2.1.md)。MIS、路径积分和离线任务 UI 继续按 A2 检查点实现。
+A2.1 已加入 CPU 场景求交、SAH BVH 和法线诊断命令，见 [实现说明](docs/INTERSECTION.md) 与 [验收记录](docs/checkpoints/A2.1.md)。后续进展按 A2 检查点记录。
 
-A2.2 已加入随机采样、四种基础 BSDF、面积/方向光和环境采样，见 [随机采样](docs/SAMPLING.md)、[表面散射](docs/BSDF.md)、[光源采样](docs/LIGHTING.md) 及 [验收记录](docs/checkpoints/A2.2.md)。后续继续接入路径积分和离线任务界面。
+A2.2 已加入随机采样、四种基础 BSDF、面积/方向光和环境采样，见 [随机采样](docs/SAMPLING.md)、[表面散射](docs/BSDF.md)、[光源采样](docs/LIGHTING.md) 及 [验收记录](docs/checkpoints/A2.2.md)。
+
+A2.3 已能通过 CLI 进行 CPU 路径追踪，支持三种采样模式、RR、薄透镜及 EXR/PNG，见 [路径追踪](docs/PATH_TRACING.md) 与 [验收记录](docs/checkpoints/A2.3.md)。A2.4 将接入多线程任务和 Qt 离线渲染界面。

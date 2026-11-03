@@ -37,6 +37,7 @@ add_library(minirender_core
     src/render/bvh.cpp
     src/render/bsdf.cpp
     src/render/light.cpp
+    src/render/path_tracer.cpp
     src/assets/obj_loader.cpp
     src/assets/scene_io.cpp)
 target_include_directories(minirender_core PUBLIC include)
@@ -44,13 +45,13 @@ target_link_libraries(minirender_core PUBLIC glm::glm PRIVATE minirender_warning
 target_compile_definitions(minirender_core PUBLIC
     GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
-add_executable(minirender_cli src/app/cli.cpp)
+add_executable(minirender_cli src/app/cli.cpp src/app/render_cli.cpp)
 target_link_libraries(minirender_cli PRIVATE minirender_core minirender_warnings)
 
 if(BUILD_TESTING)
     find_package(Threads REQUIRED)
     add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp
-        tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp)
+        tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp tests/path_tests.cpp)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_tests PRIVATE
         minirender_core Catch2::Catch2WithMain minirender_warnings Threads::Threads)
@@ -62,6 +63,14 @@ if(BUILD_TESTING)
     add_test(NAME cli_trace_normals COMMAND minirender_cli --trace-normals
         "${PROJECT_SOURCE_DIR}/scenes/studio.json" "${CMAKE_CURRENT_BINARY_DIR}/cli-normals.png")
     set_tests_properties(cli_trace_normals PROPERTIES PASS_REGULAR_EXPRESSION "triangles: 26")
+    add_test(NAME cli_path_render COMMAND minirender_cli --render
+        "${PROJECT_SOURCE_DIR}/scenes/studio.json" "${CMAKE_CURRENT_BINARY_DIR}/路径 空格/cli-path"
+        --width 4 --height 4 --spp 4 --depth 3 --seed 9 --exposure 0.5)
+    set_tests_properties(cli_path_render PROPERTIES PASS_REGULAR_EXPRESSION "paths: 64")
+    add_test(NAME cli_invalid_exposure COMMAND minirender_cli --render
+        "${PROJECT_SOURCE_DIR}/scenes/studio.json" "${CMAKE_CURRENT_BINARY_DIR}/invalid-path"
+        --exposure 1oops)
+    set_tests_properties(cli_invalid_exposure PROPERTIES WILL_FAIL TRUE)
 endif()
 
 if(MINIRENDER_BUILD_DESKTOP)
