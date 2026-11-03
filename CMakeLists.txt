@@ -32,6 +32,8 @@ add_library(minirender_core
     src/scene/scene.cpp
     src/scene/editor.cpp
     src/scene/shadow.cpp
+    src/render/intersection.cpp
+    src/render/bvh.cpp
     src/assets/obj_loader.cpp
     src/assets/scene_io.cpp)
 target_include_directories(minirender_core PUBLIC include)
@@ -43,15 +45,20 @@ add_executable(minirender_cli src/app/cli.cpp)
 target_link_libraries(minirender_cli PRIVATE minirender_core minirender_warnings)
 
 if(BUILD_TESTING)
-    add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp)
+    find_package(Threads REQUIRED)
+    add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp
+        tests/intersection_tests.cpp)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_tests PRIVATE
-        minirender_core Catch2::Catch2WithMain minirender_warnings)
+        minirender_core Catch2::Catch2WithMain minirender_warnings Threads::Threads)
     include(Catch)
     catch_discover_tests(minirender_tests)
     add_test(NAME cli_capabilities COMMAND minirender_cli --capabilities)
     set_tests_properties(cli_capabilities PROPERTIES
         PASS_REGULAR_EXPRESSION "optix: unavailable")
+    add_test(NAME cli_trace_normals COMMAND minirender_cli --trace-normals
+        "${PROJECT_SOURCE_DIR}/scenes/studio.json" "${CMAKE_CURRENT_BINARY_DIR}/cli-normals.png")
+    set_tests_properties(cli_trace_normals PROPERTIES PASS_REGULAR_EXPRESSION "triangles: 26")
 endif()
 
 if(MINIRENDER_BUILD_DESKTOP)

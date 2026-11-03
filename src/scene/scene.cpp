@@ -75,7 +75,9 @@ glm::mat4 Transform::matrix() const {
 }
 
 glm::mat3 Transform::normal_matrix() const {
-    return glm::transpose(glm::inverse(glm::mat3(matrix())));
+    // 合法的大缩放仍可能使 float 行列式溢出，导致逆矩阵全零或 NaN。
+    // 用 double 完成逆转置，再存回场景统一使用的 float 矩阵。
+    return glm::mat3(glm::transpose(glm::inverse(glm::dmat3(matrix()))));
 }
 
 void Camera::validate() const {
