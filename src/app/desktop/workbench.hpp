@@ -74,5 +74,6 @@ class Workbench final : public QMainWindow {
     std::string selected_id_;
     QString scene_path_;
     bool refreshing_ = false;
+    bool camera_refresh_pending_ = false;
     bool diagnostic_ = false;
 };

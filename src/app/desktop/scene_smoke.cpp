@@ -194,6 +194,11 @@ void start_scene_smoke(Workbench& window, const QString& directory) {
             if (viewport->rendered_frames() < 5) {
                 return;
             }
+            if (!viewport->isExposed()) {
+                window.raise();
+                window.activateWindow();
+                return;
+            }
             const auto capture = [&](const char* name) {
                 auto image = viewport->grab();
                 require(!image.isNull(), "Scene readback is empty");

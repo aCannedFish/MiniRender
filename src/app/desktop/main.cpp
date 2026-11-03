@@ -1,3 +1,4 @@
+#include "interaction_smoke.hpp"
 #include "scene_smoke.hpp"
 #include "texture_smoke.hpp"
 #include "vulkan_viewport.hpp"
@@ -53,6 +54,11 @@ bool validate_capture(const QImage& image) {
 // 桌面入口管理窗口与 Vulkan instance 生命周期：窗口必须先于 instance 销毁。
 // --smoke 用真实窗口测试渲染、缩放和读回；没有 GPU 时失败，不能静默跳过。
 int main(int argc, char** argv) {
+#ifdef Q_OS_MACOS
+    // MoltenVK 默认在调用 vkQueueSubmit 的线程中等待 Metal drawable。
+    // 拖拽期间 Cocoa 也需要主线程处理显示事务，故使用官方异步提交模式。
+    qputenv("MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS", "0");
+#endif
     QApplication application(argc, argv);
     QApplication::setApplicationName("MiniRender");
     QCommandLineParser parser;
@@ -63,10 +69,12 @@ int main(int argc, char** argv) {
     parser.addOption({"scene", "Open a scene JSON file.", "path"});
     parser.addOption({"scene-smoke", "Run scene editing and GPU checks.", "directory"});
     parser.addOption({"texture-smoke", "Run texture import and sampling checks.", "directory"});
+    parser.addOption(
+        {"interaction-smoke", "Run repeated drag and inspector layout checks.", "directory"});
     parser.process(application);
     const bool smoke = parser.isSet("smoke");
     const bool validation = parser.isSet("validation") || smoke || parser.isSet("scene-smoke") ||
-                            parser.isSet("texture-smoke");
+                            parser.isSet("texture-smoke") || parser.isSet("interaction-smoke");
     std::atomic_int validation_errors = 0;
     int result = 0;
 
@@ -112,6 +120,10 @@ int main(int argc, char** argv) {
 
         if (parser.isSet("texture-smoke")) {
             start_texture_smoke(window, parser.value("texture-smoke"));
+        }
+
+        if (parser.isSet("interaction-smoke")) {
+            start_interaction_smoke(window, parser.value("interaction-smoke"));
         }
 
         int ticks = 0;
@@ -171,6 +183,8 @@ int main(int argc, char** argv) {
             window.resize(960, 640);
         }
         window.show();
+        window.raise();
+        window.activateWindow();
         timer.start();
         result = application.exec();
     }
