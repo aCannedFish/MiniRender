@@ -93,6 +93,12 @@ SceneDocument load_scene(const std::filesystem::path& path) {
         scene.camera.near_plane = camera.at("near").get<float>();
         scene.camera.far_plane = camera.at("far").get<float>();
         scene.environment = vector3(json.at("environment"));
+        if (json.contains("environment_map")) {
+            const auto& environment = json.at("environment_map");
+            scene.environment_map.texture_id = environment.value("texture", std::string{});
+            scene.environment_map.strength = environment.value("strength", 1.0F);
+            scene.environment_map.rotation_degrees = environment.value("rotation_degrees", 0.0F);
+        }
         for (const auto& value : json.at("materials")) {
             Material material;
             material.id = value.at("id").get<std::string>();
@@ -165,6 +171,9 @@ void save_scene(const SceneDocument& document, const std::filesystem::path& path
                       {"near", camera.near_plane},
                       {"far", camera.far_plane}};
     json["environment"] = vector3(document.environment);
+    json["environment_map"] = {{"texture", document.environment_map.texture_id},
+                               {"strength", document.environment_map.strength},
+                               {"rotation_degrees", document.environment_map.rotation_degrees}};
     for (const auto* key : {"materials", "meshes", "textures", "objects", "directional_lights"}) {
         json[key] = Json::array();
     }
