@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <minirender/core/cancellation.hpp>
 #include <minirender/core/image.hpp>
 
 #include <string>
@@ -16,7 +17,8 @@ TextureFilter parse_texture_filter(const std::string& name);
 // Repeat 寻址允许负 UV；所有过滤在解码后的线性空间执行。
 class Texture {
   public:
-    explicit Texture(Image image);
+    // 生成 mip 时逐行检查取消；默认 token 保持普通资产构建行为。
+    explicit Texture(Image image, CancellationToken cancellation = {});
     const Image& level(std::size_t index) const;
     std::size_t level_count() const noexcept;
     glm::vec3 sample(glm::vec2 uv, float lod = 0,

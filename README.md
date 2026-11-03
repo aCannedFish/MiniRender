@@ -37,4 +37,6 @@ A2.4a 已接入多线程 RenderSession、暂停/恢复/取消、实际采样进�
 
 A2.4b 已将任务接入 Qt 离线面板，包含真实进度、暂停/恢复/取消、场景过期提示、后台导出和 Vulkan 图像显示。UI/CLI 输出一致，A2 本机验收完成。见 [界面说明](docs/OFFLINE_UI.md) 与 [验收记录](docs/checkpoints/A2.4b.md)。
 
-A3.1 已加入 SSAO 半球采样、双边滤波、独立的环境漫反射合成，以及原始/滤波 AO 视图。右侧“实时”页可调整参数，实时 EXR 保留合成后的线性结果。见 [SSAO 说明](docs/SSAO.md) 与 [验收记录](docs/checkpoints/A3.1.md)。A3.2 的 IBL 仍待实现。
+A3.1 已加入 SSAO 半球采样、双边滤波、独立的环境漫反射合成，以及原始/滤波 AO 视图。右侧“实时”页可调整参数，实时 EXR 保留合成后的线性结果。见 [SSAO 说明](docs/SSAO.md) 与 [验收记录](docs/checkpoints/A3.1.md)。
+
+A3.2a 已完成 IBL 的 CPU 预处理核心：漫反射卷积、GGX 粗糙度层、BRDF LUT、进度和取消。数值对照及默认参数参考图见 [IBL 说明](docs/IBL.md) 与 [验收记录](docs/checkpoints/A3.2a.md)。A3.2b 继续接入 Vulkan 和 Qt，当前视口尚未使用这些预处理数据。

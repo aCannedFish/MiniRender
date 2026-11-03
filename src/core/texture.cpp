@@ -19,10 +19,11 @@ glm::vec2 image_uv(glm::vec2 uv) {
 }
 
 // 按像素覆盖面积求均值。奇数尺寸的最后一行/列同样参与，不丢失能量。
-Image downsample(const Image& source) {
+Image downsample(const Image& source, const CancellationToken& cancellation) {
     Image target(std::max(std::size_t(1), source.width() / 2),
                  std::max(std::size_t(1), source.height() / 2));
     for (std::size_t y = 0; y < target.height(); ++y) {
+        cancellation.check();
         for (std::size_t x = 0; x < target.width(); ++x) {
             const double left = double(x) * double(source.width()) / double(target.width());
             const double right = double(x + 1) * double(source.width()) / double(target.width());
@@ -49,12 +50,14 @@ Image downsample(const Image& source) {
 
 } // namespace
 
-Texture::Texture(Image image) {
+Texture::Texture(Image image, CancellationToken cancellation) {
+    cancellation.check();
     if (image.width() > 16384 || image.height() > 16384 ||
         image.width() * image.height() > 64U * 1024U * 1024U) {
         throw std::invalid_argument("Texture exceeds the 64-megapixel budget");
     }
     for (std::size_t y = 0; y < image.height(); ++y) {
+        cancellation.check();
         for (std::size_t x = 0; x < image.width(); ++x) {
             const auto pixel = image.at(x, y);
             if (!std::isfinite(pixel.r) || !std::isfinite(pixel.g) || !std::isfinite(pixel.b)) {
@@ -64,7 +67,7 @@ Texture::Texture(Image image) {
     }
     levels_.push_back(std::move(image));
     while (levels_.back().width() > 1 || levels_.back().height() > 1) {
-        levels_.push_back(downsample(levels_.back()));
+        levels_.push_back(downsample(levels_.back(), cancellation));
     }
 }
 

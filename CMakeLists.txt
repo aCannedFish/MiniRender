@@ -41,6 +41,7 @@ add_library(minirender_core
     src/render/path_tracer.cpp
     src/render/render_session.cpp
     src/render/ssao.cpp
+    src/render/ibl.cpp
     src/assets/obj_loader.cpp
     src/assets/scene_io.cpp)
 target_include_directories(minirender_core PUBLIC include)
@@ -54,7 +55,7 @@ target_link_libraries(minirender_cli PRIVATE minirender_core minirender_warnings
 if(BUILD_TESTING)
     add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp
         tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp tests/path_tests.cpp
-        tests/session_tests.cpp tests/ssao_tests.cpp)
+        tests/session_tests.cpp tests/ssao_tests.cpp tests/ibl_tests.cpp)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_tests PRIVATE
         minirender_core Catch2::Catch2WithMain minirender_warnings Threads::Threads)
