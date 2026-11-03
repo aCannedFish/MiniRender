@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <minirender/core/texture.hpp>
 
 #include <array>
 #include <cstdint>
@@ -64,7 +65,7 @@ enum class MaterialKind { diffuse, conductor, mirror, dielectric };
 std::string material_kind_name(MaterialKind kind);
 MaterialKind parse_material_kind(const std::string& name);
 
-// base_color、emission 均为线性 RGB。基础阶段先保存均匀参数，纹理在后续接入。
+// base_color、emission 均为线性 RGB。底色纹理通过独立资产 ID 引用。
 struct Material {
     std::string id;
     std::string name;
@@ -73,13 +74,22 @@ struct Material {
     glm::vec3 emission{0.0F};
     float roughness = 0.35F;
     float ior = 1.5F;
+    std::string base_color_texture{};
+    TextureFilter texture_filter = TextureFilter::trilinear;
     void validate() const;
 };
 
 struct MeshAsset {
     std::string id;
-    std::filesystem::path source; // 相对于 SceneDocument::asset_directory。
+    std::filesystem::path source; // 相对于 asset_directory；导入时可为绝对路径，保存时转换。
     std::shared_ptr<const MeshData> data;
+};
+
+struct TextureAsset {
+    std::string id;
+    std::filesystem::path source;
+    ColorEncoding encoding = ColorEncoding::srgb;
+    std::shared_ptr<const Texture> data;
 };
 
 struct SceneObject {
@@ -106,6 +116,7 @@ struct SceneDocument {
     glm::vec3 environment{0.03F};
     std::vector<Material> materials;
     std::vector<MeshAsset> meshes;
+    std::vector<TextureAsset> textures;
     std::vector<SceneObject> objects;
     std::vector<DirectionalLight> directional_lights;
     void validate() const;
@@ -118,6 +129,7 @@ struct RenderInstance {
     Material material;
     glm::mat4 object_to_world{1.0F};
     glm::mat3 normal_to_world{1.0F};
+    std::shared_ptr<const Texture> base_color_texture;
 };
 
 struct SceneSnapshot {

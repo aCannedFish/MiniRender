@@ -1,4 +1,5 @@
 #include "scene_smoke.hpp"
+#include "texture_smoke.hpp"
 #include "vulkan_viewport.hpp"
 #include "workbench.hpp"
 
@@ -61,9 +62,11 @@ int main(int argc, char** argv) {
     parser.addOption({"validation", "Require Vulkan Validation Layers."});
     parser.addOption({"scene", "Open a scene JSON file.", "path"});
     parser.addOption({"scene-smoke", "Run scene editing and GPU checks.", "directory"});
+    parser.addOption({"texture-smoke", "Run texture import and sampling checks.", "directory"});
     parser.process(application);
     const bool smoke = parser.isSet("smoke");
-    const bool validation = parser.isSet("validation") || smoke || parser.isSet("scene-smoke");
+    const bool validation = parser.isSet("validation") || smoke || parser.isSet("scene-smoke") ||
+                            parser.isSet("texture-smoke");
     std::atomic_int validation_errors = 0;
     int result = 0;
 
@@ -107,6 +110,10 @@ int main(int argc, char** argv) {
             start_scene_smoke(window, parser.value("scene-smoke"));
         }
 
+        if (parser.isSet("texture-smoke")) {
+            start_texture_smoke(window, parser.value("texture-smoke"));
+        }
+
         int ticks = 0;
         bool resized = false;
         QSize initial_size;
@@ -119,7 +126,7 @@ int main(int argc, char** argv) {
                 application.exit(1);
                 return;
             }
-            if (viewport->isValid()) {
+            if (smoke && viewport->isValid()) {
                 window.statusBar()->showMessage(
                     QString("GPU: %1 | 帧 %2 | 交换链 %3")
                         .arg(QString::fromUtf8(viewport->physicalDeviceProperties()->deviceName))

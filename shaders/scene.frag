@@ -8,6 +8,9 @@ layout(location = 1) in vec3 world_normal;
 layout(location = 2) in vec3 base_color;
 layout(location = 3) in vec3 emission;
 layout(location = 4) in vec2 material;
+layout(location = 5) in vec2 mesh_uv;
+layout(binding = 2) uniform sampler2D base_texture;
+layout(push_constant) uniform Sampling { layout(offset = 4) int filter_mode; } sampling;
 layout(location = 0) out vec4 color;
 layout(location = 1) out vec4 normal_output;
 layout(binding = 1) uniform sampler2DArray shadow_map;
@@ -45,7 +48,35 @@ float visibility(int light, float ndl) {
     return result / 9.0;
 }
 
+ivec2 repeat_pixel(ivec2 pixel, ivec2 extent) { return (pixel % extent + extent) % extent; }
+vec3 bilinear_texture(vec2 uv, int level) {
+    ivec2 extent = textureSize(base_texture, level);
+    vec2 position = uv * vec2(extent) - 0.5;
+    ivec2 lower = ivec2(floor(position));
+    vec2 t = fract(position);
+    vec3 a = texelFetch(base_texture, repeat_pixel(lower, extent), level).rgb;
+    vec3 b = texelFetch(base_texture, repeat_pixel(lower + ivec2(1,0), extent), level).rgb;
+    vec3 c = texelFetch(base_texture, repeat_pixel(lower + ivec2(0,1), extent), level).rgb;
+    vec3 d = texelFetch(base_texture, repeat_pixel(lower + ivec2(1,1), extent), level).rgb;
+    return mix(mix(a,b,t.x), mix(c,d,t.x), t.y);
+}
+vec3 sample_base_texture() {
+    vec2 uv = vec2(fract(mesh_uv.x), 1.0 - fract(mesh_uv.y));
+    ivec2 extent = textureSize(base_texture, 0);
+    if (sampling.filter_mode == 0) {
+        return texelFetch(base_texture, repeat_pixel(ivec2(floor(uv * vec2(extent))), extent), 0).rgb;
+    }
+    if (sampling.filter_mode == 1) { return bilinear_texture(uv, 0); }
+    vec2 dx = dFdx(mesh_uv) * vec2(extent);
+    vec2 dy = dFdy(mesh_uv) * vec2(extent);
+    float lod = clamp(log2(max(max(length(dx), length(dy)), 1e-8)), 0.0, float(textureQueryLevels(base_texture)-1));
+    int lower = int(floor(lod));
+    int upper = min(lower + 1, textureQueryLevels(base_texture)-1);
+    return mix(bilinear_texture(uv, lower), bilinear_texture(uv, upper), fract(lod));
+}
+
 void main() {
+    vec3 albedo = base_color * clamp(sample_base_texture(), vec3(0.0), vec3(1.0));
     vec3 n = normalize(world_normal);
     vec3 v = normalize(frame.camera_position.xyz - world_position);
     if (dot(n, v) < 0.0) { n = -n; }
@@ -53,8 +84,8 @@ void main() {
     float roughness = max(material.x, 0.045);
     float metallic = material.y;
     float alpha = roughness * roughness;
-    vec3 f0 = mix(vec3(0.04), base_color, metallic);
-    vec3 result = emission + frame.environment.xyz * mix(base_color, f0, metallic);
+    vec3 f0 = mix(vec3(0.04), albedo, metallic);
+    vec3 result = emission + frame.environment.xyz * mix(albedo, f0, metallic);
     float ndv = max(dot(n, v), 0.0);
     for (int i = 0; i < frame.counts.x; ++i) {
         vec3 l = -normalize(frame.lights[i].direction.xyz);
@@ -67,7 +98,7 @@ void main() {
         float d = distribution_ggx(ndh, alpha);
         float g = smith_g1(ndl, alpha) * smith_g1(ndv, alpha);
         vec3 specular = f * d * g / max(4.0 * ndl * ndv, 1e-6);
-        vec3 diffuse = (vec3(1.0) - f) * (1.0 - metallic) * base_color / PI;
+        vec3 diffuse = (vec3(1.0) - f) * (1.0 - metallic) * albedo / PI;
         result += (diffuse + specular) * frame.lights[i].radiance.rgb * ndl * visibility(i, ndl);
     }
     color = vec4(result, 1.0);

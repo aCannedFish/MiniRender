@@ -61,3 +61,18 @@ target_compile_features(minirender_exr_codec PRIVATE c_std_11)
 if(MSVC)
     target_compile_options(minirender_exr_codec PRIVATE /utf-8)
 endif()
+
+FetchContent_Declare(stb_image_header
+    URL https://raw.githubusercontent.com/nothings/stb/d14d46f6b44456eb88beac58cba833a4135d4c89/stb_image.h
+    URL_HASH SHA256=594c2fe35d49488b4382dbfaec8f98366defca819d916ac95becf3e75f4200b3
+    DOWNLOAD_NO_EXTRACT TRUE SOURCE_SUBDIR minirender_vendor_only)
+FetchContent_Declare(stb_write_header
+    URL https://raw.githubusercontent.com/nothings/stb/d14d46f6b44456eb88beac58cba833a4135d4c89/stb_image_write.h
+    URL_HASH SHA256=cbd5f0ad7a9cf4468affb36354a1d2338034f2c12473cf1a8e32053cb6914a05
+    DOWNLOAD_NO_EXTRACT TRUE SOURCE_SUBDIR minirender_vendor_only)
+FetchContent_MakeAvailable(stb_image_header stb_write_header)
+add_library(minirender_raster_codec STATIC "${PROJECT_SOURCE_DIR}/src/external/raster_codec.cpp")
+target_include_directories(minirender_raster_codec SYSTEM PUBLIC "${stb_image_header_SOURCE_DIR}" "${stb_write_header_SOURCE_DIR}")
+if(MSVC)
+    target_compile_options(minirender_raster_codec PRIVATE /utf-8)
+endif()

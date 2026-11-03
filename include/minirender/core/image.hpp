@@ -9,6 +9,8 @@
 
 namespace minirender {
 
+enum class ColorEncoding { srgb, linear };
+
 // 光照与显示之间的转换仅在输出处进行。输入与存储均为线性 RGB。
 float linear_to_srgb(float linear);
 float srgb_to_linear(float encoded);
@@ -32,6 +34,12 @@ class Image {
     // 32 位浮点 RGB EXR，通过内存 codec 和 filesystem 路径读写，保留 HDR/负值及 Unicode 路径。
     void write_exr(const std::filesystem::path& path) const;
     static Image read_exr(const std::filesystem::path& path);
+
+    // PNG/JPEG 8/16 位输入按 encoding 解码；HDR/EXR 必须声明为 linear。
+    static Image read(const std::filesystem::path& path,
+                      ColorEncoding encoding = ColorEncoding::srgb);
+    void write_png(
+        const std::filesystem::path& path) const; // 线性值编码为 RGB8 sRGB，不做 tone mapping。
 
   private:
     std::size_t width_;

@@ -61,3 +61,5 @@ git diff --check
 ```
 
 每完成一个可验证 CKPT，提交相关代码、文档和验收记录并 push 到远端分支。不要把构建目录、SDK、机器路径或本地生成日志提交到普通 Git 历史。
+
+纹理文件使用固定提交的 stb 读取/写出，桌面导入使用 Qt Concurrent。新增依赖均由 CMake 传递给 VS Code；运行纹理验证见 TEXTURES.md。

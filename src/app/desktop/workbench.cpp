@@ -10,6 +10,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
+#include <QFutureWatcher>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -22,11 +23,18 @@
 #include <QToolBar>
 #include <QTreeWidget>
 #include <QVulkanInstance>
+#include <QtConcurrent/QtConcurrentRun>
 
 #include <algorithm>
 #include <array>
 
 namespace {
+
+// 工作线程只处理文件和 CPU 数据，通过 watcher 在 UI 线程提交结果。
+struct TextureLoadResult {
+    std::shared_ptr<const minirender::Texture> texture;
+    std::string error;
+};
 
 std::filesystem::path native_path(const QString& path) {
     const auto bytes = path.toUtf8();
@@ -159,6 +167,8 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     });
     auto* import = toolbar->addAction("导入 OBJ");
     connect(import, &QAction::triggered, this, [this] { import_object(); });
+    import_texture_action_ = toolbar->addAction("导入纹理");
+    connect(import_texture_action_, &QAction::triggered, this, [this] { import_texture(); });
     auto* duplicate = toolbar->addAction("复制物体");
     duplicate->setObjectName("duplicate");
     connect(duplicate, &QAction::triggered, this, [this] { duplicate_object(); });
@@ -190,7 +200,7 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     tree_->setObjectName("scene_tree");
     tree_->setHeaderLabel("物体");
     assets_ = new QTreeWidget;
-    assets_->setHeaderLabels({"网格", "三角形"});
+    assets_->setHeaderLabels({"资源", "规模"});
     auto* left_tabs = new QTabWidget;
     left_tabs->addTab(tree_, "场景");
     left_tabs->addTab(assets_, "资源");
@@ -237,6 +247,10 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     auto* status_timer = new QTimer(this);
     status_timer->setInterval(500);
     connect(status_timer, &QTimer::timeout, this, [this] {
+        if (texture_loading_) {
+            statusBar()->showMessage("正在读取纹理并生成 mipmap…");
+            return;
+        }
         if (viewport_->isValid()) {
             statusBar()->showMessage(
                 QString(
@@ -267,6 +281,11 @@ void Workbench::build_object_panel() {
     emission_ = new VectorField(object_panel_, "emission", 0, 100);
     material_kind_ = new QComboBox;
     material_kind_->addItems({"漫反射", "金属", "镜面（预览近似）", "玻璃（预览近似）"});
+    texture_selector_ = new QComboBox;
+    texture_selector_->setObjectName("base_texture");
+    texture_filter_ = new QComboBox;
+    texture_filter_->setObjectName("texture_filter");
+    texture_filter_->addItems({"最近邻", "双线性", "三线性 mipmap"});
     roughness_ = spin(object_panel_, "roughness", 0, 1, 0.05);
     ior_ = spin(object_panel_, "ior", 0.1, 5, 0.05);
     layout->addRow("名称", object_name_);
@@ -275,6 +294,8 @@ void Workbench::build_object_panel() {
     layout->addRow("缩放", scale_);
     layout->addRow("材质", material_kind_);
     layout->addRow("底色 / 线性 RGB", base_color_);
+    layout->addRow("底色纹理 / RGB", texture_selector_);
+    layout->addRow("纹理过滤", texture_filter_);
     layout->addRow("自发光", emission_);
     layout->addRow("粗糙度", roughness_);
     layout->addRow("折射率", ior_);
@@ -319,6 +340,17 @@ void Workbench::build_object_panel() {
     connect(material_kind_, &QComboBox::currentIndexChanged, this, [this] {
         edit_material_property([&](minirender::Material& material) {
             material.kind = static_cast<minirender::MaterialKind>(material_kind_->currentIndex());
+        });
+    });
+    connect(texture_selector_, &QComboBox::currentIndexChanged, this, [this] {
+        edit_material_property([&](minirender::Material& material) {
+            material.base_color_texture = texture_selector_->currentData().toString().toStdString();
+        });
+    });
+    connect(texture_filter_, &QComboBox::currentIndexChanged, this, [this] {
+        edit_material_property([&](minirender::Material& material) {
+            material.texture_filter =
+                static_cast<minirender::TextureFilter>(texture_filter_->currentIndex());
         });
     });
     object_panel_->setEnabled(false);
@@ -417,6 +449,13 @@ void Workbench::refresh() {
         new QTreeWidgetItem(assets_, {QString::fromStdString(mesh.id),
                                       QString::number(mesh.data->triangles.size())});
     }
+    for (const auto& texture : editor_.document().textures) {
+        new QTreeWidgetItem(
+            assets_, {QString::fromStdString(texture.id), QString("%1×%2 / %3 mip")
+                                                              .arg(texture.data->level(0).width())
+                                                              .arg(texture.data->level(0).height())
+                                                              .arg(texture.data->level_count())});
+    }
     if (!tree_->currentItem() && tree_->topLevelItemCount() > 0) {
         tree_->setCurrentItem(tree_->topLevelItem(0));
         selected_id_ = tree_->currentItem()->data(0, Qt::UserRole).toString().toStdString();
@@ -443,6 +482,12 @@ void Workbench::refresh_properties() {
     const auto object = std::find_if(
         document.objects.begin(), document.objects.end(),
         [&](const minirender::SceneObject& value) { return value.id == selected_id_; });
+    texture_selector_->clear();
+    texture_selector_->addItem("无", QString());
+    for (const auto& texture : document.textures) {
+        texture_selector_->addItem(QString::fromStdString(texture.id),
+                                   QString::fromStdString(texture.id));
+    }
     object_panel_->setEnabled(object != document.objects.end());
     if (object != document.objects.end()) {
         object_name_->setText(QString::fromStdString(object->name));
@@ -456,6 +501,9 @@ void Workbench::refresh_properties() {
                 material_kind_->setCurrentIndex(static_cast<int>(material.kind));
                 roughness_->setValue(material.roughness);
                 ior_->setValue(material.ior);
+                texture_selector_->setCurrentIndex(texture_selector_->findData(
+                    QString::fromStdString(material.base_color_texture)));
+                texture_filter_->setCurrentIndex(static_cast<int>(material.texture_filter));
             }
         }
     }
@@ -559,9 +607,7 @@ void Workbench::import_object() {
             }
             const auto mesh_id = unique_id(scene.meshes, "mesh_");
             const auto object_id = unique_id(scene.objects, "object_");
-            scene.meshes.push_back(
-                {mesh_id, std::filesystem::relative(native_path(path), scene.asset_directory),
-                 mesh});
+            scene.meshes.push_back({mesh_id, native_path(path), mesh});
             scene.objects.push_back({object_id,
                                      QFileInfo(path).baseName().toStdString(),
                                      mesh_id,
@@ -580,6 +626,7 @@ void Workbench::load_scene_file(const QString& path) {
     if (document.directional_lights.size() > 8) {
         throw std::runtime_error("实时视口目前最多支持 8 个方向光。");
     }
+    ++document_generation_;
     editor_.replace(std::move(document));
     scene_path_ = path;
     selected_id_.clear();
@@ -615,4 +662,70 @@ VulkanViewport* Workbench::viewport() const noexcept {
 }
 const minirender::SceneDocument& Workbench::document() const noexcept {
     return editor_.document();
+}
+
+void Workbench::import_texture() {
+    const auto path = QFileDialog::getOpenFileName(this, "导入底色纹理", {},
+                                                   "Images (*.png *.jpg *.jpeg *.hdr *.exr)");
+    if (path.isEmpty()) {
+        return;
+    }
+    const auto suffix = QFileInfo(path).suffix().toLower();
+    const auto encoding = suffix == "hdr" || suffix == "exr" ? minirender::ColorEncoding::linear
+                                                             : minirender::ColorEncoding::srgb;
+    import_texture_file(path, encoding);
+}
+
+void Workbench::import_texture_file(const QString& path, minirender::ColorEncoding encoding) {
+    if (texture_loading_) {
+        throw std::logic_error("A texture import is already running");
+    }
+    std::string material_id;
+    for (const auto& object : editor_.document().objects) {
+        if (object.id == selected_id_) {
+            material_id = object.material_id;
+        }
+    }
+    const auto generation = document_generation_;
+    const auto source = native_path(path);
+    texture_loading_ = true;
+    import_texture_action_->setEnabled(false);
+    auto* watcher = new QFutureWatcher<TextureLoadResult>(this);
+    connect(watcher, &QFutureWatcher<TextureLoadResult>::finished, this,
+            [this, watcher, generation, source, encoding, material_id] {
+                const auto result = watcher->result();
+                watcher->deleteLater();
+                texture_loading_ = false;
+                import_texture_action_->setEnabled(true);
+                if (generation != document_generation_) {
+                    return;
+                }
+                if (!result.error.empty()) {
+                    report_error(std::runtime_error(result.error));
+                    return;
+                }
+                perform_edit([&](minirender::SceneDocument& scene) {
+                    const auto id = unique_id(scene.textures, "texture_");
+                    scene.textures.push_back({id, source, encoding, result.texture});
+                    for (auto& material : scene.materials) {
+                        if (material.id == material_id) {
+                            material.base_color_texture = id;
+                        }
+                    }
+                });
+            });
+    watcher->setFuture(QtConcurrent::run([source, encoding] {
+        TextureLoadResult result;
+        try {
+            result.texture = std::make_shared<const minirender::Texture>(
+                minirender::Image::read(source, encoding));
+        } catch (const std::exception& error) {
+            result.error = error.what();
+        }
+        return result;
+    }));
+}
+
+bool Workbench::texture_loading() const noexcept {
+    return texture_loading_;
 }

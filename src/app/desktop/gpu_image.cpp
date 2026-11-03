@@ -8,7 +8,8 @@ GpuImage::~GpuImage() {
 }
 
 void GpuImage::create(VkDevice device, VkPhysicalDevice physical, VkExtent2D extent,
-                      VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspect) {
+                      VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspect,
+                      std::uint32_t mip_levels) {
     release();
     device_ = device;
     VkFormatProperties properties{};
@@ -31,7 +32,7 @@ void GpuImage::create(VkDevice device, VkPhysicalDevice physical, VkExtent2D ext
     info.imageType = VK_IMAGE_TYPE_2D;
     info.format = format;
     info.extent = {extent.width, extent.height, 1};
-    info.mipLevels = 1;
+    info.mipLevels = mip_levels;
     info.arrayLayers = 1;
     info.samples = VK_SAMPLE_COUNT_1_BIT;
     info.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -63,7 +64,7 @@ void GpuImage::create(VkDevice device, VkPhysicalDevice physical, VkExtent2D ext
     view.image = image_;
     view.viewType = VK_IMAGE_VIEW_TYPE_2D;
     view.format = format;
-    view.subresourceRange = {aspect, 0, 1, 0, 1};
+    view.subresourceRange = {aspect, 0, mip_levels, 0, 1};
     check_vk(vkCreateImageView(device_, &view, nullptr, &view_), "create offscreen view");
 }
 

@@ -48,9 +48,13 @@ std::filesystem::path portable_asset_path(const std::filesystem::path& source,
     }
     const std::string original((std::istreambuf_iterator<char>(input)), {});
     for (unsigned index = 1;; ++index) {
-        const auto name = "mesh-" + std::to_string(index) + ".obj";
+        auto name = std::filesystem::path("asset-" + std::to_string(index));
+        name += source.extension();
         const auto candidate = assets / name;
         if (std::filesystem::exists(candidate)) {
+            if (std::filesystem::file_size(candidate) != original.size()) {
+                continue;
+            }
             std::ifstream existing(candidate, std::ios::binary);
             if (!existing) {
                 continue;
@@ -98,6 +102,9 @@ SceneDocument load_scene(const std::filesystem::path& path) {
             material.emission = vector3(value.value("emission", Json::array({0, 0, 0})));
             material.roughness = value.value("roughness", 0.35F);
             material.ior = value.value("ior", 1.5F);
+            material.base_color_texture = value.value("base_color_texture", std::string{});
+            material.texture_filter =
+                parse_texture_filter(value.value("texture_filter", std::string("trilinear")));
             scene.materials.push_back(material);
         }
         for (const auto& value : json.at("meshes")) {
@@ -107,6 +114,19 @@ SceneDocument load_scene(const std::filesystem::path& path) {
             mesh.data =
                 std::make_shared<const MeshData>(load_obj(scene.asset_directory / mesh.source));
             scene.meshes.push_back(std::move(mesh));
+        }
+        for (const auto& value : json.value("textures", Json::array())) {
+            TextureAsset texture;
+            texture.id = value.at("id").get<std::string>();
+            texture.source = path_from_utf8(value.at("source").get<std::string>());
+            const auto encoding = value.value("encoding", std::string("srgb"));
+            if (encoding != "srgb" && encoding != "linear") {
+                throw std::invalid_argument("Unknown texture encoding");
+            }
+            texture.encoding = encoding == "srgb" ? ColorEncoding::srgb : ColorEncoding::linear;
+            texture.data = std::make_shared<const Texture>(
+                Image::read(scene.asset_directory / texture.source, texture.encoding));
+            scene.textures.push_back(std::move(texture));
         }
         for (const auto& value : json.at("objects")) {
             SceneObject object;
@@ -145,17 +165,20 @@ void save_scene(const SceneDocument& document, const std::filesystem::path& path
                       {"near", camera.near_plane},
                       {"far", camera.far_plane}};
     json["environment"] = vector3(document.environment);
-    for (const auto* key : {"materials", "meshes", "objects", "directional_lights"}) {
+    for (const auto* key : {"materials", "meshes", "textures", "objects", "directional_lights"}) {
         json[key] = Json::array();
     }
     for (const auto& material : document.materials) {
-        json["materials"].push_back({{"id", material.id},
-                                     {"name", material.name},
-                                     {"kind", material_kind_name(material.kind)},
-                                     {"base_color", vector3(material.base_color)},
-                                     {"emission", vector3(material.emission)},
-                                     {"roughness", material.roughness},
-                                     {"ior", material.ior}});
+        json["materials"].push_back(
+            {{"id", material.id},
+             {"name", material.name},
+             {"kind", material_kind_name(material.kind)},
+             {"base_color", vector3(material.base_color)},
+             {"emission", vector3(material.emission)},
+             {"roughness", material.roughness},
+             {"ior", material.ior},
+             {"base_color_texture", material.base_color_texture},
+             {"texture_filter", texture_filter_name(material.texture_filter)}});
     }
     const auto destination_directory = std::filesystem::absolute(path).parent_path();
     for (const auto& mesh : document.meshes) {
@@ -165,6 +188,17 @@ void save_scene(const SceneDocument& document, const std::filesystem::path& path
         const auto relative =
             portable_asset_path(document.asset_directory / mesh.source, destination_directory);
         json["meshes"].push_back({{"id", mesh.id}, {"source", path_to_utf8(relative)}});
+    }
+    for (const auto& texture : document.textures) {
+        if (texture.source.empty()) {
+            throw std::invalid_argument("Texture must have a source before saving");
+        }
+        const auto relative =
+            portable_asset_path(document.asset_directory / texture.source, destination_directory);
+        json["textures"].push_back(
+            {{"id", texture.id},
+             {"source", path_to_utf8(relative)},
+             {"encoding", texture.encoding == ColorEncoding::srgb ? "srgb" : "linear"}});
     }
     for (const auto& object : document.objects) {
         const auto& transform = object.transform;

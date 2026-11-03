@@ -26,6 +26,8 @@ endif()
 
 add_library(minirender_core
     src/core/image.cpp
+    src/core/texture.cpp
+    src/core/raster_io.cpp
     src/core/exr_io.cpp
     src/scene/scene.cpp
     src/scene/editor.cpp
@@ -33,7 +35,7 @@ add_library(minirender_core
     src/assets/obj_loader.cpp
     src/assets/scene_io.cpp)
 target_include_directories(minirender_core PUBLIC include)
-target_link_libraries(minirender_core PUBLIC glm::glm PRIVATE minirender_warnings nlohmann_json::nlohmann_json tinyobjloader minirender_exr_codec)
+target_link_libraries(minirender_core PUBLIC glm::glm PRIVATE minirender_warnings nlohmann_json::nlohmann_json tinyobjloader minirender_exr_codec minirender_raster_codec)
 target_compile_definitions(minirender_core PUBLIC
     GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
@@ -41,7 +43,7 @@ add_executable(minirender_cli src/app/cli.cpp)
 target_link_libraries(minirender_cli PRIVATE minirender_core minirender_warnings)
 
 if(BUILD_TESTING)
-    add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp)
+    add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_tests PRIVATE
         minirender_core Catch2::Catch2WithMain minirender_warnings)
