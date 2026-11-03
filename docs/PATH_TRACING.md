@@ -9,7 +9,7 @@ build/macos-core-release/minirender_cli --render scenes/path-room.json outputs/r
 
 命令保存 `room.exr` 和 `room.png`。EXR 保留线性 RGB，PNG 应用曝光、Reinhard 和既有 sRGB 编码。`--exposure` 只改变 PNG；路径累计不使用曝光值。输出名可带 `.exr` 或 `.png`，内部统一作为同一组结果的前缀。
 
-可选参数有 `--width`、`--height`、`--spp`、`--depth`、`--seed`、`--mode`、`--exposure`、`--no-rr`、`--rr-depth`。模式为 `bsdf`、`light`、`mis`。Windows 使用 UTF-16 入口再统一转换为 UTF-8，场景和输出支持中文路径。
+可选参数有 `--width`、`--height`、`--spp`、`--depth`、`--seed`、`--mode`、`--exposure`、`--no-rr`、`--rr-depth`、`--threads`、`--tile`、`--batch`。模式为 `bsdf`、`light`、`mis`。Windows 使用 UTF-16 入口再统一转换为 UTF-8，场景和输出支持中文路径。
 
 ## 数据流
 
@@ -17,7 +17,7 @@ build/macos-core-release/minirender_cli --render scenes/path-room.json outputs/r
 
 单像素样本返回 double RGB，图像平均后转为项目的 float 图像。积分器检查非有限贡献，不对高亮样本做截断。统计量由调用方持有，包含路径、阴影射线、散射事件、RR 终止及几何测试次数。
 
-`sample_pixel` 没有可变共享状态，后续 RenderSession 将复用它实现分块并行和任务控制。本检查点的 `render` 是单线程参考入口。
+`sample_pixel` 没有可变共享状态。CLI 已经通过 [RenderSession](RENDER_SESSION.md) 实现分块并行和任务控制，`PathTracer::render` 保留为单线程参考入口。
 
 ## 路径累计
 
