@@ -1,0 +1,171 @@
+{
+  "version": 1,
+  "camera": {
+    "position": [
+      3.0,
+      2.2,
+      4.5
+    ],
+    "target": [
+      0.0,
+      0.5,
+      0.0
+    ],
+    "up": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "vertical_fov": 45.0,
+    "near": 0.05,
+    "far": 100.0
+  },
+  "environment": [
+    0.15,
+    0.15,
+    0.15
+  ],
+  "materials": [
+    {
+      "id": "floor",
+      "name": "灰色地面",
+      "kind": "diffuse",
+      "base_color": [
+        0.35,
+        0.38,
+        0.42
+      ],
+      "roughness": 0.8
+    },
+    {
+      "id": "blue",
+      "name": "蓝色漫反射",
+      "kind": "diffuse",
+      "base_color": [
+        1,
+        1,
+        1
+      ],
+      "roughness": 0.4,
+      "base_color_texture": "checker"
+    },
+    {
+      "id": "metal",
+      "name": "金属",
+      "kind": "conductor",
+      "base_color": [
+        0.9,
+        0.6,
+        0.25
+      ],
+      "roughness": 0.25
+    }
+  ],
+  "meshes": [
+    {
+      "id": "cube",
+      "source": "assets/cube.obj"
+    },
+    {
+      "id": "plane",
+      "source": "assets/plane.obj"
+    }
+  ],
+  "objects": [
+    {
+      "id": "ground",
+      "name": "地面",
+      "mesh": "plane",
+      "material": "floor",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          3,
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "id": "blue_cube",
+      "name": "蓝色方块",
+      "mesh": "cube",
+      "material": "blue",
+      "visible": true,
+      "transform": {
+        "translation": [
+          -0.65,
+          0.5,
+          0
+        ],
+        "rotation": [
+          0,
+          20,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "id": "metal_cube",
+      "name": "金属方块",
+      "mesh": "cube",
+      "material": "metal",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0.8,
+          0.35,
+          0.2
+        ],
+        "rotation": [
+          0,
+          -20,
+          0
+        ],
+        "scale": [
+          0.7,
+          0.7,
+          0.7
+        ]
+      }
+    }
+  ],
+  "directional_lights": [
+    {
+      "id": "sun",
+      "direction": [
+        -1,
+        -2,
+        -1
+      ],
+      "color": [
+        1,
+        0.95,
+        0.85
+      ],
+      "intensity": 3.0
+    }
+  ],
+  "textures": [
+    {
+      "id": "checker",
+      "source": "assets/textures/checker.png",
+      "encoding": "srgb"
+    }
+  ]
+}

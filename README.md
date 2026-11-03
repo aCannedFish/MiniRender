@@ -17,4 +17,6 @@ A1.1 场景数据层已通过本机测试，支持 OBJ、JSON 场景、相机/�
 
 A1.3 已加入多方向光深度图阴影和 PCF，见 [阴影实现](docs/SHADOWS.md) 与 [验收记录](docs/checkpoints/A1.3.md)。
 
-A1.4 已加入浮点 HDR、独立后处理、FXAA、深度视图和 EXR 输出，见 [HDR 实现](docs/HDR.md) 与 [验收记录](docs/checkpoints/A1.4.md)。A1 尚有纹理、线框和编辑完善工作。
+A1.4 已加入浮点 HDR、独立后处理、FXAA、深度视图和 EXR 输出，见 [HDR 实现](docs/HDR.md) 与 [验收记录](docs/checkpoints/A1.4.md)。A1 尚有线框和编辑完善工作。
+
+A1.5 已加入纹理资产、线性 mipmap、三种过滤方式及异步导入，见 [纹理实现](docs/TEXTURES.md) 和 [验收记录](docs/checkpoints/A1.5.md)。

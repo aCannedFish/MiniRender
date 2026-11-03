@@ -21,6 +21,8 @@ class Workbench final : public QMainWindow {
     void load_scene_file(const QString& path);
     void save_scene_file(const QString& path);
     void select_object(const std::string& id);
+    void import_texture_file(const QString& path, minirender::ColorEncoding encoding);
+    bool texture_loading() const noexcept;
 
   private:
     void build_object_panel();
@@ -35,6 +37,7 @@ class Workbench final : public QMainWindow {
     void duplicate_object();
     void delete_object();
     void import_object();
+    void import_texture();
     void report_error(const std::exception& error);
     minirender::SceneObject* selected(minirender::SceneDocument& scene) const;
 
@@ -52,6 +55,11 @@ class Workbench final : public QMainWindow {
     VectorField* base_color_ = nullptr;
     VectorField* emission_ = nullptr;
     QComboBox* material_kind_ = nullptr;
+    QComboBox* texture_selector_ = nullptr;
+    QComboBox* texture_filter_ = nullptr;
+    QAction* import_texture_action_ = nullptr;
+    bool texture_loading_ = false;
+    std::uint64_t document_generation_ = 0;
     QDoubleSpinBox* roughness_ = nullptr;
     QDoubleSpinBox* ior_ = nullptr;
     QComboBox* light_selector_ = nullptr;

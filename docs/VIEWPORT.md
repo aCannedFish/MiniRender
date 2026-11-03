@@ -28,7 +28,7 @@ FrameUniform 按 std140 排列，包含 view-projection、相机位置、环境�
 
 漫反射和导体分别使用不同的 metallic 参数。均匀环境项暂时提供简单填充光；它不等同于完整 IBL。理想镜面和玻璃明确标记为预览近似，不提供真实镜面反射或折射。
 
-方向光阴影已在 A1.3 加入，见 SHADOWS.md。A1.4 将光照改为浮点 HDR 输出，并把曝光、Reinhard 和 FXAA 移到独立显示 pass，见 HDR.md。线框和纹理仍待后续实现。
+方向光阴影已在 A1.3 加入，见 SHADOWS.md。A1.4 将光照改为浮点 HDR 输出，并把曝光、Reinhard 和 FXAA 移到独立显示 pass，见 HDR.md。纹理已在 A1.5 加入，见 TEXTURES.md；线框仍待后续实现。
 
 模型参考 [Walter 等，2007](https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf) 的 GGX/Smith 推导，以及 [PBRT 微表面章节](https://www.pbr-book.org/4ed/Reflection_Models/Roughness_Using_Microfacet_Theory)。本项目预览使用分离的 G1 乘积，未采用 PBRT 的相关高度 G 实现，也未实现该论文中的粗糙透射。
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gpu_buffer.hpp"
+#include "gpu_texture.hpp"
 #include "hdr_targets.hpp"
 #include "post_process.hpp"
 #include "shadow_map.hpp"
@@ -8,6 +9,7 @@
 #include "vulkan_viewport.hpp"
 
 #include <limits>
+#include <map>
 
 // 三角网格的实时直接光照管线。使用场景快照，UI 修改通过 revision 发布。
 // 光照写入浮点 HDR；法线、深度与显示变换由独立后处理消费。
@@ -26,6 +28,18 @@ class SceneRenderer final : public ViewportRenderer {
     VkPipeline create_pipeline(bool shadow);
     void render_shadow_maps(VkCommandBuffer command);
     void upload_scene();
+    void rebuild_texture_descriptors();
+    using TextureHandle = std::shared_ptr<const minirender::Texture>;
+    struct Draw {
+        std::uint32_t first = 0;
+        std::uint32_t count = 0;
+        TextureHandle texture;
+        minirender::TextureFilter filter = minirender::TextureFilter::trilinear;
+        VkDescriptorSet descriptor = VK_NULL_HANDLE;
+    };
+    std::vector<Draw> draws_;
+    TextureHandle white_texture_;
+    std::map<TextureHandle, std::unique_ptr<GpuTexture>, std::owner_less<TextureHandle>> textures_;
     void update_uniforms();
     VulkanViewport* window_;
     VkDevice device_ = VK_NULL_HANDLE;

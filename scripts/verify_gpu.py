@@ -19,7 +19,10 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=Path("outputs/a0"))
     parser.add_argument("--timeout", type=float, default=35)
     parser.add_argument("--scene", type=Path, help="Run scene editor checks instead of A0 diagnostics")
+    parser.add_argument("--texture-check", action="store_true", help="Verify texture import and filtering")
     args = parser.parse_args()
+    if args.texture_check and not args.scene:
+        parser.error("--texture-check requires --scene")
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     executable = args.executable.resolve()
@@ -29,7 +32,12 @@ def main() -> int:
         executable = executable / "Contents/MacOS" / name
     arguments = [str(executable)]
     if args.scene:
-        arguments += ["--scene", str(args.scene.resolve()), "--scene-smoke", str(output)]
+        arguments += [
+            "--scene",
+            str(args.scene.resolve()),
+            "--texture-smoke" if args.texture_check else "--scene-smoke",
+            str(output),
+        ]
     else:
         arguments += ["--smoke", str(output / "gpu-smoke.png")]
     with (output / "gpu-smoke.log").open("w", encoding="utf-8") as log:
@@ -47,7 +55,10 @@ def main() -> int:
             code = 124
     text = (output / "gpu-smoke.log").read_text(encoding="utf-8")
     print(text, end="")
-    marker = "Scene smoke PASS" if args.scene else "GPU smoke PASS"
+    marker = (
+        "Texture smoke PASS" if args.texture_check
+        else ("Scene smoke PASS" if args.scene else "GPU smoke PASS")
+    )
     if code == 0 and (marker not in text or "Vulkan validation errors: 0" not in text):
         print("Missing verification evidence.", file=sys.stderr)
         return 1

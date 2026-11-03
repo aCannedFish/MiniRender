@@ -150,16 +150,25 @@ void Material::validate() const {
             "Roughness must be in [0,1]");
     require(std::isfinite(ior) && ior > 0, "IOR must be positive");
     material_kind_name(kind);
+    texture_filter_name(texture_filter);
 }
 
 void SceneDocument::validate() const {
     camera.validate();
     require(finite(environment) && glm::all(glm::greaterThanEqual(environment, glm::vec3(0))),
             "Environment must be finite and nonnegative");
+    std::unordered_set<std::string> texture_ids;
+    for (const auto& texture : textures) {
+        unique_id(texture_ids, texture.id, "Texture");
+        require(texture.data != nullptr, "Texture data is missing: " + texture.id);
+    }
     std::unordered_set<std::string> material_ids;
     for (const auto& material : materials) {
         unique_id(material_ids, material.id, "Material");
         material.validate();
+        require(material.base_color_texture.empty() ||
+                    texture_ids.contains(material.base_color_texture),
+                "Material references missing texture: " + material.base_color_texture);
     }
     std::unordered_set<std::string> mesh_ids;
     for (const auto& mesh : meshes) {
@@ -203,8 +212,14 @@ std::shared_ptr<const SceneSnapshot> make_snapshot(const SceneDocument& document
         const auto material =
             std::find_if(document.materials.begin(), document.materials.end(),
                          [&](const auto& value) { return value.id == object.material_id; });
+        std::shared_ptr<const Texture> texture;
+        for (const auto& asset : document.textures) {
+            if (asset.id == material->base_color_texture) {
+                texture = asset.data;
+            }
+        }
         snapshot->instances.push_back({object.id, mesh->data, *material, object.transform.matrix(),
-                                       object.transform.normal_matrix()});
+                                       object.transform.normal_matrix(), texture});
     }
     return snapshot;
 }
