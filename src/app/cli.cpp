@@ -1,3 +1,4 @@
+#include "render_cli.hpp"
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/core/image.hpp>
 #include <minirender/render/bvh.hpp>
@@ -6,16 +7,25 @@
 #include <exception>
 #include <iostream>
 #include <string_view>
+#include <vector>
+
+namespace {
+std::filesystem::path native_path(std::string_view text) {
+    return std::filesystem::path(std::u8string(text.begin(), text.end()));
+}
 
 // 无窗口入口，仅依赖 core。后续算法在此提供与 UI 相同的场景/任务接口。
-int main(int argc, char** argv) {
+int run_cli(int argc, char** argv) {
     try {
+        if (argc >= 2 && std::string_view(argv[1]) == "--render") {
+            return run_render_cli(argc - 2, argv + 2);
+        }
         if (argc == 2 && std::string_view(argv[1]) == "--capabilities") {
             std::cout << "MiniRender 0.1\nimage: linear RGB\noptix: unavailable (B2 pending)\n";
             return 0;
         }
         if (argc == 3 && std::string_view(argv[1]) == "--inspect") {
-            const auto scene = minirender::load_scene(argv[2]);
+            const auto scene = minirender::load_scene(native_path(argv[2]));
             const auto snapshot = minirender::make_snapshot(scene);
             std::size_t triangles = 0;
             for (const auto& instance : snapshot->instances) {
@@ -27,19 +37,21 @@ int main(int argc, char** argv) {
             return 0;
         }
         if (argc == 3 && std::string_view(argv[1]) == "--test-pattern") {
-            minirender::make_diagnostic_image(128, 96).write_ppm(argv[2]);
+            minirender::make_diagnostic_image(128, 96).write_ppm(native_path(argv[2]));
             std::cout << "Diagnostic image saved; this is not a rendered scene.\n";
             return 0;
         }
         if (argc == 4 && std::string_view(argv[1]) == "--trace-normals") {
-            const auto snapshot = minirender::make_snapshot(minirender::load_scene(argv[2]));
+            const auto snapshot =
+                minirender::make_snapshot(minirender::load_scene(native_path(argv[2])));
             const auto start = std::chrono::steady_clock::now();
             const minirender::SceneBvh bvh(snapshot);
             const auto built = std::chrono::steady_clock::now();
             minirender::Image image(256, 256);
             minirender::TraceStatistics queries;
             const auto& camera = snapshot->camera;
-            const auto forward = glm::normalize(camera.target - camera.position);
+            const auto forward =
+                glm::normalize(glm::dvec3(camera.target) - glm::dvec3(camera.position));
             // 一条主射线对应一个像素中心。这里只输出法线，尚未计算光照或路径积分。
             for (std::size_t y = 0; y < image.height(); ++y) {
                 for (std::size_t x = 0; x < image.width(); ++x) {
@@ -54,7 +66,7 @@ int main(int argc, char** argv) {
                 }
             }
             const auto finished = std::chrono::steady_clock::now();
-            image.write_png(argv[3]);
+            image.write_png(native_path(argv[3]));
             const auto& statistics = bvh.statistics();
             std::cout << "geometry diagnostic: world-space shading normals\ntriangles: "
                       << statistics.triangles << "\nnodes: " << statistics.nodes
@@ -68,10 +80,33 @@ int main(int argc, char** argv) {
             return 0;
         }
         std::cout << "Usage: minirender_cli --capabilities | --test-pattern output.ppm | --inspect "
-                     "scene.json | --trace-normals scene.json output.png\n";
+                     "scene.json | --trace-normals scene.json output.png | --render scene.json "
+                     "output-prefix [options]\n";
         return argc == 1 ? 0 : 2;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;
     }
 }
+
+} // namespace
+
+#ifdef _WIN32
+// Windows 命令行原生为 UTF-16；统一转换为 UTF-8，再进入跨平台的参数和路径处理。
+int wmain(int argc, wchar_t** argv) {
+    std::vector<std::string> values;
+    for (int index = 0; index < argc; ++index) {
+        const auto value = std::filesystem::path(argv[index]).u8string();
+        values.emplace_back(value.begin(), value.end());
+    }
+    std::vector<char*> arguments;
+    for (auto& value : values) {
+        arguments.push_back(value.data());
+    }
+    return run_cli(argc, arguments.data());
+}
+#else
+int main(int argc, char** argv) {
+    return run_cli(argc, argv);
+}
+#endif

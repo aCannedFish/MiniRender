@@ -51,6 +51,10 @@ struct LightSample {
     SampleMeasure measure = SampleMeasure::solid_angle;
     LightKind kind = LightKind::area;
     std::size_t emitter_index = 0;
+    // 面积光终点及其误差，用于同时偏移阴影线段两端；无限光不使用这些字段。
+    glm::dvec3 position{0};
+    glm::dvec3 normal{0};
+    glm::dvec3 position_error{0};
 };
 
 // 发光三角形作为双面漫发射面积光，与现有 emission 预览约定一致。

@@ -1,3 +1,4 @@
+#include <minirender/core/sampling.hpp>
 #include <minirender/scene/scene.hpp>
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -91,6 +92,9 @@ void Camera::validate() const {
     require(std::isfinite(near_plane) && std::isfinite(far_plane) && near_plane > 0 &&
                 far_plane > near_plane,
             "Camera clipping planes must satisfy 0 < near < far");
+    require(std::isfinite(aperture_radius) && aperture_radius >= 0 &&
+                std::isfinite(focus_distance) && focus_distance > 0,
+            "Camera lens requires nonnegative aperture and positive focus distance");
 }
 
 glm::mat4 Camera::view_matrix() const {
@@ -107,18 +111,34 @@ glm::mat4 Camera::projection_matrix(float aspect) const {
     return projection;
 }
 
-Ray Camera::generate_ray(glm::vec2 pixel_uv, float aspect) const {
+Ray Camera::generate_ray(glm::dvec2 pixel_uv, double aspect) const {
     validate();
     require(std::isfinite(aspect) && aspect > 0 && std::isfinite(pixel_uv.x) &&
                 std::isfinite(pixel_uv.y),
             "Ray coordinates and aspect must be valid");
-    const auto forward = glm::normalize(target - position);
-    const auto right = glm::normalize(glm::cross(forward, up));
+    const auto forward = glm::normalize(glm::dvec3(target) - glm::dvec3(position));
+    const auto right = glm::normalize(glm::cross(forward, glm::dvec3(up)));
     const auto camera_up = glm::cross(right, forward);
-    const float half_height = std::tan(glm::radians(vertical_fov_degrees) * 0.5F);
-    const auto direction = forward + (2.0F * pixel_uv.x - 1.0F) * aspect * half_height * right +
-                           (1.0F - 2.0F * pixel_uv.y) * half_height * camera_up;
+    const double half_height =
+        std::tan(glm::radians(static_cast<double>(vertical_fov_degrees)) * 0.5);
+    const auto direction = forward + (2 * pixel_uv.x - 1) * aspect * half_height * right +
+                           (1 - 2 * pixel_uv.y) * half_height * camera_up;
     return {position, glm::normalize(direction)};
+}
+
+Ray Camera::generate_lens_ray(glm::dvec2 pixel_uv, double aspect, glm::dvec2 lens_u) const {
+    const auto pinhole = generate_ray(pixel_uv, aspect);
+    if (aperture_radius == 0) {
+        return pinhole;
+    }
+    const auto disk = sample_disk(lens_u) * static_cast<double>(aperture_radius);
+    const auto forward = glm::normalize(glm::dvec3(target) - glm::dvec3(position));
+    const auto right = glm::normalize(glm::cross(forward, glm::dvec3(up)));
+    const auto camera_up = glm::cross(right, forward);
+    const auto focus = pinhole.origin + pinhole.direction * (static_cast<double>(focus_distance) /
+                                                             glm::dot(pinhole.direction, forward));
+    const auto origin = glm::dvec3(position) + disk.x * right + disk.y * camera_up;
+    return {origin, glm::normalize(focus - origin)};
 }
 
 std::string material_kind_name(MaterialKind kind) {

@@ -267,9 +267,20 @@ std::optional<LightSample> LightSampler::sample(glm::dvec3 reference, double lig
     }
     const auto direction = point - reference;
     const double distance = glm::length(direction);
-    return LightSample{
-        direction / distance,       light.radiance, distance,       selected->probability * density,
-        SampleMeasure::solid_angle, choice.kind,    selected->index};
+    const auto error =
+        (glm::abs(barycentric.x * light.vertices[0]) + glm::abs(barycentric.y * light.vertices[1]) +
+         glm::abs(barycentric.z * light.vertices[2])) *
+        (7 * std::numeric_limits<double>::epsilon());
+    return LightSample{direction / distance,
+                       light.radiance,
+                       distance,
+                       selected->probability * density,
+                       SampleMeasure::solid_angle,
+                       choice.kind,
+                       selected->index,
+                       point,
+                       light.normal,
+                       error};
 }
 double LightSampler::area_pdf(glm::dvec3 reference, const SurfaceHit& hit) const {
     const auto choice = area_choices_.find({hit.instance_index, hit.triangle_index});

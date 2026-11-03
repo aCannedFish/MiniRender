@@ -261,13 +261,17 @@ SurfaceHit SceneBvh::surface_hit(const Ray& ray, const PrimitiveHit& hit) const 
         geometric = -geometric;
     }
     glm::dvec3 shading(0);
-    glm::vec2 uv(0);
+    glm::dvec2 uv(0);
+    glm::dvec3 position(0), absolute_position(0);
     for (std::size_t corner = 0; corner < 3; ++corner) {
         const auto& data = triangle.corners[corner];
         const double weight = hit.hit.barycentric[static_cast<int>(corner)];
         shading +=
             weight * glm::normalize(glm::dmat3(instance.normal_to_world) * glm::dvec3(data.normal));
-        uv += static_cast<float>(weight) * data.uv;
+        uv += weight * glm::dvec2(data.uv);
+        const auto term = weight * glm::dvec3(primitive.vertices[corner]);
+        position += term;
+        absolute_position += glm::abs(term);
     }
     if (glm::dot(shading, shading) < 1e-24) {
         shading = geometric;
@@ -278,14 +282,15 @@ SurfaceHit SceneBvh::surface_hit(const Ray& ray, const PrimitiveHit& hit) const 
         }
     }
     return {hit.hit.distance,
-            glm::vec3(glm::dvec3(ray.origin) + hit.hit.distance * glm::dvec3(ray.direction)),
+            position,
             glm::vec3(geometric),
             glm::vec3(shading),
-            uv,
+            glm::vec2(uv),
             hit.hit.barycentric,
             primitive.instance,
             primitive.triangle,
-            glm::dot(glm::dvec3(ray.direction), geometric) < 0};
+            glm::dot(ray.direction, geometric) < 0,
+            absolute_position * (7 * std::numeric_limits<double>::epsilon())};
 }
 
 std::optional<SurfaceHit> SceneBvh::intersect(const Ray& ray, RayInterval interval,

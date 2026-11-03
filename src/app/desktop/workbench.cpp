@@ -21,6 +21,7 @@
 #include <QSignalBlocker>
 #include <QSizePolicy>
 #include <QStatusBar>
+#include <QStringList>
 #include <QTabWidget>
 #include <QTimer>
 #include <QToolBar>
@@ -351,9 +352,22 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
                     "%1 | %2 个物体 | 直接光照预览 | 左拖环绕 · 右拖转向 · 中拖平移 · WASDQE 移动")
                     .arg(QString::fromUtf8(viewport_->physicalDeviceProperties()->deviceName))
                     .arg(editor_.document().objects.size());
+            QStringList offline_features;
             if (!editor_.document().environment_map.texture_id.empty() &&
                 editor_.document().environment_map.strength > 0) {
-                message += " | 当前预览不显示环境图";
+                offline_features.append("环境图");
+            }
+            if (editor_.document().camera.aperture_radius > 0) {
+                offline_features.append("景深");
+            }
+            if (std::any_of(editor_.document().materials.begin(),
+                            editor_.document().materials.end(), [](const auto& material) {
+                                return glm::any(glm::greaterThan(material.emission, glm::vec3(0)));
+                            })) {
+                offline_features.append("面光源照明");
+            }
+            if (!offline_features.isEmpty()) {
+                message += " | " + offline_features.join("、") + "用于离线渲染";
             }
             statusBar()->showMessage(message);
         }

@@ -24,7 +24,7 @@ SceneObject 引用 mesh/material ID 并保存自身变换。一个网格可以�
 
 ## 保存与快照
 
-场景版本目前为整数 1。JSON 保存相机、环境、材料、模型引用、物体和方向光。加载后检查 ID 唯一性、引用完整性、数值有限性、相机及变换是否合法。
+场景版本为整数 1。JSON 保存相机、环境、材料、模型引用、物体和方向光。相机可选的 aperture_radius/focus_distance 保存薄透镜参数；可选的 environment_map 引用环境纹理，旧场景使用针孔和常量环境。加载后检查 ID 唯一性、引用完整性、数值有限性、相机及变换是否合法。
 
 模型路径相对于场景文件目录。另存到不同目录时，重算模型路径以继续指向原资产，不把个人绝对路径写入新场景。Windows 跨盘符时无法生成相对路径，因此将相关资产复制到新场景的 assets 目录；已有同内容文件复用，不覆盖不同内容的文件。JSON 文件名与资产路径通过 filesystem 的 UTF-8 转换支持中文及空格。
 
@@ -38,4 +38,4 @@ build/macos-core-debug/minirender_cli --inspect scenes/studio.json
 
 预期为 2 个网格、3 个物体、3 个可见实例、26 个实例三角形。这条命令只加载和验证数据，不代表场景已经接入 Vulkan 渲染或 UI 编辑器。
 
-A1.1 的 Debug/Release CTest 各 13/13 通过。下一子检查点将消费这些数据绘制场景，并加入相机交互和属性编辑。A1 的阴影、HDR 与 FXAA 仍在后续范围内。
+数据层回归随 core CTest 执行。实时编辑见 [场景视口](VIEWPORT.md)，CPU 求交和积分见 [场景求交](INTERSECTION.md) 与 [路径追踪](PATH_TRACING.md)。

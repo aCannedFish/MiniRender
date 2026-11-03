@@ -115,11 +115,11 @@ Camera dolly_camera(Camera camera, float distance_factor) {
 }
 
 std::optional<std::string> pick_object(const SceneSnapshot& scene, const Ray& ray) {
-    float nearest = std::numeric_limits<float>::infinity();
+    double nearest = std::numeric_limits<double>::infinity();
     std::optional<std::string> selected;
     for (const auto& instance : scene.instances) {
         for (const auto& triangle : instance.mesh->triangles) {
-            std::array<glm::vec3, 3> p;
+            std::array<glm::dvec3, 3> p;
             for (std::size_t k = 0; k < 3; ++k) {
                 p[k] =
                     glm::vec3(instance.object_to_world *
@@ -129,16 +129,16 @@ std::optional<std::string> pick_object(const SceneSnapshot& scene, const Ray& ra
             const auto edge1 = p[1] - p[0];
             const auto edge2 = p[2] - p[0];
             const auto cross = glm::cross(ray.direction, edge2);
-            const float determinant = glm::dot(edge1, cross);
+            const double determinant = glm::dot(edge1, cross);
             if (std::abs(determinant) < 1e-9F) {
                 continue;
             }
-            const float inverse = 1.0F / determinant;
+            const double inverse = 1.0 / determinant;
             const auto offset = ray.origin - p[0];
-            const float u = glm::dot(offset, cross) * inverse;
+            const double u = glm::dot(offset, cross) * inverse;
             const auto q = glm::cross(offset, edge1);
-            const float v = glm::dot(ray.direction, q) * inverse;
-            const float t = glm::dot(edge2, q) * inverse;
+            const double v = glm::dot(ray.direction, q) * inverse;
+            const double t = glm::dot(edge2, q) * inverse;
             if (u >= 0 && v >= 0 && u + v <= 1 && t > 1e-5F && t < nearest) {
                 nearest = t;
                 selected = instance.object_id;

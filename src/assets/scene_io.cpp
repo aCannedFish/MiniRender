@@ -92,6 +92,8 @@ SceneDocument load_scene(const std::filesystem::path& path) {
         scene.camera.vertical_fov_degrees = camera.at("vertical_fov").get<float>();
         scene.camera.near_plane = camera.at("near").get<float>();
         scene.camera.far_plane = camera.at("far").get<float>();
+        scene.camera.aperture_radius = camera.value("aperture_radius", 0.0F);
+        scene.camera.focus_distance = camera.value("focus_distance", 4.0F);
         scene.environment = vector3(json.at("environment"));
         if (json.contains("environment_map")) {
             const auto& environment = json.at("environment_map");
@@ -169,7 +171,9 @@ void save_scene(const SceneDocument& document, const std::filesystem::path& path
                       {"up", vector3(camera.up)},
                       {"vertical_fov", camera.vertical_fov_degrees},
                       {"near", camera.near_plane},
-                      {"far", camera.far_plane}};
+                      {"far", camera.far_plane},
+                      {"aperture_radius", camera.aperture_radius},
+                      {"focus_distance", camera.focus_distance}};
     json["environment"] = vector3(document.environment);
     json["environment_map"] = {{"texture", document.environment_map.texture_id},
                                {"strength", document.environment_map.strength},

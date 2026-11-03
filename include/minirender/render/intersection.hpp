@@ -30,7 +30,7 @@ struct Bounds3 {
 // barycentric 的三个分量依次对应输入三角形的三个顶点，和为一。
 struct TriangleHit {
     double distance = 0;
-    glm::vec3 barycentric{0};
+    glm::dvec3 barycentric{0};
 };
 
 // 每条射线只准备一次倒数、主方向置换和剪切系数，供 BVH 的多个图元测试复用。
@@ -42,6 +42,7 @@ class RayQuery {
     std::optional<double> intersect(const Bounds3& bounds, RayInterval interval) const;
     // 射线坐标系中的二维边函数，双面求交，精确边界可归属于两侧三角形。
     // 采用 Woop/Benthin/Wald 2013 的置换与剪切形式，算术统一使用 double。
+    // 排除数值误差范围内无法与零区分的起点命中。
     std::optional<TriangleHit> intersect(const std::array<glm::vec3, 3>& vertices,
                                          RayInterval interval) const;
 

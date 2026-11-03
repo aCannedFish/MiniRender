@@ -11,14 +11,15 @@ namespace minirender {
 // 材质与纹理通过 instance_index 访问 scene()，不在每次命中时拷贝字符串或资产。
 struct SurfaceHit {
     double distance = 0;
-    glm::vec3 position{0};
+    glm::dvec3 position{0};
     glm::vec3 geometric_normal{0};
     glm::vec3 shading_normal{0};
     glm::vec2 uv{0};
-    glm::vec3 barycentric{0};
+    glm::dvec3 barycentric{0};
     std::uint32_t instance_index = 0;
     std::uint32_t triangle_index = 0;
     bool front_face = true;
+    glm::dvec3 position_error{0}; // 重心插值运算的逐轴绝对误差界，用于偏移后续射线。
 };
 
 struct BvhBuildStatistics {

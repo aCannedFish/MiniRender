@@ -182,7 +182,7 @@ TEST_CASE("BVH interpolates surface data through nonuniform and mirrored transfo
     const auto hit = bvh.intersect({target + normal * 5.0F, -normal});
     REQUIRE(hit);
     REQUIRE(hit->distance == Approx(5).margin(1e-5));
-    REQUIRE(glm::length(hit->position - target) < 1e-5F);
+    REQUIRE(glm::length(hit->position - glm::dvec3(target)) < 1e-5F);
     REQUIRE(glm::dot(hit->geometric_normal, normal) > 0.99999F);
     REQUIRE(glm::dot(hit->shading_normal, normal) > 0.99999F);
     REQUIRE(hit->front_face);

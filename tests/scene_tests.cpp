@@ -44,7 +44,7 @@ TEST_CASE("Camera rays agree with Vulkan projection and pixel coordinates", "[ca
     for (glm::vec2 uv : {glm::vec2(0.5F), glm::vec2(0.1F, 0.2F), glm::vec2(0.9F, 0.85F)}) {
         const Ray ray = camera.generate_ray(uv, aspect);
         const glm::vec4 clip = camera.projection_matrix(aspect) * camera.view_matrix() *
-                               glm::vec4(ray.origin + 5.0F * ray.direction, 1.0F);
+                               glm::vec4(ray.origin + 5.0 * ray.direction, 1.0F);
         const glm::vec2 projected = glm::vec2(clip) / clip.w * 0.5F + 0.5F;
         REQUIRE(projected.x == Approx(uv.x).margin(1e-5F));
         REQUIRE(projected.y == Approx(uv.y).margin(1e-5F));

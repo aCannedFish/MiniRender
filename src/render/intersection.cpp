@@ -124,7 +124,24 @@ std::optional<TriangleHit> RayQuery::intersect(const std::array<glm::vec3, 3>& v
     if (distance < interval.minimum || distance > interval.maximum) {
         return std::nullopt;
     }
-    return TriangleHit{distance, glm::vec3(glm::dvec3(a, b, c) / determinant)};
+    // 传播剪切、边函数和距离运算的误差，拒绝无法与起点零距离可靠区分的命中。
+    // 推导见 PBRT 4 §6.5.3；此处按 double 的单位舍入误差计算。
+    const auto gamma = [](double operations) {
+        const double error = operations * (std::numeric_limits<double>::epsilon() * 0.5);
+        return error / (1 - error);
+    };
+    const double x = std::max({std::abs(p[0].x), std::abs(p[1].x), std::abs(p[2].x)});
+    const double y = std::max({std::abs(p[0].y), std::abs(p[1].y), std::abs(p[2].y)});
+    const double z = std::max({std::abs(p[0].z), std::abs(p[1].z), std::abs(p[2].z)});
+    const double error_x = gamma(5) * (x + z), error_y = gamma(5) * (y + z);
+    const double error_edge = 2 * (gamma(2) * x * y + error_y * x + error_x * y);
+    const double edge = std::max({std::abs(a), std::abs(b), std::abs(c)});
+    const double error_distance =
+        3 * (gamma(3) * edge * z + error_edge * z + gamma(3) * z * edge) / std::abs(determinant);
+    if (distance <= error_distance) {
+        return std::nullopt;
+    }
+    return TriangleHit{distance, glm::dvec3(a, b, c) / determinant};
 }
 
 } // namespace minirender
