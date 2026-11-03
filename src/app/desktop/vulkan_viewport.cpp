@@ -720,6 +720,15 @@ void VulkanViewport::set_view_mode(int mode) {
 int VulkanViewport::view_mode() const noexcept {
     return view_mode_;
 }
+void VulkanViewport::set_ssao_settings(minirender::SsaoSettings settings) {
+    settings.validate();
+    ssao_ = settings;
+    mark_preview_changed();
+    requestUpdate();
+}
+const minirender::SsaoSettings& VulkanViewport::ssao_settings() const noexcept {
+    return ssao_;
+}
 
 void VulkanViewport::set_offline_visible(bool visible) {
     if (offline_visible_ == visible) {

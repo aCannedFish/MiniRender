@@ -13,6 +13,7 @@ layout(location = 5) in vec2 mesh_uv;
 layout(binding = 2) uniform sampler2D base_texture;
 layout(location = 0) out vec4 color;
 layout(location = 1) out vec4 normal_output;
+layout(location = 2) out vec4 ambient_output;
 layout(binding = 1) uniform sampler2DArray shadow_map;
 const float PI = 3.141592653589793;
 
@@ -87,6 +88,7 @@ void main() {
     float alpha = roughness * roughness;
     vec3 f0 = mix(vec3(0.04), albedo, metallic);
     vec3 result = emission + frame.environment.xyz * mix(albedo, f0, metallic);
+    ambient_output = vec4(frame.environment.xyz * albedo * (1.0 - metallic), 1.0);
     float ndv = max(dot(n, v), 0.0);
     for (int i = 0; i < frame.counts.x; ++i) {
         vec3 l = -normalize(frame.lights[i].direction.xyz);

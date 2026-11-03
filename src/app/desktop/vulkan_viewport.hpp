@@ -1,6 +1,7 @@
 #pragma once
 
 #include <minirender/core/image.hpp>
+#include <minirender/render/ssao.hpp>
 #include <minirender/scene/scene.hpp>
 #include <vulkan/vulkan.h>
 
@@ -43,6 +44,8 @@ class VulkanViewport final : public QWindow {
     float exposure() const noexcept;
     void set_view_mode(int mode);
     int view_mode() const noexcept;
+    void set_ssao_settings(minirender::SsaoSettings settings);
+    const minirender::SsaoSettings& ssao_settings() const noexcept;
     void set_offline_visible(bool visible);
     bool offline_visible() const noexcept;
     void set_offline_image(std::shared_ptr<const minirender::Image> image);
@@ -117,6 +120,7 @@ class VulkanViewport final : public QWindow {
     bool fxaa_enabled_ = true;
     float exposure_ = 0.0F;
     int view_mode_ = 0;
+    minirender::SsaoSettings ssao_;
     QPointF mouse_origin_;
     QPointF last_mouse_;
     bool dragged_ = false;

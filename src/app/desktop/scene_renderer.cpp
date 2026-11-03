@@ -46,10 +46,18 @@ struct alignas(16) FrameUniform {
     std::array<glm::mat4, 8> shadow_view_projection;
     glm::vec4 shadow_settings;
     glm::vec4 viewport;
+    glm::mat4 view;
+    glm::mat4 projection;
+    glm::mat4 inverse_projection;
+    glm::vec4 ao_settings; // enabled, radius/m, bias/m, strength
+    glm::vec4 ao_filter;   // samples, depth sigma/m, normal exponent, use filtered
+    std::array<glm::vec4, minirender::ssao_kernel_size> ao_kernel;
 };
 static_assert(offsetof(FrameUniform, lights) == 96);
 static_assert(offsetof(FrameUniform, shadow_view_projection) == 384);
-static_assert(sizeof(FrameUniform) == 928);
+static_assert(offsetof(FrameUniform, view) == 928);
+static_assert(offsetof(FrameUniform, ao_kernel) == 1152);
+static_assert(sizeof(FrameUniform) == 2176);
 
 } // namespace
 
@@ -98,7 +106,9 @@ void SceneRenderer::initSwapChainResources() {
     pipeline_ = create_pipeline(Pass::surface);
     shadow_pipeline_ = create_pipeline(Pass::shadow);
     wire_pipeline_ = create_pipeline(Pass::wire);
-    post_process_.create(*window_, targets_, uniforms_.handle(), sizeof(FrameUniform));
+    ssao_.create(*window_, targets_, uniforms_.handle(), sizeof(FrameUniform));
+    post_process_.create(*window_, targets_, uniforms_.handle(), sizeof(FrameUniform),
+                         ssao_.hdr_view(), ssao_.raw_view(), ssao_.filtered_view());
     window_->report_swapchain();
 }
 
@@ -158,7 +168,7 @@ VkPipeline SceneRenderer::create_pipeline(Pass pass) {
     depth.depthTestEnable = VK_TRUE;
     depth.depthWriteEnable = !wire;
     depth.depthCompareOp = wire ? VK_COMPARE_OP_LESS_OR_EQUAL : VK_COMPARE_OP_LESS;
-    std::array<VkPipelineColorBlendAttachmentState, 2> attachments{};
+    std::array<VkPipelineColorBlendAttachmentState, 3> attachments{};
     for (auto& attachment : attachments) {
         attachment.colorWriteMask = 0xF;
     }
@@ -398,6 +408,16 @@ void SceneRenderer::update_uniforms() {
     frame.viewport = {1.0F / static_cast<float>(size.width()),
                       1.0F / static_cast<float>(size.height()), camera.near_plane,
                       camera.far_plane};
+    frame.view = camera.view_matrix();
+    frame.projection = camera.projection_matrix(static_cast<float>(size.width()) /
+                                                static_cast<float>(size.height()));
+    frame.inverse_projection = glm::inverse(frame.projection);
+    const auto& ao = window_->ssao_settings();
+    frame.ao_settings = {ao.enabled ? 1.0F : 0.0F, ao.radius, ao.bias, ao.strength};
+    frame.ao_filter = {static_cast<float>(ao.samples), std::max(ao.radius * 0.25F, 1e-6F), 16,
+                       ao.filtered ? 1.0F : 0.0F};
+    static const auto kernel = minirender::make_ssao_kernel();
+    frame.ao_kernel = kernel;
     uniforms_.write(&frame, sizeof(frame));
 }
 
@@ -506,8 +526,9 @@ void SceneRenderer::startNextFrame() {
     }
     vkCmdEndRenderPass(command);
     render_wire(command);
+    ssao_.draw(*window_);
     if (capture_hdr_) {
-        targets_.record_readback(command);
+        targets_.record_readback(command, ssao_.hdr_image());
         capture_hdr_ = false;
     }
     post_process_.draw(*window_);
@@ -526,6 +547,7 @@ void SceneRenderer::releaseSwapChainResources() {
     shadow_pipeline_ = VK_NULL_HANDLE;
     wire_pipeline_ = VK_NULL_HANDLE;
     post_process_.release();
+    ssao_.release();
     targets_.release();
 }
 

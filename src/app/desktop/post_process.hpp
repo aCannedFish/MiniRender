@@ -11,7 +11,8 @@ class PostProcess {
     PostProcess(const PostProcess&) = delete;
     PostProcess& operator=(const PostProcess&) = delete;
     void create(VulkanViewport& viewport, const HdrTargets& targets, VkBuffer uniform_buffer,
-                VkDeviceSize uniform_size);
+                VkDeviceSize uniform_size, VkImageView hdr, VkImageView raw_ao,
+                VkImageView filtered_ao);
     void draw(VulkanViewport& viewport);
     void release();
 
