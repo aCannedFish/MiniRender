@@ -25,4 +25,6 @@ UI 交互修复见 [验证记录](docs/checkpoints/UI1.md)：属性布局、连�
 
 参数卡顿修复见 [性能对照](docs/checkpoints/UI2.md)：普通编辑复用网格与描述符，文件导入在后台执行，状态栏显示任务阶段和预览等待。
 
-A1.6 已加入保留遮挡的线框视图，并完成场景编辑阶段验收，见 [验收记录](docs/checkpoints/A1.6.md)。该检查点还补充了 macOS Metal layer 的事务配置，修复连续运行中捕获到的呈现等待。接下来进入 A2 CPU 路径追踪。
+A1.6 已加入保留遮挡的线框视图，并完成场景编辑阶段验收，见 [验收记录](docs/checkpoints/A1.6.md)。该检查点还补充了 macOS Metal layer 的事务配置，修复连续运行中捕获到的呈现等待。
+
+A2.1 已加入 CPU 场景求交、SAH BVH 和法线诊断命令，见 [实现说明](docs/INTERSECTION.md) 与 [验收记录](docs/checkpoints/A2.1.md)。BSDF、MIS、路径积分和离线任务 UI 继续按 A2 检查点实现。
