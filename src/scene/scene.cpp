@@ -173,6 +173,11 @@ void SceneDocument::validate(MeshValidationCache* cache) const {
         unique_id(texture_ids, texture.id, "Texture");
         require(texture.data != nullptr, "Texture data is missing: " + texture.id);
     }
+    require(environment_map.texture_id.empty() || texture_ids.contains(environment_map.texture_id),
+            "Environment references missing texture: " + environment_map.texture_id);
+    require(std::isfinite(environment_map.strength) && environment_map.strength >= 0 &&
+                std::isfinite(environment_map.rotation_degrees),
+            "Environment strength and rotation must be finite; strength must be nonnegative");
     std::unordered_set<std::string> material_ids;
     for (const auto& material : materials) {
         unique_id(material_ids, material.id, "Material");
@@ -218,6 +223,13 @@ std::shared_ptr<const SceneSnapshot> make_snapshot(const SceneDocument& document
     snapshot->camera = document.camera;
     snapshot->environment = document.environment;
     snapshot->directional_lights = document.directional_lights;
+    snapshot->environment_strength = document.environment_map.strength;
+    snapshot->environment_rotation_degrees = document.environment_map.rotation_degrees;
+    for (const auto& texture : document.textures) {
+        if (texture.id == document.environment_map.texture_id) {
+            snapshot->environment_texture = texture.data;
+        }
+    }
     for (const auto& object : document.objects) {
         if (!object.visible) {
             continue;

@@ -120,6 +120,13 @@ struct DirectionalLight {
     float intensity = 3.0F;
 };
 
+// 环境图使用线性 RGB，作为常量 environment 之外的照明。旋转为右手系绕 +Y 的角度。
+struct EnvironmentMap {
+    std::string texture_id;
+    float strength = 1;
+    float rotation_degrees = 0;
+};
+
 // UI 编辑的数据。每次开始渲染都创建值拷贝快照，避免后台读取可变控件状态。
 struct SceneDocument {
     std::filesystem::path asset_directory;
@@ -130,6 +137,7 @@ struct SceneDocument {
     std::vector<TextureAsset> textures;
     std::vector<SceneObject> objects;
     std::vector<DirectionalLight> directional_lights;
+    EnvironmentMap environment_map;
     void validate(MeshValidationCache* cache = nullptr) const;
 };
 
@@ -148,6 +156,9 @@ struct SceneSnapshot {
     glm::vec3 environment;
     std::vector<RenderInstance> instances;
     std::vector<DirectionalLight> directional_lights;
+    std::shared_ptr<const Texture> environment_texture;
+    float environment_strength = 1;
+    float environment_rotation_degrees = 0;
 };
 
 std::shared_ptr<const SceneSnapshot> make_snapshot(const SceneDocument& document,

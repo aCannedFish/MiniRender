@@ -27,6 +27,7 @@ endif()
 add_library(minirender_core
     src/core/image.cpp
     src/core/texture.cpp
+    src/core/sampling.cpp
     src/core/raster_io.cpp
     src/core/exr_io.cpp
     src/scene/scene.cpp
@@ -34,6 +35,8 @@ add_library(minirender_core
     src/scene/shadow.cpp
     src/render/intersection.cpp
     src/render/bvh.cpp
+    src/render/bsdf.cpp
+    src/render/light.cpp
     src/assets/obj_loader.cpp
     src/assets/scene_io.cpp)
 target_include_directories(minirender_core PUBLIC include)
@@ -47,7 +50,7 @@ target_link_libraries(minirender_cli PRIVATE minirender_core minirender_warnings
 if(BUILD_TESTING)
     find_package(Threads REQUIRED)
     add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp
-        tests/intersection_tests.cpp)
+        tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_tests PRIVATE
         minirender_core Catch2::Catch2WithMain minirender_warnings Threads::Threads)

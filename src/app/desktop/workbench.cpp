@@ -346,11 +346,16 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
         } else if (asset_loading_) {
             statusBar()->showMessage(task_message_);
         } else if (viewport_->isValid()) {
-            statusBar()->showMessage(
+            auto message =
                 QString(
                     "%1 | %2 个物体 | 直接光照预览 | 左拖环绕 · 右拖转向 · 中拖平移 · WASDQE 移动")
                     .arg(QString::fromUtf8(viewport_->physicalDeviceProperties()->deviceName))
-                    .arg(editor_.document().objects.size()));
+                    .arg(editor_.document().objects.size());
+            if (!editor_.document().environment_map.texture_id.empty() &&
+                editor_.document().environment_map.strength > 0) {
+                message += " | 当前预览不显示环境图";
+            }
+            statusBar()->showMessage(message);
         }
     });
     status_timer->start();
