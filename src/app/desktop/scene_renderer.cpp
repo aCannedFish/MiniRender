@@ -95,18 +95,23 @@ void SceneRenderer::initResources() {
 
 void SceneRenderer::initSwapChainResources() {
     targets_.create(*window_);
-    pipeline_ = create_pipeline(false);
-    shadow_pipeline_ = create_pipeline(true);
+    pipeline_ = create_pipeline(Pass::surface);
+    shadow_pipeline_ = create_pipeline(Pass::shadow);
+    wire_pipeline_ = create_pipeline(Pass::wire);
     post_process_.create(*window_, targets_, uniforms_.handle(), sizeof(FrameUniform));
     window_->report_swapchain();
 }
 
-VkPipeline SceneRenderer::create_pipeline(bool shadow) {
-    const GpuShader vertex(device_,
-                           shadow ? ":/shaders/shadow.vert.spv" : ":/shaders/scene.vert.spv");
+VkPipeline SceneRenderer::create_pipeline(Pass pass) {
+    const bool shadow = pass == Pass::shadow;
+    const bool wire = pass == Pass::wire;
+    const GpuShader vertex(
+        device_, shadow ? ":/shaders/shadow.vert.spv"
+                        : (wire ? ":/shaders/wire.vert.spv" : ":/shaders/scene.vert.spv"));
     std::unique_ptr<GpuShader> fragment;
     if (!shadow) {
-        fragment = std::make_unique<GpuShader>(device_, ":/shaders/scene.frag.spv");
+        fragment = std::make_unique<GpuShader>(device_, wire ? ":/shaders/wire.frag.spv"
+                                                             : ":/shaders/scene.frag.spv");
     }
     std::array<VkPipelineShaderStageCreateInfo, 2> stages{};
     for (auto& stage : stages) {
@@ -127,11 +132,12 @@ VkPipeline SceneRenderer::create_pipeline(bool shadow) {
     vertex_input.vertexBindingDescriptionCount = 1;
     vertex_input.pVertexBindingDescriptions = &binding;
     vertex_input.vertexAttributeDescriptionCount =
-        shadow ? 1 : static_cast<std::uint32_t>(attributes.size());
+        (shadow || wire) ? 1 : static_cast<std::uint32_t>(attributes.size());
     vertex_input.pVertexAttributeDescriptions = attributes.data();
     VkPipelineInputAssemblyStateCreateInfo assembly{};
     assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    assembly.topology =
+        wire ? VK_PRIMITIVE_TOPOLOGY_LINE_LIST : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     VkPipelineViewportStateCreateInfo viewport{};
     viewport.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewport.viewportCount = 1;
@@ -150,15 +156,16 @@ VkPipeline SceneRenderer::create_pipeline(bool shadow) {
     VkPipelineDepthStencilStateCreateInfo depth{};
     depth.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depth.depthTestEnable = VK_TRUE;
-    depth.depthWriteEnable = VK_TRUE;
-    depth.depthCompareOp = VK_COMPARE_OP_LESS;
+    depth.depthWriteEnable = !wire;
+    depth.depthCompareOp = wire ? VK_COMPARE_OP_LESS_OR_EQUAL : VK_COMPARE_OP_LESS;
     std::array<VkPipelineColorBlendAttachmentState, 2> attachments{};
     for (auto& attachment : attachments) {
         attachment.colorWriteMask = 0xF;
     }
     VkPipelineColorBlendStateCreateInfo blend{};
     blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    blend.attachmentCount = shadow ? 0 : static_cast<std::uint32_t>(attachments.size());
+    blend.attachmentCount =
+        shadow ? 0 : (wire ? 1 : static_cast<std::uint32_t>(attachments.size()));
     blend.pAttachments = attachments.data();
     const std::array<VkDynamicState, 2> states{VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
     VkPipelineDynamicStateCreateInfo dynamic{};
@@ -178,7 +185,8 @@ VkPipeline SceneRenderer::create_pipeline(bool shadow) {
     pipeline.pColorBlendState = &blend;
     pipeline.pDynamicState = &dynamic;
     pipeline.layout = pipeline_layout_;
-    pipeline.renderPass = shadow ? shadow_map_.render_pass() : targets_.render_pass();
+    pipeline.renderPass =
+        shadow ? shadow_map_.render_pass() : (wire ? targets_.wire_pass() : targets_.render_pass());
     VkPipeline result = VK_NULL_HANDLE;
     check_vk(vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipeline, nullptr, &result),
              "scene pipeline");
@@ -199,7 +207,7 @@ void SceneRenderer::upload_scene() {
         if (!meshes_.contains(instance.mesh)) {
             Mesh mesh;
             const auto count = instance.mesh->triangles.size() * 3;
-            if (count > std::numeric_limits<std::uint32_t>::max()) {
+            if (count > std::numeric_limits<std::uint32_t>::max() / 2U) {
                 throw std::runtime_error("Mesh vertex count exceeds draw limit");
             }
             std::vector<Vertex> vertices;
@@ -220,6 +228,18 @@ void SceneRenderer::upload_scene() {
             mesh.vertices.create(device_, window_->physicalDevice(), count * sizeof(Vertex),
                                  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
             mesh.vertices.write(vertices.data(), count * sizeof(Vertex));
+            // 展开的三角形有连续三个顶点；每面生成三条边，不依赖 fillModeNonSolid。
+            // 共享边可能重复，但只读深度、实色输出不会因重复绘制改变结果。
+            std::vector<std::uint32_t> edges;
+            edges.reserve(count * 2);
+            for (std::uint32_t first = 0; first < mesh.count; first += 3) {
+                edges.insert(edges.end(),
+                             {first, first + 1, first + 1, first + 2, first + 2, first});
+            }
+            mesh.edges.create(device_, window_->physicalDevice(),
+                              edges.size() * sizeof(std::uint32_t),
+                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+            mesh.edges.write(edges.data(), edges.size() * sizeof(std::uint32_t));
             meshes_.emplace(instance.mesh, std::move(mesh));
             window_->report_mesh_upload();
         }
@@ -413,6 +433,40 @@ void SceneRenderer::render_shadow_maps(VkCommandBuffer command) {
     }
 }
 
+void SceneRenderer::render_wire(VkCommandBuffer command) {
+    // 后处理始终绑定 wire 图像，首次先清除使其布局有效；以后仅在线框模式绘制。
+    if (window_->view_mode() != 3 && targets_.wire_initialized()) {
+        return;
+    }
+    targets_.begin_wire(command);
+    if (window_->view_mode() == 3) {
+        const auto size = window_->swapChainImageSize();
+        const VkViewport viewport{
+            0, 0, static_cast<float>(size.width()), static_cast<float>(size.height()), 0, 1};
+        const VkRect2D scissor{
+            {0, 0},
+            {static_cast<std::uint32_t>(size.width()), static_cast<std::uint32_t>(size.height())}};
+        vkCmdSetViewport(command, 0, 1, &viewport);
+        vkCmdSetScissor(command, 0, 1, &scissor);
+        vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, wire_pipeline_);
+        vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
+                                &descriptor_, 0, nullptr);
+        for (std::size_t index = 0; index < draws_.size(); ++index) {
+            const auto& mesh = meshes_.at(draws_[index].mesh);
+            const auto buffer = mesh.vertices.handle();
+            const VkDeviceSize offset = 0;
+            vkCmdBindVertexBuffers(command, 0, 1, &buffer, &offset);
+            vkCmdBindIndexBuffer(command, mesh.edges.handle(), 0, VK_INDEX_TYPE_UINT32);
+            const DrawIndex push{0, static_cast<std::int32_t>(index)};
+            vkCmdPushConstants(command, pipeline_layout_,
+                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                               sizeof(push), &push);
+            vkCmdDrawIndexed(command, mesh.count * 2, 1, 0, 0, 0);
+        }
+    }
+    vkCmdEndRenderPass(command);
+}
+
 void SceneRenderer::startNextFrame() {
     if (scene_revision_ != window_->scene_revision()) {
         upload_scene();
@@ -451,6 +505,7 @@ void SceneRenderer::startNextFrame() {
         vkCmdDraw(command, mesh.count, 1, 0, 0);
     }
     vkCmdEndRenderPass(command);
+    render_wire(command);
     if (capture_hdr_) {
         targets_.record_readback(command);
         capture_hdr_ = false;
@@ -465,9 +520,11 @@ void SceneRenderer::releaseSwapChainResources() {
     if (device_ != VK_NULL_HANDLE) {
         vkDestroyPipeline(device_, pipeline_, nullptr);
         vkDestroyPipeline(device_, shadow_pipeline_, nullptr);
+        vkDestroyPipeline(device_, wire_pipeline_, nullptr);
     }
     pipeline_ = VK_NULL_HANDLE;
     shadow_pipeline_ = VK_NULL_HANDLE;
+    wire_pipeline_ = VK_NULL_HANDLE;
     post_process_.release();
     targets_.release();
 }

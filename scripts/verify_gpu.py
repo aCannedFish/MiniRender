@@ -19,11 +19,14 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=Path("outputs/a0"))
     parser.add_argument("--timeout", type=float, default=35)
     parser.add_argument("--scene", type=Path, help="Run scene editor checks instead of A0 diagnostics")
-    parser.add_argument("--texture-check", action="store_true", help="Verify texture import and filtering")
-    parser.add_argument("--interaction-check", action="store_true", help="Verify repeated drags and layout")
-    parser.add_argument("--parameter-check", action="store_true", help="Verify edit latency and background progress")
+    checks = parser.add_mutually_exclusive_group()
+    checks.add_argument("--texture-check", action="store_true", help="Verify texture import and filtering")
+    checks.add_argument("--interaction-check", action="store_true", help="Verify repeated drags and layout")
+    checks.add_argument("--parameter-check", action="store_true", help="Verify edit latency and background progress")
+    checks.add_argument("--wire-check", action="store_true", help="Verify wireframe visibility and HDR isolation")
     args = parser.parse_args()
-    if (args.texture_check or args.interaction_check or args.parameter_check) and not args.scene:
+    scene_check = args.texture_check or args.interaction_check or args.parameter_check or args.wire_check
+    if scene_check and not args.scene:
         parser.error("Scene checks require --scene")
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -32,16 +35,22 @@ def main() -> int:
         with (executable / "Contents/Info.plist").open("rb") as file:
             name = plistlib.load(file)["CFBundleExecutable"]
         executable = executable / "Contents/MacOS" / name
-    arguments = [str(executable)]
+    mode = "GPU"
+    option = "--smoke"
+    for selected, candidate in [
+        (args.parameter_check, "Parameter"),
+        (args.interaction_check, "Interaction"),
+        (args.texture_check, "Texture"),
+        (args.wire_check, "Wire"),
+    ]:
+        if selected:
+            mode = candidate
     if args.scene:
-        arguments += [
-            "--scene",
-            str(args.scene.resolve()),
-            "--parameter-smoke" if args.parameter_check else ("--interaction-smoke" if args.interaction_check else ("--texture-smoke" if args.texture_check else "--scene-smoke")),
-            str(output),
-        ]
+        mode = "Scene" if mode == "GPU" else mode
+        option = f"--{mode.lower()}-smoke"
+        arguments = [str(executable), "--scene", str(args.scene.resolve()), option, str(output)]
     else:
-        arguments += ["--smoke", str(output / "gpu-smoke.png")]
+        arguments = [str(executable), option, str(output / "gpu-smoke.png")]
     with (output / "gpu-smoke.log").open("w", encoding="utf-8") as log:
         try:
             result = subprocess.run(
@@ -57,12 +66,7 @@ def main() -> int:
             code = 124
     text = (output / "gpu-smoke.log").read_text(encoding="utf-8")
     print(text, end="")
-    marker = (
-        "Parameter smoke PASS" if args.parameter_check
-        else "Interaction smoke PASS" if args.interaction_check
-        else "Texture smoke PASS" if args.texture_check
-        else ("Scene smoke PASS" if args.scene else "GPU smoke PASS")
-    )
+    marker = f"{mode} smoke PASS"
     if code == 0 and (marker not in text or "Vulkan validation errors: 0" not in text):
         print("Missing verification evidence.", file=sys.stderr)
         return 1

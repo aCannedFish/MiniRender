@@ -137,6 +137,8 @@ void start_interaction_smoke(Workbench& window, const QString&) {
                             "Drag sequence did not move camera");
                     qInfo() << "Drag" << state->gesture << "frames" << state->frame_at_start << "->"
                             << viewport->rendered_frames() << "exposed" << viewport->isExposed();
+                    qInfo() << "Frame state:" << viewport->frame_wait_reason() << "active"
+                            << window.isActiveWindow();
                     require(viewport->rendered_frames() > state->frame_at_start + 1,
                             "Rendering stalled during a drag");
                     const auto stopped = viewport->camera();

@@ -3,6 +3,7 @@
 #include "scene_smoke.hpp"
 #include "texture_smoke.hpp"
 #include "vulkan_viewport.hpp"
+#include "wire_smoke.hpp"
 #include "workbench.hpp"
 
 #include <QApplication>
@@ -56,6 +57,9 @@ bool validate_capture(const QImage& image) {
 // --smoke 用真实窗口测试渲染、缩放和读回；没有 GPU 时失败，不能静默跳过。
 int main(int argc, char** argv) {
 #ifdef Q_OS_MACOS
+    // 自有 Vulkan 提交由 timer 调度，不参与 Qt RHI 的事务内呈现协议。
+    // 使用普通 CAMetalLayer，避免 QMetalLayer 暂存 drawable，阻塞后台 nextDrawable。
+    qputenv("QT_MTL_NO_TRANSACTION", "1");
     // MoltenVK 默认在调用 vkQueueSubmit 的线程中等待 Metal drawable。
     // 拖拽期间 Cocoa 也需要主线程处理显示事务，故使用官方异步提交模式。
     qputenv("MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS", "0");
@@ -73,11 +77,12 @@ int main(int argc, char** argv) {
     parser.addOption(
         {"interaction-smoke", "Run repeated drag and inspector layout checks.", "directory"});
     parser.addOption({"parameter-smoke", "Measure parameter edit responsiveness.", "directory"});
+    parser.addOption({"wire-smoke", "Verify wireframe depth and HDR isolation.", "directory"});
     parser.process(application);
     const bool smoke = parser.isSet("smoke");
     const bool validation = parser.isSet("validation") || smoke || parser.isSet("scene-smoke") ||
                             parser.isSet("texture-smoke") || parser.isSet("interaction-smoke") ||
-                            parser.isSet("parameter-smoke");
+                            parser.isSet("parameter-smoke") || parser.isSet("wire-smoke");
     std::atomic_int validation_errors = 0;
     int result = 0;
 
@@ -113,7 +118,8 @@ int main(int argc, char** argv) {
             try {
                 const bool regression =
                     parser.isSet("scene-smoke") || parser.isSet("texture-smoke") ||
-                    parser.isSet("interaction-smoke") || parser.isSet("parameter-smoke");
+                    parser.isSet("interaction-smoke") || parser.isSet("parameter-smoke") ||
+                    parser.isSet("wire-smoke");
                 if (regression) {
                     window.load_scene_file(scene_path);
                 } else {
@@ -137,6 +143,10 @@ int main(int argc, char** argv) {
         }
         if (parser.isSet("parameter-smoke")) {
             start_parameter_smoke(window, parser.value("parameter-smoke"));
+        }
+
+        if (parser.isSet("wire-smoke")) {
+            start_wire_smoke(window, parser.value("wire-smoke"));
         }
 
         int ticks = 0;

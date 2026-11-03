@@ -30,7 +30,7 @@ FrameUniform 按 std140 排列，包含 view-projection、相机位置、环境�
 
 漫反射和导体分别使用不同的 metallic 参数。均匀环境项暂时提供简单填充光；它不等同于完整 IBL。理想镜面和玻璃明确标记为预览近似，不提供真实镜面反射或折射。
 
-方向光阴影已在 A1.3 加入，见 SHADOWS.md。A1.4 将光照改为浮点 HDR 输出，并把曝光、Reinhard 和 FXAA 移到独立显示 pass，见 HDR.md。纹理已在 A1.5 加入，见 TEXTURES.md；线框仍待后续实现。
+方向光阴影已在 A1.3 加入，见 SHADOWS.md。A1.4 将光照改为浮点 HDR 输出，并把曝光、Reinhard 和 FXAA 移到独立显示 pass，见 HDR.md。纹理已在 A1.5 加入，见 TEXTURES.md；A1.6 的线框按三角形边线绘制，读取表面深度剔除被遮挡的边，见 checkpoints/A1.6.md。
 
 模型参考 [Walter 等，2007](https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf) 的 GGX/Smith 推导，以及 [PBRT 微表面章节](https://www.pbr-book.org/4ed/Reflection_Models/Roughness_Using_Microfacet_Theory)。本项目预览使用分离的 G1 乘积，未采用 PBRT 的相关高度 G 实现，也未实现该论文中的粗糙透射。
 
@@ -56,3 +56,5 @@ python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirend
 属性页支持滚动和窄窗口换行，工具栏“恢复布局”可以重新显示已关闭的侧栏。相机拖拽状态与窗口/GPU 调度修复详见 checkpoints/UI1.md。
 
 打开场景和导入 OBJ/纹理在后台解析，状态栏显示当前阶段及忙碌条。预览等待超过 150ms 时显示更新提示，提交对应帧的 GPU fence 完成后收起。当前实时预览没有可计量的采样总数，忙碌条不显示百分比；A2 离线渲染再使用已完成样本数报告进度。
+
+macOS 使用 `QT_MTL_NO_TRANSACTION=1` 创建普通 CAMetalLayer，与自有 timer 提交方式一致。此前仅将 MoltenVK 提交异步化仍会间歇等待 QMetalLayer drawable，跟进采样和连续复测见 checkpoints/A1.6.md。

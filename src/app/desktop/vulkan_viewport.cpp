@@ -325,6 +325,7 @@ void VulkanViewport::render_frame(bool blocking_capture) {
         const std::uint64_t timeout = blocking_capture ? 2'000'000'000ULL : 0;
         const auto ready = vkWaitForFences(device_, 1, &frame_fence_, VK_TRUE, timeout);
         if (ready == VK_TIMEOUT) {
+            frame_wait_reason_ = "GPU fence pending";
             requestUpdate();
             return;
         }
@@ -341,10 +342,12 @@ void VulkanViewport::render_frame(bool blocking_capture) {
             vkAcquireNextImageKHR(device_, swapchain_, blocking_capture ? timeout : 1'000'000ULL,
                                   acquired_, VK_NULL_HANDLE, &image_index_);
         if (acquired == VK_NOT_READY || acquired == VK_TIMEOUT) {
+            frame_wait_reason_ = "Swapchain acquisition pending";
             requestUpdate();
             return;
         }
         if (acquired == VK_ERROR_OUT_OF_DATE_KHR) {
+            frame_wait_reason_ = "Swapchain recreation pending";
             dirty_ = true;
             requestUpdate();
             return;
@@ -399,6 +402,7 @@ void VulkanViewport::frameReady() {
     submit.pSignalSemaphores = &rendered_[image_index_];
     check(vkQueueSubmit(queue_, 1, &submit, frame_fence_), "submit frame");
     submitted_preview_revision_ = preview_revision_;
+    frame_wait_reason_ = "Frame submitted";
     VkPresentInfoKHR present{};
     present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     present.waitSemaphoreCount = 1;
@@ -643,6 +647,9 @@ qint64 VulkanViewport::preview_wait_ms() const noexcept {
     return preview_revision_ != completed_preview_revision_ && preview_wait_.isValid()
                ? preview_wait_.elapsed()
                : 0;
+}
+QString VulkanViewport::frame_wait_reason() const {
+    return frame_wait_reason_;
 }
 void VulkanViewport::report_failure(const QString& error) {
     failure_ = error;

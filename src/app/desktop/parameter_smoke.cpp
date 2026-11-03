@@ -71,7 +71,7 @@ void start_parameter_smoke(Workbench& window, const QString& directory) {
                 state->waiting = false;
                 return;
             }
-            if (state->step == 12) {
+            if (state->step == 14) {
                 // 后台导入必须立即显示忙碌条；解析期间 Qt timer 和视口仍可前进。
                 if (state->import_stage == 0) {
                     const auto source =
@@ -116,7 +116,7 @@ void start_parameter_smoke(Workbench& window, const QString& directory) {
                         "Parameter responsiveness exceeded local regression budget");
                 }
                 timer->stop();
-                qInfo() << "Parameter smoke PASS: 12 operations, no mesh/descriptor rebuilds, "
+                qInfo() << "Parameter smoke PASS: 14 operations, no mesh/descriptor rebuilds, "
                            "background OBJ/scene import and progress; max callback ms"
                         << state->maximum_callback_ms << "max next frame ms"
                         << state->maximum_frame_ms;
@@ -139,7 +139,8 @@ void start_parameter_smoke(Workbench& window, const QString& directory) {
             state->elapsed.start();
             const int step = state->step++;
             if (step < 3 || step >= 9) {
-                window.findChild<QComboBox*>("view_mode")->setCurrentIndex(step % 3);
+                window.findChild<QComboBox*>("view_mode")
+                    ->setCurrentIndex(step < 3 ? step % 3 : (step - 9) % 4);
             } else if (step == 3 || step == 4) {
                 auto* spin = window.findChild<QDoubleSpinBox*>("light_intensity");
                 spin->setValue(step == 3 ? 4 : 3);
