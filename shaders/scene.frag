@@ -1,6 +1,7 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "scene_frame.glsl"
+#include "scene_instance.glsl"
 
 
 layout(location = 0) in vec3 world_position;
@@ -10,7 +11,6 @@ layout(location = 3) in vec3 emission;
 layout(location = 4) in vec2 material;
 layout(location = 5) in vec2 mesh_uv;
 layout(binding = 2) uniform sampler2D base_texture;
-layout(push_constant) uniform Sampling { layout(offset = 4) int filter_mode; } sampling;
 layout(location = 0) out vec4 color;
 layout(location = 1) out vec4 normal_output;
 layout(binding = 1) uniform sampler2DArray shadow_map;
@@ -63,10 +63,11 @@ vec3 bilinear_texture(vec2 uv, int level) {
 vec3 sample_base_texture() {
     vec2 uv = vec2(fract(mesh_uv.x), 1.0 - fract(mesh_uv.y));
     ivec2 extent = textureSize(base_texture, 0);
-    if (sampling.filter_mode == 0) {
+    int filter_mode = int(instances.values[draw_index.instance].surface.z);
+    if (filter_mode == 0) {
         return texelFetch(base_texture, repeat_pixel(ivec2(floor(uv * vec2(extent))), extent), 0).rgb;
     }
-    if (sampling.filter_mode == 1) { return bilinear_texture(uv, 0); }
+    if (filter_mode == 1) { return bilinear_texture(uv, 0); }
     vec2 dx = dFdx(mesh_uv) * vec2(extent);
     vec2 dy = dFdy(mesh_uv) * vec2(extent);
     float lod = clamp(log2(max(max(length(dx), length(dy)), 1e-8)), 0.0, float(textureQueryLevels(base_texture)-1));

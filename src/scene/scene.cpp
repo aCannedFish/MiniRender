@@ -49,6 +49,15 @@ void MeshData::validate() const {
     }
 }
 
+void MeshValidationCache::validate(const std::shared_ptr<const MeshData>& mesh) {
+    require(mesh != nullptr, "Mesh data is missing");
+    std::erase_if(meshes_, [](const auto& value) { return value.expired(); });
+    if (!meshes_.contains(mesh)) {
+        mesh->validate();
+        meshes_.insert(mesh);
+    }
+}
+
 void Transform::validate() const {
     require(finite(translation) && finite(rotation_degrees) && finite(scale),
             "Transform must be finite");
@@ -153,7 +162,7 @@ void Material::validate() const {
     texture_filter_name(texture_filter);
 }
 
-void SceneDocument::validate() const {
+void SceneDocument::validate(MeshValidationCache* cache) const {
     camera.validate();
     require(finite(environment) && glm::all(glm::greaterThanEqual(environment, glm::vec3(0))),
             "Environment must be finite and nonnegative");
@@ -174,7 +183,11 @@ void SceneDocument::validate() const {
     for (const auto& mesh : meshes) {
         unique_id(mesh_ids, mesh.id, "Mesh");
         require(mesh.data != nullptr, "Mesh data is missing: " + mesh.id);
-        mesh.data->validate();
+        if (cache) {
+            cache->validate(mesh.data);
+        } else {
+            mesh.data->validate();
+        }
     }
     std::unordered_set<std::string> object_ids;
     for (const auto& object : objects) {
@@ -196,8 +209,9 @@ void SceneDocument::validate() const {
     }
 }
 
-std::shared_ptr<const SceneSnapshot> make_snapshot(const SceneDocument& document) {
-    document.validate();
+std::shared_ptr<const SceneSnapshot> make_snapshot(const SceneDocument& document,
+                                                   MeshValidationCache* cache) {
+    document.validate(cache);
     auto snapshot = std::make_shared<SceneSnapshot>();
     snapshot->camera = document.camera;
     snapshot->environment = document.environment;

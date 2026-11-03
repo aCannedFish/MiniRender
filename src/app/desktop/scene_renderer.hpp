@@ -29,14 +29,21 @@ class SceneRenderer final : public ViewportRenderer {
     void render_shadow_maps(VkCommandBuffer command);
     void upload_scene();
     void rebuild_texture_descriptors();
+    using MeshHandle = std::shared_ptr<const minirender::MeshData>;
     using TextureHandle = std::shared_ptr<const minirender::Texture>;
-    struct Draw {
-        std::uint32_t first = 0;
+    // 网格保留局部坐标。变换与材质写入独立 SSBO，不再烘焙到每个顶点。
+    struct Mesh {
+        GpuBuffer vertices;
         std::uint32_t count = 0;
+        glm::vec3 minimum{0};
+        glm::vec3 maximum{0};
+    };
+    struct Draw {
+        MeshHandle mesh;
         TextureHandle texture;
-        minirender::TextureFilter filter = minirender::TextureFilter::trilinear;
         VkDescriptorSet descriptor = VK_NULL_HANDLE;
     };
+    std::map<MeshHandle, Mesh, std::owner_less<MeshHandle>> meshes_;
     std::vector<Draw> draws_;
     TextureHandle white_texture_;
     std::map<TextureHandle, std::unique_ptr<GpuTexture>, std::owner_less<TextureHandle>> textures_;
@@ -48,7 +55,8 @@ class SceneRenderer final : public ViewportRenderer {
     PostProcess post_process_;
     bool capture_hdr_ = false;
     std::array<glm::mat4, 8> shadow_matrices_{};
-    GpuBuffer vertices_;
+    GpuBuffer instances_;
+    std::size_t instance_capacity_ = 0;
     GpuBuffer uniforms_;
     VkDescriptorSetLayout descriptor_layout_ = VK_NULL_HANDLE;
     VkDescriptorPool descriptor_pool_ = VK_NULL_HANDLE;
@@ -56,6 +64,5 @@ class SceneRenderer final : public ViewportRenderer {
     VkPipelineLayout pipeline_layout_ = VK_NULL_HANDLE;
     VkPipeline pipeline_ = VK_NULL_HANDLE;
     VkPipeline shadow_pipeline_ = VK_NULL_HANDLE;
-    std::uint32_t vertex_count_ = 0;
     std::uint64_t scene_revision_ = std::numeric_limits<std::uint64_t>::max();
 };

@@ -9,7 +9,7 @@
 namespace minirender {
 
 SceneEditor::SceneEditor(SceneDocument document) : document_(std::move(document)) {
-    document_.validate();
+    document_.validate(&validated_meshes_);
 }
 
 const SceneDocument& SceneEditor::document() const noexcept {
@@ -17,7 +17,7 @@ const SceneDocument& SceneEditor::document() const noexcept {
 }
 
 void SceneEditor::replace(SceneDocument document) {
-    document.validate();
+    document.validate(&validated_meshes_);
     document_ = std::move(document);
     undo_.clear();
     redo_.clear();
@@ -26,7 +26,7 @@ void SceneEditor::replace(SceneDocument document) {
 void SceneEditor::edit(const std::function<void(SceneDocument&)>& operation) {
     SceneDocument candidate = document_;
     operation(candidate);
-    candidate.validate();
+    candidate.validate(&validated_meshes_);
     undo_.push_back(document_);
     if (undo_.size() > 100) {
         undo_.erase(undo_.begin());
@@ -65,6 +65,10 @@ bool SceneEditor::can_redo() const noexcept {
 void SceneEditor::update_navigation(const Camera& camera) {
     camera.validate();
     document_.camera = camera; // 连续导航不为每个 mouse move 生成撤销项。
+}
+
+std::shared_ptr<const SceneSnapshot> SceneEditor::snapshot() {
+    return make_snapshot(document_, &validated_meshes_);
 }
 
 Camera rotate_camera(Camera camera, float yaw_delta, float pitch_delta, bool orbit) {

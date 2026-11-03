@@ -18,7 +18,9 @@ open build/macos-desktop-debug/src/app/desktop/minirender_desktop.app
 
 Workbench 只读写 SceneDocument；编辑事务先在副本上修改并验证，通过后再发布新的 SceneSnapshot。GPU 渲染器不读取控件。连续相机导航只更新相机，不反复上传网格。
 
-SceneRenderer 把面角数据展开为绘制顶点，应用物体变换与法线逆转置，并附加材质参数。这个阶段使用简单的世界空间顶点流，后续实例化优化不会改变场景文件格式。GpuBuffer 负责主机可见缓冲的分配和释放，上传在前一帧 fence 完成之后进行。
+SceneRenderer 将面角展开为局部空间顶点，并按不可变 MeshData 缓存 GPU 缓冲。同一网格的多个物体复用这些顶点。物体变换、法线逆转置、底色、自发光、粗糙度和过滤方式写入独立的 std430 SSBO，每次 draw 用实例索引读取。GpuBuffer 负责主机可见缓冲的分配和释放，更新在前一帧 fence 完成之后进行。
+
+SceneEditor 缓存不可变网格的校验结果；参数与资产引用仍逐次校验。普通材质、灯光、变换和相机编辑不重新上传网格，纹理绑定、实例数量或缓冲容量变化时才重建描述符。修复过程与性能对照见 [参数响应](checkpoints/UI2.md)。
 
 FrameUniform 按 std140 排列，包含 view-projection、相机位置、环境项、最多 8 个方向光和显示参数。代码用静态断言检查关键偏移和整体大小，避免 CPU/GLSL 对齐不一致。
 
@@ -52,3 +54,5 @@ python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirend
 这是程序内控件/渲染端到端测试。外部桌面控制工具未获 MiniRender 访问权限，本次没有完成外部鼠标操作的独立复核；不把它记录为已通过。
 
 属性页支持滚动和窄窗口换行，工具栏“恢复布局”可以重新显示已关闭的侧栏。相机拖拽状态与窗口/GPU 调度修复详见 checkpoints/UI1.md。
+
+打开场景和导入 OBJ/纹理在后台解析，状态栏显示当前阶段及忙碌条。预览等待超过 150ms 时显示更新提示，提交对应帧的 GPU fence 完成后收起。当前实时预览没有可计量的采样总数，忙碌条不显示百分比；A2 离线渲染再使用已完成样本数报告进度。

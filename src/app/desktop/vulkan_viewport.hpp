@@ -4,6 +4,7 @@
 #include <minirender/scene/scene.hpp>
 #include <vulkan/vulkan.h>
 
+#include <QElapsedTimer>
 #include <QImage>
 #include <QWindow>
 
@@ -12,6 +13,14 @@
 #include <vector>
 
 class ViewportRenderer;
+
+// 渲染更新的诊断计数，用于检测普通参数编辑是否触发多余的资产上传。
+struct SceneUploadStatistics {
+    std::uint64_t mesh_uploads = 0;
+    std::uint64_t descriptor_rebuilds = 0;
+    std::uint64_t scene_updates = 0;
+    double last_update_ms = 0;
+};
 
 // Qt 提供窗口与平台 surface，本类独占 Vulkan device、交换链和帧同步。
 // 首版仅允许一帧在 GPU 执行；呈现完成信号量按交换链图像分配，不能按 CPU 帧号复用。
@@ -55,6 +64,11 @@ class VulkanViewport final : public QWindow {
     void report_swapchain();
     int rendered_frames() const noexcept;
     int resource_generations() const noexcept;
+    const SceneUploadStatistics& upload_statistics() const noexcept;
+    void report_mesh_upload();
+    void report_descriptor_rebuild();
+    void report_scene_update(double milliseconds);
+    qint64 preview_wait_ms() const noexcept;
     void report_failure(const QString& error);
     QString failure() const;
 
@@ -76,12 +90,18 @@ class VulkanViewport final : public QWindow {
     void render_frame(bool blocking_capture = false);
     void record_readback();
     void finish_readback();
+    void mark_preview_changed();
     std::uint32_t memory_type(std::uint32_t bits, VkMemoryPropertyFlags flags) const;
 
     std::unique_ptr<ViewportRenderer> renderer_;
     std::shared_ptr<const minirender::SceneSnapshot> scene_;
     minirender::Camera camera_;
     std::uint64_t scene_revision_ = 0;
+    SceneUploadStatistics upload_statistics_;
+    std::uint64_t preview_revision_ = 0;
+    std::uint64_t submitted_preview_revision_ = 0;
+    std::uint64_t completed_preview_revision_ = 0;
+    QElapsedTimer preview_wait_;
     bool shadows_enabled_ = true;
     bool fxaa_enabled_ = true;
     float exposure_ = 0.0F;

@@ -28,6 +28,15 @@ glm::mat4 directional_shadow_matrix(const SceneSnapshot& scene, glm::vec3 light_
     if (!has_geometry) {
         return glm::mat4(1);
     }
+    return directional_shadow_matrix(minimum, maximum, light_direction);
+}
+
+glm::mat4 directional_shadow_matrix(glm::vec3 minimum, glm::vec3 maximum,
+                                    glm::vec3 light_direction) {
+    const float length = glm::length(light_direction);
+    if (!std::isfinite(length) || length <= 1e-6F) {
+        throw std::invalid_argument("Shadow light direction must be finite and nonzero");
+    }
     const glm::vec3 center = (minimum + maximum) * 0.5F;
     const float radius = std::max(glm::length(maximum - minimum) * 0.5F, 0.1F);
     const auto direction = light_direction / length;
