@@ -21,9 +21,10 @@ def main() -> int:
     parser.add_argument("--scene", type=Path, help="Run scene editor checks instead of A0 diagnostics")
     parser.add_argument("--texture-check", action="store_true", help="Verify texture import and filtering")
     parser.add_argument("--interaction-check", action="store_true", help="Verify repeated drags and layout")
+    parser.add_argument("--parameter-check", action="store_true", help="Verify edit latency and background progress")
     args = parser.parse_args()
-    if (args.texture_check or args.interaction_check) and not args.scene:
-        parser.error("--texture-check requires --scene")
+    if (args.texture_check or args.interaction_check or args.parameter_check) and not args.scene:
+        parser.error("Scene checks require --scene")
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     executable = args.executable.resolve()
@@ -36,7 +37,7 @@ def main() -> int:
         arguments += [
             "--scene",
             str(args.scene.resolve()),
-            "--interaction-smoke" if args.interaction_check else ("--texture-smoke" if args.texture_check else "--scene-smoke"),
+            "--parameter-smoke" if args.parameter_check else ("--interaction-smoke" if args.interaction_check else ("--texture-smoke" if args.texture_check else "--scene-smoke")),
             str(output),
         ]
     else:
@@ -57,7 +58,8 @@ def main() -> int:
     text = (output / "gpu-smoke.log").read_text(encoding="utf-8")
     print(text, end="")
     marker = (
-        "Interaction smoke PASS" if args.interaction_check
+        "Parameter smoke PASS" if args.parameter_check
+        else "Interaction smoke PASS" if args.interaction_check
         else "Texture smoke PASS" if args.texture_check
         else ("Scene smoke PASS" if args.scene else "GPU smoke PASS")
     )

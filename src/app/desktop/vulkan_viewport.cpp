@@ -329,6 +329,11 @@ void VulkanViewport::render_frame(bool blocking_capture) {
             return;
         }
         check(ready, "wait frame fence");
+        // 连续拖拽会不断发布新版本。只要旧版本持续完成，就没有等待停滞。
+        if (completed_preview_revision_ != submitted_preview_revision_) {
+            preview_wait_.restart();
+        }
+        completed_preview_revision_ = submitted_preview_revision_;
         if (dirty_) {
             recreate_swapchain();
         }
@@ -393,6 +398,7 @@ void VulkanViewport::frameReady() {
     submit.signalSemaphoreCount = 1;
     submit.pSignalSemaphores = &rendered_[image_index_];
     check(vkQueueSubmit(queue_, 1, &submit, frame_fence_), "submit frame");
+    submitted_preview_revision_ = preview_revision_;
     VkPresentInfoKHR present{};
     present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     present.waitSemaphoreCount = 1;
@@ -612,6 +618,32 @@ int VulkanViewport::rendered_frames() const noexcept {
 int VulkanViewport::resource_generations() const noexcept {
     return swapchain_count_;
 }
+
+const SceneUploadStatistics& VulkanViewport::upload_statistics() const noexcept {
+    return upload_statistics_;
+}
+void VulkanViewport::report_mesh_upload() {
+    ++upload_statistics_.mesh_uploads;
+}
+void VulkanViewport::report_descriptor_rebuild() {
+    ++upload_statistics_.descriptor_rebuilds;
+}
+void VulkanViewport::report_scene_update(double milliseconds) {
+    ++upload_statistics_.scene_updates;
+    upload_statistics_.last_update_ms = milliseconds;
+}
+
+void VulkanViewport::mark_preview_changed() {
+    if (preview_revision_ == completed_preview_revision_) {
+        preview_wait_.start();
+    }
+    ++preview_revision_;
+}
+qint64 VulkanViewport::preview_wait_ms() const noexcept {
+    return preview_revision_ != completed_preview_revision_ && preview_wait_.isValid()
+               ? preview_wait_.elapsed()
+               : 0;
+}
 void VulkanViewport::report_failure(const QString& error) {
     failure_ = error;
     qCritical().noquote() << "Vulkan renderer:" << error;
@@ -632,6 +664,7 @@ void VulkanViewport::set_scene(std::shared_ptr<const minirender::SceneSnapshot> 
         camera_ = scene_->camera;
     }
     ++scene_revision_;
+    mark_preview_changed();
     requestUpdate();
 }
 const std::shared_ptr<const minirender::SceneSnapshot>& VulkanViewport::scene() const noexcept {
@@ -646,6 +679,7 @@ const minirender::Camera& VulkanViewport::camera() const noexcept {
 void VulkanViewport::set_camera(const minirender::Camera& camera) {
     camera.validate();
     camera_ = camera;
+    mark_preview_changed();
     if (on_camera_changed) {
         on_camera_changed(camera_);
     }
@@ -653,6 +687,7 @@ void VulkanViewport::set_camera(const minirender::Camera& camera) {
 }
 void VulkanViewport::set_exposure(float value) {
     exposure_ = value;
+    mark_preview_changed();
     requestUpdate();
 }
 float VulkanViewport::exposure() const noexcept {
@@ -660,6 +695,7 @@ float VulkanViewport::exposure() const noexcept {
 }
 void VulkanViewport::set_view_mode(int mode) {
     view_mode_ = mode;
+    mark_preview_changed();
     requestUpdate();
 }
 int VulkanViewport::view_mode() const noexcept {
@@ -762,6 +798,7 @@ void VulkanViewport::keyPressEvent(QKeyEvent* event) {
 
 void VulkanViewport::set_shadows_enabled(bool enabled) {
     shadows_enabled_ = enabled;
+    mark_preview_changed();
     requestUpdate();
 }
 bool VulkanViewport::shadows_enabled() const noexcept {
@@ -770,6 +807,7 @@ bool VulkanViewport::shadows_enabled() const noexcept {
 
 void VulkanViewport::set_fxaa_enabled(bool enabled) {
     fxaa_enabled_ = enabled;
+    mark_preview_changed();
     requestUpdate();
 }
 bool VulkanViewport::fxaa_enabled() const noexcept {

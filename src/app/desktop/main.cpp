@@ -1,4 +1,5 @@
 #include "interaction_smoke.hpp"
+#include "parameter_smoke.hpp"
 #include "scene_smoke.hpp"
 #include "texture_smoke.hpp"
 #include "vulkan_viewport.hpp"
@@ -71,10 +72,12 @@ int main(int argc, char** argv) {
     parser.addOption({"texture-smoke", "Run texture import and sampling checks.", "directory"});
     parser.addOption(
         {"interaction-smoke", "Run repeated drag and inspector layout checks.", "directory"});
+    parser.addOption({"parameter-smoke", "Measure parameter edit responsiveness.", "directory"});
     parser.process(application);
     const bool smoke = parser.isSet("smoke");
     const bool validation = parser.isSet("validation") || smoke || parser.isSet("scene-smoke") ||
-                            parser.isSet("texture-smoke") || parser.isSet("interaction-smoke");
+                            parser.isSet("texture-smoke") || parser.isSet("interaction-smoke") ||
+                            parser.isSet("parameter-smoke");
     std::atomic_int validation_errors = 0;
     int result = 0;
 
@@ -108,7 +111,14 @@ int main(int argc, char** argv) {
                     ? parser.value("scene")
                     : QCoreApplication::applicationDirPath() + "/scenes/studio.json";
             try {
-                window.load_scene_file(scene_path);
+                const bool regression =
+                    parser.isSet("scene-smoke") || parser.isSet("texture-smoke") ||
+                    parser.isSet("interaction-smoke") || parser.isSet("parameter-smoke");
+                if (regression) {
+                    window.load_scene_file(scene_path);
+                } else {
+                    window.open_scene_file(scene_path);
+                }
             } catch (const std::exception& error) {
                 qCritical() << error.what();
                 return 1;
@@ -124,6 +134,9 @@ int main(int argc, char** argv) {
 
         if (parser.isSet("interaction-smoke")) {
             start_interaction_smoke(window, parser.value("interaction-smoke"));
+        }
+        if (parser.isSet("parameter-smoke")) {
+            start_parameter_smoke(window, parser.value("parameter-smoke"));
         }
 
         int ticks = 0;

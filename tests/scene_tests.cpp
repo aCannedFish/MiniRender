@@ -185,6 +185,25 @@ TEST_CASE("Scene editor commits valid transactions and keeps invalid edits out o
     REQUIRE_FALSE(editor.can_redo());
 }
 
+TEST_CASE("Cached mesh validation still rejects new invalid geometry and metadata",
+          "[scene][editor]") {
+    SceneEditor editor(load_scene(studio_file()));
+    const auto original = editor.snapshot();
+    editor.edit([](auto& scene) { scene.materials.front().roughness = 0.2F; });
+    REQUIRE(editor.snapshot()->instances.front().mesh == original->instances.front().mesh);
+    REQUIRE_THROWS(editor.edit([](auto& scene) {
+        auto mesh = std::make_shared<MeshData>(*scene.meshes.front().data);
+        mesh->triangles.front().corners.front().position =
+            static_cast<std::uint32_t>(mesh->positions.size());
+        scene.meshes.front().data = mesh;
+    }));
+    REQUIRE_THROWS(editor.edit([](auto& scene) { scene.objects.front().material_id = "missing"; }));
+    REQUIRE_THROWS(editor.edit([](auto& scene) { scene.camera.near_plane = 0; }));
+    REQUIRE(editor.undo());
+    REQUIRE(editor.snapshot()->instances.front().mesh == original->instances.front().mesh);
+    REQUIRE_FALSE(editor.can_undo());
+}
+
 TEST_CASE("Camera navigation preserves orbit target and produces finite views", "[camera]") {
     Camera camera;
     const auto orbit = rotate_camera(camera, 0.4F, 0.3F, true);

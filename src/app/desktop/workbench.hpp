@@ -10,6 +10,8 @@ class QLineEdit;
 class QDoubleSpinBox;
 class QComboBox;
 class VectorField;
+class QProgressBar;
+class QLabel;
 
 // 桌面编辑控制器：控件编辑委托给 SceneEditor，渲染器只收到不可变快照。
 // file/undo/selection 都通过这里协调，不在 Vulkan 命令录制代码中读取控件。
@@ -19,10 +21,14 @@ class Workbench final : public QMainWindow {
     VulkanViewport* viewport() const noexcept;
     const minirender::SceneDocument& document() const noexcept;
     void load_scene_file(const QString& path);
+    // 用户操作采用后台文件解析；同步入口供自动回归与确定的场景设置使用。
+    void open_scene_file(const QString& path);
+    void import_object_file(const QString& path);
     void save_scene_file(const QString& path);
     void select_object(const std::string& id);
     void import_texture_file(const QString& path, minirender::ColorEncoding encoding);
     bool texture_loading() const noexcept;
+    bool asset_loading() const noexcept;
 
   private:
     void build_object_panel();
@@ -39,6 +45,9 @@ class Workbench final : public QMainWindow {
     void import_object();
     void import_texture();
     void report_error(const std::exception& error);
+    void begin_asset_task(const QString& message);
+    void finish_asset_task();
+    void install_scene(minirender::SceneDocument document, const QString& path);
     minirender::SceneObject* selected(minirender::SceneDocument& scene) const;
 
     VulkanViewport* viewport_ = nullptr;
@@ -58,6 +67,12 @@ class Workbench final : public QMainWindow {
     QComboBox* texture_selector_ = nullptr;
     QComboBox* texture_filter_ = nullptr;
     QAction* import_texture_action_ = nullptr;
+    QAction* import_object_action_ = nullptr;
+    QAction* open_action_ = nullptr;
+    QProgressBar* task_progress_ = nullptr;
+    QLabel* task_label_ = nullptr;
+    QString task_message_;
+    bool asset_loading_ = false;
     bool texture_loading_ = false;
     std::uint64_t document_generation_ = 0;
     QDoubleSpinBox* roughness_ = nullptr;

@@ -8,7 +8,8 @@ foreach(shader diagnostic.vert diagnostic.frag scene.vert scene.frag shadow.vert
     set(output "${CMAKE_CURRENT_BINARY_DIR}/${shader}.spv")
     add_custom_command(OUTPUT "${output}"
         COMMAND Vulkan::glslangValidator --target-env vulkan1.2 -I${PROJECT_SOURCE_DIR}/shaders -V "${source}" -o "${output}"
-        DEPENDS "${source}" "${PROJECT_SOURCE_DIR}/shaders/scene_frame.glsl" VERBATIM)
+        DEPENDS "${source}" "${PROJECT_SOURCE_DIR}/shaders/scene_frame.glsl"
+                "${PROJECT_SOURCE_DIR}/shaders/scene_instance.glsl" VERBATIM)
     list(APPEND shader_outputs "${output}")
 endforeach()
 
@@ -20,7 +21,8 @@ qt_add_executable(minirender_desktop
     gpu_image.cpp gpu_image.hpp gpu_shader.cpp gpu_shader.hpp
     hdr_targets.cpp hdr_targets.hpp post_process.cpp post_process.hpp
     scene_renderer.cpp scene_renderer.hpp shadow_map.cpp shadow_map.hpp workbench.cpp workbench.hpp
-    scene_smoke.cpp scene_smoke.hpp texture_smoke.cpp texture_smoke.hpp interaction_smoke.cpp interaction_smoke.hpp)
+    scene_smoke.cpp scene_smoke.hpp texture_smoke.cpp texture_smoke.hpp interaction_smoke.cpp interaction_smoke.hpp
+    parameter_smoke.cpp parameter_smoke.hpp)
 if(APPLE)
     set_target_properties(minirender_desktop PROPERTIES
         MACOSX_BUNDLE TRUE

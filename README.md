@@ -22,3 +22,5 @@ A1.4 已加入浮点 HDR、独立后处理、FXAA、深度视图和 EXR 输出�
 A1.5 已加入纹理资产、线性 mipmap、三种过滤方式及异步导入，见 [纹理实现](docs/TEXTURES.md) 和 [验收记录](docs/checkpoints/A1.5.md)。
 
 UI 交互修复见 [验证记录](docs/checkpoints/UI1.md)：属性布局、连续拖拽、侧栏恢复与 GPU 等待已调整。线框等后续工作暂未完成。
+
+参数卡顿修复见 [性能对照](docs/checkpoints/UI2.md)：普通编辑复用网格与描述符，文件导入在后台执行，状态栏显示任务阶段和预览等待。

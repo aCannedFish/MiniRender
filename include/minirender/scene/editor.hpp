@@ -20,11 +20,14 @@ class SceneEditor {
     bool can_undo() const noexcept;
     bool can_redo() const noexcept;
     void update_navigation(const Camera& camera);
+    // 快照仍校验全部参数与引用，已验证的不可变网格不再逐三角形扫描。
+    std::shared_ptr<const SceneSnapshot> snapshot();
 
   private:
     SceneDocument document_;
     std::vector<SceneDocument> undo_;
     std::vector<SceneDocument> redo_;
+    MeshValidationCache validated_meshes_;
 };
 
 // 角度增量以弧度表示。围绕 target 环绕或在 position 原地转向，限制 pitch 防止翻转。

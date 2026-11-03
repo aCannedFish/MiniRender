@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -34,6 +35,16 @@ struct MeshData {
     std::vector<glm::vec3> positions;
     std::vector<MeshTriangle> triangles;
     void validate() const;
+};
+
+// 资产发布后不可再修改。按 shared_ptr 的所有权缓存校验结果，过期弱引用及时清理。
+// 缓存仅在所属编辑线程使用；新网格即使复用原始地址也会按新的所有权重新校验。
+class MeshValidationCache {
+  public:
+    void validate(const std::shared_ptr<const MeshData>& mesh);
+
+  private:
+    std::set<std::weak_ptr<const MeshData>, std::owner_less<std::weak_ptr<const MeshData>>> meshes_;
 };
 
 // T * Rz * Ry * Rx * S；旋转在界面/文件中以度表示，渲染矩阵按弧度计算。
@@ -119,7 +130,7 @@ struct SceneDocument {
     std::vector<TextureAsset> textures;
     std::vector<SceneObject> objects;
     std::vector<DirectionalLight> directional_lights;
-    void validate() const;
+    void validate(MeshValidationCache* cache = nullptr) const;
 };
 
 // 每个实例持有独立的材质/变换值和只读网格。用户编辑原文档不改变已经开始的任务。
@@ -139,6 +150,7 @@ struct SceneSnapshot {
     std::vector<DirectionalLight> directional_lights;
 };
 
-std::shared_ptr<const SceneSnapshot> make_snapshot(const SceneDocument& document);
+std::shared_ptr<const SceneSnapshot> make_snapshot(const SceneDocument& document,
+                                                   MeshValidationCache* cache = nullptr);
 
 } // namespace minirender
