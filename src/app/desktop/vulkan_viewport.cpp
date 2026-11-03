@@ -313,7 +313,7 @@ void VulkanViewport::recreate_swapchain() {
     dirty_ = false;
 }
 
-void VulkanViewport::render_frame() {
+void VulkanViewport::render_frame(bool blocking_capture) {
     if (!isExposed() || width() <= 0 || height() <= 0 || !failure_.isEmpty()) {
         return;
     }
@@ -321,12 +321,24 @@ void VulkanViewport::render_frame() {
         if (device_ == VK_NULL_HANDLE) {
             initialize();
         }
+        // 普通帧只轮询，GPU 忙时将控制权交还给 Qt。显式截图使用有限等待。
+        const std::uint64_t timeout = blocking_capture ? 2'000'000'000ULL : 0;
+        const auto ready = vkWaitForFences(device_, 1, &frame_fence_, VK_TRUE, timeout);
+        if (ready == VK_TIMEOUT) {
+            requestUpdate();
+            return;
+        }
+        check(ready, "wait frame fence");
         if (dirty_) {
             recreate_swapchain();
         }
-        check(vkWaitForFences(device_, 1, &frame_fence_, VK_TRUE, UINT64_MAX), "wait frame fence");
-        const auto acquired = vkAcquireNextImageKHR(device_, swapchain_, UINT64_MAX, acquired_,
-                                                    VK_NULL_HANDLE, &image_index_);
+        const auto acquired =
+            vkAcquireNextImageKHR(device_, swapchain_, blocking_capture ? timeout : 1'000'000ULL,
+                                  acquired_, VK_NULL_HANDLE, &image_index_);
+        if (acquired == VK_NOT_READY || acquired == VK_TIMEOUT) {
+            requestUpdate();
+            return;
+        }
         if (acquired == VK_ERROR_OUT_OF_DATE_KHR) {
             dirty_ = true;
             requestUpdate();
@@ -440,7 +452,7 @@ void VulkanViewport::record_readback() {
 }
 
 void VulkanViewport::finish_readback() {
-    check(vkWaitForFences(device_, 1, &frame_fence_, VK_TRUE, UINT64_MAX), "wait readback");
+    check(vkWaitForFences(device_, 1, &frame_fence_, VK_TRUE, 2'000'000'000ULL), "wait readback");
     void* mapped = nullptr;
     check(vkMapMemory(device_, readback_memory_, 0, VK_WHOLE_SIZE, 0, &mapped), "map readback");
     captured_ = QImage(static_cast<const uchar*>(mapped), static_cast<int>(extent_.width),
@@ -462,7 +474,7 @@ QImage VulkanViewport::grab() {
     }
     captured_ = {};
     capture_ = true;
-    render_frame();
+    render_frame(true);
     capture_ = false;
     return captured_;
 }
@@ -524,6 +536,11 @@ void VulkanViewport::release() {
 }
 
 bool VulkanViewport::event(QEvent* event) {
+    if (event->type() == QEvent::WindowDeactivate || event->type() == QEvent::Hide ||
+        event->type() == QEvent::UngrabMouse) {
+        pressed_buttons_ = Qt::NoButton;
+        dragged_ = false;
+    }
     // QWidget 容器可以在 C++ 析构前销毁原生 surface；必须先释放关联交换链。
     if (event->type() == QEvent::PlatformSurface) {
         auto* surface_event = static_cast<QPlatformSurfaceEvent*>(event);
@@ -551,8 +568,8 @@ void VulkanViewport::exposeEvent(QExposeEvent*) {
     }
 }
 
-void VulkanViewport::resizeEvent(QResizeEvent*) {
-    dirty_ = true;
+void VulkanViewport::resizeEvent(QResizeEvent* event) {
+    dirty_ = dirty_ || event->size() != event->oldSize();
     requestUpdate();
 }
 
@@ -650,13 +667,20 @@ int VulkanViewport::view_mode() const noexcept {
 }
 
 void VulkanViewport::mousePressEvent(QMouseEvent* event) {
-    requestActivate();
+    // 嵌入窗口的焦点由 QWidget 容器管理，避免把子窗口当顶层窗口激活。
+    pressed_buttons_ = event->buttons();
     mouse_origin_ = last_mouse_ = event->position();
     dragged_ = false;
     event->accept();
 }
 void VulkanViewport::mouseMoveEvent(QMouseEvent* event) {
     if (!scene_) {
+        return;
+    }
+    // 只响应从本视口开始的拖拽；释放或失焦后不继承外部窗口的按钮状态。
+    pressed_buttons_ &= event->buttons();
+    if (pressed_buttons_ == Qt::NoButton) {
+        last_mouse_ = event->position();
         return;
     }
     const auto delta = event->position() - last_mouse_;
@@ -667,20 +691,23 @@ void VulkanViewport::mouseMoveEvent(QMouseEvent* event) {
     const float dx = static_cast<float>(delta.x());
     const float dy = static_cast<float>(delta.y());
     const float distance = glm::length(camera_.target - camera_.position);
-    if (event->buttons().testFlag(Qt::MiddleButton) ||
-        (event->buttons().testFlag(Qt::LeftButton) &&
+    if (pressed_buttons_.testFlag(Qt::MiddleButton) ||
+        (pressed_buttons_.testFlag(Qt::LeftButton) &&
          event->modifiers().testFlag(Qt::ShiftModifier))) {
         set_camera(
             minirender::pan_camera(camera_, {-dx * distance * 0.002F, dy * distance * 0.002F}));
-    } else if (event->buttons().testFlag(Qt::RightButton)) {
+    } else if (pressed_buttons_.testFlag(Qt::RightButton)) {
         set_camera(minirender::rotate_camera(camera_, -dx * 0.005F, -dy * 0.005F, false));
-    } else if (event->buttons().testFlag(Qt::LeftButton) && dragged_) {
+    } else if (pressed_buttons_.testFlag(Qt::LeftButton) && dragged_) {
         set_camera(minirender::rotate_camera(camera_, -dx * 0.005F, dy * 0.005F, true));
     }
     event->accept();
 }
 void VulkanViewport::mouseReleaseEvent(QMouseEvent* event) {
-    if (scene_ && event->button() == Qt::LeftButton && !dragged_ && width() > 0 && height() > 0) {
+    const bool owned_press = pressed_buttons_.testFlag(event->button());
+    pressed_buttons_ &= ~Qt::MouseButtons(event->button());
+    if (owned_press && scene_ && event->button() == Qt::LeftButton && !dragged_ && width() > 0 &&
+        height() > 0) {
         const glm::vec2 uv{static_cast<float>(event->position().x()) / static_cast<float>(width()),
                            static_cast<float>(event->position().y()) /
                                static_cast<float>(height())};
@@ -754,10 +781,11 @@ minirender::Image VulkanViewport::grab_hdr() {
     }
     const auto before = frame_count_;
     renderer_->request_hdr_capture();
-    render_frame();
+    render_frame(true);
     if (!failure_.isEmpty() || frame_count_ == before) {
         throw std::runtime_error("HDR frame was not rendered");
     }
-    check(vkWaitForFences(device_, 1, &frame_fence_, VK_TRUE, UINT64_MAX), "wait HDR capture");
+    check(vkWaitForFences(device_, 1, &frame_fence_, VK_TRUE, 2'000'000'000ULL),
+          "wait HDR capture");
     return renderer_->read_hdr_capture();
 }

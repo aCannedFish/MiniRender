@@ -166,6 +166,11 @@ void start_texture_smoke(Workbench& window, const QString& directory) {
             if (window.viewport()->rendered_frames() < 5) {
                 return;
             }
+            if (!window.viewport()->isExposed()) {
+                window.raise();
+                window.activateWindow();
+                return;
+            }
             const auto capture = [&](const char* name) {
                 const auto image = window.viewport()->grab();
                 require(!image.isNull() && image.save(directory + "/" + name + ".png"),

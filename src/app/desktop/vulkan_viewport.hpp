@@ -73,7 +73,7 @@ class VulkanViewport final : public QWindow {
     void recreate_swapchain();
     void release_swapchain();
     void release();
-    void render_frame();
+    void render_frame(bool blocking_capture = false);
     void record_readback();
     void finish_readback();
     std::uint32_t memory_type(std::uint32_t bits, VkMemoryPropertyFlags flags) const;
@@ -89,6 +89,7 @@ class VulkanViewport final : public QWindow {
     QPointF mouse_origin_;
     QPointF last_mouse_;
     bool dragged_ = false;
+    Qt::MouseButtons pressed_buttons_ = Qt::NoButton;
     VkPhysicalDevice physical_ = VK_NULL_HANDLE;
     VkPhysicalDeviceProperties properties_{};
     VkDevice device_ = VK_NULL_HANDLE;

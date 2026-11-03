@@ -20,3 +20,5 @@ A1.3 已加入多方向光深度图阴影和 PCF，见 [阴影实现](docs/SHADO
 A1.4 已加入浮点 HDR、独立后处理、FXAA、深度视图和 EXR 输出，见 [HDR 实现](docs/HDR.md) 与 [验收记录](docs/checkpoints/A1.4.md)。A1 尚有线框和编辑完善工作。
 
 A1.5 已加入纹理资产、线性 mipmap、三种过滤方式及异步导入，见 [纹理实现](docs/TEXTURES.md) 和 [验收记录](docs/checkpoints/A1.5.md)。
+
+UI 交互修复见 [验证记录](docs/checkpoints/UI1.md)：属性布局、连续拖拽、侧栏恢复与 GPU 等待已调整。线框等后续工作暂未完成。

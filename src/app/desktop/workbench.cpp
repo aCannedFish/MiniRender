@@ -15,8 +15,10 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QScreen>
 #include <QScrollArea>
 #include <QSignalBlocker>
+#include <QSizePolicy>
 #include <QStatusBar>
 #include <QTabWidget>
 #include <QTimer>
@@ -60,7 +62,28 @@ QDoubleSpinBox* spin(QWidget* parent, const QString& name, double minimum, doubl
     value->setDecimals(4);
     value->setSingleStep(step);
     value->setKeyboardTracking(false);
+    value->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     return value;
+}
+
+QScrollArea* scroll_panel(QWidget* panel) {
+    auto* area = new QScrollArea;
+    area->setWidgetResizable(true);
+    area->setFrameShape(QFrame::NoFrame);
+    area->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    panel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    area->setWidget(panel);
+    return area;
+}
+
+void configure_form(QFormLayout* form) {
+    form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+    form->setRowWrapPolicy(QFormLayout::WrapLongRows);
+    form->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    form->setFormAlignment(Qt::AlignTop | Qt::AlignLeft);
+    form->setHorizontalSpacing(10);
+    form->setVerticalSpacing(8);
+    form->setContentsMargins(10, 12, 10, 12);
 }
 
 } // namespace
@@ -73,11 +96,14 @@ class VectorField final : public QWidget {
         : QWidget(parent) {
         auto* layout = new QHBoxLayout(this);
         layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(6);
         const std::array<QString, 3> axes{"x", "y", "z"};
         for (std::size_t index = 0; index < values_.size(); ++index) {
             values_[index] = spin(this, prefix + "." + axes[index], minimum, maximum, 0.1);
             values_[index]->setPrefix(axes[index] + " ");
-            layout->addWidget(values_[index]);
+            values_[index]->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+            values_[index]->setMinimumWidth(88);
+            layout->addWidget(values_[index], 1);
             connect(values_[index], &QDoubleSpinBox::editingFinished, this, [this] {
                 if (on_changed) {
                     on_changed();
@@ -202,6 +228,7 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     assets_ = new QTreeWidget;
     assets_->setHeaderLabels({"资源", "规模"});
     auto* left_tabs = new QTabWidget;
+    left_tabs->setDocumentMode(true);
     left_tabs->addTab(tree_, "场景");
     left_tabs->addTab(assets_, "资源");
     auto* scene_dock = new QDockWidget("场景", this);
@@ -232,17 +259,46 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     build_light_panel();
     build_camera_panel();
     auto* right_tabs = new QTabWidget;
-    right_tabs->addTab(object_panel_, "物体");
-    right_tabs->addTab(light_panel_, "灯光");
-    right_tabs->addTab(camera_panel_, "相机");
+    right_tabs->setObjectName("inspector_tabs");
+    right_tabs->setDocumentMode(true);
+    right_tabs->addTab(scroll_panel(object_panel_), "物体");
+    right_tabs->addTab(scroll_panel(light_panel_), "灯光");
+    right_tabs->addTab(scroll_panel(camera_panel_), "相机");
     auto* inspector = new QDockWidget("属性", this);
-    inspector->setMinimumWidth(320);
+    inspector->setMinimumWidth(340);
+    inspector->setMaximumWidth(620);
     inspector->setWidget(right_tabs);
     addDockWidget(Qt::RightDockWidgetArea, inspector);
+    inspector->setObjectName("inspector_dock");
+    scene_dock->setObjectName("scene_dock");
+    scene_dock->setMinimumWidth(160);
+    resizeDocks({scene_dock, inspector}, {200, 430}, Qt::Horizontal);
     viewport_->on_camera_changed = [this](const minirender::Camera& camera) {
         editor_.update_navigation(camera);
-        refresh_camera();
+        if (camera_panel_->isVisible() && !camera_refresh_pending_) {
+            camera_refresh_pending_ = true;
+            QTimer::singleShot(33, this, [this] {
+                camera_refresh_pending_ = false;
+                refresh_camera();
+            });
+        }
     };
+    connect(right_tabs, &QTabWidget::currentChanged, this, [this](int index) {
+        if (index == 2) {
+            refresh_camera();
+        }
+    });
+    auto* restore = toolbar->addAction("恢复布局");
+    restore->setObjectName("restore_layout");
+    connect(restore, &QAction::triggered, this, [this, scene_dock, inspector] {
+        scene_dock->setFloating(false);
+        inspector->setFloating(false);
+        addDockWidget(Qt::LeftDockWidgetArea, scene_dock);
+        addDockWidget(Qt::RightDockWidgetArea, inspector);
+        scene_dock->show();
+        inspector->show();
+        resizeDocks({scene_dock, inspector}, {200, 430}, Qt::Horizontal);
+    });
     viewport_->on_object_picked = [this](const std::string& id) { select_object(id); };
     auto* status_timer = new QTimer(this);
     status_timer->setInterval(500);
@@ -260,7 +316,8 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
         }
     });
     status_timer->start();
-    resize(1360, 820);
+    const QSize available = screen()->availableGeometry().size();
+    resize(std::min(1280, available.width() - 40), std::min(800, available.height() - 80));
     undo_->setEnabled(false);
     redo_->setEnabled(false);
     if (diagnostic_) {
@@ -272,6 +329,7 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
 void Workbench::build_object_panel() {
     object_panel_ = new QWidget;
     auto* layout = new QFormLayout(object_panel_);
+    configure_form(layout);
     object_name_ = new QLineEdit;
     object_name_->setObjectName("object_name");
     translation_ = new VectorField(object_panel_, "translation");
@@ -299,7 +357,9 @@ void Workbench::build_object_panel() {
     layout->addRow("自发光", emission_);
     layout->addRow("粗糙度", roughness_);
     layout->addRow("折射率", ior_);
-    layout->addRow(new QLabel("同一材质的参数会同时影响引用它的物体。"));
+    auto* hint = new QLabel("同一材质的参数会同时影响引用它的物体。");
+    hint->setWordWrap(true);
+    layout->addRow(hint);
     translation_->on_changed = [this] {
         edit_object_property([&](minirender::SceneObject& object) {
             object.transform.translation = translation_->value();
@@ -359,6 +419,7 @@ void Workbench::build_object_panel() {
 void Workbench::build_light_panel() {
     light_panel_ = new QWidget;
     auto* layout = new QFormLayout(light_panel_);
+    configure_form(layout);
     light_selector_ = new QComboBox;
     light_direction_ = new VectorField(light_panel_, "light_direction", -100, 100);
     light_color_ = new VectorField(light_panel_, "light_color", 0, 100);
@@ -391,6 +452,7 @@ void Workbench::build_light_panel() {
 void Workbench::build_camera_panel() {
     camera_panel_ = new QWidget;
     auto* layout = new QFormLayout(camera_panel_);
+    configure_form(layout);
     camera_position_ = new VectorField(camera_panel_, "camera_position");
     camera_target_ = new VectorField(camera_panel_, "camera_target");
     fov_ = spin(camera_panel_, "fov", 5, 150, 1);

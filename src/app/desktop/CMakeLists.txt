@@ -20,7 +20,7 @@ qt_add_executable(minirender_desktop
     gpu_image.cpp gpu_image.hpp gpu_shader.cpp gpu_shader.hpp
     hdr_targets.cpp hdr_targets.hpp post_process.cpp post_process.hpp
     scene_renderer.cpp scene_renderer.hpp shadow_map.cpp shadow_map.hpp workbench.cpp workbench.hpp
-    scene_smoke.cpp scene_smoke.hpp texture_smoke.cpp texture_smoke.hpp)
+    scene_smoke.cpp scene_smoke.hpp texture_smoke.cpp texture_smoke.hpp interaction_smoke.cpp interaction_smoke.hpp)
 if(APPLE)
     set_target_properties(minirender_desktop PROPERTIES
         MACOSX_BUNDLE TRUE

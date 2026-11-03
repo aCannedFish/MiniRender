@@ -52,3 +52,5 @@ GPU 检查先画近处棋盘，再画远处红色三角形。若深度测试未�
 - [Qt Vulkan 窗口源码](https://github.com/qt/qtbase/blob/v6.11.2/src/gui/vulkan/qvulkanwindow.cpp)：核对生命周期、平台呈现通知和初始原型问题。
 - [Khronos Swapchain Semaphore Reuse](https://docs.vulkan.org/guide/latest/swapchain_semaphore_reuse.html)：交换链图像与呈现信号量的关系。
 - [MoltenVK Runtime Guide](https://github.com/KhronosGroup/MoltenVK/blob/main/Docs/MoltenVK_Runtime_UserGuide.md)：Metal 运行与 portability 设备要求。
+
+后续 UI 修复在 macOS 进程内启用 MoltenVK 异步提交，普通帧改为轮询 fence，并取消对嵌入窗口的手工激活，记录见 checkpoints/UI1.md。

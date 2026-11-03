@@ -20,8 +20,9 @@ def main() -> int:
     parser.add_argument("--timeout", type=float, default=35)
     parser.add_argument("--scene", type=Path, help="Run scene editor checks instead of A0 diagnostics")
     parser.add_argument("--texture-check", action="store_true", help="Verify texture import and filtering")
+    parser.add_argument("--interaction-check", action="store_true", help="Verify repeated drags and layout")
     args = parser.parse_args()
-    if args.texture_check and not args.scene:
+    if (args.texture_check or args.interaction_check) and not args.scene:
         parser.error("--texture-check requires --scene")
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -35,7 +36,7 @@ def main() -> int:
         arguments += [
             "--scene",
             str(args.scene.resolve()),
-            "--texture-smoke" if args.texture_check else "--scene-smoke",
+            "--interaction-smoke" if args.interaction_check else ("--texture-smoke" if args.texture_check else "--scene-smoke"),
             str(output),
         ]
     else:
@@ -56,7 +57,8 @@ def main() -> int:
     text = (output / "gpu-smoke.log").read_text(encoding="utf-8")
     print(text, end="")
     marker = (
-        "Texture smoke PASS" if args.texture_check
+        "Interaction smoke PASS" if args.interaction_check
+        else "Texture smoke PASS" if args.texture_check
         else ("Scene smoke PASS" if args.scene else "GPU smoke PASS")
     )
     if code == 0 and (marker not in text or "Vulkan validation errors: 0" not in text):

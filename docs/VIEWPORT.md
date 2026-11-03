@@ -50,3 +50,5 @@ python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirend
 测试保存 baseline、edited、undo、redo、reloaded、normals、dolly 和 final 图像，检查物体编辑改变像素，撤销/重做及保存重载恢复对应图像。它还发送 Qt 输入事件验证滚轮和键盘相机，并执行复制/删除动作。程序关闭后仍要求 Validation 错误数为 0。
 
 这是程序内控件/渲染端到端测试。外部桌面控制工具未获 MiniRender 访问权限，本次没有完成外部鼠标操作的独立复核；不把它记录为已通过。
+
+属性页支持滚动和窄窗口换行，工具栏“恢复布局”可以重新显示已关闭的侧栏。相机拖拽状态与窗口/GPU 调度修复详见 checkpoints/UI1.md。
