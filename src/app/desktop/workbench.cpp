@@ -1,4 +1,5 @@
 #include "workbench.hpp"
+#include "offline_panel.hpp"
 
 #include <minirender/assets/scene_io.hpp>
 
@@ -236,7 +237,11 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
         const auto path = QFileDialog::getSaveFileName(this, "导出线性 HDR", {}, "OpenEXR (*.exr)");
         if (!path.isEmpty()) {
             try {
-                viewport_->grab_hdr().write_exr(native_path(path));
+                if (viewport_->offline_visible()) {
+                    offline_->save_image(path, true);
+                } else {
+                    viewport_->grab_hdr().write_exr(native_path(path));
+                }
             } catch (const std::exception& error) {
                 report_error(error);
             }
@@ -285,6 +290,13 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     right_tabs->addTab(scroll_panel(object_panel_), "物体");
     right_tabs->addTab(scroll_panel(light_panel_), "灯光");
     right_tabs->addTab(scroll_panel(camera_panel_), "相机");
+    offline_ = new OfflinePanel(*viewport_, [this] { return editor_.snapshot(); }, this);
+    right_tabs->addTab(scroll_panel(offline_), "离线");
+    viewport_->on_display_changed = [this](bool offline) {
+        findChild<QComboBox*>("view_mode")->setEnabled(!offline);
+        findChild<QCheckBox*>("fxaa_enabled")->setEnabled(!offline);
+        findChild<QCheckBox*>("shadows_enabled")->setEnabled(!offline);
+    };
     auto* inspector = new QDockWidget("属性", this);
     inspector->setMinimumWidth(340);
     inspector->setMaximumWidth(620);
@@ -296,6 +308,7 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     resizeDocks({scene_dock, inspector}, {200, 430}, Qt::Horizontal);
     viewport_->on_camera_changed = [this](const minirender::Camera& camera) {
         editor_.update_navigation(camera);
+        offline_->scene_changed();
         if (camera_panel_->isVisible() && !camera_refresh_pending_) {
             camera_refresh_pending_ = true;
             QTimer::singleShot(33, this, [this] {
@@ -347,6 +360,11 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
         } else if (asset_loading_) {
             statusBar()->showMessage(task_message_);
         } else if (viewport_->isValid()) {
+            if (viewport_->offline_visible()) {
+                statusBar()->showMessage(
+                    "CPU 路径追踪结果 | 曝光只影响显示 | 返回实时预览后可操作相机");
+                return;
+            }
             auto message =
                 QString(
                     "%1 | %2 个物体 | 直接光照预览 | 左拖环绕 · 右拖转向 · 中拖平移 · WASDQE 移动")
@@ -519,14 +537,18 @@ void Workbench::build_camera_panel() {
     camera_position_ = new VectorField(camera_panel_, "camera_position");
     camera_target_ = new VectorField(camera_panel_, "camera_target");
     fov_ = spin(camera_panel_, "fov", 5, 150, 1);
-    auto* exposure = spin(camera_panel_, "exposure", -10, 10, 0.25);
+    exposure_ = spin(camera_panel_, "exposure", -10, 10, 0.25);
+    aperture_ = spin(camera_panel_, "aperture_radius", 0, 10, 0.005);
+    focus_ = spin(camera_panel_, "focus_distance", 0.0001, 100000, 0.1);
     auto* mode = new QComboBox;
     mode->setObjectName("view_mode");
     mode->addItems({"直接光照", "法线", "线性深度", "线框"});
     layout->addRow("位置", camera_position_);
     layout->addRow("目标", camera_target_);
     layout->addRow("垂直 FOV / °", fov_);
-    layout->addRow("曝光 / EV", exposure);
+    layout->addRow("光圈半径 / m", aperture_);
+    layout->addRow("对焦距离 / m", focus_);
+    layout->addRow("曝光 / EV", exposure_);
     layout->addRow("显示", mode);
     auto* fxaa = new QCheckBox("启用 FXAA");
     fxaa->setObjectName("fxaa_enabled");
@@ -548,17 +570,22 @@ void Workbench::build_camera_panel() {
             scene.camera.position = camera_position_->value();
             scene.camera.target = camera_target_->value();
             scene.camera.vertical_fov_degrees = static_cast<float>(fov_->value());
+            scene.camera.aperture_radius = static_cast<float>(aperture_->value());
+            scene.camera.focus_distance = static_cast<float>(focus_->value());
         });
     };
     camera_position_->on_changed = camera_target_->on_changed = update;
     connect(fov_, &QDoubleSpinBox::valueChanged, this, update);
-    connect(exposure, &QDoubleSpinBox::valueChanged, this,
+    connect(aperture_, &QDoubleSpinBox::valueChanged, this, update);
+    connect(focus_, &QDoubleSpinBox::valueChanged, this, update);
+    connect(exposure_, &QDoubleSpinBox::valueChanged, this,
             [this](double value) { viewport_->set_exposure(static_cast<float>(value)); });
     connect(mode, &QComboBox::currentIndexChanged, this,
             [this](int index) { viewport_->set_view_mode(index); });
 }
 
 void Workbench::refresh() {
+    offline_->scene_changed();
     refreshing_ = true;
     tree_->clear();
     assets_->clear();
@@ -650,6 +677,16 @@ void Workbench::refresh_camera() {
     camera_target_->set_value(editor_.document().camera.target);
     const QSignalBlocker blocker(fov_);
     fov_->setValue(editor_.document().camera.vertical_fov_degrees);
+    const QSignalBlocker aperture_blocker(aperture_);
+    const QSignalBlocker focus_blocker(focus_);
+    const QSignalBlocker exposure_blocker(exposure_);
+    aperture_->setValue(editor_.document().camera.aperture_radius);
+    focus_->setValue(editor_.document().camera.focus_distance);
+    exposure_->setValue(viewport_->exposure());
+}
+
+OfflinePanel* Workbench::offline_panel() const noexcept {
+    return offline_;
 }
 
 void Workbench::perform_edit(const std::function<void(minirender::SceneDocument&)>& operation) {

@@ -43,6 +43,11 @@ class VulkanViewport final : public QWindow {
     float exposure() const noexcept;
     void set_view_mode(int mode);
     int view_mode() const noexcept;
+    void set_offline_visible(bool visible);
+    bool offline_visible() const noexcept;
+    void set_offline_image(std::shared_ptr<const minirender::Image> image);
+    const std::shared_ptr<const minirender::Image>& offline_image() const noexcept;
+    std::function<void(bool)> on_display_changed;
     std::function<void(const minirender::Camera&)> on_camera_changed;
     std::function<void(const std::string&)> on_object_picked;
 
@@ -56,6 +61,7 @@ class VulkanViewport final : public QWindow {
     QSize swapChainImageSize() const noexcept;
     bool supportsGrab() const noexcept;
     QImage grab();
+    // 实时读回 HDR 附件；离线返回当前 CPU 预览，全尺寸导出由 OfflinePanel 处理。
     minirender::Image grab_hdr();
 
     void frameReady();
@@ -95,6 +101,9 @@ class VulkanViewport final : public QWindow {
     std::uint32_t memory_type(std::uint32_t bits, VkMemoryPropertyFlags flags) const;
 
     std::unique_ptr<ViewportRenderer> renderer_;
+    std::unique_ptr<ViewportRenderer> offline_renderer_;
+    std::shared_ptr<const minirender::Image> offline_image_;
+    bool offline_visible_ = false;
     std::shared_ptr<const minirender::SceneSnapshot> scene_;
     minirender::Camera camera_;
     std::uint64_t scene_revision_ = 0;

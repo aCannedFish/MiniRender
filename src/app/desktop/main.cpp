@@ -1,4 +1,5 @@
 #include "interaction_smoke.hpp"
+#include "offline_smoke.hpp"
 #include "parameter_smoke.hpp"
 #include "scene_smoke.hpp"
 #include "texture_smoke.hpp"
@@ -78,11 +79,14 @@ int main(int argc, char** argv) {
         {"interaction-smoke", "Run repeated drag and inspector layout checks.", "directory"});
     parser.addOption({"parameter-smoke", "Measure parameter edit responsiveness.", "directory"});
     parser.addOption({"wire-smoke", "Verify wireframe depth and HDR isolation.", "directory"});
+    parser.addOption(
+        {"offline-smoke", "Verify CPU task controls and Vulkan display.", "directory"});
     parser.process(application);
     const bool smoke = parser.isSet("smoke");
     const bool validation = parser.isSet("validation") || smoke || parser.isSet("scene-smoke") ||
                             parser.isSet("texture-smoke") || parser.isSet("interaction-smoke") ||
-                            parser.isSet("parameter-smoke") || parser.isSet("wire-smoke");
+                            parser.isSet("parameter-smoke") || parser.isSet("wire-smoke") ||
+                            parser.isSet("offline-smoke");
     std::atomic_int validation_errors = 0;
     int result = 0;
 
@@ -119,7 +123,7 @@ int main(int argc, char** argv) {
                 const bool regression =
                     parser.isSet("scene-smoke") || parser.isSet("texture-smoke") ||
                     parser.isSet("interaction-smoke") || parser.isSet("parameter-smoke") ||
-                    parser.isSet("wire-smoke");
+                    parser.isSet("wire-smoke") || parser.isSet("offline-smoke");
                 if (regression) {
                     window.load_scene_file(scene_path);
                 } else {
@@ -147,6 +151,9 @@ int main(int argc, char** argv) {
 
         if (parser.isSet("wire-smoke")) {
             start_wire_smoke(window, parser.value("wire-smoke"));
+        }
+        if (parser.isSet("offline-smoke")) {
+            start_offline_smoke(window, parser.value("offline-smoke"));
         }
 
         int ticks = 0;
