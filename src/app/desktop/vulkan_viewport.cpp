@@ -1,5 +1,6 @@
 #include "vulkan_viewport.hpp"
 #include "diagnostic_renderer.hpp"
+#include "offline_renderer.hpp"
 #include "scene_renderer.hpp"
 #include <minirender/scene/editor.hpp>
 
@@ -121,6 +122,8 @@ void VulkanViewport::initialize() {
         renderer_ = std::make_unique<DiagnosticRenderer>(this);
     }
     renderer_->initResources();
+    offline_renderer_ = std::make_unique<OfflineRenderer>(this);
+    offline_renderer_->initResources();
 }
 
 std::uint32_t VulkanViewport::memory_type(std::uint32_t bits, VkMemoryPropertyFlags flags) const {
@@ -310,6 +313,7 @@ void VulkanViewport::recreate_swapchain() {
               "create framebuffer");
     }
     renderer_->initSwapChainResources();
+    offline_renderer_->initSwapChainResources();
     dirty_ = false;
 }
 
@@ -360,7 +364,8 @@ void VulkanViewport::render_frame(bool blocking_capture) {
         begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         check(vkBeginCommandBuffer(command_, &begin), "begin frame");
-        renderer_->startNextFrame();
+        // 两个实现共享交换链，同一时刻只有一个录制；选择发生在上一帧 fence 完成后。
+        (offline_visible_ ? offline_renderer_ : renderer_)->startNextFrame();
     } catch (const std::exception& error) {
         report_failure(QString::fromUtf8(error.what()));
     }
@@ -493,6 +498,9 @@ void VulkanViewport::release_swapchain() {
     if (renderer_) {
         renderer_->releaseSwapChainResources();
     }
+    if (offline_renderer_) {
+        offline_renderer_->releaseSwapChainResources();
+    }
     for (auto framebuffer : framebuffers_) {
         vkDestroyFramebuffer(device_, framebuffer, nullptr);
     }
@@ -527,6 +535,10 @@ void VulkanViewport::release() {
     if (renderer_) {
         renderer_->releaseResources();
         renderer_.reset();
+    }
+    if (offline_renderer_) {
+        offline_renderer_->releaseResources();
+        offline_renderer_.reset();
     }
     vkDestroyBuffer(device_, readback_, nullptr);
     vkFreeMemory(device_, readback_memory_, nullptr);
@@ -709,7 +721,36 @@ int VulkanViewport::view_mode() const noexcept {
     return view_mode_;
 }
 
+void VulkanViewport::set_offline_visible(bool visible) {
+    if (offline_visible_ == visible) {
+        return;
+    }
+    offline_visible_ = visible;
+    pressed_buttons_ = Qt::NoButton;
+    dragged_ = false;
+    mark_preview_changed();
+    if (on_display_changed) {
+        on_display_changed(visible);
+    }
+    requestUpdate();
+}
+bool VulkanViewport::offline_visible() const noexcept {
+    return offline_visible_;
+}
+void VulkanViewport::set_offline_image(std::shared_ptr<const minirender::Image> image) {
+    offline_image_ = std::move(image);
+    mark_preview_changed();
+    requestUpdate();
+}
+const std::shared_ptr<const minirender::Image>& VulkanViewport::offline_image() const noexcept {
+    return offline_image_;
+}
+
 void VulkanViewport::mousePressEvent(QMouseEvent* event) {
+    if (offline_visible_) {
+        event->accept();
+        return;
+    }
     // 嵌入窗口的焦点由 QWidget 容器管理，避免把子窗口当顶层窗口激活。
     pressed_buttons_ = event->buttons();
     mouse_origin_ = last_mouse_ = event->position();
@@ -717,7 +758,7 @@ void VulkanViewport::mousePressEvent(QMouseEvent* event) {
     event->accept();
 }
 void VulkanViewport::mouseMoveEvent(QMouseEvent* event) {
-    if (!scene_) {
+    if (!scene_ || offline_visible_) {
         return;
     }
     // 只响应从本视口开始的拖拽；释放或失焦后不继承外部窗口的按钮状态。
@@ -749,8 +790,8 @@ void VulkanViewport::mouseMoveEvent(QMouseEvent* event) {
 void VulkanViewport::mouseReleaseEvent(QMouseEvent* event) {
     const bool owned_press = pressed_buttons_.testFlag(event->button());
     pressed_buttons_ &= ~Qt::MouseButtons(event->button());
-    if (owned_press && scene_ && event->button() == Qt::LeftButton && !dragged_ && width() > 0 &&
-        height() > 0) {
+    if (owned_press && scene_ && !offline_visible_ && event->button() == Qt::LeftButton &&
+        !dragged_ && width() > 0 && height() > 0) {
         const glm::vec2 uv{static_cast<float>(event->position().x()) / static_cast<float>(width()),
                            static_cast<float>(event->position().y()) /
                                static_cast<float>(height())};
@@ -764,14 +805,14 @@ void VulkanViewport::mouseReleaseEvent(QMouseEvent* event) {
     event->accept();
 }
 void VulkanViewport::wheelEvent(QWheelEvent* event) {
-    if (scene_) {
+    if (scene_ && !offline_visible_) {
         set_camera(minirender::dolly_camera(
             camera_, std::exp(-static_cast<float>(event->angleDelta().y()) / 1200.0F)));
     }
     event->accept();
 }
 void VulkanViewport::keyPressEvent(QKeyEvent* event) {
-    if (!scene_) {
+    if (!scene_ || offline_visible_) {
         return;
     }
     glm::vec3 move(0);
@@ -821,6 +862,9 @@ bool VulkanViewport::fxaa_enabled() const noexcept {
     return fxaa_enabled_;
 }
 minirender::Image VulkanViewport::grab_hdr() {
+    if (offline_visible_ && offline_image_) {
+        return *offline_image_;
+    }
     if (!isValid() || !isExposed() || !scene_) {
         throw std::logic_error("HDR capture requires a visible scene viewport");
     }

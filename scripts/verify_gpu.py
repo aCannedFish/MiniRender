@@ -24,8 +24,17 @@ def main() -> int:
     checks.add_argument("--interaction-check", action="store_true", help="Verify repeated drags and layout")
     checks.add_argument("--parameter-check", action="store_true", help="Verify edit latency and background progress")
     checks.add_argument("--wire-check", action="store_true", help="Verify wireframe visibility and HDR isolation")
+    checks.add_argument(
+        "--offline-check", action="store_true", help="Verify CPU task controls and Vulkan display"
+    )
     args = parser.parse_args()
-    scene_check = args.texture_check or args.interaction_check or args.parameter_check or args.wire_check
+    scene_check = (
+        args.texture_check
+        or args.interaction_check
+        or args.parameter_check
+        or args.wire_check
+        or args.offline_check
+    )
     if scene_check and not args.scene:
         parser.error("Scene checks require --scene")
     output = args.output.resolve()
@@ -38,6 +47,7 @@ def main() -> int:
     mode = "GPU"
     option = "--smoke"
     for selected, candidate in [
+        (args.offline_check, "Offline"),
         (args.parameter_check, "Parameter"),
         (args.interaction_check, "Interaction"),
         (args.texture_check, "Texture"),

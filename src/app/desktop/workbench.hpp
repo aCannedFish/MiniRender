@@ -12,6 +12,7 @@ class QComboBox;
 class VectorField;
 class QProgressBar;
 class QLabel;
+class OfflinePanel;
 
 // 桌面编辑控制器：控件编辑委托给 SceneEditor，渲染器只收到不可变快照。
 // file/undo/selection 都通过这里协调，不在 Vulkan 命令录制代码中读取控件。
@@ -29,6 +30,7 @@ class Workbench final : public QMainWindow {
     void import_texture_file(const QString& path, minirender::ColorEncoding encoding);
     bool texture_loading() const noexcept;
     bool asset_loading() const noexcept;
+    OfflinePanel* offline_panel() const noexcept;
 
   private:
     void build_object_panel();
@@ -57,6 +59,7 @@ class Workbench final : public QMainWindow {
     QWidget* object_panel_ = nullptr;
     QWidget* light_panel_ = nullptr;
     QWidget* camera_panel_ = nullptr;
+    OfflinePanel* offline_ = nullptr;
     QLineEdit* object_name_ = nullptr;
     VectorField* translation_ = nullptr;
     VectorField* rotation_ = nullptr;
@@ -84,6 +87,9 @@ class Workbench final : public QMainWindow {
     VectorField* camera_position_ = nullptr;
     VectorField* camera_target_ = nullptr;
     QDoubleSpinBox* fov_ = nullptr;
+    QDoubleSpinBox* aperture_ = nullptr;
+    QDoubleSpinBox* focus_ = nullptr;
+    QDoubleSpinBox* exposure_ = nullptr;
     QAction* undo_ = nullptr;
     QAction* redo_ = nullptr;
     std::string selected_id_;
