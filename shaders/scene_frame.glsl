@@ -10,5 +10,6 @@ layout(binding = 0, std140) uniform Frame {
     vec4 display;
     mat4 shadow_view_projection[8];
     vec4 shadow_settings;
+    vec4 viewport;
 } frame;
 #endif

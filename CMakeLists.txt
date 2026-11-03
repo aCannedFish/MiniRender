@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(MiniRender VERSION 0.1.0 LANGUAGES CXX)
+project(MiniRender VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -26,13 +26,14 @@ endif()
 
 add_library(minirender_core
     src/core/image.cpp
+    src/core/exr_io.cpp
     src/scene/scene.cpp
     src/scene/editor.cpp
     src/scene/shadow.cpp
     src/assets/obj_loader.cpp
     src/assets/scene_io.cpp)
 target_include_directories(minirender_core PUBLIC include)
-target_link_libraries(minirender_core PUBLIC glm::glm PRIVATE minirender_warnings nlohmann_json::nlohmann_json tinyobjloader)
+target_link_libraries(minirender_core PUBLIC glm::glm PRIVATE minirender_warnings nlohmann_json::nlohmann_json tinyobjloader minirender_exr_codec)
 target_compile_definitions(minirender_core PUBLIC
     GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE)
 

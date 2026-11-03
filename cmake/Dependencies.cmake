@@ -35,3 +35,29 @@ FetchContent_Declare(tinyobjloader
     URL https://github.com/tinyobjloader/tinyobjloader/archive/refs/tags/v2.0.0rc13.tar.gz
     URL_HASH SHA256=0feb92b838f8ce4aa6eb0ccc32dff30cb64a891e0ec3bde837fca49c78d44334)
 FetchContent_MakeAvailable(tinyobjloader)
+
+# TinyEXR 源码归档包含大量测试图；只取版本固定、逐个校验的 codec 文件。
+# SOURCE_SUBDIR 指向不存在的目录，避免执行上游仅用于自测的 CMakeLists。
+FetchContent_Declare(tinyexr_header
+    URL https://raw.githubusercontent.com/syoyo/tinyexr/v1.0.12/tinyexr.h
+    URL_HASH SHA256=e3eb50490af81dc3f5f067cf7f62955894d5db8f88a091c19bc4eef8e468095f
+    DOWNLOAD_NO_EXTRACT TRUE SOURCE_SUBDIR minirender_vendor_only)
+FetchContent_Declare(tinyexr_miniz_source
+    URL https://raw.githubusercontent.com/syoyo/tinyexr/v1.0.12/deps/miniz/miniz.c
+    URL_HASH SHA256=44d54a3caedf3eae0adc6b6e5a5024c5ba6543abc81d20e741d0353b801e57d3
+    DOWNLOAD_NO_EXTRACT TRUE SOURCE_SUBDIR minirender_vendor_only)
+FetchContent_Declare(tinyexr_miniz_header
+    URL https://raw.githubusercontent.com/syoyo/tinyexr/v1.0.12/deps/miniz/miniz.h
+    URL_HASH SHA256=295d1a0041aea09609598c0f1f35c1977ca05ad662acbadcfdaac44c140af37b
+    DOWNLOAD_NO_EXTRACT TRUE SOURCE_SUBDIR minirender_vendor_only)
+FetchContent_MakeAvailable(tinyexr_header tinyexr_miniz_source tinyexr_miniz_header)
+add_library(minirender_exr_codec STATIC
+    "${PROJECT_SOURCE_DIR}/src/external/exr_codec.cpp"
+    "${tinyexr_miniz_source_SOURCE_DIR}/miniz.c")
+target_include_directories(minirender_exr_codec SYSTEM PUBLIC "${tinyexr_header_SOURCE_DIR}"
+    PRIVATE "${tinyexr_miniz_header_SOURCE_DIR}")
+target_compile_features(minirender_exr_codec PRIVATE c_std_11)
+
+if(MSVC)
+    target_compile_options(minirender_exr_codec PRIVATE /utf-8)
+endif()

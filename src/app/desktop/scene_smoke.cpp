@@ -1,5 +1,6 @@
 #include "scene_smoke.hpp"
 #include "workbench.hpp"
+#include <minirender/assets/scene_io.hpp>
 #include <minirender/scene/editor.hpp>
 
 #include <QAction>
@@ -17,6 +18,7 @@
 
 #include <cmath>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 
 namespace {
@@ -113,6 +115,54 @@ void verify_second_light_shadows(Workbench& window, const QImage& on, const QIma
             "Second-light GPU shadows disagree with geometry rays");
 }
 
+// 将可见地面点投影到像素，直接核对法线编码或相机空间线性深度的显示值。
+void verify_surface_view(Workbench& window, const QImage& image, bool normal_view) {
+    const auto& scene = *window.viewport()->scene();
+    const auto& camera = window.viewport()->camera();
+    const float aspect = static_cast<float>(image.width()) / static_cast<float>(image.height());
+    const auto view = camera.view_matrix();
+    const auto projection = camera.projection_matrix(aspect) * view;
+    int checked = 0;
+    int matched = 0;
+    for (int z = -5; z <= 5; ++z) {
+        for (int x = -5; x <= 5; ++x) {
+            const glm::vec3 point{static_cast<float>(x) * 0.5F, 0, static_cast<float>(z) * 0.5F};
+            const auto clip = projection * glm::vec4(point, 1);
+            if (clip.w <= 0) {
+                continue;
+            }
+            const glm::vec2 uv = glm::vec2(clip) / clip.w * 0.5F + 0.5F;
+            if (uv.x <= 0.02F || uv.y <= 0.02F || uv.x >= 0.98F || uv.y >= 0.98F) {
+                continue;
+            }
+            if (minirender::pick_object(scene, camera.generate_ray(uv, aspect)) != "ground") {
+                continue;
+            }
+            const auto actual =
+                image.pixelColor(static_cast<int>(uv.x * static_cast<float>(image.width())),
+                                 static_cast<int>(uv.y * static_cast<float>(image.height())));
+            const float depth = -(view * glm::vec4(point, 1)).z;
+            const glm::vec3 expected =
+                normal_view ? glm::vec3(0.5F, 1.0F, 0.5F) : glm::vec3(1.0F / (1.0F + depth));
+            bool equal = true;
+            for (int component = 0; component < 3; ++component) {
+                const int value =
+                    minirender::encode_unorm8(minirender::linear_to_srgb(expected[component]));
+                const int channel = component == 0
+                                        ? actual.red()
+                                        : (component == 1 ? actual.green() : actual.blue());
+                equal = equal && std::abs(value - channel) <= 2;
+            }
+            ++checked;
+            matched += equal;
+        }
+    }
+    qInfo() << (normal_view ? "Normal" : "Depth") << "surface samples:" << matched << "/"
+            << checked;
+    require(checked >= 10 && matched * 100 >= checked * 98,
+            "Debug view disagrees with geometric reference");
+}
+
 struct SmokeState {
     int stage = 0;
     int ticks = 0;
@@ -121,6 +171,11 @@ struct SmokeState {
     QImage baseline;
     QImage edited;
     QImage shadowed;
+    QImage unfiltered;
+    std::optional<minirender::Image> linear;
+    QPoint hdr_sample;
+    QSize before_resize;
+    int before_resize_generation = 0;
     minirender::Camera before_navigation;
 };
 
@@ -196,8 +251,10 @@ void start_scene_smoke(Workbench& window, const QString& directory) {
                 window.findChild<QComboBox*>("view_mode")->setCurrentIndex(1);
                 break;
             case 6: {
-                require(changed_pixels(state->edited, capture("normals")) > 1000,
+                const auto normals = capture("normals");
+                require(changed_pixels(state->edited, normals) > 1000,
                         "Normal view did not change image");
+                verify_surface_view(window, normals, true);
                 window.findChild<QComboBox*>("view_mode")->setCurrentIndex(0);
                 state->before_navigation = viewport->camera();
                 state->camera_distance =
@@ -255,13 +312,137 @@ void start_scene_smoke(Workbench& window, const QString& directory) {
                 window.findChild<QCheckBox*>("shadows_enabled")->setChecked(true);
                 break;
             }
-            case 10:
+            case 10: {
                 capture("final");
+                auto scene = window.document();
+                scene.environment = glm::vec3(0);
+                for (auto& light : scene.directional_lights) {
+                    light.intensity = 0;
+                }
+                for (auto& material : scene.materials) {
+                    material.base_color = glm::vec3(0);
+                    material.emission =
+                        material.id == "blue" ? glm::vec3(8.0F, 2.0F, 0.5F) : glm::vec3(0);
+                }
+                const auto path = directory + "/hdr-scene.json";
+                minirender::save_scene(scene, std::filesystem::path(path.toStdU16String()));
+                window.load_scene_file(path);
+                window.findChild<QCheckBox*>("fxaa_enabled")->setChecked(false);
+                window.findChild<QDoubleSpinBox*>("exposure")->setValue(0);
+                break;
+            }
+            case 11: {
+                state->linear = viewport->grab_hdr();
+                const auto& linear = *state->linear;
+                bool found = false;
+                const auto expected = glm::vec3(8.0F, 2.0F, 0.5F);
+                for (std::size_t y = 13; y + 13 < linear.height() && !found; ++y) {
+                    for (std::size_t x = 13; x + 13 < linear.width() && !found; ++x) {
+                        bool interior = glm::length(linear.at(x, y) - expected) < 1e-4F;
+                        for (const auto offset : {glm::ivec2(-12, -12), glm::ivec2(12, -12),
+                                                  glm::ivec2(-12, 12), glm::ivec2(12, 12)}) {
+                            const auto nx =
+                                static_cast<std::size_t>(static_cast<int>(x) + offset.x);
+                            const auto ny =
+                                static_cast<std::size_t>(static_cast<int>(y) + offset.y);
+                            interior =
+                                interior && glm::length(linear.at(nx, ny) - expected) < 1e-4F;
+                        }
+                        if (interior) {
+                            state->hdr_sample = QPoint(static_cast<int>(x), static_cast<int>(y));
+                            found = true;
+                        }
+                    }
+                }
+                require(found, "HDR capture did not preserve an interior radiance of (8,2,0.5)");
+                const auto path =
+                    std::filesystem::path((directory + "/radiance.exr").toStdU16String());
+                linear.write_exr(path);
+                const auto decoded = minirender::Image::read_exr(path);
+                const auto sample = state->hdr_sample;
+                const auto x = static_cast<std::size_t>(sample.x());
+                const auto y = static_cast<std::size_t>(sample.y());
+                require(decoded.at(x, y) == linear.at(x, y),
+                        "EXR output did not preserve float radiance");
+                state->unfiltered = capture("hdr-tonemapped");
+                const auto displayed = state->unfiltered.pixelColor(sample);
+                for (int component = 0; component < 3; ++component) {
+                    const int expected_byte = minirender::encode_unorm8(minirender::linear_to_srgb(
+                        expected[component] / (1 + expected[component])));
+                    const int actual_byte =
+                        component == 0 ? displayed.red()
+                                       : (component == 1 ? displayed.green() : displayed.blue());
+                    require(std::abs(expected_byte - actual_byte) <= 2,
+                            "GPU tone mapping disagrees with known sRGB value");
+                }
+                window.findChild<QDoubleSpinBox*>("exposure")->setValue(2);
+                break;
+            }
+            case 12: {
+                const auto linear = viewport->grab_hdr();
+                float max_difference = 0;
+                for (std::size_t y = 0; y < linear.height(); ++y) {
+                    for (std::size_t x = 0; x < linear.width(); ++x) {
+                        max_difference = std::max(
+                            max_difference, glm::length(linear.at(x, y) - state->linear->at(x, y)));
+                    }
+                }
+                require(max_difference < 1e-6F, "Exposure changed raw HDR radiance");
+                const auto brighter = capture("exposure-plus-two");
+                require(brighter.pixelColor(state->hdr_sample).green() >
+                            state->unfiltered.pixelColor(state->hdr_sample).green() + 10,
+                        "Exposure control did not affect display");
+                window.findChild<QDoubleSpinBox*>("exposure")->setValue(0);
+                window.findChild<QCheckBox*>("fxaa_enabled")->setChecked(true);
+                qInfo()
+                    << "HDR: radiance (8,2,0.5), EXR round trip preserved; exposure raw difference"
+                    << max_difference;
+                break;
+            }
+            case 13: {
+                const auto filtered = capture("fxaa-on");
+                const int difference = changed_pixels(state->unfiltered, filtered);
+                require(difference > 50, "FXAA did not modify high-contrast edges");
+                const auto before = state->unfiltered.pixelColor(state->hdr_sample);
+                const auto after = filtered.pixelColor(state->hdr_sample);
+                require(std::abs(before.red() - after.red()) +
+                                std::abs(before.green() - after.green()) +
+                                std::abs(before.blue() - after.blue()) <=
+                            3,
+                        "FXAA blurred a flat interior region");
+                qInfo() << "FXAA changed pixels:" << difference << "flat interior preserved";
+                window.findChild<QComboBox*>("view_mode")->setCurrentIndex(2);
+                break;
+            }
+            case 14: {
+                const auto depth = capture("depth");
+                require(changed_pixels(state->unfiltered, depth) > 1000, "Depth view is missing");
+                verify_surface_view(window, depth, false);
+                state->before_resize = viewport->swapChainImageSize();
+                state->before_resize_generation = viewport->resource_generations();
+                window.resize(window.width() - 80, window.height() - 60);
+                break;
+            }
+            case 15: {
+                if (viewport->resource_generations() <= state->before_resize_generation ||
+                    viewport->swapChainImageSize() == state->before_resize) {
+                    --state->stage;
+                    return;
+                }
+                capture("resized-depth");
+                const auto linear = viewport->grab_hdr();
+                require(linear.width() ==
+                                static_cast<std::size_t>(viewport->swapChainImageSize().width()) &&
+                            linear.height() ==
+                                static_cast<std::size_t>(viewport->swapChainImageSize().height()),
+                        "HDR targets did not resize with swapchain");
+                qInfo() << "HDR resize:" << viewport->swapChainImageSize();
                 timer->stop();
-                qInfo() << "Scene smoke PASS: material, transform, undo/redo, save/load, normals, "
-                           "camera, duplicate/delete";
+                qInfo() << "Scene smoke PASS: editor, shadows, HDR readback, EXR, exposure, FXAA "
+                           "and depth";
                 QApplication::exit(0);
                 break;
+            }
             default:
                 break;
             }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <minirender/core/image.hpp>
 #include <minirender/scene/scene.hpp>
 #include <vulkan/vulkan.h>
 
@@ -27,6 +28,8 @@ class VulkanViewport final : public QWindow {
     void set_camera(const minirender::Camera& camera);
     void set_shadows_enabled(bool enabled);
     bool shadows_enabled() const noexcept;
+    void set_fxaa_enabled(bool enabled);
+    bool fxaa_enabled() const noexcept;
     void set_exposure(float value);
     float exposure() const noexcept;
     void set_view_mode(int mode);
@@ -44,6 +47,7 @@ class VulkanViewport final : public QWindow {
     QSize swapChainImageSize() const noexcept;
     bool supportsGrab() const noexcept;
     QImage grab();
+    minirender::Image grab_hdr();
 
     void frameReady();
     void requestUpdate();
@@ -79,6 +83,7 @@ class VulkanViewport final : public QWindow {
     minirender::Camera camera_;
     std::uint64_t scene_revision_ = 0;
     bool shadows_enabled_ = true;
+    bool fxaa_enabled_ = true;
     float exposure_ = 0.0F;
     int view_mode_ = 0;
     QPointF mouse_origin_;

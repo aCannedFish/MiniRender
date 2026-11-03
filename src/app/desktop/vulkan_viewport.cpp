@@ -740,3 +740,24 @@ void VulkanViewport::set_shadows_enabled(bool enabled) {
 bool VulkanViewport::shadows_enabled() const noexcept {
     return shadows_enabled_;
 }
+
+void VulkanViewport::set_fxaa_enabled(bool enabled) {
+    fxaa_enabled_ = enabled;
+    requestUpdate();
+}
+bool VulkanViewport::fxaa_enabled() const noexcept {
+    return fxaa_enabled_;
+}
+minirender::Image VulkanViewport::grab_hdr() {
+    if (!isValid() || !isExposed() || !scene_) {
+        throw std::logic_error("HDR capture requires a visible scene viewport");
+    }
+    const auto before = frame_count_;
+    renderer_->request_hdr_capture();
+    render_frame();
+    if (!failure_.isEmpty() || frame_count_ == before) {
+        throw std::runtime_error("HDR frame was not rendered");
+    }
+    check(vkWaitForFences(device_, 1, &frame_fence_, VK_TRUE, UINT64_MAX), "wait HDR capture");
+    return renderer_->read_hdr_capture();
+}

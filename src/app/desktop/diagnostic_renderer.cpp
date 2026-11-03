@@ -1,12 +1,10 @@
 #include "diagnostic_renderer.hpp"
-
-#include <QFile>
+#include "gpu_shader.hpp"
 
 #include <array>
 #include <cstring>
 #include <stdexcept>
 #include <string>
-#include <vector>
 
 namespace {
 
@@ -16,40 +14,6 @@ void check(VkResult result, const char* operation) {
         throw std::runtime_error(std::string(operation) + " failed: " + std::to_string(result));
     }
 }
-
-// 临时 shader module 的生命周期只覆盖 pipeline 创建；失败时也必须释放。
-class ShaderModule {
-  public:
-    ShaderModule(VkDevice device, const QString& resource) : device_(device) {
-        QFile file(resource);
-        if (!file.open(QIODevice::ReadOnly)) {
-            throw std::runtime_error("Cannot load embedded SPIR-V shader");
-        }
-        const QByteArray bytes = file.readAll();
-        if (bytes.isEmpty() || bytes.size() % 4 != 0) {
-            throw std::runtime_error("SPIR-V byte count is invalid");
-        }
-        std::vector<std::uint32_t> words(static_cast<std::size_t>(bytes.size()) / 4);
-        std::memcpy(words.data(), bytes.constData(), static_cast<std::size_t>(bytes.size()));
-        VkShaderModuleCreateInfo info{};
-        info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        info.codeSize = static_cast<std::size_t>(bytes.size());
-        info.pCode = words.data();
-        check(vkCreateShaderModule(device_, &info, nullptr, &handle_), "create shader");
-    }
-    ~ShaderModule() {
-        vkDestroyShaderModule(device_, handle_, nullptr);
-    }
-    ShaderModule(const ShaderModule&) = delete;
-    ShaderModule& operator=(const ShaderModule&) = delete;
-    VkShaderModule get() const {
-        return handle_;
-    }
-
-  private:
-    VkDevice device_;
-    VkShaderModule handle_ = VK_NULL_HANDLE;
-};
 
 } // namespace
 
@@ -210,17 +174,17 @@ void DiagnosticRenderer::initSwapChainResources() {
 }
 
 void DiagnosticRenderer::create_pipeline() {
-    ShaderModule vertex(device_, ":/shaders/diagnostic.vert.spv");
-    ShaderModule fragment(device_, ":/shaders/diagnostic.frag.spv");
+    GpuShader vertex(device_, ":/shaders/diagnostic.vert.spv");
+    GpuShader fragment(device_, ":/shaders/diagnostic.frag.spv");
     std::array<VkPipelineShaderStageCreateInfo, 2> stages{};
     for (auto& stage : stages) {
         stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stage.pName = "main";
     }
     stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-    stages[0].module = vertex.get();
+    stages[0].module = vertex.handle();
     stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    stages[1].module = fragment.get();
+    stages[1].module = fragment.handle();
     VkPipelineVertexInputStateCreateInfo vertex_input{};
     vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     VkPipelineInputAssemblyStateCreateInfo assembly{};

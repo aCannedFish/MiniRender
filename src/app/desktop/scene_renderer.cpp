@@ -1,10 +1,8 @@
 #include "scene_renderer.hpp"
+#include "gpu_shader.hpp"
 #include <minirender/scene/shadow.hpp>
 
-#include <QFile>
-
 #include <array>
-#include <cstring>
 #include <stdexcept>
 #include <vector>
 
@@ -30,44 +28,11 @@ struct alignas(16) FrameUniform {
     glm::vec4 display;
     std::array<glm::mat4, 8> shadow_view_projection;
     glm::vec4 shadow_settings;
+    glm::vec4 viewport;
 };
 static_assert(offsetof(FrameUniform, lights) == 96);
 static_assert(offsetof(FrameUniform, shadow_view_projection) == 384);
-static_assert(sizeof(FrameUniform) == 912);
-
-// shader module 只需存活到 pipeline 创建完成；异常路径同样释放。
-class Shader {
-  public:
-    Shader(VkDevice device, const char* resource) : device_(device) {
-        QFile file(QString::fromUtf8(resource));
-        if (!file.open(QIODevice::ReadOnly)) {
-            throw std::runtime_error("Cannot open scene SPIR-V");
-        }
-        const auto bytes = file.readAll();
-        if (bytes.isEmpty() || bytes.size() % 4 != 0) {
-            throw std::runtime_error("Invalid SPIR-V size");
-        }
-        std::vector<std::uint32_t> words(static_cast<std::size_t>(bytes.size()) / 4);
-        std::memcpy(words.data(), bytes.constData(), static_cast<std::size_t>(bytes.size()));
-        VkShaderModuleCreateInfo info{};
-        info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        info.codeSize = static_cast<std::size_t>(bytes.size());
-        info.pCode = words.data();
-        check_vk(vkCreateShaderModule(device_, &info, nullptr, &handle_), "create scene shader");
-    }
-    ~Shader() {
-        vkDestroyShaderModule(device_, handle_, nullptr);
-    }
-    Shader(const Shader&) = delete;
-    Shader& operator=(const Shader&) = delete;
-    VkShaderModule handle() const {
-        return handle_;
-    }
-
-  private:
-    VkDevice device_;
-    VkShaderModule handle_ = VK_NULL_HANDLE;
-};
+static_assert(sizeof(FrameUniform) == 928);
 
 } // namespace
 
@@ -134,16 +99,19 @@ void SceneRenderer::initResources() {
 }
 
 void SceneRenderer::initSwapChainResources() {
+    targets_.create(*window_);
     pipeline_ = create_pipeline(false);
     shadow_pipeline_ = create_pipeline(true);
+    post_process_.create(*window_, targets_, uniforms_.handle(), sizeof(FrameUniform));
     window_->report_swapchain();
 }
 
 VkPipeline SceneRenderer::create_pipeline(bool shadow) {
-    const Shader vertex(device_, shadow ? ":/shaders/shadow.vert.spv" : ":/shaders/scene.vert.spv");
-    std::unique_ptr<Shader> fragment;
+    const GpuShader vertex(device_,
+                           shadow ? ":/shaders/shadow.vert.spv" : ":/shaders/scene.vert.spv");
+    std::unique_ptr<GpuShader> fragment;
     if (!shadow) {
-        fragment = std::make_unique<Shader>(device_, ":/shaders/scene.frag.spv");
+        fragment = std::make_unique<GpuShader>(device_, ":/shaders/scene.frag.spv");
     }
     std::array<VkPipelineShaderStageCreateInfo, 2> stages{};
     for (auto& stage : stages) {
@@ -191,12 +159,14 @@ VkPipeline SceneRenderer::create_pipeline(bool shadow) {
     depth.depthTestEnable = VK_TRUE;
     depth.depthWriteEnable = VK_TRUE;
     depth.depthCompareOp = VK_COMPARE_OP_LESS;
-    VkPipelineColorBlendAttachmentState attachment{};
-    attachment.colorWriteMask = 0xF;
+    std::array<VkPipelineColorBlendAttachmentState, 2> attachments{};
+    for (auto& attachment : attachments) {
+        attachment.colorWriteMask = 0xF;
+    }
     VkPipelineColorBlendStateCreateInfo blend{};
     blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    blend.attachmentCount = shadow ? 0 : 1;
-    blend.pAttachments = &attachment;
+    blend.attachmentCount = shadow ? 0 : static_cast<std::uint32_t>(attachments.size());
+    blend.pAttachments = attachments.data();
     const std::array<VkDynamicState, 2> states{VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
     VkPipelineDynamicStateCreateInfo dynamic{};
     dynamic.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -215,7 +185,7 @@ VkPipeline SceneRenderer::create_pipeline(bool shadow) {
     pipeline.pColorBlendState = &blend;
     pipeline.pDynamicState = &dynamic;
     pipeline.layout = pipeline_layout_;
-    pipeline.renderPass = shadow ? shadow_map_.render_pass() : window_->defaultRenderPass();
+    pipeline.renderPass = shadow ? shadow_map_.render_pass() : targets_.render_pass();
     VkPipeline result = VK_NULL_HANDLE;
     check_vk(vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipeline, nullptr, &result),
              "scene pipeline");
@@ -277,10 +247,14 @@ void SceneRenderer::update_uniforms() {
         frame.lights[i].radiance = glm::vec4(lights[i].color * lights[i].intensity, 0);
     }
     frame.counts.x = static_cast<int>(lights.size());
-    frame.display = {window_->exposure(), static_cast<float>(window_->view_mode()), 0, 0};
+    frame.display = {window_->exposure(), static_cast<float>(window_->view_mode()),
+                     window_->fxaa_enabled() ? 1.0F : 0.0F, 0};
     frame.shadow_view_projection = shadow_matrices_;
     frame.shadow_settings = {window_->shadows_enabled() ? 1.0F : 0.0F, 1.0F / ShadowMap::resolution,
                              0, 0};
+    frame.viewport = {1.0F / static_cast<float>(size.width()),
+                      1.0F / static_cast<float>(size.height()), camera.near_plane,
+                      camera.far_plane};
     uniforms_.write(&frame, sizeof(frame));
 }
 
@@ -322,18 +296,8 @@ void SceneRenderer::startNextFrame() {
     const auto size = window_->swapChainImageSize();
     const VkExtent2D extent{static_cast<std::uint32_t>(size.width()),
                             static_cast<std::uint32_t>(size.height())};
-    std::array<VkClearValue, 2> clear{};
-    clear[0].color = {{0.012F, 0.018F, 0.028F, 1.0F}};
-    clear[1].depthStencil = {1, 0};
-    VkRenderPassBeginInfo begin{};
-    begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    begin.renderPass = window_->defaultRenderPass();
-    begin.framebuffer = window_->currentFramebuffer();
-    begin.renderArea.extent = extent;
-    begin.clearValueCount = static_cast<std::uint32_t>(clear.size());
-    begin.pClearValues = clear.data();
     const auto command = window_->currentCommandBuffer();
-    vkCmdBeginRenderPass(command, &begin, VK_SUBPASS_CONTENTS_INLINE);
+    targets_.begin(command);
     const VkViewport viewport{
         0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1};
     const VkRect2D scissor{{0, 0}, extent};
@@ -349,6 +313,11 @@ void SceneRenderer::startNextFrame() {
         vkCmdDraw(command, vertex_count_, 1, 0, 0);
     }
     vkCmdEndRenderPass(command);
+    if (capture_hdr_) {
+        targets_.record_readback(command);
+        capture_hdr_ = false;
+    }
+    post_process_.draw(*window_);
     window_->report_frame();
     window_->frameReady();
     window_->requestUpdate();
@@ -361,6 +330,8 @@ void SceneRenderer::releaseSwapChainResources() {
     }
     pipeline_ = VK_NULL_HANDLE;
     shadow_pipeline_ = VK_NULL_HANDLE;
+    post_process_.release();
+    targets_.release();
 }
 
 void SceneRenderer::releaseResources() {
@@ -379,4 +350,11 @@ void SceneRenderer::releaseResources() {
     descriptor_layout_ = VK_NULL_HANDLE;
     scene_revision_ = std::numeric_limits<std::uint64_t>::max();
     device_ = VK_NULL_HANDLE;
+}
+
+void SceneRenderer::request_hdr_capture() {
+    capture_hdr_ = true;
+}
+minirender::Image SceneRenderer::read_hdr_capture() {
+    return targets_.readback();
 }

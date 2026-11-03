@@ -69,6 +69,16 @@ void GpuBuffer::write(const void* data, std::size_t bytes) {
     vkUnmapMemory(device_, memory_);
 }
 
+void GpuBuffer::read(void* data, std::size_t bytes) {
+    if (bytes > size_ || memory_ == VK_NULL_HANDLE) {
+        throw std::out_of_range("GPU readback exceeds allocation");
+    }
+    void* mapped = nullptr;
+    check_vk(vkMapMemory(device_, memory_, 0, size_, 0, &mapped), "map readback");
+    std::memcpy(data, mapped, bytes);
+    vkUnmapMemory(device_, memory_);
+}
+
 void GpuBuffer::release() {
     if (device_ != VK_NULL_HANDLE) {
         vkDestroyBuffer(device_, buffer_, nullptr);

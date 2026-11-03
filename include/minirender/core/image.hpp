@@ -29,6 +29,10 @@ class Image {
     // 不执行色调映射；超出显示范围的有限值截断，非有限值显示为 0。
     void write_ppm(const std::filesystem::path& path) const;
 
+    // 32 位浮点 RGB EXR，通过内存 codec 和 filesystem 路径读写，保留 HDR/负值及 Unicode 路径。
+    void write_exr(const std::filesystem::path& path) const;
+    static Image read_exr(const std::filesystem::path& path);
+
   private:
     std::size_t width_;
     std::size_t height_;
