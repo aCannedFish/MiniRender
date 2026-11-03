@@ -54,3 +54,5 @@ GPU 检查先画近处棋盘，再画远处红色三角形。若深度测试未�
 - [MoltenVK Runtime Guide](https://github.com/KhronosGroup/MoltenVK/blob/main/Docs/MoltenVK_Runtime_UserGuide.md)：Metal 运行与 portability 设备要求。
 
 后续 UI 修复在 macOS 进程内启用 MoltenVK 异步提交，普通帧改为轮询 fence，并取消对嵌入窗口的手工激活，记录见 checkpoints/UI1.md。
+
+A1.6 的后续采样仍捕获到 QMetalLayer drawable 等待，因此在 QApplication 创建前增加 `QT_MTL_NO_TRANSACTION=1`。自有 Vulkan 调度使用普通 CAMetalLayer，避免参与 Qt RHI 的事务内呈现。依据与连续回归见 checkpoints/A1.6.md。

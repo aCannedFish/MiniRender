@@ -503,7 +503,7 @@ void Workbench::build_camera_panel() {
     auto* exposure = spin(camera_panel_, "exposure", -10, 10, 0.25);
     auto* mode = new QComboBox;
     mode->setObjectName("view_mode");
-    mode->addItems({"直接光照", "法线", "线性深度"});
+    mode->addItems({"直接光照", "法线", "线性深度", "线框"});
     layout->addRow("位置", camera_position_);
     layout->addRow("目标", camera_target_);
     layout->addRow("垂直 FOV / °", fov_);

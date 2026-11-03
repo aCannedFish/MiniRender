@@ -3,7 +3,7 @@ find_package(Vulkan 1.2 REQUIRED COMPONENTS glslangValidator)
 
 # SPIR-V 随可执行文件嵌入 Qt 资源，运行不依赖源码目录或当前工作目录。
 set(shader_outputs)
-foreach(shader diagnostic.vert diagnostic.frag scene.vert scene.frag shadow.vert post.vert post.frag)
+foreach(shader diagnostic.vert diagnostic.frag scene.vert scene.frag shadow.vert wire.vert wire.frag post.vert post.frag)
     set(source "${PROJECT_SOURCE_DIR}/shaders/${shader}")
     set(output "${CMAKE_CURRENT_BINARY_DIR}/${shader}.spv")
     add_custom_command(OUTPUT "${output}"
@@ -22,7 +22,7 @@ qt_add_executable(minirender_desktop
     hdr_targets.cpp hdr_targets.hpp post_process.cpp post_process.hpp
     scene_renderer.cpp scene_renderer.hpp shadow_map.cpp shadow_map.hpp workbench.cpp workbench.hpp
     scene_smoke.cpp scene_smoke.hpp texture_smoke.cpp texture_smoke.hpp interaction_smoke.cpp interaction_smoke.hpp
-    parameter_smoke.cpp parameter_smoke.hpp)
+    parameter_smoke.cpp parameter_smoke.hpp wire_smoke.cpp wire_smoke.hpp)
 if(APPLE)
     set_target_properties(minirender_desktop PROPERTIES
         MACOSX_BUNDLE TRUE

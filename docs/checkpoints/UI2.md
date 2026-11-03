@@ -64,3 +64,5 @@ CPU-only Debug 与 desktop Debug CTest 均为 24/24 通过，包括新增的缓�
 7. parameter_smoke.cpp：控件、响应时间、资产缓存与任务提示的组合检查。
 
 接口依据：[Qt keyboardTracking](https://doc.qt.io/qt-6/qabstractspinbox.html#keyboardTracking-prop)、[Khronos Shader Memory Layout](https://docs.vulkan.org/guide/latest/shader_memory_layout.html)。
+
+后续 A1.6 连续测试另外捕获到间歇的 QMetalLayer drawable 等待，并补充 Qt 的非事务 Metal layer 配置。详情见 [A1.6](A1.6.md)。

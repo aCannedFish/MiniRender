@@ -86,6 +86,37 @@ void HdrTargets::create(VulkanViewport& viewport) {
     framebuffer.layers = 1;
     check_vk(vkCreateFramebuffer(device_, &framebuffer, nullptr, &framebuffer_),
              "create HDR framebuffer");
+    wire_.create(device_, physical_, extent_, VK_FORMAT_R8G8B8A8_UNORM,
+                 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                 VK_IMAGE_ASPECT_COLOR_BIT);
+    std::array<VkAttachmentDescription, 2> wire_attachments{};
+    wire_attachments[0] = attachments[0];
+    wire_attachments[0].format = VK_FORMAT_R8G8B8A8_UNORM;
+    wire_attachments[1] = attachments[2];
+    wire_attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    // 保留表面深度和 read-only 布局，使背面的边线受已绘制表面遮挡。
+    wire_attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    const VkAttachmentReference wire_color{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+    const VkAttachmentReference wire_depth{1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL};
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &wire_color;
+    subpass.pDepthStencilAttachment = &wire_depth;
+    dependencies[0].srcStageMask |=
+        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    dependencies[0].srcAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    dependencies[0].dstAccessMask =
+        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+    dependencies[1].srcAccessMask =
+        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+    pass.attachmentCount = static_cast<std::uint32_t>(wire_attachments.size());
+    pass.pAttachments = wire_attachments.data();
+    check_vk(vkCreateRenderPass(device_, &pass, nullptr, &wire_pass_), "create wire pass");
+    const std::array<VkImageView, 2> wire_views{wire_.view(), depth_.view()};
+    framebuffer.renderPass = wire_pass_;
+    framebuffer.attachmentCount = static_cast<std::uint32_t>(wire_views.size());
+    framebuffer.pAttachments = wire_views.data();
+    check_vk(vkCreateFramebuffer(device_, &framebuffer, nullptr, &wire_framebuffer_),
+             "create wire framebuffer");
 }
 
 void HdrTargets::begin(VkCommandBuffer command) {
@@ -101,6 +132,29 @@ void HdrTargets::begin(VkCommandBuffer command) {
     begin.clearValueCount = static_cast<std::uint32_t>(clear.size());
     begin.pClearValues = clear.data();
     vkCmdBeginRenderPass(command, &begin, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void HdrTargets::begin_wire(VkCommandBuffer command) {
+    std::array<VkClearValue, 2> clear{};
+    clear[0].color = {{0.012F, 0.018F, 0.028F, 1}};
+    VkRenderPassBeginInfo begin{};
+    begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    begin.renderPass = wire_pass_;
+    begin.framebuffer = wire_framebuffer_;
+    begin.renderArea.extent = extent_;
+    begin.clearValueCount = static_cast<std::uint32_t>(clear.size());
+    begin.pClearValues = clear.data();
+    vkCmdBeginRenderPass(command, &begin, VK_SUBPASS_CONTENTS_INLINE);
+    wire_initialized_ = true;
+}
+bool HdrTargets::wire_initialized() const noexcept {
+    return wire_initialized_;
+}
+VkRenderPass HdrTargets::wire_pass() const noexcept {
+    return wire_pass_;
+}
+VkImageView HdrTargets::wire_view() const noexcept {
+    return wire_.view();
 }
 
 void HdrTargets::record_readback(VkCommandBuffer command) {
@@ -151,14 +205,20 @@ minirender::Image HdrTargets::readback() {
 
 void HdrTargets::release() {
     if (device_ != VK_NULL_HANDLE) {
+        vkDestroyFramebuffer(device_, wire_framebuffer_, nullptr);
+        vkDestroyRenderPass(device_, wire_pass_, nullptr);
         vkDestroyFramebuffer(device_, framebuffer_, nullptr);
         vkDestroyRenderPass(device_, pass_, nullptr);
     }
+    wire_framebuffer_ = VK_NULL_HANDLE;
+    wire_pass_ = VK_NULL_HANDLE;
+    wire_initialized_ = false;
     framebuffer_ = VK_NULL_HANDLE;
     pass_ = VK_NULL_HANDLE;
     readback_.release();
     color_.release();
     normal_.release();
+    wire_.release();
     depth_.release();
     device_ = VK_NULL_HANDLE;
     captured_ = false;

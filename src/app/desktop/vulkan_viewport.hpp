@@ -69,6 +69,7 @@ class VulkanViewport final : public QWindow {
     void report_descriptor_rebuild();
     void report_scene_update(double milliseconds);
     qint64 preview_wait_ms() const noexcept;
+    QString frame_wait_reason() const;
     void report_failure(const QString& error);
     QString failure() const;
 
@@ -102,6 +103,7 @@ class VulkanViewport final : public QWindow {
     std::uint64_t submitted_preview_revision_ = 0;
     std::uint64_t completed_preview_revision_ = 0;
     QElapsedTimer preview_wait_;
+    QString frame_wait_reason_;
     bool shadows_enabled_ = true;
     bool fxaa_enabled_ = true;
     float exposure_ = 0.0F;

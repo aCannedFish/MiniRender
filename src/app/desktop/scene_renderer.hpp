@@ -25,7 +25,9 @@ class SceneRenderer final : public ViewportRenderer {
     minirender::Image read_hdr_capture() override;
 
   private:
-    VkPipeline create_pipeline(bool shadow);
+    enum class Pass { surface, shadow, wire };
+    VkPipeline create_pipeline(Pass pass);
+    void render_wire(VkCommandBuffer command);
     void render_shadow_maps(VkCommandBuffer command);
     void upload_scene();
     void rebuild_texture_descriptors();
@@ -34,6 +36,7 @@ class SceneRenderer final : public ViewportRenderer {
     // 网格保留局部坐标。变换与材质写入独立 SSBO，不再烘焙到每个顶点。
     struct Mesh {
         GpuBuffer vertices;
+        GpuBuffer edges;
         std::uint32_t count = 0;
         glm::vec3 minimum{0};
         glm::vec3 maximum{0};
@@ -64,5 +67,6 @@ class SceneRenderer final : public ViewportRenderer {
     VkPipelineLayout pipeline_layout_ = VK_NULL_HANDLE;
     VkPipeline pipeline_ = VK_NULL_HANDLE;
     VkPipeline shadow_pipeline_ = VK_NULL_HANDLE;
+    VkPipeline wire_pipeline_ = VK_NULL_HANDLE;
     std::uint64_t scene_revision_ = std::numeric_limits<std::uint64_t>::max();
 };

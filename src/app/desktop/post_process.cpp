@@ -18,7 +18,7 @@ void PostProcess::create(VulkanViewport& viewport, const HdrTargets& targets,
     sampler.addressModeU = sampler.addressModeV = sampler.addressModeW =
         VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     check_vk(vkCreateSampler(device_, &sampler, nullptr, &sampler_), "create post sampler");
-    std::array<VkDescriptorSetLayoutBinding, 4> bindings{};
+    std::array<VkDescriptorSetLayoutBinding, 5> bindings{};
     bindings[0] = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     for (std::uint32_t i = 1; i < bindings.size(); ++i) {
         bindings[i] = {i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
@@ -31,7 +31,7 @@ void PostProcess::create(VulkanViewport& viewport, const HdrTargets& targets,
     check_vk(vkCreateDescriptorSetLayout(device_, &descriptor_layout, nullptr, &descriptor_layout_),
              "post descriptor layout");
     const std::array<VkDescriptorPoolSize, 2> sizes{
-        {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}, {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3}}};
+        {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}, {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4}}};
     VkDescriptorPoolCreateInfo pool{};
     pool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool.maxSets = 1;
@@ -46,11 +46,12 @@ void PostProcess::create(VulkanViewport& viewport, const HdrTargets& targets,
     allocate.pSetLayouts = &descriptor_layout_;
     check_vk(vkAllocateDescriptorSets(device_, &allocate, &descriptor_), "post descriptor set");
     VkDescriptorBufferInfo buffer{uniform_buffer, 0, uniform_size};
-    const std::array<VkDescriptorImageInfo, 3> images{
+    const std::array<VkDescriptorImageInfo, 4> images{
         {{sampler_, targets.color_view(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
          {sampler_, targets.normal_view(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-         {sampler_, targets.depth_view(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL}}};
-    std::array<VkWriteDescriptorSet, 4> writes{};
+         {sampler_, targets.depth_view(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL},
+         {sampler_, targets.wire_view(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}}};
+    std::array<VkWriteDescriptorSet, 5> writes{};
     for (std::uint32_t i = 0; i < writes.size(); ++i) {
         writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[i].dstSet = descriptor_;
