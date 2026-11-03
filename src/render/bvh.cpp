@@ -24,7 +24,9 @@ std::uint32_t bin_index(float centroid, float low, float high) {
 
 } // namespace
 
-SceneBvh::SceneBvh(std::shared_ptr<const SceneSnapshot> scene) : scene_(std::move(scene)) {
+SceneBvh::SceneBvh(std::shared_ptr<const SceneSnapshot> scene, CancellationToken cancellation)
+    : scene_(std::move(scene)), construction_cancellation_(std::move(cancellation)) {
+    construction_cancellation_.check();
     if (!scene_) {
         throw std::invalid_argument("BVH requires a scene snapshot");
     }
@@ -34,6 +36,7 @@ SceneBvh::SceneBvh(std::shared_ptr<const SceneSnapshot> scene) : scene_(std::mov
     }
     std::size_t total = 0;
     for (const auto& instance : scene_->instances) {
+        construction_cancellation_.check();
         if (instance.mesh->triangles.size() > index_limit / 2 - total) {
             throw std::length_error("Scene triangle count exceeds BVH index range");
         }
@@ -48,6 +51,9 @@ SceneBvh::SceneBvh(std::shared_ptr<const SceneSnapshot> scene) : scene_(std::mov
         const auto& instance = scene_->instances[instance_index];
         mirrored_.push_back(glm::determinant(glm::dmat3(instance.object_to_world)) < 0);
         for (std::size_t index = 0; index < instance.mesh->triangles.size(); ++index) {
+            if ((index & 255U) == 0) {
+                construction_cancellation_.check();
+            }
             const auto& triangle = instance.mesh->triangles[index];
             Primitive primitive{};
             BuildPrimitive build_primitive{};
@@ -85,15 +91,20 @@ SceneBvh::SceneBvh(std::shared_ptr<const SceneSnapshot> scene) : scene_(std::mov
         build(0, static_cast<std::uint32_t>(primitives_.size()), 0, build_primitives);
     }
     statistics_.nodes = nodes_.size();
+    construction_cancellation_ = {};
 }
 
 std::uint32_t SceneBvh::build(std::uint32_t begin, std::uint32_t end, std::size_t depth,
                               std::span<const BuildPrimitive> primitives) {
+    construction_cancellation_.check();
     const auto node_index = static_cast<std::uint32_t>(nodes_.size());
     nodes_.emplace_back();
     Bounds3 bounds;
     Bounds3 centroids;
     for (auto index = begin; index < end; ++index) {
+        if ((index & 1023U) == 0) {
+            construction_cancellation_.check();
+        }
         bounds.expand(primitives[order_[index]].bounds);
         centroids.expand(primitives[order_[index]].centroid);
     }
@@ -123,6 +134,9 @@ std::uint32_t SceneBvh::build(std::uint32_t begin, std::uint32_t end, std::size_
         }
         std::array<Bin, bin_count> bins{};
         for (auto index = begin; index < end; ++index) {
+            if ((index & 1023U) == 0) {
+                construction_cancellation_.check();
+            }
             const auto& primitive = primitives[order_[index]];
             auto& bin = bins[bin_index(primitive.centroid[axis], centroids.minimum[axis],
                                        centroids.maximum[axis])];
@@ -183,8 +197,8 @@ const BvhBuildStatistics& SceneBvh::statistics() const noexcept {
 }
 
 std::optional<SceneBvh::PrimitiveHit> SceneBvh::trace(const RayQuery& query, RayInterval interval,
-                                                      bool any_hit,
-                                                      TraceStatistics* statistics) const {
+                                                      bool any_hit, TraceStatistics* statistics,
+                                                      const CancellationToken& cancellation) const {
     interval.validate();
     if (nodes_.empty()) {
         return std::nullopt;
@@ -209,6 +223,7 @@ std::optional<SceneBvh::PrimitiveHit> SceneBvh::trace(const RayQuery& query, Ray
     stack[pending++] = {0, *root};
     std::optional<PrimitiveHit> result;
     while (pending) {
+        cancellation.check();
         const auto entry = stack[--pending];
         if (entry.enter > interval.maximum) {
             continue;
@@ -216,6 +231,9 @@ std::optional<SceneBvh::PrimitiveHit> SceneBvh::trace(const RayQuery& query, Ray
         const auto& node = nodes_[entry.node];
         if (node.count) {
             for (std::uint32_t offset = 0; offset < node.count; ++offset) {
+                if ((offset & 255U) == 0) {
+                    cancellation.check();
+                }
                 const auto primitive = order_[node.first + offset];
                 if (statistics) {
                     ++statistics->triangle_tests;
@@ -294,12 +312,16 @@ SurfaceHit SceneBvh::surface_hit(const Ray& ray, const PrimitiveHit& hit) const 
 }
 
 std::optional<SurfaceHit> SceneBvh::intersect(const Ray& ray, RayInterval interval,
-                                              TraceStatistics* statistics) const {
-    const auto hit = trace(RayQuery(ray), interval, false, statistics);
+                                              TraceStatistics* statistics,
+                                              const CancellationToken& cancellation) const {
+    cancellation.check();
+    const auto hit = trace(RayQuery(ray), interval, false, statistics, cancellation);
     return hit ? std::optional(surface_hit(ray, *hit)) : std::nullopt;
 }
-bool SceneBvh::occluded(const Ray& ray, RayInterval interval, TraceStatistics* statistics) const {
-    return trace(RayQuery(ray), interval, true, statistics).has_value();
+bool SceneBvh::occluded(const Ray& ray, RayInterval interval, TraceStatistics* statistics,
+                        const CancellationToken& cancellation) const {
+    cancellation.check();
+    return trace(RayQuery(ray), interval, true, statistics, cancellation).has_value();
 }
 
 } // namespace minirender

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <minirender/core/cancellation.hpp>
 #include <minirender/render/intersection.hpp>
 
 #include <span>
@@ -40,15 +41,17 @@ struct TraceStatistics {
 // 构造完成后不修改任何成员，可供多条渲染线程共享；不依赖 Qt 或 GPU SDK。
 class SceneBvh {
   public:
-    explicit SceneBvh(std::shared_ptr<const SceneSnapshot> scene);
+    explicit SceneBvh(std::shared_ptr<const SceneSnapshot> scene,
+                      CancellationToken cancellation = {});
     const SceneSnapshot& scene() const noexcept;
     const BvhBuildStatistics& statistics() const noexcept;
     // 返回闭区间内最近命中；等距命中按原场景图元次序选择，避免遍历顺序影响结果。
     std::optional<SurfaceHit> intersect(const Ray& ray, RayInterval interval = {},
-                                        TraceStatistics* statistics = nullptr) const;
+                                        TraceStatistics* statistics = nullptr,
+                                        const CancellationToken& cancellation = {}) const;
     // 阴影查询在首次命中时返回，不计算 UV、法线或其余最近命中数据。
-    bool occluded(const Ray& ray, RayInterval interval = {},
-                  TraceStatistics* statistics = nullptr) const;
+    bool occluded(const Ray& ray, RayInterval interval = {}, TraceStatistics* statistics = nullptr,
+                  const CancellationToken& cancellation = {}) const;
 
   private:
     struct Primitive {
@@ -75,7 +78,8 @@ class SceneBvh {
     std::uint32_t build(std::uint32_t begin, std::uint32_t end, std::size_t depth,
                         std::span<const BuildPrimitive> primitives);
     std::optional<PrimitiveHit> trace(const RayQuery& query, RayInterval interval, bool any_hit,
-                                      TraceStatistics* statistics) const;
+                                      TraceStatistics* statistics,
+                                      const CancellationToken& cancellation) const;
     SurfaceHit surface_hit(const Ray& ray, const PrimitiveHit& hit) const;
     std::shared_ptr<const SceneSnapshot> scene_;
     std::vector<Primitive> primitives_;
@@ -83,6 +87,7 @@ class SceneBvh {
     std::vector<Node> nodes_;
     std::vector<bool> mirrored_;
     BvhBuildStatistics statistics_;
+    CancellationToken construction_cancellation_;
 };
 
 } // namespace minirender

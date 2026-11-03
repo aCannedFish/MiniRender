@@ -1,7 +1,7 @@
 #include "render_cli.hpp"
 
 #include <minirender/assets/scene_io.hpp>
-#include <minirender/render/path_tracer.hpp>
+#include <minirender/render/render_session.hpp>
 
 #include <charconv>
 #include <chrono>
@@ -43,10 +43,12 @@ int run_render_cli(int argc, char** argv) {
     if (argc < 2) {
         throw std::invalid_argument(
             "Usage: --render scene.json output-prefix [--width N --height N --spp N --depth N "
-            "--mode mis|bsdf|light --seed N --exposure EV --no-rr --rr-depth N]");
+            "--mode mis|bsdf|light --seed N --exposure EV --no-rr --rr-depth N --threads N --tile "
+            "N --batch N]");
     }
     minirender::RenderSettings render;
     minirender::IntegratorSettings integrator;
+    minirender::SessionSettings session_settings;
     double exposure = 0;
     for (int index = 2; index < argc; ++index) {
         const std::string_view option(argv[index]);
@@ -69,6 +71,12 @@ int run_render_cli(int argc, char** argv) {
             integrator.maximum_depth = number<std::uint32_t>(value);
         } else if (option == "--rr-depth") {
             integrator.roulette_depth = number<std::uint32_t>(value);
+        } else if (option == "--threads") {
+            session_settings.threads = number<std::uint32_t>(value);
+        } else if (option == "--tile") {
+            session_settings.tile_size = number<std::uint32_t>(value);
+        } else if (option == "--batch") {
+            session_settings.batch_samples = number<std::uint32_t>(value);
         } else if (option == "--seed") {
             render.seed = number<std::uint64_t>(value);
         } else if (option == "--mode") {
@@ -81,14 +89,27 @@ int run_render_cli(int argc, char** argv) {
     }
     render.validate();
     integrator.validate();
+    session_settings.validate();
     if (!std::isfinite(exposure) || std::abs(exposure) > 64) {
         throw std::invalid_argument("Exposure must be finite and in [-64,64]");
     }
     const auto scene = minirender::make_snapshot(minirender::load_scene(native_path(argv[0])));
     const auto start = std::chrono::steady_clock::now();
-    const minirender::PathTracer tracer(scene, integrator);
-    minirender::PathStatistics statistics;
-    const auto image = tracer.render(render, &statistics);
+    minirender::RenderSession session;
+    session.start(scene, render, integrator, session_settings);
+    while (!session.wait_for(std::chrono::milliseconds(200))) {
+        const auto progress = session.progress();
+        std::cerr << "progress: " << minirender::render_state_name(progress.state) << ' '
+                  << progress.recorded_samples << '/' << progress.total_samples << '\n';
+    }
+    session.wait();
+    const auto progress = session.progress();
+    if (progress.state != minirender::RenderState::completed) {
+        throw std::runtime_error(progress.error.empty() ? "Render did not complete"
+                                                        : progress.error);
+    }
+    const auto image = session.result();
+    const auto& statistics = progress.statistics;
     const auto finished = std::chrono::steady_clock::now();
     auto prefix = native_path(argv[1]);
     if (prefix.extension() == ".png" || prefix.extension() == ".exr") {
@@ -100,12 +121,14 @@ int run_render_cli(int argc, char** argv) {
     auto exr = prefix, png = prefix;
     exr += ".exr";
     png += ".png";
-    image.write_exr(exr);
-    minirender::display_image(image, exposure).write_png(png);
+    image->write_exr(exr);
+    minirender::display_image(*image, exposure).write_png(png);
     std::cout << "CPU path render complete\nmode: "
               << minirender::sampling_mode_name(integrator.mode) << "\nresolution: " << render.width
               << 'x' << render.height << "\nspp: " << render.samples_per_pixel
-              << "\npaths: " << statistics.paths << "\nshadow rays: " << statistics.shadow_rays
+              << "\npaths: " << statistics.paths << "\nthreads: " << progress.worker_count
+              << "\nrecorded samples: " << progress.recorded_samples
+              << "\nshadow rays: " << statistics.shadow_rays
               << "\nscattering events: " << statistics.scattering_events
               << "\ntriangle tests: " << statistics.geometry.triangle_tests << "\nelapsed ms: "
               << std::chrono::duration<double, std::milli>(finished - start).count()

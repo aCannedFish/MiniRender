@@ -91,8 +91,10 @@ Ray spawn_ray(const SurfaceHit& hit, glm::dvec3 direction) {
     return {offset_origin(hit, direction), glm::normalize(direction)};
 }
 
-PathTracer::PathTracer(std::shared_ptr<const SceneSnapshot> scene, IntegratorSettings settings)
-    : scene_(std::move(scene)), bvh_(scene_), lights_(scene_), settings_(settings) {
+PathTracer::PathTracer(std::shared_ptr<const SceneSnapshot> scene, IntegratorSettings settings,
+                       CancellationToken cancellation)
+    : scene_(std::move(scene)), bvh_(scene_, cancellation), lights_(scene_, cancellation),
+      settings_(settings), cancellation_(std::move(cancellation)) {
     settings_.validate();
 }
 const SceneSnapshot& PathTracer::scene() const noexcept {
@@ -119,7 +121,8 @@ bool PathTracer::visible(const SurfaceHit& hit, const LightSample& light,
         ray.direction = difference / limit;
         limit = std::nextafter(limit, 0.0);
     }
-    return !bvh_.occluded(ray, {0, limit}, statistics ? &statistics->geometry : nullptr);
+    return !bvh_.occluded(ray, {0, limit}, statistics ? &statistics->geometry : nullptr,
+                          cancellation_);
 }
 glm::dvec3 PathTracer::trace(Ray ray, Sampler& sampler, RayInterval primary_interval,
                              PathStatistics* statistics) const {
@@ -131,10 +134,11 @@ glm::dvec3 PathTracer::trace(Ray ray, Sampler& sampler, RayInterval primary_inte
     double previous_pdf = 0, eta_scale = 1;
     bool previous_delta = true;
     for (std::uint32_t depth = 0;; ++depth) {
+        cancellation_.check();
         const auto hit = bvh_.intersect(
             ray,
             depth == 0 ? primary_interval : RayInterval{0, std::numeric_limits<double>::infinity()},
-            statistics ? &statistics->geometry : nullptr);
+            statistics ? &statistics->geometry : nullptr, cancellation_);
         const auto emission_weight = [&](double light_pdf) {
             if (depth == 0 || previous_delta || settings_.mode == SamplingMode::bsdf) {
                 return 1.0;

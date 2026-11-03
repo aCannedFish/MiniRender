@@ -44,7 +44,7 @@ Ray spawn_ray(const SurfaceHit& hit, glm::dvec3 direction);
 class PathTracer {
   public:
     explicit PathTracer(std::shared_ptr<const SceneSnapshot> scene,
-                        IntegratorSettings settings = {});
+                        IntegratorSettings settings = {}, CancellationToken cancellation = {});
     glm::dvec3 trace(Ray ray, Sampler& sampler,
                      RayInterval primary_interval = {0, std::numeric_limits<double>::infinity()},
                      PathStatistics* statistics = nullptr) const;
@@ -61,6 +61,7 @@ class PathTracer {
     SceneBvh bvh_;
     LightSampler lights_;
     IntegratorSettings settings_;
+    CancellationToken cancellation_;
 };
 
 // 保留原始 HDR 图像；返回应用曝光和 Reinhard 后的线性显示图，由 PNG 编码器做 sRGB。

@@ -19,7 +19,7 @@ struct EnvironmentSample {
 // 非均匀分布混入 5% 均匀球面密度，覆盖双线性插值和零权重像素附近的支持集。
 class EnvironmentLight {
   public:
-    explicit EnvironmentLight(const SceneSnapshot& scene);
+    explicit EnvironmentLight(const SceneSnapshot& scene, CancellationToken cancellation = {});
     glm::dvec3 evaluate(glm::dvec3 direction) const;
     double pdf(glm::dvec3 direction) const;
     EnvironmentSample sample(glm::dvec2 u) const;
@@ -62,7 +62,8 @@ struct LightSample {
 // 接收 make_snapshot 生成的有效快照；构造完成后只读，可供渲染线程共享。
 class LightSampler {
   public:
-    explicit LightSampler(std::shared_ptr<const SceneSnapshot> scene);
+    explicit LightSampler(std::shared_ptr<const SceneSnapshot> scene,
+                          CancellationToken cancellation = {});
     std::optional<LightSample> sample(glm::dvec3 reference, double light_u,
                                       glm::dvec2 surface_u) const;
     double area_pdf(glm::dvec3 reference, const SurfaceHit& hit) const;

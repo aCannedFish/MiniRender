@@ -10,6 +10,7 @@ option(MINIRENDER_BUILD_DESKTOP "Build the Qt/Vulkan desktop application" OFF)
 option(MINIRENDER_ENABLE_OPTIX "Enable the NVIDIA backend (B2 checkpoint)" OFF)
 include(CTest)
 include(cmake/Dependencies.cmake)
+find_package(Threads REQUIRED)
 
 # 不在 core 配置中发现或启用 GPU SDK，确保 CPU 回归可在无 GPU 的 CI 运行。
 if(MINIRENDER_ENABLE_OPTIX)
@@ -38,10 +39,11 @@ add_library(minirender_core
     src/render/bsdf.cpp
     src/render/light.cpp
     src/render/path_tracer.cpp
+    src/render/render_session.cpp
     src/assets/obj_loader.cpp
     src/assets/scene_io.cpp)
 target_include_directories(minirender_core PUBLIC include)
-target_link_libraries(minirender_core PUBLIC glm::glm PRIVATE minirender_warnings nlohmann_json::nlohmann_json tinyobjloader minirender_exr_codec minirender_raster_codec)
+target_link_libraries(minirender_core PUBLIC glm::glm Threads::Threads PRIVATE minirender_warnings nlohmann_json::nlohmann_json tinyobjloader minirender_exr_codec minirender_raster_codec)
 target_compile_definitions(minirender_core PUBLIC
     GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
@@ -49,14 +51,14 @@ add_executable(minirender_cli src/app/cli.cpp src/app/render_cli.cpp)
 target_link_libraries(minirender_cli PRIVATE minirender_core minirender_warnings)
 
 if(BUILD_TESTING)
-    find_package(Threads REQUIRED)
     add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp
-        tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp tests/path_tests.cpp)
+        tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp tests/path_tests.cpp
+        tests/session_tests.cpp)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_tests PRIVATE
         minirender_core Catch2::Catch2WithMain minirender_warnings Threads::Threads)
     include(Catch)
-    catch_discover_tests(minirender_tests)
+    catch_discover_tests(minirender_tests PROPERTIES TIMEOUT 120)
     add_test(NAME cli_capabilities COMMAND minirender_cli --capabilities)
     set_tests_properties(cli_capabilities PROPERTIES
         PASS_REGULAR_EXPRESSION "optix: unavailable")
@@ -65,7 +67,7 @@ if(BUILD_TESTING)
     set_tests_properties(cli_trace_normals PROPERTIES PASS_REGULAR_EXPRESSION "triangles: 26")
     add_test(NAME cli_path_render COMMAND minirender_cli --render
         "${PROJECT_SOURCE_DIR}/scenes/studio.json" "${CMAKE_CURRENT_BINARY_DIR}/路径 空格/cli-path"
-        --width 4 --height 4 --spp 4 --depth 3 --seed 9 --exposure 0.5)
+        --width 4 --height 4 --spp 4 --depth 3 --seed 9 --exposure 0.5 --threads 2 --tile 2 --batch 2)
     set_tests_properties(cli_path_render PROPERTIES PASS_REGULAR_EXPRESSION "paths: 64")
     add_test(NAME cli_invalid_exposure COMMAND minirender_cli --render
         "${PROJECT_SOURCE_DIR}/scenes/studio.json" "${CMAKE_CURRENT_BINARY_DIR}/invalid-path"

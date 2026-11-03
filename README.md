@@ -31,4 +31,6 @@ A2.1 已加入 CPU 场景求交、SAH BVH 和法线诊断命令，见 [实现说
 
 A2.2 已加入随机采样、四种基础 BSDF、面积/方向光和环境采样，见 [随机采样](docs/SAMPLING.md)、[表面散射](docs/BSDF.md)、[光源采样](docs/LIGHTING.md) 及 [验收记录](docs/checkpoints/A2.2.md)。
 
-A2.3 已能通过 CLI 进行 CPU 路径追踪，支持三种采样模式、RR、薄透镜及 EXR/PNG，见 [路径追踪](docs/PATH_TRACING.md) 与 [验收记录](docs/checkpoints/A2.3.md)。A2.4 将接入多线程任务和 Qt 离线渲染界面。
+A2.3 已能通过 CLI 进行 CPU 路径追踪，支持三种采样模式、RR、薄透镜及 EXR/PNG，见 [路径追踪](docs/PATH_TRACING.md) 与 [验收记录](docs/checkpoints/A2.3.md)。后续任务与界面按 A2.4 检查点接入。
+
+A2.4a 已接入多线程 RenderSession、暂停/恢复/取消、实际采样进度和不可变预览，CLI 支持线程/tile/批次设置。见 [任务说明](docs/RENDER_SESSION.md) 与 [验收记录](docs/checkpoints/A2.4a.md)。A2.4b 继续接入 Qt 控件及 Vulkan 离线显示。

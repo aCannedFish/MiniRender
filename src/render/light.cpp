@@ -49,12 +49,13 @@ double area_density(glm::dvec3 reference, glm::dvec3 point, const glm::dvec3& no
 
 } // namespace
 
-EnvironmentLight::EnvironmentLight(const SceneSnapshot& scene)
+EnvironmentLight::EnvironmentLight(const SceneSnapshot& scene, CancellationToken cancellation)
     : constant_(scene.environment), texture_(scene.environment_texture),
       strength_(scene.environment_strength),
       rotation_(std::remainder(static_cast<double>(scene.environment_rotation_degrees), 360.0) *
                 pi / 180),
       integral_(4 * pi * luminance(constant_)) {
+    cancellation.check();
     if (!texture_ || strength_ == 0) {
         return;
     }
@@ -68,6 +69,7 @@ EnvironmentLight::EnvironmentLight(const SceneSnapshot& scene)
     solid_angles_.reserve(image.height());
     double map_integral = 0;
     for (std::size_t y = 0; y < image.height(); ++y) {
+        cancellation.check();
         const double theta0 = pi * static_cast<double>(y) / static_cast<double>(image.height());
         const double theta1 = pi * static_cast<double>(y + 1) / static_cast<double>(image.height());
         const double angle = (2 * pi / static_cast<double>(image.width())) * 2 *
@@ -86,6 +88,7 @@ EnvironmentLight::EnvironmentLight(const SceneSnapshot& scene)
     double full_integral = 0;
     const auto& full = texture_->level(0);
     for (std::size_t y = 0; y < full.height(); ++y) {
+        cancellation.check();
         const double theta0 = pi * static_cast<double>(y) / static_cast<double>(full.height());
         const double theta1 = pi * static_cast<double>(y + 1) / static_cast<double>(full.height());
         const double angle = (2 * pi / static_cast<double>(full.width())) * 2 *
@@ -175,14 +178,19 @@ double EnvironmentLight::luminance_integral() const noexcept {
     return integral_;
 }
 
-LightSampler::LightSampler(std::shared_ptr<const SceneSnapshot> scene)
-    : scene_(std::move(scene)), environment_(checked_scene(scene_)) {
+LightSampler::LightSampler(std::shared_ptr<const SceneSnapshot> scene,
+                           CancellationToken cancellation)
+    : scene_(std::move(scene)), environment_(checked_scene(scene_), cancellation) {
+    cancellation.check();
     Bounds3 bounds;
     std::vector<double> weights;
     for (std::size_t index = 0; index < scene_->instances.size(); ++index) {
         const auto& instance = scene_->instances[index];
         const auto radiance = glm::dvec3(instance.material.emission);
         for (std::size_t face = 0; face < instance.mesh->triangles.size(); ++face) {
+            if ((face & 255U) == 0) {
+                cancellation.check();
+            }
             std::array<glm::dvec3, 3> vertices;
             for (std::size_t corner = 0; corner < 3; ++corner) {
                 const auto local =
