@@ -124,19 +124,9 @@ SceneDocument load_scene(const std::filesystem::path& path) {
     }
 }
 
-void save_scene(const SceneDocument& document, const std::filesystem::path& path,
-                CancellationToken cancellation, SceneSaveCallback progress) {
-    const auto asset_count = document.meshes.size() + document.textures.size();
-    const auto report = [&](SceneSaveStage stage, std::size_t completed, std::size_t total) {
-        cancellation.check();
-        if (progress) {
-            progress({stage, 0, asset_count, completed, total});
-        }
-        cancellation.check();
-    };
-    report(SceneSaveStage::validation, 0, 1);
-    document.validate(nullptr, cancellation);
-    report(SceneSaveStage::validation, 1, 1);
+void ensure_asset_destination(const SceneDocument& document, const std::filesystem::path& path,
+                              CancellationToken cancellation) {
+    cancellation.check();
     // 场景目标不能与输入资产重合，硬链接或符号链接别名也须拒绝。
     const auto destination = std::filesystem::weakly_canonical(std::filesystem::absolute(path));
     const auto protect_source = [&](const auto& asset) {
@@ -157,6 +147,22 @@ void save_scene(const SceneDocument& document, const std::filesystem::path& path
     for (const auto& texture : document.textures) {
         protect_source(texture);
     }
+}
+
+void save_scene(const SceneDocument& document, const std::filesystem::path& path,
+                CancellationToken cancellation, SceneSaveCallback progress) {
+    const auto asset_count = document.meshes.size() + document.textures.size();
+    const auto report = [&](SceneSaveStage stage, std::size_t completed, std::size_t total) {
+        cancellation.check();
+        if (progress) {
+            progress({stage, 0, asset_count, completed, total});
+        }
+        cancellation.check();
+    };
+    report(SceneSaveStage::validation, 0, 1);
+    document.validate(nullptr, cancellation);
+    ensure_asset_destination(document, path, cancellation);
+    report(SceneSaveStage::validation, 1, 1);
     detail::StagedFile staged(path);
     Json json;
     json["version"] = 1;

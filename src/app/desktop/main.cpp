@@ -1,3 +1,4 @@
+#include "geometry_smoke.hpp"
 #include "ibl_smoke.hpp"
 #include "interaction_smoke.hpp"
 #include "offline_smoke.hpp"
@@ -106,6 +107,9 @@ int main(int argc, char** argv) {
     parser.addHelpOption();
     parser.addOption({"smoke", "Run resize/readback checks and save a PNG.", "output"});
     parser.addOption({"validation", "Require Vulkan Validation Layers."});
+    parser.addOption(
+        {"timing-only",
+         "Measure regression responsiveness without Vulkan validation instrumentation."});
     parser.addOption({"scene", "Open a scene JSON file.", "path"});
     parser.addOption({"scene-smoke", "Run scene editing and GPU checks.", "directory"});
     parser.addOption({"texture-smoke", "Run texture import and sampling checks.", "directory"});
@@ -119,19 +123,29 @@ int main(int argc, char** argv) {
         {"ssao-smoke", "Verify SSAO sampling, filtering and lighting isolation.", "directory"});
     parser.addOption(
         {"ibl-smoke", "Verify IBL tasks, environment editing and CPU/GPU results.", "directory"});
+    parser.addOption({"geometry-smoke",
+                      "Verify background geometry, file tasks and CPU/GPU updates.", "directory"});
     parser.process(application);
     const bool smoke = parser.isSet("smoke");
     const bool regression = smoke || parser.isSet("scene-smoke") || parser.isSet("texture-smoke") ||
                             parser.isSet("interaction-smoke") || parser.isSet("parameter-smoke") ||
                             parser.isSet("wire-smoke") || parser.isSet("offline-smoke") ||
-                            parser.isSet("ssao-smoke") || parser.isSet("ibl-smoke");
-    const bool validation = parser.isSet("validation") || regression;
+                            parser.isSet("ssao-smoke") || parser.isSet("ibl-smoke") ||
+                            parser.isSet("geometry-smoke");
+    const bool timing_only = parser.isSet("timing-only");
+    if (timing_only && (!regression || parser.isSet("validation"))) {
+        qCritical() << "--timing-only requires a regression mode and excludes --validation.";
+        return 1;
+    }
+    const bool validation = parser.isSet("validation") || (regression && !timing_only);
+    qInfo() << "Vulkan validation mode:" << (validation ? "enabled" : "disabled");
     RegressionInputGuard input_guard;
     if (regression) {
         application.installEventFilter(&input_guard);
     }
     std::atomic_int validation_errors = 0;
     int result = 0;
+    QElapsedTimer geometry_cleanup;
 
     QVulkanInstance instance;
     instance.setApiVersion(QVersionNumber(1, 2));
@@ -209,6 +223,9 @@ int main(int argc, char** argv) {
         if (parser.isSet("ibl-smoke")) {
             start_ibl_smoke(window, parser.value("ibl-smoke"));
         }
+        if (parser.isSet("geometry-smoke")) {
+            start_geometry_smoke(window, parser.value("geometry-smoke"), timing_only);
+        }
 
         int ticks = 0;
         bool resized = false;
@@ -271,9 +288,18 @@ int main(int argc, char** argv) {
         window.activateWindow();
         timer.start();
         result = application.exec();
+        if (parser.isSet("geometry-smoke")) {
+            geometry_cleanup.start();
+        }
     }
     // 销毁窗口及 GPU 资源后再判断，才能捕获 shutdown 期间的 Validation 错误。
     instance.destroy();
+    if (geometry_cleanup.isValid()) {
+        qInfo() << "Geometry shutdown ms:" << geometry_cleanup.elapsed();
+        if (geometry_cleanup.elapsed() > 2000) {
+            result = 1;
+        }
+    }
     qInfo() << "Vulkan validation errors:" << validation_errors.load();
     return validation_errors.load() == 0 ? result : 1;
 }

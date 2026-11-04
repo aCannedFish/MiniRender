@@ -12,11 +12,7 @@
 
 namespace {
 
-struct Vertex {
-    glm::vec3 position;
-    glm::vec3 normal;
-    glm::vec2 uv;
-};
+using Vertex = minirender::RasterVertex;
 // std430 按 16 字节对齐。normal 使用 mat4，避免 CPU mat3 的紧密布局与 GLSL 不一致。
 struct alignas(16) GpuInstance {
     glm::mat4 object_to_world;
@@ -228,40 +224,24 @@ void SceneRenderer::upload_scene() {
         used.insert(instance.mesh);
         if (!meshes_.contains(instance.mesh)) {
             Mesh mesh;
-            const auto count = instance.mesh->triangles.size() * 3;
-            if (count > std::numeric_limits<std::uint32_t>::max() / 2U) {
-                throw std::runtime_error("Mesh vertex count exceeds draw limit");
+            auto prepared = window_->raster_mesh(instance.mesh);
+            if (!prepared) {
+                // 同步诊断入口现场准备；交互导入与几何任务在后台完成准备。
+                prepared = minirender::prepare_raster_mesh(*instance.mesh);
+                window_->supply_raster_mesh(instance.mesh, prepared);
             }
-            std::vector<Vertex> vertices;
-            vertices.reserve(count);
-            mesh.minimum = glm::vec3(std::numeric_limits<float>::infinity());
-            mesh.maximum = glm::vec3(-std::numeric_limits<float>::infinity());
-            for (const auto position : instance.mesh->positions) {
-                mesh.minimum = glm::min(mesh.minimum, position);
-                mesh.maximum = glm::max(mesh.maximum, position);
-            }
-            for (const auto& triangle : instance.mesh->triangles) {
-                for (const auto& corner : triangle.corners) {
-                    vertices.push_back(
-                        {instance.mesh->positions[corner.position], corner.normal, corner.uv});
-                }
-            }
+            const auto count = prepared->vertices.size();
             mesh.count = static_cast<std::uint32_t>(count);
+            mesh.minimum = prepared->minimum;
+            mesh.maximum = prepared->maximum;
             mesh.vertices.create(device_, window_->physicalDevice(), count * sizeof(Vertex),
                                  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-            mesh.vertices.write(vertices.data(), count * sizeof(Vertex));
-            // 展开的三角形有连续三个顶点；每面生成三条边，不依赖 fillModeNonSolid。
-            // 共享边可能重复，但只读深度、实色输出不会因重复绘制改变结果。
-            std::vector<std::uint32_t> edges;
-            edges.reserve(count * 2);
-            for (std::uint32_t first = 0; first < mesh.count; first += 3) {
-                edges.insert(edges.end(),
-                             {first, first + 1, first + 1, first + 2, first + 2, first});
-            }
+            mesh.vertices.write(prepared->vertices.data(), count * sizeof(Vertex));
             mesh.edges.create(device_, window_->physicalDevice(),
-                              edges.size() * sizeof(std::uint32_t),
+                              prepared->edges.size() * sizeof(std::uint32_t),
                               VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-            mesh.edges.write(edges.data(), edges.size() * sizeof(std::uint32_t));
+            mesh.edges.write(prepared->edges.data(),
+                             prepared->edges.size() * sizeof(std::uint32_t));
             meshes_.emplace(instance.mesh, std::move(mesh));
             window_->report_mesh_upload();
         }

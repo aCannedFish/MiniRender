@@ -23,6 +23,8 @@ qt_add_executable(minirender_desktop
     gpu_texture.cpp gpu_texture.hpp
     gpu_ibl.cpp gpu_ibl.hpp
     ibl_controller.cpp ibl_controller.hpp environment_panel.cpp environment_panel.hpp
+    geometry_controller.cpp geometry_controller.hpp geometry_panel.cpp geometry_panel.hpp
+    geometry_smoke.cpp geometry_smoke.hpp
     ibl_smoke.cpp ibl_smoke.hpp
     offline_renderer.cpp offline_renderer.hpp offline_panel.cpp offline_panel.hpp
     offline_smoke.cpp offline_smoke.hpp

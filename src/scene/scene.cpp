@@ -70,6 +70,15 @@ void MeshValidationCache::validate(const std::shared_ptr<const MeshData>& mesh,
     }
 }
 
+void MeshValidationCache::merge_validated(const MeshValidationCache& other) {
+    std::erase_if(meshes_, [](const auto& value) { return value.expired(); });
+    for (const auto& mesh : other.meshes_) {
+        if (!mesh.expired()) {
+            meshes_.insert(mesh);
+        }
+    }
+}
+
 void Transform::validate() const {
     require(finite(translation) && finite(rotation_degrees) && finite(scale),
             "Transform must be finite");

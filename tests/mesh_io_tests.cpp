@@ -319,3 +319,45 @@ TEST_CASE("Displaced assets preserve immutable undo snapshots through export and
     save_scene(editor.document(), directory.path / "displaced.json");
     same_mesh(*load_scene(directory.path / "displaced.json").meshes[0].data, *displaced.mesh);
 }
+
+TEST_CASE("Worker validation caches preserve transaction checks and reject failed mesh validation",
+          "[geometry][scene]") {
+    SceneEditor editor(load_scene(studio_file()));
+    const auto original = editor.document().meshes[0].data;
+    const auto refined = subdivide_loop(original, {2}).mesh;
+    MeshValidationCache verified;
+    verified.validate(refined);
+    REQUIRE_THROWS_AS(editor.edit_prevalidated(
+                          [&](auto& scene) {
+                              scene.meshes[0].data = refined;
+                              scene.objects[0].material_id = "missing";
+                          },
+                          verified),
+                      std::invalid_argument);
+    REQUIRE(editor.document().meshes[0].data == original);
+    REQUIRE_FALSE(editor.can_undo());
+    editor.edit_prevalidated(
+        [&](auto& scene) {
+            scene.meshes[0].data = refined;
+            scene.meshes[0].source.clear();
+        },
+        verified);
+    REQUIRE(editor.document().meshes[0].data == refined);
+    auto invalid = std::make_shared<MeshData>(*refined);
+    invalid->triangles[0].corners[0].position = invalid_mesh_index;
+    MeshValidationCache rejected;
+    REQUIRE_THROWS_AS(rejected.validate(invalid), std::invalid_argument);
+    REQUIRE_THROWS_AS(
+        editor.edit_prevalidated([&](auto& scene) { scene.meshes[0].data = invalid; }, rejected),
+        std::invalid_argument);
+    REQUIRE(editor.document().meshes[0].data == refined);
+    REQUIRE(editor.undo());
+    REQUIRE(editor.document().meshes[0].data == original);
+    auto replacement = load_scene(studio_file());
+    replacement.meshes[0].data = refined;
+    replacement.meshes[0].source.clear();
+    editor.replace_prevalidated(std::move(replacement), verified);
+    REQUIRE(editor.document().meshes[0].data == refined);
+    REQUIRE_FALSE(editor.can_undo());
+    REQUIRE_FALSE(editor.can_redo());
+}

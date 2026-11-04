@@ -24,6 +24,11 @@ def main() -> int:
         action="store_true",
         help="Enable synchronization validation in the Vulkan layer",
     )
+    parser.add_argument(
+        "--timing-only",
+        action="store_true",
+        help="Measure responsiveness without Vulkan validation instrumentation",
+    )
     parser.add_argument("--scene", type=Path, help="Run scene editor checks instead of A0 diagnostics")
     checks = parser.add_mutually_exclusive_group()
     checks.add_argument("--texture-check", action="store_true", help="Verify texture import and filtering")
@@ -35,7 +40,12 @@ def main() -> int:
     )
     checks.add_argument("--ssao-check", action="store_true", help="Verify SSAO and lighting isolation")
     checks.add_argument("--ibl-check", action="store_true", help="Verify IBL tasks and CPU/GPU sampling")
+    checks.add_argument(
+        "--geometry-check", action="store_true", help="Verify geometry tasks and CPU/GPU updates"
+    )
     args = parser.parse_args()
+    if args.timing_only and args.sync_validation:
+        parser.error("Timing measurements and synchronization validation must run separately")
     scene_check = (
         args.texture_check
         or args.interaction_check
@@ -44,6 +54,7 @@ def main() -> int:
         or args.offline_check
         or args.ssao_check
         or args.ibl_check
+        or args.geometry_check
     )
     if scene_check and not args.scene:
         parser.error("Scene checks require --scene")
@@ -57,6 +68,7 @@ def main() -> int:
     mode = "GPU"
     option = "--smoke"
     for selected, candidate in [
+        (args.geometry_check, "Geometry"),
         (args.ibl_check, "IBL"),
         (args.ssao_check, "SSAO"),
         (args.offline_check, "Offline"),
@@ -73,6 +85,8 @@ def main() -> int:
         arguments = [str(executable), "--scene", str(args.scene.resolve()), option, str(output)]
     else:
         arguments = [str(executable), option, str(output / "gpu-smoke.png")]
+    if args.timing_only:
+        arguments.append("--timing-only")
     with (output / "gpu-smoke.log").open("w", encoding="utf-8") as log:
         environment = os.environ.copy()
         if args.sync_validation:
@@ -95,7 +109,16 @@ def main() -> int:
     text = (output / "gpu-smoke.log").read_text(encoding="utf-8")
     print(text, end="")
     marker = f"{mode} smoke PASS"
-    if code == 0 and (marker not in text or "Vulkan validation errors: 0" not in text):
+    validation_mode = (
+        "Vulkan validation mode: disabled"
+        if args.timing_only
+        else "Vulkan validation mode: enabled"
+    )
+    if code == 0 and (
+        marker not in text
+        or "Vulkan validation errors: 0" not in text
+        or validation_mode not in text
+    ):
         print("Missing verification evidence.", file=sys.stderr)
         return 1
     return code

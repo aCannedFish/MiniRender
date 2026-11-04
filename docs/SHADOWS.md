@@ -35,6 +35,12 @@ python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirend
 
 本机记录：第二盏灯 127/127 遮挡点、982/982 受光点与几何射线一致，74,860 像素因阴影变暗。单灯和多灯测试均为 0 个 Vulkan Validation 错误。
 
+## 接收面偏移
+
+位移曲面使用局部接收面平面修正 PCF 比较深度。片元着色器先在统一控制流中计算世界位置的屏幕导数，再将其变换到当前光源的阴影 UV 与深度空间。通过 UV 导数的 2×2 矩阵求出深度梯度 $g=(\partial z/\partial u,\partial z/\partial v)$，每个邻近采样点比较 $z+g\cdot\Delta uv-bias$。
+
+这样，3×3 PCF 的各样本按接收面的局部深度比较，可消除斜面和粗细分曲面的细碎自阴影条纹。实现参考 Microsoft 的 [Per-Texel Depth Bias](https://learn.microsoft.com/en-us/windows/desktop/DxTechArts/cascaded-shadow-maps#calculating-a-per-texel-depth-bias-with-ddx-and-ddy-for-large-pcfs)。几何回归另用 CPU 遮挡射线检查直接受光曲面与地面阴影。
+
 ## 参考
 
 PCF 原始论文：[Reeves、Salesin、Cook，Rendering Antialiased Shadows with Depth Maps，1987](https://graphics.pixar.com/library/ShadowMaps/paper.pdf)。本项目使用固定 3×3 核，不复现原论文全部采样策略。

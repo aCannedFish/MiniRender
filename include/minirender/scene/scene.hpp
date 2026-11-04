@@ -43,6 +43,9 @@ struct MeshData {
 class MeshValidationCache {
   public:
     void validate(const std::shared_ptr<const MeshData>& mesh, CancellationToken cancellation = {});
+    // 合并后台已完成的校验结果；私有条目只能由 validate 成功后创建。
+    // 调用方须保证两个缓存此时均无其他线程写入，网格仍遵守发布后不可变约定。
+    void merge_validated(const MeshValidationCache& other);
 
   private:
     std::set<std::weak_ptr<const MeshData>, std::owner_less<std::weak_ptr<const MeshData>>> meshes_;

@@ -682,6 +682,8 @@ void VulkanViewport::set_scene(std::shared_ptr<const minirender::SceneSnapshot> 
         ibl_maps_.reset();
     }
     scene_ = std::move(scene);
+    raster_meshes_.retain(scene_ ? std::span<const minirender::RenderInstance>(scene_->instances)
+                                 : std::span<const minirender::RenderInstance>{});
     if (scene_) {
         camera_ = scene_->camera;
     }
@@ -694,6 +696,16 @@ const std::shared_ptr<const minirender::SceneSnapshot>& VulkanViewport::scene() 
 }
 std::uint64_t VulkanViewport::scene_revision() const noexcept {
     return scene_revision_;
+}
+
+void VulkanViewport::supply_raster_mesh(
+    const std::shared_ptr<const minirender::MeshData>& mesh,
+    std::shared_ptr<const minirender::RasterMeshData> prepared) {
+    raster_meshes_.supply(mesh, std::move(prepared));
+}
+std::shared_ptr<const minirender::RasterMeshData>
+VulkanViewport::raster_mesh(const std::shared_ptr<const minirender::MeshData>& mesh) {
+    return raster_meshes_.find(mesh);
 }
 const minirender::Camera& VulkanViewport::camera() const noexcept {
     return camera_;

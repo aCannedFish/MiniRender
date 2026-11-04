@@ -1,4 +1,5 @@
 #include "texture_smoke.hpp"
+#include "ibl_controller.hpp"
 #include "workbench.hpp"
 
 #include <minirender/assets/scene_io.hpp>
@@ -169,6 +170,10 @@ void start_texture_smoke(Workbench& window, const QString& directory) {
             if (!window.viewport()->isExposed()) {
                 window.raise();
                 window.activateWindow();
+                return;
+            }
+            if (state->stage == 0 &&
+                window.ibl_controller()->status().state != IblTaskState::ready) {
                 return;
             }
             const auto capture = [&](const char* name) {
