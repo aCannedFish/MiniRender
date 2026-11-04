@@ -2,7 +2,7 @@
 
 ## 职责
 
-A3.2a 提供独立于 Qt/Vulkan 的 CPU 预处理核心。它生成环境漫反射、不同粗糙度的镜面环境和 BRDF 查找表。实时上传、后台任务控制、缓存及环境图编辑在 A3.2b 接入，当前视口尚未消费这些数据。
+A3.2a 提供独立于 Qt/Vulkan 的 CPU 预处理核心，生成环境漫反射、不同粗糙度的镜面环境和 BRDF 查找表。A3.2b 通过后台控制器和 Vulkan 浮点纹理接入实时管线，使用见[环境界面](ENVIRONMENT_UI.md)。
 
 输入 `Texture` 已是线性 RGB。预处理不包含常量 `environment`、环境图强度和旋转，因此这些参数变化可以复用同一结果。完成后返回 `shared_ptr<const>`，数据可以跨线程只读共享。
 
@@ -105,6 +105,8 @@ BRDF 对照采用独立的 256×256 半球立体角积分。$F_0=1,r=1,N=V$ 的�
 4. `bake_ibl_environment`：Lambert 均值、GGX 方向及源图 LOD。
 5. `integrate_ibl_brdf`：利用白色 BSDF 分离 A/B。
 6. `ibl_tests.cpp`：解析、独立积分和阶段取消验证。
+
+实时部分继续读 `IblController` 的来源切换与结果发布、`GpuIbl` 的上传/回收、`ibl_sampling.glsl` 的数据查询，最后读 `ibl_smoke.cpp` 的 CPU/GPU 对照。镜面层使用 2D array，环境背景在主场景 MRT 中绘制且不写深度；环境漫反射继续单独输出，供 SSAO 合成。
 
 ## 资料
 

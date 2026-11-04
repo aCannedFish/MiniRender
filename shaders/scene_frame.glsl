@@ -17,5 +17,6 @@ layout(binding = 0, std140) uniform Frame {
     vec4 ao_settings;
     vec4 ao_filter;
     vec4 ao_kernel[64];
+    vec4 ibl;
 } frame;
 #endif

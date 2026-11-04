@@ -678,6 +678,9 @@ void VulkanViewport::set_scene(std::shared_ptr<const minirender::SceneSnapshot> 
     if (static_cast<bool>(scene_) != static_cast<bool>(scene) && device_ != VK_NULL_HANDLE) {
         release();
     }
+    if (!scene_ || !scene || scene_->environment_texture != scene->environment_texture) {
+        ibl_maps_.reset();
+    }
     scene_ = std::move(scene);
     if (scene_) {
         camera_ = scene_->camera;
@@ -728,6 +731,36 @@ void VulkanViewport::set_ssao_settings(minirender::SsaoSettings settings) {
 }
 const minirender::SsaoSettings& VulkanViewport::ssao_settings() const noexcept {
     return ssao_;
+}
+void VulkanViewport::set_ibl_data(std::shared_ptr<const minirender::IblEnvironment> maps,
+                                  std::shared_ptr<const minirender::Image> lut) {
+    if (maps == ibl_maps_ && lut == ibl_lut_) {
+        return;
+    }
+    ibl_maps_ = std::move(maps);
+    ibl_lut_ = std::move(lut);
+    mark_preview_changed();
+    requestUpdate();
+}
+const std::shared_ptr<const minirender::IblEnvironment>& VulkanViewport::ibl_maps() const noexcept {
+    return ibl_maps_;
+}
+const std::shared_ptr<const minirender::Image>& VulkanViewport::ibl_lut() const noexcept {
+    return ibl_lut_;
+}
+void VulkanViewport::set_environment_background(bool enabled) {
+    environment_background_ = enabled;
+    mark_preview_changed();
+    requestUpdate();
+}
+bool VulkanViewport::environment_background() const noexcept {
+    return environment_background_;
+}
+void VulkanViewport::report_ibl_update() {
+    ++ibl_texture_updates_;
+}
+std::uint64_t VulkanViewport::ibl_texture_updates() const noexcept {
+    return ibl_texture_updates_;
 }
 
 void VulkanViewport::set_offline_visible(bool visible) {

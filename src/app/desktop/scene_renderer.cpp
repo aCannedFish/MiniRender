@@ -5,6 +5,7 @@
 #include <QElapsedTimer>
 
 #include <array>
+#include <cmath>
 #include <set>
 #include <stdexcept>
 #include <vector>
@@ -52,12 +53,14 @@ struct alignas(16) FrameUniform {
     glm::vec4 ao_settings; // enabled, radius/m, bias/m, strength
     glm::vec4 ao_filter;   // samples, depth sigma/m, normal exponent, use filtered
     std::array<glm::vec4, minirender::ssao_kernel_size> ao_kernel;
+    glm::vec4 ibl; // BRDF ready, maps ready, strength, rotation/radians
 };
 static_assert(offsetof(FrameUniform, lights) == 96);
 static_assert(offsetof(FrameUniform, shadow_view_projection) == 384);
 static_assert(offsetof(FrameUniform, view) == 928);
 static_assert(offsetof(FrameUniform, ao_kernel) == 1152);
-static_assert(sizeof(FrameUniform) == 2176);
+static_assert(offsetof(FrameUniform, ibl) == 2176);
+static_assert(sizeof(FrameUniform) == 2192);
 
 } // namespace
 
@@ -68,7 +71,8 @@ void SceneRenderer::initResources() {
     uniforms_.create(device_, window_->physicalDevice(), sizeof(FrameUniform),
                      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     shadow_map_.create(*window_);
-    std::array<VkDescriptorSetLayoutBinding, 4> bindings{};
+    ibl_.create(*window_);
+    std::array<VkDescriptorSetLayoutBinding, 8> bindings{};
     auto& binding = bindings[0];
     binding.binding = 0;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -82,6 +86,10 @@ void SceneRenderer::initResources() {
                    nullptr};
     bindings[3] = {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
+    for (std::uint32_t i = 4; i < bindings.size(); ++i) {
+        bindings[i] = {i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
+                       VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
+    }
     layout.bindingCount = static_cast<std::uint32_t>(bindings.size());
     layout.pBindings = bindings.data();
     check_vk(vkCreateDescriptorSetLayout(device_, &layout, nullptr, &descriptor_layout_),
@@ -106,6 +114,7 @@ void SceneRenderer::initSwapChainResources() {
     pipeline_ = create_pipeline(Pass::surface);
     shadow_pipeline_ = create_pipeline(Pass::shadow);
     wire_pipeline_ = create_pipeline(Pass::wire);
+    background_pipeline_ = create_pipeline(Pass::background);
     ssao_.create(*window_, targets_, uniforms_.handle(), sizeof(FrameUniform));
     post_process_.create(*window_, targets_, uniforms_.handle(), sizeof(FrameUniform),
                          ssao_.hdr_view(), ssao_.raw_view(), ssao_.filtered_view());
@@ -115,13 +124,16 @@ void SceneRenderer::initSwapChainResources() {
 VkPipeline SceneRenderer::create_pipeline(Pass pass) {
     const bool shadow = pass == Pass::shadow;
     const bool wire = pass == Pass::wire;
-    const GpuShader vertex(
-        device_, shadow ? ":/shaders/shadow.vert.spv"
-                        : (wire ? ":/shaders/wire.vert.spv" : ":/shaders/scene.vert.spv"));
+    const bool background = pass == Pass::background;
+    const GpuShader vertex(device_, background ? ":/shaders/screen.vert.spv"
+                                               : (shadow ? ":/shaders/shadow.vert.spv"
+                                                         : (wire ? ":/shaders/wire.vert.spv"
+                                                                 : ":/shaders/scene.vert.spv")));
     std::unique_ptr<GpuShader> fragment;
     if (!shadow) {
-        fragment = std::make_unique<GpuShader>(device_, wire ? ":/shaders/wire.frag.spv"
-                                                             : ":/shaders/scene.frag.spv");
+        fragment = std::make_unique<GpuShader>(
+            device_, background ? ":/shaders/environment.frag.spv"
+                                : (wire ? ":/shaders/wire.frag.spv" : ":/shaders/scene.frag.spv"));
     }
     std::array<VkPipelineShaderStageCreateInfo, 2> stages{};
     for (auto& stage : stages) {
@@ -139,10 +151,10 @@ VkPipeline SceneRenderer::create_pipeline(Pass pass) {
          {5, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, uv)}}};
     VkPipelineVertexInputStateCreateInfo vertex_input{};
     vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertex_input.vertexBindingDescriptionCount = 1;
+    vertex_input.vertexBindingDescriptionCount = background ? 0 : 1;
     vertex_input.pVertexBindingDescriptions = &binding;
     vertex_input.vertexAttributeDescriptionCount =
-        (shadow || wire) ? 1 : static_cast<std::uint32_t>(attributes.size());
+        background ? 0 : ((shadow || wire) ? 1 : static_cast<std::uint32_t>(attributes.size()));
     vertex_input.pVertexAttributeDescriptions = attributes.data();
     VkPipelineInputAssemblyStateCreateInfo assembly{};
     assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -165,8 +177,8 @@ VkPipeline SceneRenderer::create_pipeline(Pass pass) {
     multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
     VkPipelineDepthStencilStateCreateInfo depth{};
     depth.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depth.depthTestEnable = VK_TRUE;
-    depth.depthWriteEnable = !wire;
+    depth.depthTestEnable = !background;
+    depth.depthWriteEnable = !wire && !background;
     depth.depthCompareOp = wire ? VK_COMPARE_OP_LESS_OR_EQUAL : VK_COMPARE_OP_LESS;
     std::array<VkPipelineColorBlendAttachmentState, 3> attachments{};
     for (auto& attachment : attachments) {
@@ -329,7 +341,7 @@ void SceneRenderer::rebuild_texture_descriptors() {
     const auto count = static_cast<std::uint32_t>(draws_.size() + 1);
     const std::array<VkDescriptorPoolSize, 3> sizes{
         {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, count},
-         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2 * count},
+         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6 * count},
          {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, count}}};
     VkDescriptorPoolCreateInfo pool{};
     pool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -354,7 +366,8 @@ void SceneRenderer::rebuild_texture_descriptors() {
                                                           textures_.at(handle)->descriptor()};
         VkDescriptorBufferInfo instances{instances_.handle(), 0,
                                          instance_capacity_ * sizeof(GpuInstance)};
-        std::array<VkWriteDescriptorSet, 4> writes{};
+        const auto ibl_images = ibl_.descriptors();
+        std::array<VkWriteDescriptorSet, 8> writes{};
         for (std::uint32_t binding = 0; binding < writes.size(); ++binding) {
             writes[binding].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             writes[binding].dstSet = sets[index];
@@ -369,7 +382,8 @@ void SceneRenderer::rebuild_texture_descriptors() {
             } else if (binding == 3) {
                 writes[binding].pBufferInfo = &instances;
             } else {
-                writes[binding].pImageInfo = &images[binding - 1];
+                writes[binding].pImageInfo =
+                    binding < 3 ? &images[binding - 1] : &ibl_images[binding - 4];
             }
         }
         vkUpdateDescriptorSets(device_, static_cast<std::uint32_t>(writes.size()), writes.data(), 0,
@@ -380,6 +394,29 @@ void SceneRenderer::rebuild_texture_descriptors() {
     for (std::size_t index = 0; index < draws_.size(); ++index) {
         draws_[index].descriptor = sets[index + 1];
     }
+}
+
+void SceneRenderer::update_ibl_descriptors() {
+    const auto images = ibl_.descriptors();
+    std::vector<VkDescriptorSet> sets{descriptor_};
+    for (const auto& draw : draws_) {
+        sets.push_back(draw.descriptor);
+    }
+    std::vector<VkWriteDescriptorSet> writes;
+    for (const auto set : sets) {
+        for (std::uint32_t i = 0; i < images.size(); ++i) {
+            VkWriteDescriptorSet write{};
+            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            write.dstSet = set;
+            write.dstBinding = 4 + i;
+            write.descriptorCount = 1;
+            write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            write.pImageInfo = &images[i];
+            writes.push_back(write);
+        }
+    }
+    vkUpdateDescriptorSets(device_, static_cast<std::uint32_t>(writes.size()), writes.data(), 0,
+                           nullptr);
 }
 
 void SceneRenderer::update_uniforms() {
@@ -400,6 +437,7 @@ void SceneRenderer::update_uniforms() {
         frame.lights[i].radiance = glm::vec4(lights[i].color * lights[i].intensity, 0);
     }
     frame.counts.x = static_cast<int>(lights.size());
+    frame.counts.y = window_->environment_background() ? 1 : 0;
     frame.display = {window_->exposure(), static_cast<float>(window_->view_mode()),
                      window_->fxaa_enabled() ? 1.0F : 0.0F, 0};
     frame.shadow_view_projection = shadow_matrices_;
@@ -418,6 +456,10 @@ void SceneRenderer::update_uniforms() {
                        ao.filtered ? 1.0F : 0.0F};
     static const auto kernel = minirender::make_ssao_kernel();
     frame.ao_kernel = kernel;
+    frame.ibl = {
+        window_->ibl_lut() ? 1.0F : 0.0F, window_->ibl_maps() ? 1.0F : 0.0F,
+        window_->scene()->environment_strength,
+        glm::radians(std::remainder(window_->scene()->environment_rotation_degrees, 360.0F))};
     uniforms_.write(&frame, sizeof(frame));
 }
 
@@ -488,9 +530,15 @@ void SceneRenderer::render_wire(VkCommandBuffer command) {
 }
 
 void SceneRenderer::startNextFrame() {
+    const bool ibl_changed = ibl_.update(*window_, window_->ibl_maps(), window_->ibl_lut());
     if (scene_revision_ != window_->scene_revision()) {
         upload_scene();
     }
+    if (ibl_changed) {
+        update_ibl_descriptors();
+        window_->report_ibl_update();
+    }
+    ibl_.record_upload(window_->currentCommandBuffer());
     for (auto& [handle, texture] : textures_) {
         texture->retire_upload();
         texture->record_upload(window_->currentCommandBuffer());
@@ -507,6 +555,12 @@ void SceneRenderer::startNextFrame() {
     const VkRect2D scissor{{0, 0}, extent};
     vkCmdSetViewport(command, 0, 1, &viewport);
     vkCmdSetScissor(command, 0, 1, &scissor);
+    if (window_->ibl_maps() && window_->environment_background()) {
+        vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, background_pipeline_);
+        vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
+                                &descriptor_, 0, nullptr);
+        vkCmdDraw(command, 3, 1, 0, 0);
+    }
     vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
     vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                             &descriptor_, 0, nullptr);
@@ -542,10 +596,12 @@ void SceneRenderer::releaseSwapChainResources() {
         vkDestroyPipeline(device_, pipeline_, nullptr);
         vkDestroyPipeline(device_, shadow_pipeline_, nullptr);
         vkDestroyPipeline(device_, wire_pipeline_, nullptr);
+        vkDestroyPipeline(device_, background_pipeline_, nullptr);
     }
     pipeline_ = VK_NULL_HANDLE;
     shadow_pipeline_ = VK_NULL_HANDLE;
     wire_pipeline_ = VK_NULL_HANDLE;
+    background_pipeline_ = VK_NULL_HANDLE;
     post_process_.release();
     ssao_.release();
     targets_.release();
@@ -558,6 +614,7 @@ void SceneRenderer::releaseResources() {
     instance_capacity_ = 0;
     uniforms_.release();
     shadow_map_.release();
+    ibl_.release();
     if (device_ == VK_NULL_HANDLE) {
         return;
     }

@@ -13,6 +13,8 @@ class VectorField;
 class QProgressBar;
 class QLabel;
 class OfflinePanel;
+class EnvironmentPanel;
+class IblController;
 
 // 桌面编辑控制器：控件编辑委托给 SceneEditor，渲染器只收到不可变快照。
 // file/undo/selection 都通过这里协调，不在 Vulkan 命令录制代码中读取控件。
@@ -31,6 +33,8 @@ class Workbench final : public QMainWindow {
     bool texture_loading() const noexcept;
     bool asset_loading() const noexcept;
     OfflinePanel* offline_panel() const noexcept;
+    IblController* ibl_controller() const noexcept;
+    void import_environment_file(const QString& path);
 
   private:
     void build_object_panel();
@@ -60,6 +64,8 @@ class Workbench final : public QMainWindow {
     QWidget* light_panel_ = nullptr;
     QWidget* camera_panel_ = nullptr;
     OfflinePanel* offline_ = nullptr;
+    EnvironmentPanel* environment_ = nullptr;
+    IblController* ibl_ = nullptr;
     QLineEdit* object_name_ = nullptr;
     VectorField* translation_ = nullptr;
     VectorField* rotation_ = nullptr;

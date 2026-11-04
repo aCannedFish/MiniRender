@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gpu_buffer.hpp"
+#include "gpu_ibl.hpp"
 #include "gpu_texture.hpp"
 #include "hdr_targets.hpp"
 #include "post_process.hpp"
@@ -26,12 +27,13 @@ class SceneRenderer final : public ViewportRenderer {
     minirender::Image read_hdr_capture() override;
 
   private:
-    enum class Pass { surface, shadow, wire };
+    enum class Pass { surface, shadow, wire, background };
     VkPipeline create_pipeline(Pass pass);
     void render_wire(VkCommandBuffer command);
     void render_shadow_maps(VkCommandBuffer command);
     void upload_scene();
     void rebuild_texture_descriptors();
+    void update_ibl_descriptors();
     using MeshHandle = std::shared_ptr<const minirender::MeshData>;
     using TextureHandle = std::shared_ptr<const minirender::Texture>;
     // 网格保留局部坐标。变换与材质写入独立 SSBO，不再烘焙到每个顶点。
@@ -63,6 +65,7 @@ class SceneRenderer final : public ViewportRenderer {
     GpuBuffer instances_;
     std::size_t instance_capacity_ = 0;
     GpuBuffer uniforms_;
+    GpuIbl ibl_;
     VkDescriptorSetLayout descriptor_layout_ = VK_NULL_HANDLE;
     VkDescriptorPool descriptor_pool_ = VK_NULL_HANDLE;
     VkDescriptorSet descriptor_ = VK_NULL_HANDLE;
@@ -70,5 +73,6 @@ class SceneRenderer final : public ViewportRenderer {
     VkPipeline pipeline_ = VK_NULL_HANDLE;
     VkPipeline shadow_pipeline_ = VK_NULL_HANDLE;
     VkPipeline wire_pipeline_ = VK_NULL_HANDLE;
+    VkPipeline background_pipeline_ = VK_NULL_HANDLE;
     std::uint64_t scene_revision_ = std::numeric_limits<std::uint64_t>::max();
 };
