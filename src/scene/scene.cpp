@@ -29,12 +29,20 @@ void unique_id(std::unordered_set<std::string>& ids, const std::string& id, cons
 
 } // namespace
 
-void MeshData::validate() const {
+void MeshData::validate(CancellationToken cancellation) const {
+    cancellation.check();
     require(!positions.empty() && !triangles.empty(), "Mesh must contain positions and triangles");
+    std::size_t checked = 0;
     for (const auto position : positions) {
+        if (checked++ % 1024 == 0) {
+            cancellation.check();
+        }
         require(finite(position), "Mesh position must be finite");
     }
     for (const auto& triangle : triangles) {
+        if (checked++ % 1024 == 0) {
+            cancellation.check();
+        }
         for (const auto& corner : triangle.corners) {
             require(corner.position < positions.size(), "Mesh position index is out of range");
             require(finite(corner.normal) && glm::dot(corner.normal, corner.normal) > 1e-12F,
@@ -48,13 +56,16 @@ void MeshData::validate() const {
         const auto area = glm::cross(b - a, c - a);
         require(glm::dot(area, area) > 1e-20F, "Degenerate mesh triangle");
     }
+    cancellation.check();
 }
 
-void MeshValidationCache::validate(const std::shared_ptr<const MeshData>& mesh) {
+void MeshValidationCache::validate(const std::shared_ptr<const MeshData>& mesh,
+                                   CancellationToken cancellation) {
+    cancellation.check();
     require(mesh != nullptr, "Mesh data is missing");
     std::erase_if(meshes_, [](const auto& value) { return value.expired(); });
     if (!meshes_.contains(mesh)) {
-        mesh->validate();
+        mesh->validate(cancellation);
         meshes_.insert(mesh);
     }
 }
@@ -184,12 +195,14 @@ void Material::validate() const {
     texture_filter_name(texture_filter);
 }
 
-void SceneDocument::validate(MeshValidationCache* cache) const {
+void SceneDocument::validate(MeshValidationCache* cache, CancellationToken cancellation) const {
+    cancellation.check();
     camera.validate();
     require(finite(environment) && glm::all(glm::greaterThanEqual(environment, glm::vec3(0))),
             "Environment must be finite and nonnegative");
     std::unordered_set<std::string> texture_ids;
     for (const auto& texture : textures) {
+        cancellation.check();
         unique_id(texture_ids, texture.id, "Texture");
         require(texture.data != nullptr, "Texture data is missing: " + texture.id);
     }
@@ -200,6 +213,7 @@ void SceneDocument::validate(MeshValidationCache* cache) const {
             "Environment strength and rotation must be finite; strength must be nonnegative");
     std::unordered_set<std::string> material_ids;
     for (const auto& material : materials) {
+        cancellation.check();
         unique_id(material_ids, material.id, "Material");
         material.validate();
         require(material.base_color_texture.empty() ||
@@ -208,16 +222,18 @@ void SceneDocument::validate(MeshValidationCache* cache) const {
     }
     std::unordered_set<std::string> mesh_ids;
     for (const auto& mesh : meshes) {
+        cancellation.check();
         unique_id(mesh_ids, mesh.id, "Mesh");
         require(mesh.data != nullptr, "Mesh data is missing: " + mesh.id);
         if (cache) {
-            cache->validate(mesh.data);
+            cache->validate(mesh.data, cancellation);
         } else {
-            mesh.data->validate();
+            mesh.data->validate(cancellation);
         }
     }
     std::unordered_set<std::string> object_ids;
     for (const auto& object : objects) {
+        cancellation.check();
         unique_id(object_ids, object.id, "Object");
         require(mesh_ids.contains(object.mesh_id),
                 "Object references missing mesh: " + object.mesh_id);
@@ -227,6 +243,7 @@ void SceneDocument::validate(MeshValidationCache* cache) const {
     }
     std::unordered_set<std::string> light_ids;
     for (const auto& light : directional_lights) {
+        cancellation.check();
         unique_id(light_ids, light.id, "Light");
         require(finite(light.direction) && glm::length(light.direction) > 1e-6F,
                 "Light direction must be nonzero");

@@ -35,14 +35,14 @@ struct MeshTriangle {
 struct MeshData {
     std::vector<glm::vec3> positions;
     std::vector<MeshTriangle> triangles;
-    void validate() const;
+    void validate(CancellationToken cancellation = {}) const;
 };
 
 // 资产发布后不可再修改。按 shared_ptr 的所有权缓存校验结果，过期弱引用及时清理。
 // 缓存仅在所属编辑线程使用；新网格即使复用原始地址也会按新的所有权重新校验。
 class MeshValidationCache {
   public:
-    void validate(const std::shared_ptr<const MeshData>& mesh);
+    void validate(const std::shared_ptr<const MeshData>& mesh, CancellationToken cancellation = {});
 
   private:
     std::set<std::weak_ptr<const MeshData>, std::owner_less<std::weak_ptr<const MeshData>>> meshes_;
@@ -143,7 +143,7 @@ struct SceneDocument {
     std::vector<SceneObject> objects;
     std::vector<DirectionalLight> directional_lights;
     EnvironmentMap environment_map;
-    void validate(MeshValidationCache* cache = nullptr) const;
+    void validate(MeshValidationCache* cache = nullptr, CancellationToken cancellation = {}) const;
 };
 
 // 每个实例持有独立的材质/变换值和只读网格。用户编辑原文档不改变已经开始的任务。

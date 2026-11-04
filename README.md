@@ -44,3 +44,5 @@ A3.2a 已完成 IBL 的 CPU 预处理核心：漫反射卷积、GGX 粗糙度层
 A3.2b 已接入 Vulkan 实时 IBL 与环境背景，右侧“环境”页支持导入、强度/旋转、后台进度、取消/重试和缓存。UI 参数可撤销并保存，SSAO 继续只影响环境漫反射。A3 本机验收完成，见 [环境界面](docs/ENVIRONMENT_UI.md) 与 [验收记录](docs/checkpoints/A3.2b.md)。
 
 A4.1 已加入半边拓扑和均匀 Loop 核心，保留面角 UV 接缝，提供进度、取消及 CPU 渲染示例。几何工具 UI、位移、简化、重网格和自适应细分按后续检查点接入。见 [网格处理](docs/GEOMETRY.md) 与 [验收记录](docs/checkpoints/A4.1.md)。
+
+A4.2a 已加入真实高度位移、共享顶点与边内部的接缝检查、OBJ 写出和生成资产的场景保存，支持进度与取消。见 [高度位移](docs/DISPLACEMENT.md) 和 [资产导出](docs/ASSET_EXPORT.md)。Qt 后台几何工具由 A4.2b 接入。
