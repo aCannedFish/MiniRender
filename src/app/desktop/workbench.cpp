@@ -1,4 +1,5 @@
 #include "workbench.hpp"
+#include "environment_panel.hpp"
 #include "offline_panel.hpp"
 #include "realtime_panel.hpp"
 
@@ -295,6 +296,26 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     right_tabs->addTab(scroll_panel(offline_), "离线");
     auto* realtime = new RealtimePanel(*viewport_, this);
     right_tabs->addTab(scroll_panel(realtime), "实时");
+    ibl_ = new IblController(*viewport_, this);
+    environment_ = new EnvironmentPanel(*viewport_, *ibl_, this);
+    right_tabs->addTab(scroll_panel(environment_), "环境");
+    environment_->on_edited = [this](glm::vec3 constant, minirender::EnvironmentMap map) {
+        perform_edit([&](auto& document) {
+            document.environment = constant;
+            document.environment_map = map;
+        });
+    };
+    environment_->on_import = [this] {
+        const auto path = QFileDialog::getOpenFileName(this, "导入环境图", {},
+                                                       "Images (*.hdr *.exr *.png *.jpg *.jpeg)");
+        if (!path.isEmpty()) {
+            try {
+                import_environment_file(path);
+            } catch (const std::exception& error) {
+                report_error(error);
+            }
+        }
+    };
     viewport_->on_display_changed = [this, realtime](bool offline) {
         findChild<QComboBox*>("view_mode")->setEnabled(!offline);
         findChild<QCheckBox*>("fxaa_enabled")->setEnabled(!offline);
@@ -374,9 +395,8 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
                     .arg(QString::fromUtf8(viewport_->physicalDeviceProperties()->deviceName))
                     .arg(editor_.document().objects.size());
             QStringList offline_features;
-            if (!editor_.document().environment_map.texture_id.empty() &&
-                editor_.document().environment_map.strength > 0) {
-                offline_features.append("环境图");
+            if (viewport_->ibl_maps()) {
+                message += " | IBL 环境光";
             }
             if (editor_.document().camera.aperture_radius > 0) {
                 offline_features.append("景深");
@@ -589,6 +609,7 @@ void Workbench::build_camera_panel() {
 
 void Workbench::refresh() {
     offline_->scene_changed();
+    environment_->set_document(editor_.document());
     refreshing_ = true;
     tree_->clear();
     assets_->clear();
@@ -778,6 +799,7 @@ void Workbench::begin_asset_task(const QString& message) {
     open_action_->setEnabled(false);
     import_object_action_->setEnabled(false);
     import_texture_action_->setEnabled(false);
+    environment_->set_import_enabled(false);
 }
 
 void Workbench::finish_asset_task() {
@@ -786,6 +808,7 @@ void Workbench::finish_asset_task() {
     open_action_->setEnabled(true);
     import_object_action_->setEnabled(true);
     import_texture_action_->setEnabled(true);
+    environment_->set_import_enabled(true);
 }
 
 bool Workbench::asset_loading() const noexcept {
@@ -949,4 +972,37 @@ void Workbench::import_texture_file(const QString& path, minirender::ColorEncodi
 
 bool Workbench::texture_loading() const noexcept {
     return texture_loading_;
+}
+
+IblController* Workbench::ibl_controller() const noexcept {
+    return ibl_;
+}
+void Workbench::import_environment_file(const QString& path) {
+    begin_asset_task("正在读取环境图…");
+    const auto source = native_path(path);
+    const auto suffix = QFileInfo(path).suffix().toLower();
+    const auto encoding = suffix == "hdr" || suffix == "exr" ? minirender::ColorEncoding::linear
+                                                             : minirender::ColorEncoding::srgb;
+    const auto generation = document_generation_;
+    run_background(
+        this,
+        [source, encoding] {
+            return std::make_shared<const minirender::Texture>(
+                minirender::Image::read(source, encoding));
+        },
+        [this, source, encoding, generation](const auto& result) {
+            finish_asset_task();
+            if (generation != document_generation_) {
+                return;
+            }
+            if (!result.error.empty()) {
+                report_error(std::runtime_error(result.error));
+                return;
+            }
+            perform_edit([&](auto& scene) {
+                const auto id = unique_id(scene.textures, "environment_");
+                scene.textures.push_back({id, source, encoding, result.value});
+                scene.environment_map.texture_id = id;
+            });
+        });
 }

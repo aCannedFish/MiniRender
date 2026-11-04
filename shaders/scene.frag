@@ -2,6 +2,7 @@
 #extension GL_GOOGLE_include_directive : require
 #include "scene_frame.glsl"
 #include "scene_instance.glsl"
+#include "ibl_sampling.glsl"
 
 
 layout(location = 0) in vec3 world_position;
@@ -87,9 +88,21 @@ void main() {
     float metallic = material.y;
     float alpha = roughness * roughness;
     vec3 f0 = mix(vec3(0.04), albedo, metallic);
-    vec3 result = emission + frame.environment.xyz * mix(albedo, f0, metallic);
-    ambient_output = vec4(frame.environment.xyz * albedo * (1.0 - metallic), 1.0);
     float ndv = max(dot(n, v), 0.0);
+    vec3 diffuse_environment=frame.environment.rgb;
+    vec3 specular_environment=frame.environment.rgb;
+    if(frame.ibl.y>0.5) {
+        diffuse_environment+=frame.ibl.z*ibl_diffuse(n);
+        specular_environment+=frame.ibl.z*ibl_specular(reflect(-v,n),clamp(material.x,0.0,1.0));
+    }
+    vec3 ambient_diffuse=diffuse_environment*albedo*(1.0-metallic);
+    vec3 specular_factor=albedo;
+    if(frame.ibl.x>0.5) {
+        vec2 ab=ibl_brdf(ndv,clamp(material.x,0.0,1.0));
+        specular_factor=albedo*ab.x+ab.y;
+    }
+    vec3 result=emission+ambient_diffuse+metallic*specular_environment*specular_factor;
+    ambient_output=vec4(ambient_diffuse,1.0);
     for (int i = 0; i < frame.counts.x; ++i) {
         vec3 l = -normalize(frame.lights[i].direction.xyz);
         float ndl = max(dot(n, l), 0.0);

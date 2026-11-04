@@ -39,4 +39,6 @@ A2.4b 已将任务接入 Qt 离线面板，包含真实进度、暂停/恢复/�
 
 A3.1 已加入 SSAO 半球采样、双边滤波、独立的环境漫反射合成，以及原始/滤波 AO 视图。右侧“实时”页可调整参数，实时 EXR 保留合成后的线性结果。见 [SSAO 说明](docs/SSAO.md) 与 [验收记录](docs/checkpoints/A3.1.md)。
 
-A3.2a 已完成 IBL 的 CPU 预处理核心：漫反射卷积、GGX 粗糙度层、BRDF LUT、进度和取消。数值对照及默认参数参考图见 [IBL 说明](docs/IBL.md) 与 [验收记录](docs/checkpoints/A3.2a.md)。A3.2b 继续接入 Vulkan 和 Qt，当前视口尚未使用这些预处理数据。
+A3.2a 已完成 IBL 的 CPU 预处理核心：漫反射卷积、GGX 粗糙度层、BRDF LUT、进度和取消。数值对照及默认参数参考图见 [IBL 说明](docs/IBL.md) 与 [验收记录](docs/checkpoints/A3.2a.md)。
+
+A3.2b 已接入 Vulkan 实时 IBL 与环境背景，右侧“环境”页支持导入、强度/旋转、后台进度、取消/重试和缓存。UI 参数可撤销并保存，SSAO 继续只影响环境漫反射。A3 本机验收完成，见 [环境界面](docs/ENVIRONMENT_UI.md) 与 [验收记录](docs/checkpoints/A3.2b.md)。

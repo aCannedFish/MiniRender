@@ -1,6 +1,7 @@
 #pragma once
 
 #include <minirender/core/image.hpp>
+#include <minirender/render/ibl.hpp>
 #include <minirender/render/ssao.hpp>
 #include <minirender/scene/scene.hpp>
 #include <vulkan/vulkan.h>
@@ -46,6 +47,14 @@ class VulkanViewport final : public QWindow {
     int view_mode() const noexcept;
     void set_ssao_settings(minirender::SsaoSettings settings);
     const minirender::SsaoSettings& ssao_settings() const noexcept;
+    void set_ibl_data(std::shared_ptr<const minirender::IblEnvironment> maps,
+                      std::shared_ptr<const minirender::Image> lut);
+    const std::shared_ptr<const minirender::IblEnvironment>& ibl_maps() const noexcept;
+    const std::shared_ptr<const minirender::Image>& ibl_lut() const noexcept;
+    void set_environment_background(bool enabled);
+    bool environment_background() const noexcept;
+    void report_ibl_update();
+    std::uint64_t ibl_texture_updates() const noexcept;
     void set_offline_visible(bool visible);
     bool offline_visible() const noexcept;
     void set_offline_image(std::shared_ptr<const minirender::Image> image);
@@ -121,6 +130,10 @@ class VulkanViewport final : public QWindow {
     float exposure_ = 0.0F;
     int view_mode_ = 0;
     minirender::SsaoSettings ssao_;
+    std::shared_ptr<const minirender::IblEnvironment> ibl_maps_;
+    std::shared_ptr<const minirender::Image> ibl_lut_;
+    bool environment_background_ = true;
+    std::uint64_t ibl_texture_updates_ = 0;
     QPointF mouse_origin_;
     QPointF last_mouse_;
     bool dragged_ = false;

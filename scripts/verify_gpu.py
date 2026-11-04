@@ -34,6 +34,7 @@ def main() -> int:
         "--offline-check", action="store_true", help="Verify CPU task controls and Vulkan display"
     )
     checks.add_argument("--ssao-check", action="store_true", help="Verify SSAO and lighting isolation")
+    checks.add_argument("--ibl-check", action="store_true", help="Verify IBL tasks and CPU/GPU sampling")
     args = parser.parse_args()
     scene_check = (
         args.texture_check
@@ -42,6 +43,7 @@ def main() -> int:
         or args.wire_check
         or args.offline_check
         or args.ssao_check
+        or args.ibl_check
     )
     if scene_check and not args.scene:
         parser.error("Scene checks require --scene")
@@ -55,6 +57,7 @@ def main() -> int:
     mode = "GPU"
     option = "--smoke"
     for selected, candidate in [
+        (args.ibl_check, "IBL"),
         (args.ssao_check, "SSAO"),
         (args.offline_check, "Offline"),
         (args.parameter_check, "Parameter"),

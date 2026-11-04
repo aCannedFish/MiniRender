@@ -1,3 +1,4 @@
+#include "ibl_smoke.hpp"
 #include "interaction_smoke.hpp"
 #include "offline_smoke.hpp"
 #include "parameter_smoke.hpp"
@@ -13,6 +14,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QDockWidget>
+#include <QEvent>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QLabel>
@@ -27,6 +29,37 @@
 #include <cmath>
 
 namespace {
+
+// 自动回归只接受程序内测试事件，避免用户在其他工作中误触测试窗口改变相机/控件。
+// 普通启动不安装此过滤器；窗口关闭等系统事件仍正常处理。
+class RegressionInputGuard final : public QObject {
+  protected:
+    bool eventFilter(QObject*, QEvent* event) override {
+        // Qt 在应用切换时也会生成非 spontaneous 的失焦事件。自动手势不随桌面焦点中断，
+        // 合成 UngrabMouse 仍正常送达，用于测试捕获恢复。
+        if (event->type() == QEvent::WindowDeactivate) {
+            return true;
+        }
+        if (!event->spontaneous()) {
+            return false;
+        }
+        switch (event->type()) {
+        case QEvent::KeyPress:
+        case QEvent::KeyRelease:
+        case QEvent::ShortcutOverride:
+        case QEvent::MouseButtonPress:
+        case QEvent::MouseButtonRelease:
+        case QEvent::MouseButtonDblClick:
+        case QEvent::MouseMove:
+        case QEvent::Wheel:
+        case QEvent::WindowDeactivate:
+        case QEvent::UngrabMouse:
+            return true;
+        default:
+            return false;
+        }
+    }
+};
 
 // 用独立的颜色计数和中心点判断结果，避免只检查文件存在就认定 GPU 渲染通过。
 bool validate_capture(const QImage& image) {
@@ -84,12 +117,19 @@ int main(int argc, char** argv) {
         {"offline-smoke", "Verify CPU task controls and Vulkan display.", "directory"});
     parser.addOption(
         {"ssao-smoke", "Verify SSAO sampling, filtering and lighting isolation.", "directory"});
+    parser.addOption(
+        {"ibl-smoke", "Verify IBL tasks, environment editing and CPU/GPU results.", "directory"});
     parser.process(application);
     const bool smoke = parser.isSet("smoke");
-    const bool validation = parser.isSet("validation") || smoke || parser.isSet("scene-smoke") ||
-                            parser.isSet("texture-smoke") || parser.isSet("interaction-smoke") ||
-                            parser.isSet("parameter-smoke") || parser.isSet("wire-smoke") ||
-                            parser.isSet("offline-smoke") || parser.isSet("ssao-smoke");
+    const bool regression = smoke || parser.isSet("scene-smoke") || parser.isSet("texture-smoke") ||
+                            parser.isSet("interaction-smoke") || parser.isSet("parameter-smoke") ||
+                            parser.isSet("wire-smoke") || parser.isSet("offline-smoke") ||
+                            parser.isSet("ssao-smoke") || parser.isSet("ibl-smoke");
+    const bool validation = parser.isSet("validation") || regression;
+    RegressionInputGuard input_guard;
+    if (regression) {
+        application.installEventFilter(&input_guard);
+    }
     std::atomic_int validation_errors = 0;
     int result = 0;
 
@@ -116,6 +156,15 @@ int main(int argc, char** argv) {
 
     {
         Workbench window(&instance, smoke);
+        if (regression) {
+            QObject::connect(&window, &QWidget::windowTitleChanged, &window,
+                             [&window](const QString& title) {
+                                 if (!title.contains("自动回归")) {
+                                     window.setWindowTitle(title + " [自动回归]");
+                                 }
+                             });
+            window.setWindowTitle(window.windowTitle() + " [自动回归]");
+        }
         auto* viewport = window.viewport();
         if (!smoke) {
             const QString scene_path =
@@ -123,11 +172,6 @@ int main(int argc, char** argv) {
                     ? parser.value("scene")
                     : QCoreApplication::applicationDirPath() + "/scenes/studio.json";
             try {
-                const bool regression =
-                    parser.isSet("scene-smoke") || parser.isSet("texture-smoke") ||
-                    parser.isSet("interaction-smoke") || parser.isSet("parameter-smoke") ||
-                    parser.isSet("wire-smoke") || parser.isSet("offline-smoke") ||
-                    parser.isSet("ssao-smoke");
                 if (regression) {
                     window.load_scene_file(scene_path);
                 } else {
@@ -161,6 +205,9 @@ int main(int argc, char** argv) {
         }
         if (parser.isSet("ssao-smoke")) {
             start_ssao_smoke(window, parser.value("ssao-smoke"));
+        }
+        if (parser.isSet("ibl-smoke")) {
+            start_ibl_smoke(window, parser.value("ibl-smoke"));
         }
 
         int ticks = 0;
