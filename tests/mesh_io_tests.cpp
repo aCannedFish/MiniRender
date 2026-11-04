@@ -124,7 +124,7 @@ TEST_CASE("OBJ export cancellation and errors retain the original destination", 
     const auto mesh = generated_scene(3).meshes[0].data;
     const auto target = directory.path / "existing.obj";
     const std::string original = "original object bytes\n";
-    std::ofstream(target) << original;
+    std::ofstream(target, std::ios::binary) << original;
     for (const bool at_end : {false, true}) {
         CancellationSource cancellation;
         bool reached = false;
@@ -149,7 +149,7 @@ TEST_CASE("OBJ export cancellation and errors retain the original destination", 
     REQUIRE(bytes(target) == original);
     const auto blocked = directory.path / "directory.obj";
     std::filesystem::create_directory(blocked);
-    std::ofstream(blocked / "marker") << original;
+    std::ofstream(blocked / "marker", std::ios::binary) << original;
     REQUIRE_THROWS(save_obj(*mesh, blocked));
     REQUIRE(bytes(blocked / "marker") == original);
     no_staging_directories(directory.path);
@@ -178,7 +178,8 @@ TEST_CASE("Generated meshes save alongside scenes without rewriting source asset
     REQUIRE(load_scene(file).meshes[0].source == asset);
     std::size_t generated_count = 0;
     for (const auto& entry : std::filesystem::directory_iterator(directory.path / "assets")) {
-        generated_count += entry.is_regular_file();
+        generated_count += entry.is_regular_file() &&
+                           entry.path().filename().u8string().starts_with(u8"generated-");
     }
     REQUIRE(generated_count == 1);
     no_staging_directories(directory.path);
@@ -211,7 +212,7 @@ TEST_CASE("Scene save cancels every precommit stage without replacing the origin
             save_scene(scene, file);
         }
         const std::string original = "original scene bytes\n";
-        std::ofstream(file) << original;
+        std::ofstream(file, std::ios::binary) << original;
         CancellationSource cancellation;
         bool reached = false;
         REQUIRE_THROWS_AS(
@@ -237,7 +238,7 @@ TEST_CASE("Scene save failures preserve old JSON and clean staging files", "[sce
     TemporaryDirectory directory;
     const auto file = directory.path / "existing.json";
     const std::string original = "original scene bytes\n";
-    std::ofstream(file) << original;
+    std::ofstream(file, std::ios::binary) << original;
     auto scene = generated_scene();
     // 数据已加载但原始文件被移除时应报错，避免保存出无法重新打开的场景。
     scene.meshes[1].source = directory.path / "missing.obj";
