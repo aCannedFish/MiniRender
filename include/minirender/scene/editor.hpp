@@ -14,7 +14,12 @@ class SceneEditor {
     explicit SceneEditor(SceneDocument document);
     const SceneDocument& document() const noexcept;
     void replace(SceneDocument document);
+    // 接收场景载入任务的已校验记录，替换成功后清空历史。
+    void replace_prevalidated(SceneDocument document, const MeshValidationCache& validated);
     void edit(const std::function<void(SceneDocument&)>& operation);
+    // 后台网格已校验后合并其所有权缓存，再执行普通事务；其他文档参数仍完整校验。
+    void edit_prevalidated(const std::function<void(SceneDocument&)>& operation,
+                           const MeshValidationCache& validated);
     bool undo();
     bool redo();
     bool can_undo() const noexcept;

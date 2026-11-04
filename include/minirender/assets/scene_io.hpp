@@ -30,6 +30,11 @@ struct SceneSaveProgress {
 };
 using SceneSaveCallback = std::function<void(const SceneSaveProgress&)>;
 
+// 拒绝目标与任一输入网格/纹理路径相同或等价的情况，供导出与保存共用。
+// 只检查目标保护，不校验整个文档或访问网格数据；文件系统查询应放在 worker。
+void ensure_asset_destination(const SceneDocument& document, const std::filesystem::path& path,
+                              CancellationToken cancellation = {});
+
 // 另存时重算已有资产路径。source 为空的生成网格写入内容命名的新 OBJ，不覆盖输入。
 // JSON 在最后原子替换；失败/取消保留原 JSON，可能留下尚未引用的新资产。
 // 不修改原 document。回调在调用线程触发；commit 0/1 为最后取消点，返回表示提交完成。

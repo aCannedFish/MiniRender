@@ -2,6 +2,7 @@
 
 #include <minirender/core/image.hpp>
 #include <minirender/render/ibl.hpp>
+#include <minirender/render/raster_mesh.hpp>
 #include <minirender/render/ssao.hpp>
 #include <minirender/scene/scene.hpp>
 #include <vulkan/vulkan.h>
@@ -35,6 +36,10 @@ class VulkanViewport final : public QWindow {
     void set_scene(std::shared_ptr<const minirender::SceneSnapshot> scene);
     const std::shared_ptr<const minirender::SceneSnapshot>& scene() const noexcept;
     std::uint64_t scene_revision() const noexcept;
+    void supply_raster_mesh(const std::shared_ptr<const minirender::MeshData>& mesh,
+                            std::shared_ptr<const minirender::RasterMeshData> prepared);
+    std::shared_ptr<const minirender::RasterMeshData>
+    raster_mesh(const std::shared_ptr<const minirender::MeshData>& mesh);
     const minirender::Camera& camera() const noexcept;
     void set_camera(const minirender::Camera& camera);
     void set_shadows_enabled(bool enabled);
@@ -117,6 +122,7 @@ class VulkanViewport final : public QWindow {
     std::shared_ptr<const minirender::Image> offline_image_;
     bool offline_visible_ = false;
     std::shared_ptr<const minirender::SceneSnapshot> scene_;
+    minirender::RasterMeshCache raster_meshes_;
     minirender::Camera camera_;
     std::uint64_t scene_revision_ = 0;
     SceneUploadStatistics upload_statistics_;

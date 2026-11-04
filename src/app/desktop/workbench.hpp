@@ -2,6 +2,7 @@
 
 #include "vulkan_viewport.hpp"
 
+#include <QElapsedTimer>
 #include <QMainWindow>
 #include <minirender/scene/editor.hpp>
 
@@ -15,6 +16,9 @@ class QLabel;
 class OfflinePanel;
 class EnvironmentPanel;
 class IblController;
+class GeometryController;
+class GeometryPanel;
+struct GeometryTaskResult;
 
 // 桌面编辑控制器：控件编辑委托给 SceneEditor，渲染器只收到不可变快照。
 // file/undo/selection 都通过这里协调，不在 Vulkan 命令录制代码中读取控件。
@@ -28,6 +32,13 @@ class Workbench final : public QMainWindow {
     void open_scene_file(const QString& path);
     void import_object_file(const QString& path);
     void save_scene_file(const QString& path);
+    // 工具栏及几何操作使用后台入口；同步保存保留给确定执行顺序的回归检查。
+    void save_scene_async(const QString& path);
+    void apply_geometry();
+    void import_height_file(const QString& path);
+    void export_geometry_file(const QString& path);
+    GeometryController* geometry_controller() const noexcept;
+    GeometryPanel* geometry_panel() const noexcept;
     void select_object(const std::string& id);
     void import_texture_file(const QString& path, minirender::ColorEncoding encoding);
     bool texture_loading() const noexcept;
@@ -43,7 +54,8 @@ class Workbench final : public QMainWindow {
     void refresh();
     void refresh_properties();
     void refresh_camera();
-    void perform_edit(const std::function<void(minirender::SceneDocument&)>& edit);
+    void perform_edit(const std::function<void(minirender::SceneDocument&)>& edit,
+                      const minirender::MeshValidationCache* validated = nullptr);
     void edit_object_property(const std::function<void(minirender::SceneObject&)>& edit);
     void edit_material_property(const std::function<void(minirender::Material&)>& edit);
     void duplicate_object();
@@ -53,7 +65,9 @@ class Workbench final : public QMainWindow {
     void report_error(const std::exception& error);
     void begin_asset_task(const QString& message);
     void finish_asset_task();
-    void install_scene(minirender::SceneDocument document, const QString& path);
+    bool finish_geometry_task(const GeometryTaskResult& result);
+    void install_scene(minirender::SceneDocument document, const QString& path,
+                       const minirender::MeshValidationCache* validated = nullptr);
     minirender::SceneObject* selected(minirender::SceneDocument& scene) const;
 
     VulkanViewport* viewport_ = nullptr;
@@ -66,6 +80,8 @@ class Workbench final : public QMainWindow {
     OfflinePanel* offline_ = nullptr;
     EnvironmentPanel* environment_ = nullptr;
     IblController* ibl_ = nullptr;
+    GeometryController* geometry_tasks_ = nullptr;
+    GeometryPanel* geometry_ = nullptr;
     QLineEdit* object_name_ = nullptr;
     VectorField* translation_ = nullptr;
     VectorField* rotation_ = nullptr;
@@ -78,12 +94,17 @@ class Workbench final : public QMainWindow {
     QAction* import_texture_action_ = nullptr;
     QAction* import_object_action_ = nullptr;
     QAction* open_action_ = nullptr;
+    QAction* save_action_ = nullptr;
+    QAction* save_as_action_ = nullptr;
     QProgressBar* task_progress_ = nullptr;
     QLabel* task_label_ = nullptr;
     QString task_message_;
+    QString geometry_notice_extra_;
+    QElapsedTimer geometry_notice_;
     bool asset_loading_ = false;
     bool texture_loading_ = false;
     std::uint64_t document_generation_ = 0;
+    std::uint64_t document_revision_ = 0;
     QDoubleSpinBox* roughness_ = nullptr;
     QDoubleSpinBox* ior_ = nullptr;
     QComboBox* light_selector_ = nullptr;

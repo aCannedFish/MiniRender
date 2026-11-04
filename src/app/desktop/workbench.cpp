@@ -1,5 +1,6 @@
 #include "workbench.hpp"
 #include "environment_panel.hpp"
+#include "geometry_panel.hpp"
 #include "offline_panel.hpp"
 #include "realtime_panel.hpp"
 
@@ -41,6 +42,20 @@ namespace {
 template <typename T> struct TaskResult {
     T value{};
     std::string error;
+};
+
+// 文件解析和完整网格校验一起完成，GUI 事务复用校验缓存。
+struct LoadedMesh {
+    std::shared_ptr<const minirender::MeshData> data;
+    std::shared_ptr<const minirender::RasterMeshData> raster;
+    minirender::MeshValidationCache validated;
+};
+struct LoadedScene {
+    minirender::SceneDocument document;
+    minirender::MeshValidationCache validated;
+    std::vector<std::pair<std::shared_ptr<const minirender::MeshData>,
+                          std::shared_ptr<const minirender::RasterMeshData>>>
+        raster;
 };
 
 template <typename Work, typename Done> void run_background(QObject* owner, Work work, Done done) {
@@ -172,27 +187,29 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
             }
         }
     });
-    auto* save = toolbar->addAction("保存");
-    save->setShortcut(QKeySequence::Save);
-    connect(save, &QAction::triggered, this, [this] {
+    save_action_ = toolbar->addAction("保存");
+    save_action_->setObjectName("save_scene");
+    save_action_->setShortcut(QKeySequence::Save);
+    connect(save_action_, &QAction::triggered, this, [this] {
         auto path = scene_path_;
         if (path.isEmpty()) {
             path = QFileDialog::getSaveFileName(this, "保存场景", {}, "Scene (*.json)");
         }
         if (!path.isEmpty()) {
             try {
-                save_scene_file(path);
+                save_scene_async(path);
             } catch (const std::exception& error) {
                 report_error(error);
             }
         }
     });
-    auto* save_as = toolbar->addAction("另存");
-    connect(save_as, &QAction::triggered, this, [this] {
+    save_as_action_ = toolbar->addAction("另存");
+    save_as_action_->setObjectName("save_scene_as");
+    connect(save_as_action_, &QAction::triggered, this, [this] {
         const auto path = QFileDialog::getSaveFileName(this, "另存场景", {}, "Scene (*.json)");
         if (!path.isEmpty()) {
             try {
-                save_scene_file(path);
+                save_scene_async(path);
             } catch (const std::exception& error) {
                 report_error(error);
             }
@@ -207,11 +224,13 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     redo_->setShortcut(QKeySequence::Redo);
     connect(undo_, &QAction::triggered, this, [this] {
         if (editor_.undo()) {
+            ++document_revision_;
             refresh();
         }
     });
     connect(redo_, &QAction::triggered, this, [this] {
         if (editor_.redo()) {
+            ++document_revision_;
             refresh();
         }
     });
@@ -299,6 +318,38 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     ibl_ = new IblController(*viewport_, this);
     environment_ = new EnvironmentPanel(*viewport_, *ibl_, this);
     right_tabs->addTab(scroll_panel(environment_), "环境");
+    geometry_tasks_ = new GeometryController(this);
+    geometry_ = new GeometryPanel(*geometry_tasks_, this);
+    right_tabs->addTab(scroll_panel(geometry_), "几何");
+    geometry_->on_apply = [this] {
+        try {
+            apply_geometry();
+        } catch (const std::exception& error) {
+            report_error(error);
+        }
+    };
+    geometry_->on_import = [this] {
+        const auto path = QFileDialog::getOpenFileName(this, "导入高度图（线性 R 通道）", {},
+                                                       "Images (*.exr *.hdr *.png *.jpg *.jpeg)");
+        if (!path.isEmpty()) {
+            try {
+                import_height_file(path);
+            } catch (const std::exception& error) {
+                report_error(error);
+            }
+        }
+    };
+    geometry_->on_export = [this] {
+        const auto path =
+            QFileDialog::getSaveFileName(this, "导出当前网格", {}, "Wavefront (*.obj)");
+        if (!path.isEmpty()) {
+            try {
+                export_geometry_file(path);
+            } catch (const std::exception& error) {
+                report_error(error);
+            }
+        }
+    };
     environment_->on_edited = [this](glm::vec3 constant, minirender::EnvironmentMap map) {
         perform_edit([&](auto& document) {
             document.environment = constant;
@@ -333,6 +384,7 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     resizeDocks({scene_dock, inspector}, {200, 430}, Qt::Horizontal);
     viewport_->on_camera_changed = [this](const minirender::Camera& camera) {
         editor_.update_navigation(camera);
+        ++document_revision_;
         offline_->scene_changed();
         if (camera_panel_->isVisible() && !camera_refresh_pending_) {
             camera_refresh_pending_ = true;
@@ -360,6 +412,8 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     });
     viewport_->on_object_picked = [this](const std::string& id) { select_object(id); };
     task_label_ = new QLabel(this);
+    task_label_->setMaximumWidth(360);
+    task_label_->setTextFormat(Qt::PlainText);
     task_label_->setObjectName("task_label");
     task_progress_ = new QProgressBar(this);
     task_progress_->setObjectName("task_progress");
@@ -377,13 +431,30 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
         const bool busy = asset_loading_ || waiting;
         task_label_->setVisible(busy);
         task_progress_->setVisible(busy);
-        task_label_->setText(asset_loading_ ? task_message_ : "正在更新预览…");
+        const auto geometry_status = geometry_tasks_->status();
+        const bool geometry_running = geometry_tasks_->busy();
+        const auto task_text = geometry_running && !geometry_status.progress.stage.empty()
+                                   ? QString::fromUtf8(geometry_status.progress.stage.c_str())
+                               : asset_loading_ ? task_message_
+                                                : "正在更新预览…";
+        task_label_->setText(task_label_->fontMetrics().elidedText(task_text, Qt::ElideRight, 360));
+        task_label_->setToolTip(task_text);
+        if (geometry_running && geometry_status.progress.total > 1) {
+            task_progress_->setRange(0, 1000);
+            task_progress_->setValue(static_cast<int>(1000 * geometry_status.progress.completed /
+                                                      geometry_status.progress.total));
+        } else {
+            task_progress_->setRange(0, 0);
+        }
         if (!viewport_->failure().isEmpty()) {
             task_label_->hide();
             task_progress_->hide();
             statusBar()->showMessage(viewport_->failure());
         } else if (asset_loading_) {
-            statusBar()->showMessage(task_message_);
+            statusBar()->showMessage(task_text);
+        } else if (geometry_notice_.isValid() && geometry_notice_.elapsed() < 5000) {
+            statusBar()->showMessage(QString::fromUtf8(geometry_status.message.c_str()) +
+                                     geometry_notice_extra_);
         } else if (viewport_->isValid()) {
             if (viewport_->offline_visible()) {
                 statusBar()->showMessage(
@@ -655,6 +726,7 @@ void Workbench::refresh() {
 void Workbench::refresh_properties() {
     refreshing_ = true;
     const auto& document = editor_.document();
+    geometry_->set_context(document, selected_id_);
     const auto object = std::find_if(
         document.objects.begin(), document.objects.end(),
         [&](const minirender::SceneObject& value) { return value.id == selected_id_; });
@@ -713,9 +785,15 @@ OfflinePanel* Workbench::offline_panel() const noexcept {
     return offline_;
 }
 
-void Workbench::perform_edit(const std::function<void(minirender::SceneDocument&)>& operation) {
+void Workbench::perform_edit(const std::function<void(minirender::SceneDocument&)>& operation,
+                             const minirender::MeshValidationCache* validated) {
     try {
-        editor_.edit(operation);
+        if (validated) {
+            editor_.edit_prevalidated(operation, *validated);
+        } else {
+            editor_.edit(operation);
+        }
+        ++document_revision_;
         refresh();
     } catch (const std::exception& error) {
         refresh_properties();
@@ -792,23 +870,32 @@ void Workbench::begin_asset_task(const QString& message) {
         throw std::logic_error("An asset task is already running");
     }
     asset_loading_ = true;
+    geometry_notice_.invalidate();
+    geometry_notice_extra_.clear();
     task_message_ = message;
     task_label_->setText(message);
     task_label_->show();
     task_progress_->show();
+    task_progress_->setRange(0, 0);
     open_action_->setEnabled(false);
+    save_action_->setEnabled(false);
+    save_as_action_->setEnabled(false);
     import_object_action_->setEnabled(false);
     import_texture_action_->setEnabled(false);
     environment_->set_import_enabled(false);
+    geometry_->set_asset_task_busy(true);
 }
 
 void Workbench::finish_asset_task() {
     asset_loading_ = false;
     texture_loading_ = false;
     open_action_->setEnabled(true);
+    save_action_->setEnabled(true);
+    save_as_action_->setEnabled(true);
     import_object_action_->setEnabled(true);
     import_texture_action_->setEnabled(true);
     environment_->set_import_enabled(true);
+    geometry_->set_asset_task_busy(false);
 }
 
 bool Workbench::asset_loading() const noexcept {
@@ -822,7 +909,12 @@ void Workbench::import_object_file(const QString& path) {
     run_background(
         this,
         [source] {
-            return std::make_shared<const minirender::MeshData>(minirender::load_obj(source));
+            LoadedMesh result;
+            result.data =
+                std::make_shared<const minirender::MeshData>(minirender::load_obj(source));
+            result.validated.validate(result.data);
+            result.raster = minirender::prepare_raster_mesh(*result.data);
+            return result;
         },
         [this, source, path, generation](const auto& result) {
             finish_asset_task();
@@ -833,21 +925,24 @@ void Workbench::import_object_file(const QString& path) {
                 report_error(std::runtime_error(result.error));
                 return;
             }
-            perform_edit([&](minirender::SceneDocument& scene) {
-                if (scene.materials.empty()) {
-                    scene.materials.push_back({"default", "默认材质"});
-                }
-                const auto mesh_id = unique_id(scene.meshes, "mesh_");
-                const auto object_id = unique_id(scene.objects, "object_");
-                scene.meshes.push_back({mesh_id, source, result.value});
-                scene.objects.push_back({object_id,
-                                         QFileInfo(path).baseName().toStdString(),
-                                         mesh_id,
-                                         scene.materials.front().id,
-                                         {},
-                                         true});
-                selected_id_ = object_id;
-            });
+            viewport_->supply_raster_mesh(result.value.data, result.value.raster);
+            perform_edit(
+                [&](minirender::SceneDocument& scene) {
+                    if (scene.materials.empty()) {
+                        scene.materials.push_back({"default", "默认材质"});
+                    }
+                    const auto mesh_id = unique_id(scene.meshes, "mesh_");
+                    const auto object_id = unique_id(scene.objects, "object_");
+                    scene.meshes.push_back({mesh_id, source, result.value.data});
+                    scene.objects.push_back({object_id,
+                                             QFileInfo(path).baseName().toStdString(),
+                                             mesh_id,
+                                             scene.materials.front().id,
+                                             {},
+                                             true});
+                    selected_id_ = object_id;
+                },
+                &result.value.validated);
         });
 }
 
@@ -856,7 +951,22 @@ void Workbench::open_scene_file(const QString& path) {
     const auto source = native_path(path);
     const auto generation = ++document_generation_;
     run_background(
-        this, [source] { return minirender::load_scene(source); },
+        this,
+        [source] {
+            LoadedScene result;
+            result.document = minirender::load_scene(source);
+            result.document.validate(&result.validated);
+            for (const auto& mesh : result.document.meshes) {
+                const bool visible = std::any_of(
+                    result.document.objects.begin(), result.document.objects.end(),
+                    [&](const auto& item) { return item.visible && item.mesh_id == mesh.id; });
+                if (visible) {
+                    result.raster.emplace_back(mesh.data,
+                                               minirender::prepare_raster_mesh(*mesh.data));
+                }
+            }
+            return result;
+        },
         [this, path, generation](const auto& result) {
             finish_asset_task();
             if (generation != document_generation_) {
@@ -867,7 +977,10 @@ void Workbench::open_scene_file(const QString& path) {
                 return;
             }
             try {
-                install_scene(result.value, path);
+                for (const auto& [mesh, raster] : result.value.raster) {
+                    viewport_->supply_raster_mesh(mesh, raster);
+                }
+                install_scene(result.value.document, path, &result.value.validated);
             } catch (const std::exception& error) {
                 report_error(error);
             }
@@ -878,12 +991,19 @@ void Workbench::load_scene_file(const QString& path) {
     install_scene(minirender::load_scene(native_path(path)), path);
 }
 
-void Workbench::install_scene(minirender::SceneDocument document, const QString& path) {
+void Workbench::install_scene(minirender::SceneDocument document, const QString& path,
+                              const minirender::MeshValidationCache* validated) {
     if (document.directional_lights.size() > 8) {
         throw std::runtime_error("实时视口目前最多支持 8 个方向光。");
     }
     ++document_generation_;
-    editor_.replace(std::move(document));
+    ++document_revision_;
+    geometry_tasks_->cancel();
+    if (validated) {
+        editor_.replace_prevalidated(std::move(document), *validated);
+    } else {
+        editor_.replace(std::move(document));
+    }
     scene_path_ = path;
     selected_id_.clear();
     diagnostic_ = false;
@@ -895,6 +1015,180 @@ void Workbench::save_scene_file(const QString& path) {
     minirender::save_scene(editor_.document(), native_path(path));
     scene_path_ = path;
     setWindowTitle("MiniRender — " + QFileInfo(path).fileName());
+}
+
+GeometryController* Workbench::geometry_controller() const noexcept {
+    return geometry_tasks_;
+}
+GeometryPanel* Workbench::geometry_panel() const noexcept {
+    return geometry_;
+}
+
+// 每个结束分支都释放资产互斥状态，失败信息由几何面板和短时状态栏消息显示。
+bool Workbench::finish_geometry_task(const GeometryTaskResult& result) {
+    finish_asset_task();
+    geometry_notice_.restart();
+    return result.error.empty() && !result.cancelled;
+}
+
+void Workbench::apply_geometry() {
+    const auto& document = editor_.document();
+    const auto object = std::find_if(document.objects.begin(), document.objects.end(),
+                                     [&](const auto& item) { return item.id == selected_id_; });
+    if (object == document.objects.end()) {
+        throw std::invalid_argument("Select an object before generating geometry");
+    }
+    const auto mesh = std::find_if(document.meshes.begin(), document.meshes.end(),
+                                   [&](const auto& item) { return item.id == object->mesh_id; });
+    if (mesh == document.meshes.end()) {
+        throw std::invalid_argument("Selected mesh is missing");
+    }
+    const auto params = geometry_->parameters();
+    GeometryTaskInput input;
+    input.mesh = mesh->data;
+    input.loop = params.loop;
+    input.height_settings = params.displacement;
+    input.target_name = object->name;
+    if (params.displacement && params.displacement->scale != 0) {
+        const auto height = std::find_if(
+            document.textures.begin(), document.textures.end(), [&](const auto& texture) {
+                return texture.id == params.height_id &&
+                       texture.encoding == minirender::ColorEncoding::linear;
+            });
+        if (height == document.textures.end()) {
+            throw std::invalid_argument("Select a linear height texture before displacement");
+        }
+        input.height = height->data;
+    }
+    const auto generation = document_generation_;
+    const auto target = object->id;
+    const auto expected_mesh_id = mesh->id;
+    const auto source = mesh->data;
+    begin_asset_task("正在生成网格…");
+    try {
+        geometry_tasks_->build_mesh(std::move(input), [this, generation, target, expected_mesh_id,
+                                                       source](const auto& result) {
+            if (!finish_geometry_task(result)) {
+                return true;
+            }
+            const auto& current = editor_.document();
+            const auto current_object =
+                std::find_if(current.objects.begin(), current.objects.end(),
+                             [&](const auto& item) { return item.id == target; });
+            const auto current_mesh =
+                std::find_if(current.meshes.begin(), current.meshes.end(),
+                             [&](const auto& item) { return item.id == expected_mesh_id; });
+            if (generation != document_generation_ || current_object == current.objects.end() ||
+                current_object->mesh_id != expected_mesh_id ||
+                current_mesh == current.meshes.end() || current_mesh->data != source) {
+                return false;
+            }
+            if (result.mesh != source) {
+                editor_.edit_prevalidated(
+                    [&](auto& scene) {
+                        const auto id = unique_id(scene.meshes, "geometry_");
+                        scene.meshes.push_back({id, {}, result.mesh});
+                        for (auto& item : scene.objects) {
+                            if (item.id == target) {
+                                item.mesh_id = id;
+                            }
+                        }
+                    },
+                    result.validated_meshes);
+                ++document_revision_;
+                viewport_->supply_raster_mesh(result.mesh, result.raster);
+                refresh();
+            }
+            if (selected_id_ == target) {
+                geometry_->show_result(result);
+            }
+            return true;
+        });
+    } catch (...) {
+        finish_asset_task();
+        throw;
+    }
+}
+
+void Workbench::import_height_file(const QString& path) {
+    const auto generation = document_generation_;
+    begin_asset_task("正在读取线性高度图…");
+    try {
+        geometry_tasks_->import_height(native_path(path), [this, generation](const auto& result) {
+            if (!finish_geometry_task(result)) {
+                return true;
+            }
+            if (generation != document_generation_) {
+                return false;
+            }
+            std::string id;
+            editor_.edit([&](auto& scene) {
+                id = unique_id(scene.textures, "height_");
+                scene.textures.push_back(
+                    {id, result.saved_path, minirender::ColorEncoding::linear, result.height});
+            });
+            ++document_revision_;
+            refresh();
+            geometry_->select_height(id);
+            return true;
+        });
+    } catch (...) {
+        finish_asset_task();
+        throw;
+    }
+}
+
+void Workbench::export_geometry_file(const QString& path) {
+    const auto& document = editor_.document();
+    const auto object = std::find_if(document.objects.begin(), document.objects.end(),
+                                     [&](const auto& item) { return item.id == selected_id_; });
+    if (object == document.objects.end()) {
+        throw std::invalid_argument("Select an object before exporting geometry");
+    }
+    const auto mesh = std::find_if(document.meshes.begin(), document.meshes.end(),
+                                   [&](const auto& item) { return item.id == object->mesh_id; });
+    if (mesh == document.meshes.end()) {
+        throw std::invalid_argument("Selected mesh is missing");
+    }
+    begin_asset_task("正在导出 OBJ…");
+    try {
+        geometry_tasks_->export_obj(document, mesh->data, native_path(path),
+                                    [this](const auto& result) {
+                                        finish_geometry_task(result);
+                                        return true;
+                                    });
+    } catch (...) {
+        finish_asset_task();
+        throw;
+    }
+}
+
+void Workbench::save_scene_async(const QString& path) {
+    const auto generation = document_generation_;
+    const auto revision = document_revision_;
+    begin_asset_task("正在保存场景快照…");
+    try {
+        geometry_tasks_->save_scene(editor_.document(), native_path(path),
+                                    [this, generation, revision, path](const auto& result) {
+                                        if (!finish_geometry_task(result)) {
+                                            return true;
+                                        }
+                                        if (generation == document_generation_) {
+                                            scene_path_ = path;
+                                            const bool changed = revision != document_revision_;
+                                            setWindowTitle("MiniRender — " +
+                                                           QFileInfo(path).fileName() +
+                                                           (changed ? " *" : ""));
+                                            if (changed) {
+                                                geometry_notice_extra_ = " | 当前还有未保存修改";
+                                            }
+                                        }
+                                        return true;
+                                    });
+    } catch (...) {
+        finish_asset_task();
+        throw;
+    }
 }
 
 void Workbench::select_object(const std::string& id) {

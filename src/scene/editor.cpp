@@ -23,6 +23,12 @@ void SceneEditor::replace(SceneDocument document) {
     redo_.clear();
 }
 
+void SceneEditor::replace_prevalidated(SceneDocument document,
+                                       const MeshValidationCache& validated) {
+    validated_meshes_.merge_validated(validated);
+    replace(std::move(document));
+}
+
 void SceneEditor::edit(const std::function<void(SceneDocument&)>& operation) {
     SceneDocument candidate = document_;
     operation(candidate);
@@ -33,6 +39,12 @@ void SceneEditor::edit(const std::function<void(SceneDocument&)>& operation) {
     }
     document_ = std::move(candidate);
     redo_.clear();
+}
+
+void SceneEditor::edit_prevalidated(const std::function<void(SceneDocument&)>& operation,
+                                    const MeshValidationCache& validated) {
+    validated_meshes_.merge_validated(validated);
+    edit(operation);
 }
 
 bool SceneEditor::undo() {
