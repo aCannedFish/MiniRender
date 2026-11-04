@@ -1,9 +1,10 @@
+#include "asset_writer.hpp"
+#include "staged_file.hpp"
 #include <minirender/assets/scene_io.hpp>
 
 #include <nlohmann/json.hpp>
 
 #include <fstream>
-#include <iterator>
 #include <stdexcept>
 
 namespace minirender {
@@ -30,44 +31,6 @@ std::filesystem::path path_from_utf8(const std::string& text) {
 std::string path_to_utf8(const std::filesystem::path& path) {
     const auto text = path.generic_u8string();
     return std::string(text.begin(), text.end());
-}
-
-// Windows 跨盘符无法生成相对路径。此时复制资产到新场景旁，仍保持场景可移动。
-// 不覆盖已有不同内容的文件；同内容复用，冲突时选择新的编号。
-std::filesystem::path portable_asset_path(const std::filesystem::path& source,
-                                          const std::filesystem::path& destination) {
-    const auto relative = std::filesystem::relative(source, destination);
-    if (!relative.empty()) {
-        return relative;
-    }
-    const auto assets = destination / "assets";
-    std::filesystem::create_directories(assets);
-    std::ifstream input(source, std::ios::binary);
-    if (!input) {
-        throw std::runtime_error("Cannot copy scene asset: " + path_to_utf8(source));
-    }
-    const std::string original((std::istreambuf_iterator<char>(input)), {});
-    for (unsigned index = 1;; ++index) {
-        auto name = std::filesystem::path("asset-" + std::to_string(index));
-        name += source.extension();
-        const auto candidate = assets / name;
-        if (std::filesystem::exists(candidate)) {
-            if (std::filesystem::file_size(candidate) != original.size()) {
-                continue;
-            }
-            std::ifstream existing(candidate, std::ios::binary);
-            if (!existing) {
-                continue;
-            }
-            const std::string content((std::istreambuf_iterator<char>(existing)), {});
-            if (content != original) {
-                continue;
-            }
-        } else {
-            std::filesystem::copy_file(source, candidate);
-        }
-        return std::filesystem::path("assets") / name;
-    }
 }
 
 } // namespace
@@ -161,8 +124,40 @@ SceneDocument load_scene(const std::filesystem::path& path) {
     }
 }
 
-void save_scene(const SceneDocument& document, const std::filesystem::path& path) {
-    document.validate();
+void save_scene(const SceneDocument& document, const std::filesystem::path& path,
+                CancellationToken cancellation, SceneSaveCallback progress) {
+    const auto asset_count = document.meshes.size() + document.textures.size();
+    const auto report = [&](SceneSaveStage stage, std::size_t completed, std::size_t total) {
+        cancellation.check();
+        if (progress) {
+            progress({stage, 0, asset_count, completed, total});
+        }
+        cancellation.check();
+    };
+    report(SceneSaveStage::validation, 0, 1);
+    document.validate(nullptr, cancellation);
+    report(SceneSaveStage::validation, 1, 1);
+    // 场景目标不能与输入资产重合，硬链接或符号链接别名也须拒绝。
+    const auto destination = std::filesystem::weakly_canonical(std::filesystem::absolute(path));
+    const auto protect_source = [&](const auto& asset) {
+        cancellation.check();
+        if (asset.source.empty()) {
+            return;
+        }
+        const auto source = document.asset_directory / asset.source;
+        std::error_code error;
+        if (std::filesystem::weakly_canonical(std::filesystem::absolute(source)) == destination ||
+            std::filesystem::equivalent(source, path, error)) {
+            throw std::invalid_argument("Scene destination aliases input asset: " + asset.id);
+        }
+    };
+    for (const auto& mesh : document.meshes) {
+        protect_source(mesh);
+    }
+    for (const auto& texture : document.textures) {
+        protect_source(texture);
+    }
+    detail::StagedFile staged(path);
     Json json;
     json["version"] = 1;
     const auto& camera = document.camera;
@@ -194,20 +189,27 @@ void save_scene(const SceneDocument& document, const std::filesystem::path& path
              {"texture_filter", texture_filter_name(material.texture_filter)}});
     }
     const auto destination_directory = std::filesystem::absolute(path).parent_path();
+    std::size_t asset_index = 0;
     for (const auto& mesh : document.meshes) {
-        if (mesh.source.empty()) {
-            throw std::invalid_argument("Mesh must be exported before saving scene: " + mesh.id);
-        }
+        cancellation.check();
         const auto relative =
-            portable_asset_path(document.asset_directory / mesh.source, destination_directory);
+            mesh.source.empty()
+                ? detail::write_generated_asset(*mesh.data, destination_directory,
+                                                staged.directory(), asset_index, asset_count,
+                                                cancellation, progress)
+                : detail::portable_asset_path(document.asset_directory / mesh.source,
+                                              destination_directory, asset_index, asset_count,
+                                              cancellation, progress);
         json["meshes"].push_back({{"id", mesh.id}, {"source", path_to_utf8(relative)}});
+        ++asset_index;
     }
     for (const auto& texture : document.textures) {
         if (texture.source.empty()) {
             throw std::invalid_argument("Texture must have a source before saving");
         }
-        const auto relative =
-            portable_asset_path(document.asset_directory / texture.source, destination_directory);
+        const auto relative = detail::portable_asset_path(document.asset_directory / texture.source,
+                                                          destination_directory, asset_index++,
+                                                          asset_count, cancellation, progress);
         json["textures"].push_back(
             {{"id", texture.id},
              {"source", path_to_utf8(relative)},
@@ -231,10 +233,11 @@ void save_scene(const SceneDocument& document, const std::filesystem::path& path
                                               {"color", vector3(light.color)},
                                               {"intensity", light.intensity}});
     }
-    std::ofstream stream(path);
-    stream.exceptions(std::ios::badbit | std::ios::failbit);
-    stream << json.dump(2) << '\n';
-    stream.close();
+    report(SceneSaveStage::metadata, 0, 1);
+    staged.stream() << json.dump(2) << '\n';
+    report(SceneSaveStage::metadata, 1, 1);
+    report(SceneSaveStage::commit, 0, 1);
+    staged.commit();
 }
 
 } // namespace minirender

@@ -1,4 +1,5 @@
 #include <minirender/geometry/loop.hpp>
+#include <minirender/geometry/normals.hpp>
 
 #include <cmath>
 #include <numbers>
@@ -143,71 +144,38 @@ LoopResult subdivide_loop(std::shared_ptr<const MeshData> input, LoopSettings se
             split_face(source.triangles[face], topology, face,
                        static_cast<MeshIndex>(source.positions.size()),
                        std::span<MeshTriangle, 4>(next->triangles.data() + face * 4, 4));
+            const auto& parent = source.triangles[face].corners;
+            const glm::dvec3 a = source.positions[parent[0].position];
+            const glm::dvec3 b = source.positions[parent[1].position];
+            const glm::dvec3 c = source.positions[parent[2].position];
+            const auto parent_area = glm::cross(b - a, c - a);
+            for (std::size_t child = face * 4; child < face * 4 + 4; ++child) {
+                const auto& corners = next->triangles[child].corners;
+                const glm::dvec3 x = next->positions[corners[0].position];
+                const glm::dvec3 y = next->positions[corners[1].position];
+                const glm::dvec3 z = next->positions[corners[2].position];
+                const auto area = glm::cross(y - x, z - x);
+                if (glm::dot(area, area) <= 1e-20) {
+                    throw std::invalid_argument("Loop level " + std::to_string(level) + " face " +
+                                                std::to_string(child) + " is degenerate");
+                }
+                // 要求子面法线在父面法线上的投影为正，不检测全局自交。
+                if (glm::dot(area, parent_area) <= 0) {
+                    throw std::invalid_argument("Loop level " + std::to_string(level) + " face " +
+                                                std::to_string(child) +
+                                                " reverses relative to its parent face");
+                }
+            }
             if ((face + 1) % 1024 == 0) {
                 report(LoopStage::faces, level, face + 1, source.triangles.size());
             }
         }
         report(LoopStage::faces, level, source.triangles.size(), source.triangles.size());
 
-        // 面积加权法线只依赖几何位置，不沿 UV 接缝拆点。每层重算，丢弃原有硬法线。
-        // 阶段总量包括累积每面、归一化每位置以及写回每面角三部分。
-        const auto normal_total = next->triangles.size() * 4 + next->positions.size();
-        std::size_t normal_completed = 0;
-        const auto advance_normals = [&] {
-            ++normal_completed;
-            if (normal_completed % 1024 == 0) {
-                report(LoopStage::normals, level, normal_completed, normal_total);
-            }
-        };
-        report(LoopStage::normals, level, 0, normal_total);
-        std::vector<glm::dvec3> normals(next->positions.size(), glm::dvec3(0));
-        std::vector<double> areas(next->positions.size(), 0);
-        for (std::size_t face = 0; face < next->triangles.size(); ++face) {
-            const auto& corners = next->triangles[face].corners;
-            const glm::dvec3 a = next->positions[corners[0].position];
-            const glm::dvec3 b = next->positions[corners[1].position];
-            const glm::dvec3 c = next->positions[corners[2].position];
-            const auto area = glm::cross(b - a, c - a);
-            const auto squared_area = glm::dot(area, area);
-            if (!std::isfinite(squared_area) || squared_area <= 1e-20) {
-                throw std::invalid_argument("Loop level " + std::to_string(level) + " face " +
-                                            std::to_string(face) + " is degenerate");
-            }
-            // 要求子面法线在父面法线上的投影为正，拒绝局部折回或翻转的结果。
-            // 该条件也会拒绝转动超过 90 度的子面，不构成全局自交检测。
-            const auto& parent = source.triangles[face / 4].corners;
-            const glm::dvec3 parent_a = source.positions[parent[0].position];
-            const glm::dvec3 parent_b = source.positions[parent[1].position];
-            const glm::dvec3 parent_c = source.positions[parent[2].position];
-            if (glm::dot(area, glm::cross(parent_b - parent_a, parent_c - parent_a)) <= 0) {
-                throw std::invalid_argument("Loop level " + std::to_string(level) + " face " +
-                                            std::to_string(face) +
-                                            " reverses relative to its parent face");
-            }
-            for (const auto& corner : corners) {
-                normals[corner.position] += area;
-                areas[corner.position] += std::sqrt(squared_area);
-            }
-            advance_normals();
-        }
-        for (std::size_t vertex = 0; vertex < normals.size(); ++vertex) {
-            if (areas[vertex] > 0) {
-                const auto length = glm::length(normals[vertex]);
-                if (length <= 1e-12 * areas[vertex]) {
-                    throw std::invalid_argument("Loop vertex " + std::to_string(vertex) +
-                                                " has no stable smooth normal");
-                }
-                normals[vertex] /= length;
-            }
-            advance_normals();
-        }
-        for (auto& triangle : next->triangles) {
-            for (auto& corner : triangle.corners) {
-                corner.normal = glm::vec3(normals[corner.position]);
-                advance_normals();
-            }
-        }
-        report(LoopStage::normals, level, normal_completed, normal_total);
+        // 与真实位移共用面积加权法线，跨 UV 接缝共享方向，丢弃原有硬法线。
+        recompute_smooth_normals(*next, cancellation, [&](auto done, auto total) {
+            report(LoopStage::normals, level, done, total);
+        });
         report(LoopStage::output_topology, level, 0, 1);
         HalfedgeMesh next_topology(*next, cancellation);
         report(LoopStage::output_topology, level, 1, 1);

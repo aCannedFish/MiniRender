@@ -36,6 +36,8 @@ add_library(minirender_core
     src/scene/shadow.cpp
     src/geometry/halfedge.cpp
     src/geometry/loop.cpp
+    src/geometry/normals.cpp
+    src/geometry/displacement.cpp
     src/render/intersection.cpp
     src/render/bvh.cpp
     src/render/bsdf.cpp
@@ -45,6 +47,9 @@ add_library(minirender_core
     src/render/ssao.cpp
     src/render/ibl.cpp
     src/assets/obj_loader.cpp
+    src/assets/obj_writer.cpp
+    src/assets/asset_writer.cpp
+    src/assets/staged_file.cpp
     src/assets/scene_io.cpp)
 target_include_directories(minirender_core PUBLIC include)
 target_link_libraries(minirender_core PUBLIC glm::glm Threads::Threads PRIVATE minirender_warnings nlohmann_json::nlohmann_json tinyobjloader minirender_exr_codec minirender_raster_codec)
@@ -59,9 +64,13 @@ if(BUILD_TESTING)
     add_executable(minirender_loop_example examples/loop.cpp)
     target_compile_definitions(minirender_loop_example PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_loop_example PRIVATE minirender_core minirender_warnings)
+    add_executable(minirender_displacement_example examples/displacement.cpp)
+    target_compile_definitions(minirender_displacement_example PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+    target_link_libraries(minirender_displacement_example PRIVATE minirender_core minirender_warnings)
     add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp
         tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp tests/path_tests.cpp
-        tests/session_tests.cpp tests/ssao_tests.cpp tests/ibl_tests.cpp tests/geometry_tests.cpp)
+        tests/session_tests.cpp tests/ssao_tests.cpp tests/ibl_tests.cpp tests/geometry_tests.cpp
+        tests/displacement_tests.cpp tests/mesh_io_tests.cpp)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_tests PRIVATE
         minirender_core Catch2::Catch2WithMain minirender_warnings Threads::Threads)
