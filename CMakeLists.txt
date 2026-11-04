@@ -34,6 +34,8 @@ add_library(minirender_core
     src/scene/scene.cpp
     src/scene/editor.cpp
     src/scene/shadow.cpp
+    src/geometry/halfedge.cpp
+    src/geometry/loop.cpp
     src/render/intersection.cpp
     src/render/bvh.cpp
     src/render/bsdf.cpp
@@ -53,9 +55,13 @@ add_executable(minirender_cli src/app/cli.cpp src/app/render_cli.cpp)
 target_link_libraries(minirender_cli PRIVATE minirender_core minirender_warnings)
 
 if(BUILD_TESTING)
+    # 教学示例独立运行，较慢的图像生成不加入每次 CTest。
+    add_executable(minirender_loop_example examples/loop.cpp)
+    target_compile_definitions(minirender_loop_example PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+    target_link_libraries(minirender_loop_example PRIVATE minirender_core minirender_warnings)
     add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp
         tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp tests/path_tests.cpp
-        tests/session_tests.cpp tests/ssao_tests.cpp tests/ibl_tests.cpp)
+        tests/session_tests.cpp tests/ssao_tests.cpp tests/ibl_tests.cpp tests/geometry_tests.cpp)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_tests PRIVATE
         minirender_core Catch2::Catch2WithMain minirender_warnings Threads::Threads)
