@@ -42,3 +42,5 @@ A3.1 已加入 SSAO 半球采样、双边滤波、独立的环境漫反射合成
 A3.2a 已完成 IBL 的 CPU 预处理核心：漫反射卷积、GGX 粗糙度层、BRDF LUT、进度和取消。数值对照及默认参数参考图见 [IBL 说明](docs/IBL.md) 与 [验收记录](docs/checkpoints/A3.2a.md)。
 
 A3.2b 已接入 Vulkan 实时 IBL 与环境背景，右侧“环境”页支持导入、强度/旋转、后台进度、取消/重试和缓存。UI 参数可撤销并保存，SSAO 继续只影响环境漫反射。A3 本机验收完成，见 [环境界面](docs/ENVIRONMENT_UI.md) 与 [验收记录](docs/checkpoints/A3.2b.md)。
+
+A4.1 已加入半边拓扑和均匀 Loop 核心，保留面角 UV 接缝，提供进度、取消及 CPU 渲染示例。几何工具 UI、位移、简化、重网格和自适应细分按后续检查点接入。见 [网格处理](docs/GEOMETRY.md) 与 [验收记录](docs/checkpoints/A4.1.md)。
