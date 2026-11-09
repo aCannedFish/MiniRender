@@ -135,7 +135,7 @@ void PostProcess::create(VulkanViewport& viewport, const HdrTargets& targets,
              "post pipeline");
 }
 
-void PostProcess::draw(VulkanViewport& viewport) {
+void PostProcess::draw(VulkanViewport& viewport, const std::function<void()>& overlay) {
     const auto size = viewport.swapChainImageSize();
     const VkExtent2D extent{static_cast<std::uint32_t>(size.width()),
                             static_cast<std::uint32_t>(size.height())};
@@ -160,6 +160,9 @@ void PostProcess::draw(VulkanViewport& viewport) {
     vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, layout_, 0, 1, &descriptor_,
                             0, nullptr);
     vkCmdDraw(command, 3, 1, 0, 0);
+    if (overlay) {
+        overlay();
+    }
     vkCmdEndRenderPass(command);
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gizmo_renderer.hpp"
 #include "gpu_buffer.hpp"
 #include "gpu_ibl.hpp"
 #include "gpu_texture.hpp"
@@ -60,6 +61,7 @@ class SceneRenderer final : public ViewportRenderer {
     HdrTargets targets_;
     SsaoPass ssao_;
     PostProcess post_process_;
+    GizmoRenderer gizmo_;
     bool capture_hdr_ = false;
     std::array<glm::mat4, 8> shadow_matrices_{};
     GpuBuffer instances_;

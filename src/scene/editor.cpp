@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <stdexcept>
 
 namespace minirender {
 
@@ -19,6 +20,7 @@ const SceneDocument& SceneEditor::document() const noexcept {
 void SceneEditor::replace(SceneDocument document) {
     document.validate(&validated_meshes_);
     document_ = std::move(document);
+    transform_edit_.reset();
     undo_.clear();
     redo_.clear();
 }
@@ -33,6 +35,7 @@ void SceneEditor::edit(const std::function<void(SceneDocument&)>& operation) {
     SceneDocument candidate = document_;
     operation(candidate);
     candidate.validate(&validated_meshes_);
+    commit_transform_edit();
     undo_.push_back(document_);
     if (undo_.size() > 100) {
         undo_.erase(undo_.begin());
@@ -48,6 +51,9 @@ void SceneEditor::edit_prevalidated(const std::function<void(SceneDocument&)>& o
 }
 
 bool SceneEditor::undo() {
+    if (transform_edit_ && cancel_transform_edit()) {
+        return true;
+    }
     if (undo_.empty()) {
         return false;
     }
@@ -58,6 +64,7 @@ bool SceneEditor::undo() {
 }
 
 bool SceneEditor::redo() {
+    cancel_transform_edit();
     if (redo_.empty()) {
         return false;
     }
@@ -68,15 +75,83 @@ bool SceneEditor::redo() {
 }
 
 bool SceneEditor::can_undo() const noexcept {
-    return !undo_.empty();
+    return (transform_edit_ && transform_edit_->changed) || !undo_.empty();
 }
 bool SceneEditor::can_redo() const noexcept {
-    return !redo_.empty();
+    return !(transform_edit_ && transform_edit_->changed) && !redo_.empty();
+}
+
+void SceneEditor::begin_transform_edit(const std::string& object_id) {
+    if (transform_edit_) {
+        throw std::logic_error("A transform gesture is already active");
+    }
+    const auto object = std::find_if(document_.objects.begin(), document_.objects.end(),
+                                     [&](const auto& item) { return item.id == object_id; });
+    if (object == document_.objects.end()) {
+        throw std::invalid_argument("Transform target is missing");
+    }
+    transform_edit_ = TransformEdit{object_id, document_, false};
+}
+
+void SceneEditor::preview_transform(const Transform& transform) {
+    if (!transform_edit_) {
+        throw std::logic_error("Begin a transform gesture before updating its preview");
+    }
+    transform.validate();
+    auto candidate = document_;
+    const auto target =
+        std::find_if(candidate.objects.begin(), candidate.objects.end(),
+                     [&](const auto& item) { return item.id == transform_edit_->object_id; });
+    const auto original = std::find_if(
+        transform_edit_->initial.objects.begin(), transform_edit_->initial.objects.end(),
+        [&](const auto& item) { return item.id == transform_edit_->object_id; });
+    if (target == candidate.objects.end() || original == transform_edit_->initial.objects.end()) {
+        throw std::logic_error("Transform target changed during a gesture");
+    }
+    target->transform = transform;
+    candidate.validate(&validated_meshes_);
+    transform_edit_->changed = transform.translation != original->transform.translation ||
+                               transform.rotation_degrees != original->transform.rotation_degrees ||
+                               transform.scale != original->transform.scale;
+    document_ = std::move(candidate);
+}
+
+bool SceneEditor::commit_transform_edit() {
+    if (!transform_edit_) {
+        return false;
+    }
+    const bool changed = transform_edit_->changed;
+    if (changed) {
+        undo_.push_back(std::move(transform_edit_->initial));
+        if (undo_.size() > 100) {
+            undo_.erase(undo_.begin());
+        }
+        redo_.clear();
+    }
+    transform_edit_.reset();
+    return changed;
+}
+
+bool SceneEditor::cancel_transform_edit() {
+    if (!transform_edit_) {
+        return false;
+    }
+    const bool changed = transform_edit_->changed;
+    document_ = std::move(transform_edit_->initial);
+    transform_edit_.reset();
+    return changed;
+}
+
+bool SceneEditor::transforming() const noexcept {
+    return transform_edit_.has_value();
 }
 
 void SceneEditor::update_navigation(const Camera& camera) {
     camera.validate();
     document_.camera = camera; // 连续导航不为每个 mouse move 生成撤销项。
+    if (transform_edit_) {
+        transform_edit_->initial.camera = camera;
+    }
 }
 
 std::shared_ptr<const SceneSnapshot> SceneEditor::snapshot() {

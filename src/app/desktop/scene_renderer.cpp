@@ -114,6 +114,7 @@ void SceneRenderer::initSwapChainResources() {
     ssao_.create(*window_, targets_, uniforms_.handle(), sizeof(FrameUniform));
     post_process_.create(*window_, targets_, uniforms_.handle(), sizeof(FrameUniform),
                          ssao_.hdr_view(), ssao_.raw_view(), ssao_.filtered_view());
+    gizmo_.create(*window_);
     window_->report_swapchain();
 }
 
@@ -565,7 +566,9 @@ void SceneRenderer::startNextFrame() {
         targets_.record_readback(command, ssao_.hdr_image());
         capture_hdr_ = false;
     }
-    post_process_.draw(*window_);
+    post_process_.draw(*window_, [this] {
+        gizmo_.draw(*window_, window_->gizmo_layout(), window_->highlighted_gizmo_handle());
+    });
     window_->report_frame();
     window_->frameReady();
     window_->requestUpdate();
@@ -583,6 +586,7 @@ void SceneRenderer::releaseSwapChainResources() {
     wire_pipeline_ = VK_NULL_HANDLE;
     background_pipeline_ = VK_NULL_HANDLE;
     post_process_.release();
+    gizmo_.release();
     ssao_.release();
     targets_.release();
 }

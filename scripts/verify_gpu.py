@@ -43,6 +43,9 @@ def main() -> int:
     checks.add_argument(
         "--geometry-check", action="store_true", help="Verify geometry tasks and CPU/GPU updates"
     )
+    checks.add_argument(
+        "--gizmo-check", action="store_true", help="Verify object translation and rotation"
+    )
     args = parser.parse_args()
     if args.timing_only and args.sync_validation:
         parser.error("Timing measurements and synchronization validation must run separately")
@@ -55,6 +58,7 @@ def main() -> int:
         or args.ssao_check
         or args.ibl_check
         or args.geometry_check
+        or args.gizmo_check
     )
     if scene_check and not args.scene:
         parser.error("Scene checks require --scene")
@@ -68,6 +72,7 @@ def main() -> int:
     mode = "GPU"
     option = "--smoke"
     for selected, candidate in [
+        (args.gizmo_check, "Gizmo"),
         (args.geometry_check, "Geometry"),
         (args.ibl_check, "IBL"),
         (args.ssao_check, "SSAO"),

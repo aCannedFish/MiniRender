@@ -20,6 +20,13 @@ class SceneEditor {
     // 后台网格已校验后合并其所有权缓存，再执行普通事务；其他文档参数仍完整校验。
     void edit_prevalidated(const std::function<void(SceneDocument&)>& operation,
                            const MeshValidationCache& validated);
+    // 连续物体操纵：预览更新当前文档，提交时整次手势进入一条历史，取消时恢复启动状态。
+    // 普通 edit 会先提交已有手势；replace 清除手势，undo 优先取消尚未提交的变化。
+    void begin_transform_edit(const std::string& object_id);
+    void preview_transform(const Transform& transform);
+    bool commit_transform_edit();
+    bool cancel_transform_edit();
+    bool transforming() const noexcept;
     bool undo();
     bool redo();
     bool can_undo() const noexcept;
@@ -33,6 +40,12 @@ class SceneEditor {
     std::vector<SceneDocument> undo_;
     std::vector<SceneDocument> redo_;
     MeshValidationCache validated_meshes_;
+    struct TransformEdit {
+        std::string object_id;
+        SceneDocument initial;
+        bool changed = false;
+    };
+    std::optional<TransformEdit> transform_edit_;
 };
 
 // 角度增量以弧度表示。围绕 target 环绕或在 position 原地转向，限制 pitch 防止翻转。

@@ -492,6 +492,13 @@ void generate(Workbench& window, int levels, bool displace) {
 
 } // namespace
 
+QImage verify_geometry_gpu(Workbench& window, const QString& directory, const QString& label) {
+    return verify_gpu(window, directory, label);
+}
+void capture_workbench_ui(Workbench& window, const QString& path) {
+    capture_ui(window, path);
+}
+
 void start_geometry_smoke(Workbench& window, const QString& directory,
                           bool measure_responsiveness) {
     require(QDir().mkpath(directory), "Cannot create geometry output directory");

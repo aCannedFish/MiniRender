@@ -25,6 +25,7 @@ struct GeometryTaskResult;
 class Workbench final : public QMainWindow {
   public:
     explicit Workbench(QVulkanInstance* instance, bool diagnostic = false);
+    ~Workbench() override;
     VulkanViewport* viewport() const noexcept;
     const minirender::SceneDocument& document() const noexcept;
     void load_scene_file(const QString& path);
@@ -54,6 +55,9 @@ class Workbench final : public QMainWindow {
     void refresh();
     void refresh_properties();
     void refresh_camera();
+    bool begin_transform();
+    bool preview_transform(const minirender::Transform& transform);
+    void finish_transform(bool commit);
     void perform_edit(const std::function<void(minirender::SceneDocument&)>& edit,
                       const minirender::MeshValidationCache* validated = nullptr);
     void edit_object_property(const std::function<void(minirender::SceneObject&)>& edit);
@@ -103,6 +107,7 @@ class Workbench final : public QMainWindow {
     QElapsedTimer geometry_notice_;
     bool asset_loading_ = false;
     bool texture_loading_ = false;
+    std::optional<minirender::Transform> transform_preview_;
     std::uint64_t document_generation_ = 0;
     std::uint64_t document_revision_ = 0;
     QDoubleSpinBox* roughness_ = nullptr;

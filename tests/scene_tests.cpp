@@ -185,6 +185,105 @@ TEST_CASE("Scene editor commits valid transactions and keeps invalid edits out o
     REQUIRE_FALSE(editor.can_redo());
 }
 
+TEST_CASE("Transform previews create one undo entry for a complete drag", "[editor][gesture]") {
+    SceneEditor editor(load_scene(studio_file()));
+    const auto id = editor.document().objects.front().id;
+    const auto original = editor.document().objects.front().transform;
+    const auto mesh = editor.document().meshes.front().data;
+    editor.begin_transform_edit(id);
+    auto value = original;
+    for (int step = 1; step <= 150; ++step) {
+        value.translation.x = original.translation.x + static_cast<float>(step) * 0.01F;
+        editor.preview_transform(value);
+    }
+    REQUIRE(editor.transforming());
+    REQUIRE(editor.document().objects.front().transform.translation.x ==
+            Approx(value.translation.x));
+    REQUIRE(editor.document().meshes.front().data == mesh);
+    REQUIRE(editor.commit_transform_edit());
+    REQUIRE_FALSE(editor.transforming());
+    REQUIRE(editor.undo());
+    REQUIRE(editor.document().objects.front().transform.translation == original.translation);
+    REQUIRE_FALSE(editor.can_undo());
+    REQUIRE(editor.redo());
+    REQUIRE(editor.document().objects.front().transform.translation == value.translation);
+}
+
+TEST_CASE("Transform cancellation and unchanged drags preserve redo history", "[editor][gesture]") {
+    SceneEditor editor(load_scene(studio_file()));
+    editor.edit([](auto& scene) { scene.objects.front().visible = false; });
+    REQUIRE(editor.undo());
+    REQUIRE(editor.can_redo());
+    const auto id = editor.document().objects.front().id;
+    const auto original = editor.document().objects.front().transform;
+    editor.begin_transform_edit(id);
+    auto changed = original;
+    changed.translation.x += 2;
+    editor.preview_transform(changed);
+    REQUIRE_FALSE(editor.can_redo());
+    auto invalid = changed;
+    invalid.scale.x = 0;
+    REQUIRE_THROWS_AS(editor.preview_transform(invalid), std::invalid_argument);
+    REQUIRE_THROWS_AS(editor.edit([](auto& scene) { scene.camera.vertical_fov_degrees = 0; }),
+                      std::invalid_argument);
+    REQUIRE(editor.transforming());
+    REQUIRE(editor.document().objects.front().transform.translation == changed.translation);
+    REQUIRE(editor.cancel_transform_edit());
+    REQUIRE(editor.document().objects.front().transform.translation == original.translation);
+    REQUIRE(editor.can_redo());
+    editor.begin_transform_edit(id);
+    editor.preview_transform(original);
+    REQUIRE_FALSE(editor.commit_transform_edit());
+    REQUIRE(editor.can_redo());
+    REQUIRE(editor.redo());
+    REQUIRE_FALSE(editor.document().objects.front().visible);
+    REQUIRE_THROWS_AS(editor.begin_transform_edit("missing-object"), std::invalid_argument);
+    REQUIRE_THROWS_AS(editor.preview_transform(original), std::logic_error);
+}
+
+TEST_CASE("Ordinary edits commit a transform preview before their own transaction",
+          "[editor][gesture]") {
+    SceneEditor editor(load_scene(studio_file()));
+    const auto original = editor.document().objects.front();
+    editor.begin_transform_edit(original.id);
+    auto moved = original.transform;
+    moved.translation.z += 1;
+    editor.preview_transform(moved);
+    editor.edit([](auto& scene) { scene.objects.front().name = "Renamed after drag"; });
+    REQUIRE_FALSE(editor.transforming());
+    REQUIRE(editor.undo());
+    REQUIRE(editor.document().objects.front().name == original.name);
+    REQUIRE(editor.document().objects.front().transform.translation == moved.translation);
+    REQUIRE(editor.undo());
+    REQUIRE(editor.document().objects.front().transform.translation ==
+            original.transform.translation);
+    REQUIRE_FALSE(editor.can_undo());
+}
+
+TEST_CASE("Undo cancels an active transform and scene replacement clears its state",
+          "[editor][gesture]") {
+    SceneEditor editor(load_scene(studio_file()));
+    const auto original = editor.document().objects.front();
+    editor.begin_transform_edit(original.id);
+    auto moved = original.transform;
+    moved.rotation_degrees.x += 45;
+    editor.preview_transform(moved);
+    auto camera = editor.document().camera;
+    camera.position.z += 1;
+    editor.update_navigation(camera);
+    REQUIRE(editor.undo());
+    REQUIRE(editor.document().objects.front().transform.rotation_degrees ==
+            original.transform.rotation_degrees);
+    REQUIRE(editor.document().camera.position == camera.position);
+    REQUIRE_FALSE(editor.can_undo());
+    editor.begin_transform_edit(original.id);
+    editor.preview_transform(moved);
+    editor.replace(load_scene(studio_file()));
+    REQUIRE_FALSE(editor.transforming());
+    REQUIRE_FALSE(editor.can_undo());
+    REQUIRE_FALSE(editor.commit_transform_edit());
+}
+
 TEST_CASE("Cached mesh validation still rejects new invalid geometry and metadata",
           "[scene][editor]") {
     SceneEditor editor(load_scene(studio_file()));

@@ -7,6 +7,7 @@
 #include <minirender/assets/scene_io.hpp>
 
 #include <QAction>
+#include <QActionGroup>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDockWidget>
@@ -283,6 +284,7 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     addDockWidget(Qt::LeftDockWidgetArea, scene_dock);
     connect(tree_, &QTreeWidget::currentItemChanged, this, [this](QTreeWidgetItem* item) {
         if (!refreshing_) {
+            viewport_->finish_gizmo_drag(false);
             selected_id_ = item ? item->data(0, Qt::UserRole).toString().toStdString() : "";
             refresh_properties();
         }
@@ -411,6 +413,47 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
         resizeDocks({scene_dock, inspector}, {200, 430}, Qt::Horizontal);
     });
     viewport_->on_object_picked = [this](const std::string& id) { select_object(id); };
+    addToolBarBreak();
+    auto* manipulation = addToolBar("物体操纵");
+    manipulation->setObjectName("gizmo_toolbar");
+    manipulation->setMovable(false);
+    auto* tool_group = new QActionGroup(manipulation);
+    const std::array<QString, 3> tool_names{"选择 V", "移动 T", "旋转 R"};
+    const std::array<QString, 3> tool_ids{"gizmo_select", "gizmo_translate", "gizmo_rotate"};
+    const std::array<minirender::GizmoMode, 3> tool_modes{minirender::GizmoMode::select,
+                                                          minirender::GizmoMode::translate,
+                                                          minirender::GizmoMode::rotate};
+    std::array<QAction*, 3> tools{};
+    for (std::size_t index = 0; index < tools.size(); ++index) {
+        tools[index] = manipulation->addAction(tool_names[index]);
+        tools[index]->setObjectName(tool_ids[index]);
+        tools[index]->setCheckable(true);
+        tool_group->addAction(tools[index]);
+        connect(tools[index], &QAction::toggled, this,
+                [this, mode = tool_modes[index]](bool checked) {
+                    if (checked) {
+                        viewport_->set_gizmo_mode(mode);
+                    }
+                });
+    }
+    tools[0]->setChecked(true);
+    auto* tool_hint =
+        new QLabel("  世界坐标轴 · 拖动轴移动，拖动圆环旋转 · Esc 取消", manipulation);
+    tool_hint->setObjectName("gizmo_hint");
+    manipulation->addWidget(tool_hint);
+    viewport_->on_gizmo_mode_changed = [tools, tool_modes](auto mode) {
+        for (std::size_t index = 0; index < tools.size(); ++index) {
+            tools[index]->setChecked(tool_modes[index] == mode);
+        }
+    };
+    viewport_->on_transform_begin = [this] { return begin_transform(); };
+    viewport_->on_transform_preview = [this](const auto& transform) {
+        return preview_transform(transform);
+    };
+    viewport_->on_transform_end = [this](bool commit) { finish_transform(commit); };
+    viewport_->on_interaction_error = [this](const auto& error) {
+        statusBar()->showMessage(QString::fromStdString(error), 5000);
+    };
     task_label_ = new QLabel(this);
     task_label_->setMaximumWidth(360);
     task_label_->setTextFormat(Qt::PlainText);
@@ -679,6 +722,9 @@ void Workbench::build_camera_panel() {
 }
 
 void Workbench::refresh() {
+    if (!editor_.transforming()) {
+        viewport_->finish_gizmo_drag(false);
+    }
     offline_->scene_changed();
     environment_->set_document(editor_.document());
     refreshing_ = true;
@@ -737,6 +783,10 @@ void Workbench::refresh_properties() {
                                    QString::fromStdString(texture.id));
     }
     object_panel_->setEnabled(object != document.objects.end());
+    viewport_->set_gizmo_target(
+        object != document.objects.end() && object->visible ? object->id : "",
+        object != document.objects.end() && object->visible ? std::optional(object->transform)
+                                                            : std::nullopt);
     if (object != document.objects.end()) {
         object_name_->setText(QString::fromStdString(object->name));
         translation_->set_value(object->transform.translation);
@@ -1193,6 +1243,7 @@ void Workbench::save_scene_async(const QString& path) {
 }
 
 void Workbench::select_object(const std::string& id) {
+    viewport_->finish_gizmo_drag(false);
     selected_id_ = id;
     for (int index = 0; index < tree_->topLevelItemCount(); ++index) {
         auto* item = tree_->topLevelItem(index);
@@ -1207,6 +1258,81 @@ void Workbench::select_object(const std::string& id) {
 
 void Workbench::report_error(const std::exception& error) {
     QMessageBox::warning(this, "操作失败", QString::fromUtf8(error.what()));
+}
+
+Workbench::~Workbench() {
+    // 原生子窗口晚于派生类成员销毁；先结束手势，断开持有编辑器引用的回调。
+    viewport_->finish_gizmo_drag(false);
+    viewport_->on_transform_begin = {};
+    viewport_->on_transform_preview = {};
+    viewport_->on_transform_end = {};
+    viewport_->on_gizmo_mode_changed = {};
+    viewport_->on_interaction_error = {};
+}
+
+bool Workbench::begin_transform() {
+    try {
+        const auto& objects = editor_.document().objects;
+        const auto object = std::find_if(objects.begin(), objects.end(),
+                                         [&](const auto& item) { return item.id == selected_id_; });
+        if (object == objects.end() || !object->visible) {
+            return false;
+        }
+        editor_.begin_transform_edit(selected_id_);
+        transform_preview_ = object->transform;
+        return true;
+    } catch (const std::exception& error) {
+        statusBar()->showMessage(QString::fromUtf8(error.what()), 5000);
+        return false;
+    }
+}
+
+bool Workbench::preview_transform(const minirender::Transform& transform) {
+    if (!editor_.transforming() || !transform_preview_) {
+        return false;
+    }
+    const auto& previous = *transform_preview_;
+    if (previous.translation == transform.translation &&
+        previous.rotation_degrees == transform.rotation_degrees &&
+        previous.scale == transform.scale) {
+        return true;
+    }
+    try {
+        editor_.preview_transform(transform);
+        transform_preview_ = transform;
+        ++document_revision_;
+        // 每个鼠标事件只更新变换控件与场景参数，不重建树或扫描网格。
+        translation_->set_value(transform.translation);
+        rotation_->set_value(transform.rotation_degrees);
+        scale_->set_value(transform.scale);
+        undo_->setEnabled(editor_.can_undo());
+        redo_->setEnabled(editor_.can_redo());
+        viewport_->set_gizmo_target(selected_id_, transform);
+        viewport_->set_scene(editor_.snapshot());
+        offline_->scene_changed();
+        return true;
+    } catch (const std::exception& error) {
+        statusBar()->showMessage(QString::fromUtf8(error.what()), 5000);
+        return false;
+    }
+}
+
+void Workbench::finish_transform(bool commit) {
+    transform_preview_.reset();
+    if (!editor_.transforming()) {
+        return;
+    }
+    const bool changed = commit ? editor_.commit_transform_edit() : editor_.cancel_transform_edit();
+    if (changed && !commit) {
+        ++document_revision_;
+    }
+    undo_->setEnabled(editor_.can_undo());
+    redo_->setEnabled(editor_.can_redo());
+    if (changed && !commit) {
+        refresh_properties();
+        viewport_->set_scene(editor_.snapshot());
+        offline_->scene_changed();
+    }
 }
 VulkanViewport* Workbench::viewport() const noexcept {
     return viewport_;
