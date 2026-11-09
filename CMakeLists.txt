@@ -38,6 +38,8 @@ add_library(minirender_core
     src/geometry/loop.cpp
     src/geometry/normals.cpp
     src/geometry/displacement.cpp
+    src/geometry/surface.cpp
+    src/geometry/simplify.cpp
     src/render/intersection.cpp
     src/render/bvh.cpp
     src/render/bsdf.cpp
@@ -68,10 +70,14 @@ if(BUILD_TESTING)
     add_executable(minirender_displacement_example examples/displacement.cpp)
     target_compile_definitions(minirender_displacement_example PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_displacement_example PRIVATE minirender_core minirender_warnings)
+    add_executable(minirender_simplify_example examples/simplify.cpp)
+    target_compile_definitions(minirender_simplify_example PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+    target_link_libraries(minirender_simplify_example PRIVATE minirender_core minirender_warnings)
     add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp
         tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp tests/path_tests.cpp
         tests/session_tests.cpp tests/ssao_tests.cpp tests/ibl_tests.cpp tests/geometry_tests.cpp
-        tests/displacement_tests.cpp tests/mesh_io_tests.cpp tests/raster_mesh_tests.cpp)
+        tests/displacement_tests.cpp tests/mesh_io_tests.cpp tests/raster_mesh_tests.cpp
+        tests/simplify_tests.cpp)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_tests PRIVATE
         minirender_core Catch2::Catch2WithMain minirender_warnings Threads::Threads)

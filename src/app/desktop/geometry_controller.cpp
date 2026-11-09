@@ -73,6 +73,27 @@ const char* save_stage(minirender::SceneSaveStage stage) {
     return "保存";
 }
 
+const char* simplify_stage(minirender::SimplifyStage stage) {
+    using Stage = minirender::SimplifyStage;
+    switch (stage) {
+    case Stage::input_topology:
+        return "检查输入拓扑";
+    case Stage::quadrics:
+        return "构建二次误差与保护条件";
+    case Stage::candidates:
+        return "计算候选边";
+    case Stage::collapse:
+        return "执行合法边折叠";
+    case Stage::output:
+        return "生成输出网格与法线";
+    case Stage::error:
+        return "测量双向表面距离";
+    case Stage::complete:
+        return "简化完成";
+    }
+    return "简化";
+}
+
 } // namespace
 
 GeometryController::GeometryController(QObject* parent) : QObject(parent) {}
@@ -178,21 +199,33 @@ void GeometryController::build_mesh(GeometryTaskInput input, Completion completi
         [input = std::move(input)](auto token, const Reporter& report) {
             GeometryTaskResult result;
             const auto prefix = input.target_name + " | ";
-            auto refined = minirender::subdivide_loop(input.mesh, input.loop, token, [&](auto p) {
-                report({prefix + "Loop " + std::to_string(p.level) + "/" +
-                            std::to_string(input.loop.levels) + " · " + loop_stage(p.stage),
-                        p.completed, p.total});
-            });
-            result.mesh = std::move(refined.mesh);
-            result.topology = refined.levels.back();
-            if (input.height_settings && input.height_settings->scale != 0) {
-                auto displaced = minirender::displace_mesh(
-                    result.mesh, input.height, *input.height_settings, token, [&](auto p) {
-                        report({prefix + displacement_stage(p.stage), p.completed, p.total});
+            if (input.simplify) {
+                result.simplification =
+                    minirender::simplify_qem(input.mesh, *input.simplify, token, [&](auto p) {
+                        report({prefix + simplify_stage(p.stage) + " · 当前 " +
+                                    std::to_string(p.current_triangles) + " 面",
+                                p.completed, p.total});
                     });
-                result.mesh = std::move(displaced.mesh);
-                result.topology = displaced.topology;
-                result.maximum_displacement = displaced.maximum_displacement;
+                result.mesh = result.simplification->mesh;
+                result.topology = result.simplification->topology;
+            } else {
+                auto refined =
+                    minirender::subdivide_loop(input.mesh, input.loop, token, [&](auto p) {
+                        report({prefix + "Loop " + std::to_string(p.level) + "/" +
+                                    std::to_string(input.loop.levels) + " · " + loop_stage(p.stage),
+                                p.completed, p.total});
+                    });
+                result.mesh = std::move(refined.mesh);
+                result.topology = refined.levels.back();
+                if (input.height_settings && input.height_settings->scale != 0) {
+                    auto displaced = minirender::displace_mesh(
+                        result.mesh, input.height, *input.height_settings, token, [&](auto p) {
+                            report({prefix + displacement_stage(p.stage), p.completed, p.total});
+                        });
+                    result.mesh = std::move(displaced.mesh);
+                    result.topology = displaced.topology;
+                    result.maximum_displacement = displaced.maximum_displacement;
+                }
             }
             report({prefix + "检查发布数据", 0, 1});
             result.validated_meshes.validate(result.mesh, token);
@@ -203,6 +236,13 @@ void GeometryController::build_mesh(GeometryTaskInput input, Completion completi
                 });
             result.summary = input.target_name + " | 已生成 " +
                              std::to_string(result.mesh->triangles.size()) + " 个三角形";
+            if (result.simplification &&
+                result.simplification->stop != minirender::SimplifyStop::target_reached) {
+                result.summary +=
+                    result.simplification->stop == minirender::SimplifyStop::error_limit
+                        ? "，已达 QEM 代价上限"
+                        : "，剩余边受拓扑或属性约束";
+            }
             return result;
         },
         std::move(completion));
