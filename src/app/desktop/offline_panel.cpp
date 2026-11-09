@@ -204,6 +204,17 @@ void OfflinePanel::set_settings(minirender::RenderSettings render,
     threads_->setValue(static_cast<int>(session.threads));
     session_settings_ = session;
 }
+void OfflinePanel::prepare_import(minirender::RenderSettings render,
+                                  minirender::IntegratorSettings integrator) {
+    render.validate();
+    integrator.validate();
+    session_->cancel();
+    viewport_.set_offline_image(nullptr);
+    viewport_.set_offline_visible(false);
+    imported_settings_ = ImportSettings{render, integrator};
+    poll();
+}
+
 void OfflinePanel::start() {
     try {
         if (exporting_) {
@@ -243,6 +254,12 @@ void OfflinePanel::scene_changed() {
 }
 
 void OfflinePanel::poll() {
+    if (imported_settings_ && minirender::render_terminal(session_->progress().state) &&
+        !exporting_) {
+        const auto settings = *imported_settings_;
+        imported_settings_.reset();
+        set_settings(settings.render, settings.integrator, {});
+    }
     using minirender::RenderState;
     const auto p = session_->progress();
     const bool terminal = minirender::render_terminal(p.state);

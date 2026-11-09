@@ -4,6 +4,7 @@
 
 #include <QWidget>
 #include <functional>
+#include <optional>
 
 class VulkanViewport;
 class QSpinBox;
@@ -27,6 +28,8 @@ class OfflinePanel final : public QWidget {
     void scene_changed();
     void set_settings(minirender::RenderSettings render, minirender::IntegratorSettings integrator,
                       minirender::SessionSettings session);
+    void prepare_import(minirender::RenderSettings render,
+                        minirender::IntegratorSettings integrator);
     void save_image(const QString& path, bool exr);
     bool exporting() const noexcept;
     bool stale() const noexcept;
@@ -35,6 +38,12 @@ class OfflinePanel final : public QWidget {
   private:
     void poll();
     void choose_export(bool exr);
+    // 覆盖导入先异步取消旧任务，终止后再应用新建议，避免阻塞界面。
+    struct ImportSettings {
+        minirender::RenderSettings render;
+        minirender::IntegratorSettings integrator;
+    };
+    std::optional<ImportSettings> imported_settings_;
     VulkanViewport& viewport_;
     std::function<std::shared_ptr<const minirender::SceneSnapshot>()> snapshot_;
     std::shared_ptr<minirender::RenderSession> session_;

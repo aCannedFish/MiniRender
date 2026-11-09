@@ -1,4 +1,5 @@
 #include "workbench.hpp"
+#include "builtin_scenes.hpp"
 #include "environment_panel.hpp"
 #include "geometry_panel.hpp"
 #include "offline_panel.hpp"
@@ -21,6 +22,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
 #include <QMessageBox>
 #include <QProgressBar>
 #include <QScreen>
@@ -32,6 +34,7 @@
 #include <QTabWidget>
 #include <QTimer>
 #include <QToolBar>
+#include <QToolButton>
 #include <QTreeWidget>
 #include <QVulkanInstance>
 #include <QtConcurrent/QtConcurrentRun>
@@ -190,6 +193,28 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
             }
         }
     });
+    builtin_button_ = new QToolButton;
+    builtin_button_->setText("快速导入");
+    builtin_button_->setObjectName("builtin_scenes");
+    builtin_button_->setPopupMode(QToolButton::InstantPopup);
+    auto* builtin_menu = new QMenu(builtin_button_);
+    builtin_menu->setToolTipsVisible(true);
+    builtin_menu->addAction("覆盖当前场景，导入后可继续编辑")->setEnabled(false);
+    builtin_menu->addSeparator();
+    for (const auto& preset : builtin_scenes()) {
+        auto* action = builtin_menu->addAction(preset.name);
+        action->setObjectName("builtin_" + preset.id);
+        action->setToolTip(preset.description + " 覆盖当前场景后可继续编辑，离线渲染手动启动。");
+        connect(action, &QAction::triggered, this, [this, id = preset.id] {
+            try {
+                import_builtin_scene(id);
+            } catch (const std::exception& error) {
+                report_error(error);
+            }
+        });
+    }
+    builtin_button_->setMenu(builtin_menu);
+    toolbar->addWidget(builtin_button_);
     save_action_ = toolbar->addAction("保存");
     save_action_->setObjectName("save_scene");
     save_action_->setShortcut(QKeySequence::Save);
@@ -552,7 +577,7 @@ void Workbench::build_object_panel() {
     rotation_ = new VectorField(object_panel_, "rotation", -360, 360);
     scale_ = new VectorField(object_panel_, "scale", -100, 100);
     base_color_ = new VectorField(object_panel_, "base_color", 0, 1);
-    emission_ = new VectorField(object_panel_, "emission", 0, 100);
+    emission_ = new VectorField(object_panel_, "emission", 0, 1000000);
     material_kind_ = new QComboBox;
     material_kind_->addItems({"漫反射", "金属", "镜面（预览近似）", "玻璃（预览近似）"});
     texture_selector_ = new QComboBox;
@@ -939,6 +964,7 @@ void Workbench::begin_asset_task(const QString& message) {
     task_progress_->show();
     task_progress_->setRange(0, 0);
     open_action_->setEnabled(false);
+    builtin_button_->setEnabled(false);
     save_action_->setEnabled(false);
     save_as_action_->setEnabled(false);
     import_object_action_->setEnabled(false);
@@ -951,6 +977,7 @@ void Workbench::finish_asset_task() {
     asset_loading_ = false;
     texture_loading_ = false;
     open_action_->setEnabled(true);
+    builtin_button_->setEnabled(true);
     save_action_->setEnabled(true);
     save_as_action_->setEnabled(true);
     import_object_action_->setEnabled(true);
@@ -1007,7 +1034,7 @@ void Workbench::import_object_file(const QString& path) {
         });
 }
 
-void Workbench::open_scene_file(const QString& path) {
+void Workbench::open_scene_file(const QString& path, std::function<void()> after_load) {
     begin_asset_task("正在读取场景与资产…");
     const auto source = native_path(path);
     const auto generation = ++document_generation_;
@@ -1028,7 +1055,7 @@ void Workbench::open_scene_file(const QString& path) {
             }
             return result;
         },
-        [this, path, generation](const auto& result) {
+        [this, path, generation, after_load = std::move(after_load)](const auto& result) {
             finish_asset_task();
             if (generation != document_generation_) {
                 return;
@@ -1042,10 +1069,35 @@ void Workbench::open_scene_file(const QString& path) {
                     viewport_->supply_raster_mesh(mesh, raster);
                 }
                 install_scene(result.value.document, path, &result.value.validated);
+                if (after_load) {
+                    after_load();
+                }
             } catch (const std::exception& error) {
                 report_error(error);
             }
         });
+}
+
+void Workbench::import_builtin_scene(const QString& id) {
+    const auto& scenes = builtin_scenes();
+    const auto found =
+        std::find_if(scenes.begin(), scenes.end(), [&](const auto& item) { return item.id == id; });
+    if (found == scenes.end()) {
+        throw std::invalid_argument("Unknown built-in scene");
+    }
+    const auto preset = *found;
+    open_scene_file(builtin_scene_directory() + "/" + preset.filename, [this, preset] {
+        scene_path_.clear();
+        findChild<QDoubleSpinBox*>("exposure")->setValue(0);
+        offline_->prepare_import(preset.render, preset.integrator);
+        select_object(preset.selected_object);
+        findChild<QComboBox*>("view_mode")->setCurrentIndex(preset.normal_preview ? 1 : 0);
+        setWindowTitle("MiniRender — " + preset.name + "（示例副本）");
+        statusBar()->showMessage(
+            preset.name + " 已覆盖导入，可编辑后开始离线渲染。" +
+                (preset.normal_preview ? " 当前法线视图便于编辑，离线渲染使用场景实际光照。" : ""),
+            12000);
+    });
 }
 
 void Workbench::load_scene_file(const QString& path) {
