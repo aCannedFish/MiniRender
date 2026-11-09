@@ -52,6 +52,14 @@ target_link_libraries(minirender_desktop PRIVATE
     minirender_core minirender_warnings Qt6::Widgets Qt6::Concurrent Vulkan::Vulkan)
 
 # 示例资源随可执行文件复制，运行时不依赖源码目录。
+if(APPLE)
+    # MacOS 目录只保存可执行代码，资源放在 Resources，满足 bundle 签名规则。
+    set(scene_destination "$<TARGET_BUNDLE_CONTENT_DIR:minirender_desktop>/Resources/scenes")
+    add_custom_command(TARGET minirender_desktop POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E rm -rf "$<TARGET_FILE_DIR:minirender_desktop>/scenes")
+else()
+    set(scene_destination "$<TARGET_FILE_DIR:minirender_desktop>/scenes")
+endif()
 add_custom_command(TARGET minirender_desktop POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${PROJECT_SOURCE_DIR}/scenes" "$<TARGET_FILE_DIR:minirender_desktop>/scenes")
+        "${PROJECT_SOURCE_DIR}/scenes" "${scene_destination}")

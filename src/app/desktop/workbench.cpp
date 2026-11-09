@@ -10,6 +10,8 @@
 #include <QActionGroup>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QCoreApplication>
+#include <QDir>
 #include <QDockWidget>
 #include <QDoubleSpinBox>
 #include <QFileDialog>
@@ -1064,10 +1066,19 @@ void Workbench::install_scene(minirender::SceneDocument document, const QString&
         editor_.replace(std::move(document));
     }
     scene_path_ = path;
+#ifdef Q_OS_MACOS
+    // 包内示例作为模板打开，首次保存选择用户路径，保持已签名资源不变。
+    const auto resources =
+        QDir(QCoreApplication::applicationDirPath() + "/../Resources").canonicalPath();
+    if (!resources.isEmpty() && QFileInfo(path).canonicalFilePath().startsWith(resources + '/')) {
+        scene_path_.clear();
+    }
+#endif
     selected_id_.clear();
     diagnostic_ = false;
     refresh();
-    setWindowTitle("MiniRender — " + QFileInfo(path).fileName());
+    setWindowTitle("MiniRender — " + QFileInfo(path).fileName() +
+                   (scene_path_.isEmpty() ? "（示例副本）" : ""));
 }
 
 void Workbench::save_scene_file(const QString& path) {

@@ -22,7 +22,7 @@ LSREGISTER = Path(
 )
 
 
-def bundle_info(bundle: Path) -> dict:
+def bundle_info(bundle: Path, require_executable: bool = True) -> dict:
     """读取并校验本项目应用包，避免覆盖或删除同名的其他应用。"""
     info = plistlib.loads((bundle / "Contents/Info.plist").read_bytes())
     if info.get("CFBundleIdentifier") != BUNDLE_ID:
@@ -30,7 +30,7 @@ def bundle_info(bundle: Path) -> dict:
     executable = info.get("CFBundleExecutable", "")
     if not executable or Path(executable).name != executable:
         raise ValueError(f"Invalid bundle executable: {bundle}")
-    if not (bundle / "Contents/MacOS" / executable).is_file():
+    if require_executable and not (bundle / "Contents/MacOS" / executable).is_file():
         raise ValueError(f"Bundle executable is missing: {bundle}")
     return info
 
@@ -46,7 +46,7 @@ def old_bundles(roots: list[Path], app_directories: list[Path]) -> list[Path]:
     owned = []
     for candidate in sorted(set(candidates)):
         try:
-            bundle_info(candidate)
+            bundle_info(candidate, require_executable=False)
         except (OSError, ValueError, plistlib.InvalidFileException):
             continue
         owned.append(candidate)
@@ -55,7 +55,7 @@ def old_bundles(roots: list[Path], app_directories: list[Path]) -> list[Path]:
 
 def remove_bundle(bundle: Path) -> None:
     """删除经过身份校验的应用包；符号链接只解除链接，保留其目标。"""
-    bundle_info(bundle)
+    bundle_info(bundle, require_executable=False)
     if bundle.is_symlink():
         bundle.unlink()
     else:
@@ -84,7 +84,9 @@ def require_stopped(bundles: list[Path]) -> None:
     processes = subprocess.check_output(["ps", "-axo", "comm="], text=True).splitlines()
     for bundle in bundles:
         executable = (
-            bundle / "Contents/MacOS" / bundle_info(bundle)["CFBundleExecutable"]
+            bundle
+            / "Contents/MacOS"
+            / bundle_info(bundle, require_executable=False)["CFBundleExecutable"]
         )
         if str(executable) in processes or str(executable.resolve()) in processes:
             raise RuntimeError(f"Close MiniRender before updating: {bundle}")
@@ -175,8 +177,44 @@ def main() -> int:
             + "\n",
             encoding="utf-8",
         )
+        # 只部署 Widgets 使用的 Cocoa 和原生样式插件，避免混入其他 Qt 版本的插件。
+        qtpaths = str(Path(deploy).with_name("qtpaths"))
+        plugins = Path(
+            subprocess.check_output(
+                [qtpaths, "--query", "QT_INSTALL_PLUGINS"], text=True
+            ).strip()
+        )
+        additional = []
+        for relative in [
+            Path("platforms/libqcocoa.dylib"),
+            Path("styles/libqmacstyle.dylib"),
+        ]:
+            plugin = staged / "Contents/PlugIns" / relative
+            plugin.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(plugins / relative, plugin)
+            additional.append(f"-executable={plugin}")
+        (resources / "qt.conf").write_text(
+            "[Paths]\nPlugins=PlugIns\n", encoding="utf-8"
+        )
+        result = subprocess.run(
+            [
+                deploy,
+                str(staged),
+                "-always-overwrite",
+                "-no-plugins",
+                "-codesign=-",
+                *additional,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        print(result.stdout, end="")
+        print(result.stderr, end="", file=sys.stderr)
+        if "ERROR:" in result.stdout or "ERROR:" in result.stderr:
+            raise RuntimeError("Qt deployment reported an error")
         subprocess.run(
-            [deploy, str(staged), "-always-overwrite", "-codesign=-"], check=True
+            ["codesign", "--verify", "--deep", "--strict", str(staged)], check=True
         )
         subprocess.run(
             [
@@ -187,6 +225,22 @@ def main() -> int:
                 str(repository / "outputs/install"),
                 "--timeout",
                 "60",
+            ],
+            cwd=repository,
+            check=True,
+        )
+        subprocess.run(
+            [
+                sys.executable,
+                str(repository / "scripts/verify_gpu.py"),
+                str(staged),
+                "--scene",
+                str(staged / "Contents/Resources/scenes/studio.json"),
+                "--sides-check",
+                "--output",
+                str(repository / "outputs/install-sides"),
+                "--timeout",
+                "120",
             ],
             cwd=repository,
             check=True,

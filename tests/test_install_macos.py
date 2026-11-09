@@ -52,6 +52,15 @@ class InstallerTests(unittest.TestCase):
             self.assertTrue(foreign.exists())
             self.assertEqual(unrelated.read_text(encoding="utf-8"), "model")
 
+    def test_incomplete_owned_bundle_is_removed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            bundle = make_bundle(root / "build/debug/src/app/desktop/partial.app")
+            (bundle / "Contents/MacOS/minirender").unlink()
+            self.assertEqual(installer.old_bundles([root], []), [bundle])
+            installer.remove_bundle(bundle)
+            self.assertFalse(bundle.exists())
+
     def test_symlink_cleanup_preserves_the_target(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

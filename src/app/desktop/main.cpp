@@ -208,10 +208,15 @@ int main(int argc, char** argv) {
         auto* viewport = window.viewport();
         viewport->set_offscreen_rendering(offscreen);
         if (!smoke) {
+#ifdef Q_OS_MACOS
+            const QString bundled_scene =
+                QCoreApplication::applicationDirPath() + "/../Resources/scenes/studio.json";
+#else
+            const QString bundled_scene =
+                QCoreApplication::applicationDirPath() + "/scenes/studio.json";
+#endif
             const QString scene_path =
-                parser.isSet("scene")
-                    ? parser.value("scene")
-                    : QCoreApplication::applicationDirPath() + "/scenes/studio.json";
+                parser.isSet("scene") ? parser.value("scene") : bundled_scene;
             try {
                 if (regression) {
                     window.load_scene_file(scene_path);
