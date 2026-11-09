@@ -234,7 +234,7 @@ def main() -> int:
                 str(staged),
                 "-always-overwrite",
                 "-no-plugins",
-                "-codesign=-",
+                "-no-codesign",
                 *additional,
             ],
             capture_output=True,
@@ -245,6 +245,19 @@ def main() -> int:
         print(result.stderr, end="", file=sys.stderr)
         if "ERROR:" in result.stdout or "ERROR:" in result.stderr:
             raise RuntimeError("Qt deployment reported an error")
+        # 全部依赖路径调整完毕后，再按内层代码、框架、应用的顺序签名。
+        # 避免部署工具在签名后继续修改其他模块的加载路径。
+        frameworks = staged / "Contents/Frameworks"
+        code = [
+            *frameworks.glob("*.dylib"),
+            *(staged / "Contents/PlugIns").rglob("*.dylib"),
+            *frameworks.glob("*.framework"),
+        ]
+        for binary in code:
+            subprocess.run(
+                ["codesign", "--force", "--sign", "-", str(binary)], check=True
+            )
+        subprocess.run(["codesign", "--force", "--sign", "-", str(staged)], check=True)
         subprocess.run(
             ["codesign", "--verify", "--deep", "--strict", str(staged)], check=True
         )
