@@ -367,9 +367,18 @@ enum class Stage {
     qem_constrained,
     qem_export,
     qem_save,
+    remesh_apply,
+    remesh_offline,
+    remesh_undo,
+    remesh_redo,
+    remesh_export,
+    remesh_save,
+    remesh_budget_wait,
     qem_cancel_start,
     qem_cancel_phase,
     qem_cancel_wait,
+    remesh_cancel_phase,
+    remesh_cancel_wait,
     shutdown
 };
 
@@ -377,7 +386,9 @@ struct State {
     Stage stage = Stage::startup;
     int ticks = 0, maximum_ticks = 4000, frame = 0;
     std::uint64_t uploads = 0;
-    bool monitor = false, numeric_progress = false, cancel_sent = false, exposed = true;
+    bool monitor = false, numeric_progress = false, cancel_sent = false, renderable = true;
+    bool active = false;
+    bool offscreen = false;
     qint64 last = 0, maximum_gap = 0, cancel_at = 0;
     qint64 maximum_event_latency = 0;
     std::size_t probe_samples = 0;
@@ -386,9 +397,11 @@ struct State {
     int probe_event_type = 0;
     std::chrono::steady_clock::time_point measurement_started{};
     QElapsedTimer clock;
-    std::shared_ptr<const minirender::MeshData> source, generated, large, simplified;
+    std::shared_ptr<const minirender::MeshData> source, generated, large, simplified, remeshed,
+        remesh_input;
+    minirender::RemeshSettings remesh_settings;
     std::shared_ptr<const minirender::SceneSnapshot> snapshot;
-    QImage baseline, after, qem_before, qem_after;
+    QImage baseline, after, qem_before, qem_after, remesh_before, remesh_after;
     std::size_t original_meshes = 0, original_objects = 0;
     float saved_x = 0;
     std::filesystem::path input_file;
@@ -424,7 +437,8 @@ class UiEventProbe final : public QObject {
             return QObject::event(event);
         }
         const auto& probe = *static_cast<UiProbeEvent*>(event);
-        if (state_->monitor && probe.epoch == state_->probe_epoch.load(std::memory_order_relaxed) &&
+        if (state_->monitor && state_->active && state_->renderable &&
+            probe.epoch == state_->probe_epoch.load(std::memory_order_relaxed) &&
             probe.sent >= state_->measurement_started) {
             const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                                      std::chrono::steady_clock::now() - probe.sent)
@@ -447,12 +461,16 @@ class UiEventProbe final : public QObject {
 
 void record_gap(State& state) {
     const auto now = state.clock.elapsed();
+    if (!state.active || !state.renderable) {
+        state.last = 0;
+        return;
+    }
     if (state.monitor && state.last) {
         if (now - state.last > 150) {
             qInfo() << "Geometry heartbeat gap ms" << now - state.last << "stage"
                     << static_cast<int>(state.stage) << "application state"
-                    << static_cast<int>(QGuiApplication::applicationState()) << "exposed"
-                    << state.exposed;
+                    << static_cast<int>(QGuiApplication::applicationState()) << "renderable"
+                    << state.renderable;
         }
         state.maximum_gap = std::max(state.maximum_gap, now - state.last);
     }
@@ -511,11 +529,21 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
         state->maximum_ticks = budget;
     }
     state->clock.start();
+    state->offscreen = window.viewport()->offscreen_rendering();
+    state->active =
+        state->offscreen || QGuiApplication::applicationState() == Qt::ApplicationActive;
+    QObject::connect(qGuiApp, &QGuiApplication::applicationStateChanged, &window,
+                     [state](Qt::ApplicationState value) {
+                         state->active = state->offscreen || value == Qt::ApplicationActive;
+                         state->last = 0;
+                         state->measurement_started = std::chrono::steady_clock::now();
+                         state->probe_epoch.fetch_add(1, std::memory_order_relaxed);
+                     });
     new UiEventProbe(&window, state);
     auto* heartbeat = new QTimer(&window);
     heartbeat->setInterval(10);
     QObject::connect(heartbeat, &QTimer::timeout, &window, [state, &window] {
-        state->exposed = window.viewport()->can_render();
+        state->renderable = window.viewport()->can_render();
         record_gap(*state);
     });
     heartbeat->start();
@@ -530,6 +558,10 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
                 const auto status = tasks->status();
                 if (++state->ticks > state->maximum_ticks || !viewport->failure().isEmpty()) {
                     throw std::runtime_error("Geometry test timed out or renderer failed");
+                }
+                if (!viewport->can_render()) {
+                    state->last = 0;
+                    return;
                 }
                 if (viewport->rendered_frames() < 5) {
                     return;
@@ -1045,6 +1077,153 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
                                     state->simplified->positions,
                                 "QEM saved scene lost its generated asset");
                     });
+                    state->remesh_input = mesh_for(window.document(), "blue_cube");
+                    state->snapshot = minirender::make_snapshot(window.document());
+                    verify(*state, [&] {
+                        state->remesh_before = verify_gpu(window, directory, "remesh-before");
+                    });
+                    control<QPushButton>(window, "offline_start")->click();
+                    control<QComboBox>(window, "geometry_operation")->setCurrentIndex(2);
+                    control<QDoubleSpinBox>(window, "geometry_remesh_length")->setValue(0.1);
+                    control<QSpinBox>(window, "geometry_remesh_iterations")->setValue(3);
+                    state->remesh_settings = *window.geometry_panel()->parameters().remesh;
+                    require(control<QPushButton>(window, "geometry_apply")->isEnabled(),
+                            "Remeshing apply control is disabled");
+                    control<QPushButton>(window, "geometry_apply")->click();
+                    control<QDoubleSpinBox>(window, "geometry_remesh_length")->setValue(0.2);
+                    control<QDoubleSpinBox>(window, "roughness")->setValue(0.24);
+                    advance(Stage::remesh_apply);
+                    return;
+                case Stage::remesh_apply:
+                    if (!finished(window) || !offline_done() || !preview_ready()) {
+                        return;
+                    }
+                    ready(window);
+                    state->remeshed = mesh_for(window.document(), "blue_cube");
+                    require(state->remeshed != state->remesh_input,
+                            "Remeshing did not publish a new asset");
+                    require(mesh_for(window.document(), "metal_cube") == state->source,
+                            "Remeshing changed another instance");
+                    require(std::abs(control<QDoubleSpinBox>(window, "roughness")->value() - 0.24) <
+                                1e-6,
+                            "Remeshing overwrote an unrelated material edit");
+                    require(control<QLabel>(window, "geometry_metrics")
+                                ->text()
+                                .contains("平均角度偏差"),
+                            "Remeshing quality report is missing");
+                    require(control<QLabel>(window, "geometry_metrics")
+                                ->text()
+                                .contains("本次边长 0.1 m"),
+                            "Remeshing report did not retain the applied edge length");
+                    verify(*state, [&] {
+                        const auto expected = minirender::remesh_isotropic(state->remesh_input,
+                                                                           state->remesh_settings);
+                        require(expected.mesh->positions == state->remeshed->positions &&
+                                    expected.mesh->triangles.size() ==
+                                        state->remeshed->triangles.size(),
+                                "Remeshing did not preserve its start-time settings");
+                        verify_offline(window, state->snapshot);
+                        require(window.offline_panel()->stale(),
+                                "Remeshing did not mark an old offline snapshot stale");
+                        control<QCheckBox>(window, "offline_show")->setChecked(false);
+                        state->remesh_after = verify_gpu(window, directory, "remeshed");
+                        require(QDir().mkpath(directory + "/remesh-shadow"),
+                                "Cannot create remeshing shadow directory");
+                        verify_shadows(window, directory + "/remesh-shadow");
+                        control<QComboBox>(window, "view_mode")->setCurrentIndex(3);
+                        require(viewport->grab().save(directory + "/remeshed-wire.png"),
+                                "Cannot save remeshing wireframe");
+                        control<QComboBox>(window, "view_mode")->setCurrentIndex(0);
+                        verify_layout(window);
+                        capture_ui(window, directory + "/remesh-ui.png");
+                    });
+                    state->snapshot = minirender::make_snapshot(window.document());
+                    control<QPushButton>(window, "offline_start")->click();
+                    advance(Stage::remesh_offline);
+                    return;
+                case Stage::remesh_offline:
+                    if (!offline_done()) {
+                        return;
+                    }
+                    verify(*state, [&] { verify_offline(window, state->snapshot); });
+                    control<QCheckBox>(window, "offline_show")->setChecked(false);
+                    control<QAction>(window, "undo")->trigger();
+                    require(mesh_for(window.document(), "blue_cube") == state->remesh_input,
+                            "Remeshing undo did not restore its input");
+                    advance(Stage::remesh_undo);
+                    return;
+                case Stage::remesh_undo:
+                    if (!preview_ready()) {
+                        return;
+                    }
+                    verify(*state, [&] {
+                        require(changed_pixels(state->remesh_before,
+                                               verify_gpu(window, directory, "remesh-undo")) == 0,
+                                "Remeshing GPU undo pixels changed");
+                    });
+                    control<QAction>(window, "redo")->trigger();
+                    require(mesh_for(window.document(), "blue_cube") == state->remeshed,
+                            "Remeshing redo did not restore its output");
+                    advance(Stage::remesh_redo);
+                    return;
+                case Stage::remesh_redo:
+                    if (!preview_ready()) {
+                        return;
+                    }
+                    verify(*state, [&] {
+                        require(changed_pixels(state->remesh_after,
+                                               verify_gpu(window, directory, "remesh-redo")) == 0,
+                                "Remeshing GPU redo pixels changed");
+                    });
+                    window.export_geometry_file(directory + "/重网格 模型.obj");
+                    advance(Stage::remesh_export);
+                    return;
+                case Stage::remesh_export:
+                    if (!finished(window)) {
+                        return;
+                    }
+                    ready(window);
+                    verify(*state, [&] {
+                        const auto loaded =
+                            minirender::load_obj(native(directory + "/重网格 模型.obj"));
+                        require(loaded.positions == state->remeshed->positions &&
+                                    loaded.triangles.size() == state->remeshed->triangles.size(),
+                                "Remeshing OBJ round trip changed geometry");
+                    });
+                    window.save_scene_async(directory + "/重网格 场景.json");
+                    advance(Stage::remesh_save);
+                    return;
+                case Stage::remesh_save:
+                    if (!finished(window)) {
+                        return;
+                    }
+                    ready(window);
+                    verify(*state, [&] {
+                        const auto saved =
+                            minirender::load_scene(native(directory + "/重网格 场景.json"));
+                        require(mesh_for(saved, "blue_cube")->positions ==
+                                    state->remeshed->positions,
+                                "Remeshing scene save lost its asset");
+                    });
+                    {
+                        const auto faces = static_cast<int>(state->remeshed->triangles.size());
+                        control<QSpinBox>(window, "geometry_remesh_budget")->setValue(faces - 1);
+                        require(!control<QPushButton>(window, "geometry_apply")->isEnabled(),
+                                "Remeshing input budget did not disable apply");
+                        control<QSpinBox>(window, "geometry_remesh_budget")->setValue(faces);
+                    }
+                    control<QDoubleSpinBox>(window, "geometry_remesh_length")->setValue(0.001);
+                    window.apply_geometry();
+                    advance(Stage::remesh_budget_wait);
+                    return;
+                case Stage::remesh_budget_wait:
+                    if (!finished(window)) {
+                        return;
+                    }
+                    require(status.state == GeometryTaskState::failed &&
+                                mesh_for(window.document(), "blue_cube") == state->remeshed,
+                            "Failed remeshing published a partial mesh");
+                    control<QComboBox>(window, "geometry_operation")->setCurrentIndex(1);
                     // 重新导入压力网格，在候选边计算阶段检查取消。
                     window.import_object_file(directory + "/large.obj");
                     advance(Stage::qem_cancel_start);
@@ -1076,13 +1255,46 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
                             "QEM cancel was not reported");
                     require(state->clock.elapsed() - state->cancel_at < 2000,
                             "QEM cancellation exceeded two seconds");
-                    require(mesh_for(window.document(), "blue_cube") == state->simplified,
+                    require(mesh_for(window.document(), "blue_cube") == state->remeshed,
                             "Cancelled QEM changed an existing asset");
+                    state->remesh_input =
+                        mesh_for(window.document(), window.document().objects.back().id);
+                    control<QComboBox>(window, "geometry_operation")->setCurrentIndex(2);
+                    control<QSpinBox>(window, "geometry_remesh_budget")->setValue(1000000);
+                    control<QDoubleSpinBox>(window, "geometry_remesh_length")->setValue(0.0005);
+                    window.apply_geometry();
+                    advance(Stage::remesh_cancel_phase);
+                    return;
+                case Stage::remesh_cancel_phase:
+                    require(tasks->busy(), "Remeshing cancellation fixture finished too early");
+                    if (status.progress.stage.find("建立边候选") == std::string::npos ||
+                        status.progress.completed == 0) {
+                        return;
+                    }
+                    state->cancel_at = state->clock.elapsed();
+                    control<QPushButton>(window, "geometry_cancel")->click();
+                    advance(Stage::remesh_cancel_wait);
+                    return;
+                case Stage::remesh_cancel_wait: {
+                    if (!finished(window)) {
+                        return;
+                    }
+                    require(status.state == GeometryTaskState::cancelled,
+                            "Remeshing cancel was not reported");
+                    require(state->clock.elapsed() - state->cancel_at < 2000,
+                            "Remeshing cancellation exceeded two seconds");
+                    require(mesh_for(window.document(), window.document().objects.back().id) ==
+                                state->remesh_input,
+                            "Cancelled remeshing changed its input asset");
+                    QElapsedTimer restore_timer;
+                    restore_timer.start();
                     window.load_scene_file(directory + "/start.json");
                     window.select_object("blue_cube");
                     generate(window, 8, false);
+                    qInfo() << "Geometry restore before shutdown ms" << restore_timer.elapsed();
                     advance(Stage::shutdown);
                     return;
+                }
                 case Stage::shutdown:
                     require(tasks->busy(), "Geometry shutdown requires an active worker");
                     QCoreApplication::sendPostedEvents(state->probe_receiver,
@@ -1099,7 +1311,8 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
                     qInfo() << "Geometry smoke PASS: controls, shared assets, undo/redo, CPU/GPU "
                                "geometry, "
                                "snapshot save, OBJ import/export, cancellation and stale results; "
-                               "QEM controls, measured error and LOD history; event latency ms"
+                               "QEM/remeshing controls, measured quality/error and history; event "
+                               "latency ms"
                             << state->maximum_event_latency << "heartbeat ms" << state->maximum_gap;
                     timer->stop();
                     QApplication::exit(0);

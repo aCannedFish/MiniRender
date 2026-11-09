@@ -17,6 +17,7 @@ struct GeometryParameters {
     std::optional<minirender::DisplacementSettings> displacement;
     std::string height_id;
     std::optional<minirender::SimplifySettings> simplify;
+    std::optional<minirender::RemeshSettings> remesh;
 };
 
 // 几何参数只在点击生成时提交，修改控件只更新基于数组规模的预算估计。
@@ -39,7 +40,15 @@ class GeometryPanel final : public QWidget {
     std::shared_ptr<const minirender::MeshData> mesh_;
     bool external_busy_ = false;
     QFormLayout* form_;
-    QWidget *height_row_, *simplification_;
+    QWidget* height_row_;
+    QWidget* constraints_;
+    QWidget* remeshing_;
+    QFormLayout* tool_form_;
+    QDoubleSpinBox* remesh_length_;
+    QDoubleSpinBox* remesh_step_;
+    QSpinBox* remesh_iterations_;
+    QSpinBox* remesh_budget_;
+    QCheckBox* remesh_projection_;
     QComboBox* operation_;
     QSpinBox* target_faces_;
     QCheckBox *error_limit_, *boundary_, *uv_seams_, *hard_normals_, *creases_;

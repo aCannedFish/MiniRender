@@ -94,6 +94,37 @@ const char* simplify_stage(minirender::SimplifyStage stage) {
     return "简化";
 }
 
+const char* remesh_stage(minirender::RemeshStage stage) {
+    using Stage = minirender::RemeshStage;
+    switch (stage) {
+    case Stage::input_topology:
+        return "检查输入拓扑";
+    case Stage::reference_surface:
+        return "建立原表面查询";
+    case Stage::edge_queue:
+        return "建立边候选";
+    case Stage::split:
+        return "分裂长边";
+    case Stage::collapse:
+        return "折叠短边";
+    case Stage::flip:
+        return "调整顶点价数";
+    case Stage::smooth:
+        return "计算切向平滑";
+    case Stage::projection:
+        return "投影并传递 UV";
+    case Stage::output:
+        return "准备输出网格";
+    case Stage::quality:
+        return "测量网格质量";
+    case Stage::error:
+        return "测量双向表面距离";
+    case Stage::complete:
+        return "重网格完成";
+    }
+    return "重网格";
+}
+
 } // namespace
 
 GeometryController::GeometryController(QObject* parent) : QObject(parent) {}
@@ -199,7 +230,21 @@ void GeometryController::build_mesh(GeometryTaskInput input, Completion completi
         [input = std::move(input)](auto token, const Reporter& report) {
             GeometryTaskResult result;
             const auto prefix = input.target_name + " | ";
-            if (input.simplify) {
+            if (input.remesh && input.simplify) {
+                throw std::invalid_argument("Select one geometry operation per task");
+            }
+            if (input.remesh) {
+                result.remeshing =
+                    minirender::remesh_isotropic(input.mesh, *input.remesh, token, [&](auto p) {
+                        report({prefix + "重网格 " + std::to_string(p.iteration) + "/" +
+                                    std::to_string(input.remesh->iterations) + " · " +
+                                    remesh_stage(p.stage) + " · 当前 " +
+                                    std::to_string(p.current_triangles) + " 面",
+                                p.completed, p.total});
+                    });
+                result.mesh = result.remeshing->mesh;
+                result.topology = result.remeshing->topology;
+            } else if (input.simplify) {
                 result.simplification =
                     minirender::simplify_qem(input.mesh, *input.simplify, token, [&](auto p) {
                         report({prefix + simplify_stage(p.stage) + " · 当前 " +
