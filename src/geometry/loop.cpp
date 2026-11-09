@@ -1,8 +1,7 @@
+#include "loop_rules.hpp"
 #include <minirender/geometry/loop.hpp>
 #include <minirender/geometry/normals.hpp>
 
-#include <cmath>
-#include <numbers>
 #include <stdexcept>
 #include <string>
 
@@ -23,9 +22,7 @@ glm::vec3 even_position(const MeshData& mesh, const HalfedgeMesh& topology, Mesh
         const glm::dvec3 b = mesh.positions[halfedges[halfedges[v.halfedge].previous].origin];
         return glm::vec3(p + ((a - p) + (b - p)) / 8.0);
     }
-    const double n = v.valence;
-    const double lambda = 3.0 / 8.0 + std::cos(2 * std::numbers::pi / n) / 4.0;
-    const double beta = (5.0 / 8.0 - lambda * lambda) / n;
+    const double beta = detail::loop_beta(v.valence);
     glm::dvec3 relative_sum(0);
     auto current = v.halfedge;
     for (MeshIndex index = 0; index < v.valence; ++index) {

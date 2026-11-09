@@ -125,6 +125,31 @@ const char* remesh_stage(minirender::RemeshStage stage) {
     return "重网格";
 }
 
+const char* adaptive_stage(minirender::AdaptiveStage stage) {
+    using Stage = minirender::AdaptiveStage;
+    switch (stage) {
+    case Stage::topology:
+        return "检查控制网格";
+    case Stage::seams:
+        return "检查高度接缝";
+    case Stage::sampling:
+        return "采样参照表面";
+    case Stage::refinement:
+        return "细化误差区域";
+    case Stage::balance:
+        return "平衡相邻层级";
+    case Stage::transitions:
+        return "构造过渡三角形";
+    case Stage::normals:
+        return "计算输出法线";
+    case Stage::output:
+        return "准备并校验结果";
+    case Stage::complete:
+        return "自适应细分完成";
+    }
+    return "自适应细分";
+}
+
 } // namespace
 
 GeometryController::GeometryController(QObject* parent) : QObject(parent) {}
@@ -230,10 +255,24 @@ void GeometryController::build_mesh(GeometryTaskInput input, Completion completi
         [input = std::move(input)](auto token, const Reporter& report) {
             GeometryTaskResult result;
             const auto prefix = input.target_name + " | ";
-            if (input.remesh && input.simplify) {
+            const int tools = static_cast<int>(input.remesh.has_value()) +
+                              static_cast<int>(input.simplify.has_value()) +
+                              static_cast<int>(input.adaptive.has_value());
+            if (tools > 1) {
                 throw std::invalid_argument("Select one geometry operation per task");
             }
-            if (input.remesh) {
+            if (input.adaptive) {
+                result.adaptation = minirender::subdivide_adaptive(
+                    input.mesh, input.height, *input.adaptive, token, [&](auto p) {
+                        report({prefix + adaptive_stage(p.stage) + " · red 叶子 " +
+                                    std::to_string(p.current_triangles) + " · 求值点 " +
+                                    std::to_string(p.evaluation_points),
+                                p.completed, p.total});
+                    });
+                result.mesh = result.adaptation->mesh;
+                result.topology = result.adaptation->topology;
+                result.maximum_displacement = result.adaptation->maximum_displacement;
+            } else if (input.remesh) {
                 result.remeshing =
                     minirender::remesh_isotropic(input.mesh, *input.remesh, token, [&](auto p) {
                         report({prefix + "重网格 " + std::to_string(p.iteration) + "/" +

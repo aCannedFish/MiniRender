@@ -513,6 +513,12 @@ void generate(Workbench& window, int levels, bool displace) {
 QImage verify_geometry_gpu(Workbench& window, const QString& directory, const QString& label) {
     return verify_gpu(window, directory, label);
 }
+void verify_geometry_shadows(Workbench& window, const QString& directory) {
+    verify_shadows(window, directory);
+}
+void verify_geometry_layout(Workbench& window) {
+    verify_layout(window);
+}
 void capture_workbench_ui(Workbench& window, const QString& path) {
     capture_ui(window, path);
 }

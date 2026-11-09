@@ -18,6 +18,7 @@ struct GeometryParameters {
     std::string height_id;
     std::optional<minirender::SimplifySettings> simplify;
     std::optional<minirender::RemeshSettings> remesh;
+    std::optional<minirender::AdaptiveSettings> adaptive;
 };
 
 // 几何参数只在点击生成时提交，修改控件只更新基于数组规模的预算估计。
@@ -44,6 +45,12 @@ class GeometryPanel final : public QWidget {
     QWidget* constraints_;
     QWidget* remeshing_;
     QFormLayout* tool_form_;
+    QWidget* adaptive_group_;
+    QSpinBox* adaptive_minimum_;
+    QSpinBox* adaptive_maximum_;
+    QSpinBox* adaptive_budget_;
+    QComboBox* adaptive_metric_;
+    QDoubleSpinBox* adaptive_error_;
     QDoubleSpinBox* remesh_length_;
     QDoubleSpinBox* remesh_step_;
     QSpinBox* remesh_iterations_;

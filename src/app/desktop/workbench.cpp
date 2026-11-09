@@ -1172,6 +1172,19 @@ void Workbench::apply_geometry() {
     input.height_settings = params.displacement;
     input.simplify = params.simplify;
     input.remesh = params.remesh;
+    input.adaptive = params.adaptive;
+    if (input.adaptive && input.adaptive->metric == minirender::AdaptiveMetric::screen_pixels) {
+        const auto extent = viewport_->swapChainImageSize();
+        if (extent.isEmpty()) {
+            throw std::runtime_error("Wait for the viewport before using pixel error");
+        }
+        const auto& camera = viewport_->camera();
+        input.adaptive->projection = minirender::AdaptiveProjection{
+            glm::dmat4(camera.projection_matrix(static_cast<float>(extent.width()) /
+                                                static_cast<float>(extent.height()))) *
+                glm::dmat4(camera.view_matrix()) * glm::dmat4(object->transform.matrix()),
+            {static_cast<double>(extent.width()), static_cast<double>(extent.height())}};
+    }
     input.target_name = object->name;
     if (params.displacement && params.displacement->scale != 0) {
         const auto height = std::find_if(

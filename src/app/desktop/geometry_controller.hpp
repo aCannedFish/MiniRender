@@ -1,6 +1,7 @@
 #pragma once
 
 #include <minirender/assets/scene_io.hpp>
+#include <minirender/geometry/adaptive.hpp>
 #include <minirender/geometry/displacement.hpp>
 #include <minirender/geometry/loop.hpp>
 #include <minirender/geometry/remesh.hpp>
@@ -25,7 +26,7 @@ struct GeometryTaskProgress {
     std::size_t total = 0;
 };
 
-// 启动时固定参数和数据所有权。simplify/remesh 互斥，两者均空时执行 Loop/位移。
+// 启动时固定参数和数据所有权。工具选项互斥，均空时执行均匀 Loop/位移。
 struct GeometryTaskInput {
     std::shared_ptr<const minirender::MeshData> mesh;
     std::shared_ptr<const minirender::Texture> height;
@@ -33,6 +34,7 @@ struct GeometryTaskInput {
     std::optional<minirender::DisplacementSettings> height_settings;
     std::optional<minirender::SimplifySettings> simplify;
     std::optional<minirender::RemeshSettings> remesh;
+    std::optional<minirender::AdaptiveSettings> adaptive;
     std::string target_name;
 };
 
@@ -46,6 +48,7 @@ struct GeometryTaskResult {
     double maximum_displacement = 0;
     std::optional<minirender::SimplifyResult> simplification;
     std::optional<minirender::RemeshResult> remeshing;
+    std::optional<minirender::AdaptiveResult> adaptation;
     std::string error;
     std::string summary;
     bool cancelled = false;

@@ -56,7 +56,8 @@ GeometryPanel::GeometryPanel(GeometryController& controller, QWidget* parent)
     form->addRow(target_);
     operation_ = new QComboBox(this);
     operation_->setObjectName("geometry_operation");
-    operation_->addItems({"Loop 与高度位移", "QEM 网格简化", "各向同性重网格"});
+    operation_->addItems(
+        {"Loop 与高度位移", "QEM 网格简化", "各向同性重网格", "自适应 Loop 与位移"});
     form->addRow("操作", operation_);
     remeshing_ = new QWidget(this);
     auto* remesh_form = new QFormLayout(remeshing_);
@@ -85,6 +86,37 @@ GeometryPanel::GeometryPanel(GeometryController& controller, QWidget* parent)
     remesh_form->addRow("平滑步长", remesh_step_);
     remesh_form->addRow(remesh_projection_);
     form->addRow(remeshing_);
+    adaptive_group_ = new QWidget(this);
+    auto* adaptive_form = new QFormLayout(adaptive_group_);
+    adaptive_form->setContentsMargins(0, 0, 0, 0);
+    adaptive_form->setRowWrapPolicy(QFormLayout::WrapLongRows);
+    adaptive_form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+    const auto level_field = [&](const char* name, int value) {
+        auto* field = new QSpinBox(adaptive_group_);
+        field->setObjectName(name);
+        field->setRange(0, 8);
+        field->setValue(value);
+        field->setKeyboardTracking(false);
+        return field;
+    };
+    adaptive_minimum_ = level_field("geometry_adaptive_min", 0);
+    adaptive_maximum_ = level_field("geometry_adaptive_max", 4);
+    adaptive_budget_ = new QSpinBox(adaptive_group_);
+    adaptive_budget_->setObjectName("geometry_adaptive_budget");
+    adaptive_budget_->setRange(1, 1000000);
+    adaptive_budget_->setValue(500000);
+    adaptive_budget_->setKeyboardTracking(false);
+    adaptive_metric_ = new QComboBox(adaptive_group_);
+    adaptive_metric_->setObjectName("geometry_adaptive_metric");
+    adaptive_metric_->addItems({"局部位置误差 / m", "固定视图投影误差 / px"});
+    adaptive_error_ =
+        scalar(adaptive_group_, "geometry_adaptive_error", 0.000001, 10000, 0.005, 6, 0.001);
+    adaptive_form->addRow("最小层级", adaptive_minimum_);
+    adaptive_form->addRow("参照最大层级", adaptive_maximum_);
+    adaptive_form->addRow("误差指标", adaptive_metric_);
+    adaptive_form->addRow("目标误差", adaptive_error_);
+    adaptive_form->addRow("面数上限", adaptive_budget_);
+    form->addRow(adaptive_group_);
     constraints_ = new QWidget(this);
     auto* simplify_form = new QFormLayout(constraints_);
     tool_form_ = simplify_form;
@@ -210,6 +242,14 @@ GeometryPanel::GeometryPanel(GeometryController& controller, QWidget* parent)
     connect(remesh_iterations_, &QSpinBox::valueChanged, this, [this] { update(); });
     connect(remesh_budget_, &QSpinBox::valueChanged, this, [this] { update(); });
     connect(remesh_projection_, &QCheckBox::toggled, this, [this] { update(); });
+    connect(adaptive_minimum_, &QSpinBox::valueChanged, this, [this] { update(); });
+    connect(adaptive_maximum_, &QSpinBox::valueChanged, this, [this] { update(); });
+    connect(adaptive_budget_, &QSpinBox::valueChanged, this, [this] { update(); });
+    connect(adaptive_error_, &QDoubleSpinBox::valueChanged, this, [this] { update(); });
+    connect(adaptive_metric_, &QComboBox::currentIndexChanged, this, [this](int index) {
+        adaptive_error_->setValue(index == 0 ? .005 : 1.0);
+        update();
+    });
     connect(apply_, &QPushButton::clicked, this, [this] {
         if (on_apply) {
             on_apply();
@@ -266,12 +306,26 @@ GeometryParameters GeometryPanel::parameters() const {
     }
     result.loop.levels = static_cast<std::uint32_t>(levels_->value());
     result.loop.maximum_triangles = static_cast<std::size_t>(budget_->value());
+    if (operation_->currentIndex() == 3) {
+        minirender::AdaptiveSettings settings;
+        settings.minimum_level = static_cast<std::uint32_t>(adaptive_minimum_->value());
+        settings.maximum_level = static_cast<std::uint32_t>(adaptive_maximum_->value());
+        settings.maximum_triangles = static_cast<std::size_t>(adaptive_budget_->value());
+        settings.maximum_evaluation_points =
+            std::min<std::size_t>(4000000, settings.maximum_triangles * 4);
+        settings.tolerance = adaptive_error_->value();
+        settings.metric = static_cast<minirender::AdaptiveMetric>(adaptive_metric_->currentIndex());
+        result.adaptive = settings;
+    }
     result.height_id = height_->currentData().toString().toStdString();
     if (displace_->isChecked()) {
         result.displacement = minirender::DisplacementSettings{};
         result.displacement->scale = scale_->value();
         result.displacement->midlevel = midlevel_->value();
         result.displacement->seam_tolerance = tolerance_->value();
+        if (result.adaptive) {
+            result.adaptive->displacement = result.displacement;
+        }
     }
     return result;
 }
@@ -324,6 +378,35 @@ void GeometryPanel::select_height(const std::string& id) {
     update();
 }
 void GeometryPanel::show_result(const GeometryTaskResult& result) {
+    if (result.adaptation) {
+        const auto& a = *result.adaptation;
+        QStringList levels;
+        for (std::size_t i = 0; i < a.triangles_per_level.size(); ++i) {
+            if (a.triangles_per_level[i]) {
+                levels << QString("L%1: %2").arg(i).arg(a.triangles_per_level[i]);
+            }
+        }
+        const QString unit = a.metric == minirender::AdaptiveMetric::local_distance ? "m" : "px";
+        metrics_->setText(
+            QString("自适应：%1 → %2 面，最深 red 层级 %3\n"
+                    "本次目标 %4 %5，最大采样误差 %6 %5\nred 分裂 %7，其中平衡分裂 %8；过渡面 %9\n"
+                    "虚拟求值点 %10，参照查询 %11\n各叶子层级输出面数：%12\n%13")
+                .arg(a.input_topology.faces)
+                .arg(a.topology.faces)
+                .arg(a.deepest_level)
+                .arg(a.applied_tolerance, 0, 'g', 6)
+                .arg(unit)
+                .arg(a.maximum_sampled_error, 0, 'g', 6)
+                .arg(a.red_refinements)
+                .arg(a.balancing_refinements)
+                .arg(a.transition_triangles)
+                .arg(a.evaluation_points)
+                .arg(a.reference_queries)
+                .arg(levels.join(" · "))
+                .arg(a.maximum_level_reached ? "已达最大层级，部分采样误差仍超过目标。"
+                                             : "终端三角形通过本次采样误差检查。"));
+        return;
+    }
     if (result.remeshing) {
         const auto& r = *result.remeshing;
         const double fraction = r.after.edges
@@ -398,13 +481,19 @@ void GeometryPanel::update() {
     const bool running = controller_.busy();
     const bool blocked = running || external_busy_;
     bool permitted = mesh_ != nullptr;
+    adaptive_minimum_->setMaximum(adaptive_maximum_->value());
+    adaptive_maximum_->setMinimum(adaptive_minimum_->value());
     const auto params = parameters();
+    const bool adapting = params.adaptive.has_value();
     const bool simplifying = params.simplify.has_value();
     const bool remeshing = params.remesh.has_value();
     for (QWidget* field : std::array<QWidget*, 7>{levels_, budget_, displace_, height_row_, scale_,
                                                   midlevel_, tolerance_}) {
         form_->setRowVisible(field, !simplifying && !remeshing);
     }
+    form_->setRowVisible(levels_, !simplifying && !remeshing && !adapting);
+    form_->setRowVisible(budget_, !simplifying && !remeshing && !adapting);
+    form_->setRowVisible(adaptive_group_, adapting);
     form_->setRowVisible(constraints_, simplifying || remeshing);
     form_->setRowVisible(remeshing_, remeshing);
     tool_form_->setRowVisible(target_faces_, simplifying);
@@ -413,14 +502,17 @@ void GeometryPanel::update() {
     crease_angle_->setEnabled(creases_->isChecked());
     quadric_error_->setEnabled(error_limit_->isChecked());
     note_->setText(
-        remeshing ? "按物体局部边长调整三角形分布，依次分裂、折叠、翻边、平滑和投影。"
-                    "保护边可细分，原位置保留；结果报告实际边长分布与表面误差。"
+        adapting
+            ? "按需细化误差区域并平衡邻接层级，过渡三角形共享边点。参照层级固定本次有限 Loop 表面；"
+              "像素指标采用任务启动时的视图与变换。更改相机后可重新生成。"
+        : remeshing ? "按物体局部边长调整三角形分布，依次分裂、折叠、翻边、平滑和投影。"
+                      "保护边可细分，原位置保留；结果报告实际边长分布与表面误差。"
         : simplifying
             ? "在当前网格上执行边折叠。接缝与硬法线顶点的相邻边保留，边界与折痕位置固定。"
               "结果报告实际面数和双向采样误差；保护条件可能使目标面数不可达。"
             : "高度取线性 R 通道，距离为物体局部米。生成基于当前网格；再次生成会继续细分，"
               "可通过撤销恢复。原始共享资产保留，仅更新启动任务时选中的物体。");
-    if (mesh_ && !simplifying && !remeshing) {
+    if (mesh_ && !simplifying && !remeshing && !adapting) {
         std::uint64_t faces = mesh_->triangles.size(), positions = mesh_->positions.size();
         bool over_budget = faces > params.loop.maximum_triangles;
         for (std::uint32_t level = 0; level < params.loop.levels && !over_budget; ++level) {
@@ -463,6 +555,19 @@ void GeometryPanel::update() {
                                .arg(params.remesh->maximum_triangles)
                                .arg(static_cast<double>(estimated) / (1024 * 1024), 0, 'f', 1)
                                .arg(permitted ? "" : "输入超过面数或工作内存预算。"));
+    }
+    if (mesh_ && adapting) {
+        const auto estimate = mesh_->triangles.size() * 2048ULL + mesh_->positions.size() * 512ULL;
+        permitted = mesh_->triangles.size() <= params.adaptive->maximum_triangles &&
+                    mesh_->positions.size() <= params.adaptive->maximum_evaluation_points &&
+                    estimate <= 2ULL * 1024 * 1024 * 1024;
+        estimate_->setText(
+            QString("输入 %1 面，输出上限 %2 面，虚拟点上限 %3；输入工作集估计 %4 MiB。%5")
+                .arg(mesh_->triangles.size())
+                .arg(params.adaptive->maximum_triangles)
+                .arg(params.adaptive->maximum_evaluation_points)
+                .arg(static_cast<double>(estimate) / (1024 * 1024), 0, 'f', 1)
+                .arg(permitted ? "" : "超过输入预算。"));
     }
     const bool height_needed = params.displacement && params.displacement->scale != 0;
     apply_->setEnabled(permitted && !blocked && (!height_needed || !params.height_id.empty()));
