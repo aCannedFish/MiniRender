@@ -4,7 +4,8 @@ find_package(Vulkan 1.2 REQUIRED COMPONENTS glslangValidator)
 # SPIR-V 随可执行文件嵌入 Qt 资源，运行不依赖源码目录或当前工作目录。
 set(shader_outputs)
 foreach(shader diagnostic.vert diagnostic.frag scene.vert scene.frag shadow.vert
-    wire.vert wire.frag post.vert post.frag offline.frag screen.vert ssao.frag ao_filter.frag ao_composite.frag environment.frag)
+    wire.vert wire.frag post.vert post.frag offline.frag screen.vert ssao.frag ao_filter.frag ao_composite.frag environment.frag
+    gizmo.vert gizmo.frag)
     set(source "${PROJECT_SOURCE_DIR}/shaders/${shader}")
     set(output "${CMAKE_CURRENT_BINARY_DIR}/${shader}.spv")
     add_custom_command(OUTPUT "${output}"
@@ -25,6 +26,8 @@ qt_add_executable(minirender_desktop
     ibl_controller.cpp ibl_controller.hpp environment_panel.cpp environment_panel.hpp
     geometry_controller.cpp geometry_controller.hpp geometry_panel.cpp geometry_panel.hpp
     geometry_smoke.cpp geometry_smoke.hpp
+    gizmo_renderer.cpp gizmo_renderer.hpp
+    gizmo_smoke.cpp gizmo_smoke.hpp
     ibl_smoke.cpp ibl_smoke.hpp
     offline_renderer.cpp offline_renderer.hpp offline_panel.cpp offline_panel.hpp
     offline_smoke.cpp offline_smoke.hpp

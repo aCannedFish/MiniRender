@@ -4,6 +4,7 @@
 #include <minirender/render/ibl.hpp>
 #include <minirender/render/raster_mesh.hpp>
 #include <minirender/render/ssao.hpp>
+#include <minirender/scene/gizmo.hpp>
 #include <minirender/scene/scene.hpp>
 #include <vulkan/vulkan.h>
 
@@ -67,6 +68,19 @@ class VulkanViewport final : public QWindow {
     std::function<void(bool)> on_display_changed;
     std::function<void(const minirender::Camera&)> on_camera_changed;
     std::function<void(const std::string&)> on_object_picked;
+    // 操纵器预览与历史由 Workbench/SceneEditor 管理；视口拥有几何命中和鼠标手势。
+    void set_gizmo_mode(minirender::GizmoMode mode);
+    minirender::GizmoMode gizmo_mode() const noexcept;
+    void set_gizmo_target(std::string object_id, std::optional<minirender::Transform> transform);
+    const minirender::GizmoLayout& gizmo_layout() const noexcept;
+    minirender::GizmoHandle highlighted_gizmo_handle() const noexcept;
+    bool gizmo_dragging() const noexcept;
+    void finish_gizmo_drag(bool commit);
+    std::function<bool()> on_transform_begin;
+    std::function<bool(const minirender::Transform&)> on_transform_preview;
+    std::function<void(bool)> on_transform_end;
+    std::function<void(minirender::GizmoMode)> on_gizmo_mode_changed;
+    std::function<void(const std::string&)> on_interaction_error;
 
     bool isValid() const noexcept;
     VkDevice device() const noexcept;
@@ -115,6 +129,7 @@ class VulkanViewport final : public QWindow {
     void record_readback();
     void finish_readback();
     void mark_preview_changed();
+    void rebuild_gizmo();
     std::uint32_t memory_type(std::uint32_t bits, VkMemoryPropertyFlags flags) const;
 
     std::unique_ptr<ViewportRenderer> renderer_;
@@ -144,6 +159,12 @@ class VulkanViewport final : public QWindow {
     QPointF last_mouse_;
     bool dragged_ = false;
     Qt::MouseButtons pressed_buttons_ = Qt::NoButton;
+    minirender::GizmoMode gizmo_mode_ = minirender::GizmoMode::select;
+    std::string gizmo_target_id_;
+    std::optional<minirender::Transform> gizmo_target_;
+    minirender::GizmoLayout gizmo_layout_;
+    minirender::GizmoHandle gizmo_hover_ = minirender::GizmoHandle::none;
+    std::optional<minirender::GizmoDrag> gizmo_drag_;
     VkPhysicalDevice physical_ = VK_NULL_HANDLE;
     VkPhysicalDeviceProperties properties_{};
     VkDevice device_ = VK_NULL_HANDLE;

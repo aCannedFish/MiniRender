@@ -33,6 +33,7 @@ add_library(minirender_core
     src/core/exr_io.cpp
     src/scene/scene.cpp
     src/scene/editor.cpp
+    src/scene/gizmo.cpp
     src/scene/shadow.cpp
     src/geometry/halfedge.cpp
     src/geometry/loop.cpp
@@ -77,7 +78,7 @@ if(BUILD_TESTING)
         tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp tests/path_tests.cpp
         tests/session_tests.cpp tests/ssao_tests.cpp tests/ibl_tests.cpp tests/geometry_tests.cpp
         tests/displacement_tests.cpp tests/mesh_io_tests.cpp tests/raster_mesh_tests.cpp
-        tests/simplify_tests.cpp)
+        tests/simplify_tests.cpp tests/gizmo_tests.cpp)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_tests PRIVATE
         minirender_core Catch2::Catch2WithMain minirender_warnings Threads::Threads)

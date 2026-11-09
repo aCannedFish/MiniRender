@@ -560,6 +560,7 @@ void VulkanViewport::release() {
 bool VulkanViewport::event(QEvent* event) {
     if (event->type() == QEvent::WindowDeactivate || event->type() == QEvent::Hide ||
         event->type() == QEvent::UngrabMouse) {
+        finish_gizmo_drag(event->type() == QEvent::UngrabMouse);
         pressed_buttons_ = Qt::NoButton;
         dragged_ = false;
     }
@@ -591,7 +592,9 @@ void VulkanViewport::exposeEvent(QExposeEvent*) {
 }
 
 void VulkanViewport::resizeEvent(QResizeEvent* event) {
+    finish_gizmo_drag(true);
     dirty_ = dirty_ || event->size() != event->oldSize();
+    rebuild_gizmo();
     requestUpdate();
 }
 
@@ -687,6 +690,7 @@ void VulkanViewport::set_scene(std::shared_ptr<const minirender::SceneSnapshot> 
     if (scene_) {
         camera_ = scene_->camera;
     }
+    rebuild_gizmo();
     ++scene_revision_;
     mark_preview_changed();
     requestUpdate();
@@ -712,7 +716,9 @@ const minirender::Camera& VulkanViewport::camera() const noexcept {
 }
 void VulkanViewport::set_camera(const minirender::Camera& camera) {
     camera.validate();
+    finish_gizmo_drag(true);
     camera_ = camera;
+    rebuild_gizmo();
     mark_preview_changed();
     if (on_camera_changed) {
         on_camera_changed(camera_);
@@ -779,7 +785,9 @@ void VulkanViewport::set_offline_visible(bool visible) {
     if (offline_visible_ == visible) {
         return;
     }
+    finish_gizmo_drag(true);
     offline_visible_ = visible;
+    rebuild_gizmo();
     pressed_buttons_ = Qt::NoButton;
     dragged_ = false;
     mark_preview_changed();
@@ -809,11 +817,50 @@ void VulkanViewport::mousePressEvent(QMouseEvent* event) {
     pressed_buttons_ = event->buttons();
     mouse_origin_ = last_mouse_ = event->position();
     dragged_ = false;
+    if (event->button() == Qt::LeftButton && event->modifiers() == Qt::NoModifier &&
+        gizmo_target_) {
+        const glm::dvec2 pointer(event->position().x(), event->position().y());
+        const auto hit = gizmo_layout_.hit(pointer);
+        const minirender::GizmoView view{camera_, {width(), height()}};
+        auto drag = minirender::GizmoDrag::begin(view, *gizmo_target_, gizmo_layout_, hit, pointer);
+        if (drag && on_transform_begin && on_transform_begin()) {
+            gizmo_drag_ = std::move(drag);
+            gizmo_hover_ = hit.handle;
+            mark_preview_changed();
+            requestUpdate();
+        }
+    }
     event->accept();
 }
 void VulkanViewport::mouseMoveEvent(QMouseEvent* event) {
     if (!scene_ || offline_visible_) {
         return;
+    }
+    const glm::dvec2 pointer(event->position().x(), event->position().y());
+    if (gizmo_drag_) {
+        if (!event->buttons().testFlag(Qt::LeftButton)) {
+            finish_gizmo_drag(true);
+            return;
+        }
+        try {
+            const auto value = gizmo_drag_->update(pointer);
+            if (!on_transform_preview || !on_transform_preview(value)) {
+                finish_gizmo_drag(false);
+            }
+        } catch (const std::exception& error) {
+            finish_gizmo_drag(false);
+            if (on_interaction_error) {
+                on_interaction_error(error.what());
+            }
+        }
+        event->accept();
+        return;
+    }
+    const auto hovered = gizmo_layout_.hit(pointer).handle;
+    if (hovered != gizmo_hover_) {
+        gizmo_hover_ = hovered;
+        mark_preview_changed();
+        requestUpdate();
     }
     // 只响应从本视口开始的拖拽；释放或失焦后不继承外部窗口的按钮状态。
     pressed_buttons_ &= event->buttons();
@@ -842,6 +889,11 @@ void VulkanViewport::mouseMoveEvent(QMouseEvent* event) {
     event->accept();
 }
 void VulkanViewport::mouseReleaseEvent(QMouseEvent* event) {
+    if (gizmo_drag_ && event->button() == Qt::LeftButton) {
+        finish_gizmo_drag(true);
+        event->accept();
+        return;
+    }
     const bool owned_press = pressed_buttons_.testFlag(event->button());
     pressed_buttons_ &= ~Qt::MouseButtons(event->button());
     if (owned_press && scene_ && !offline_visible_ && event->button() == Qt::LeftButton &&
@@ -859,6 +911,7 @@ void VulkanViewport::mouseReleaseEvent(QMouseEvent* event) {
     event->accept();
 }
 void VulkanViewport::wheelEvent(QWheelEvent* event) {
+    finish_gizmo_drag(true);
     if (scene_ && !offline_visible_) {
         set_camera(minirender::dolly_camera(
             camera_, std::exp(-static_cast<float>(event->angleDelta().y()) / 1200.0F)));
@@ -867,6 +920,19 @@ void VulkanViewport::wheelEvent(QWheelEvent* event) {
 }
 void VulkanViewport::keyPressEvent(QKeyEvent* event) {
     if (!scene_ || offline_visible_) {
+        return;
+    }
+    if (event->key() == Qt::Key_Escape && gizmo_drag_) {
+        finish_gizmo_drag(false);
+        event->accept();
+        return;
+    }
+    if (event->modifiers() == Qt::NoModifier &&
+        (event->key() == Qt::Key_V || event->key() == Qt::Key_T || event->key() == Qt::Key_R)) {
+        set_gizmo_mode(event->key() == Qt::Key_T   ? minirender::GizmoMode::translate
+                       : event->key() == Qt::Key_R ? minirender::GizmoMode::rotate
+                                                   : minirender::GizmoMode::select);
+        event->accept();
         return;
     }
     glm::vec3 move(0);
@@ -896,6 +962,67 @@ void VulkanViewport::keyPressEvent(QKeyEvent* event) {
     const float speed = event->modifiers().testFlag(Qt::ShiftModifier) ? 0.3F : 0.1F;
     set_camera(minirender::move_camera(camera_, move * speed));
     event->accept();
+}
+
+void VulkanViewport::set_gizmo_mode(minirender::GizmoMode mode) {
+    if (mode == gizmo_mode_) {
+        return;
+    }
+    finish_gizmo_drag(true);
+    gizmo_mode_ = mode;
+    gizmo_hover_ = minirender::GizmoHandle::none;
+    rebuild_gizmo();
+    mark_preview_changed();
+    requestUpdate();
+    if (on_gizmo_mode_changed) {
+        on_gizmo_mode_changed(mode);
+    }
+}
+minirender::GizmoMode VulkanViewport::gizmo_mode() const noexcept {
+    return gizmo_mode_;
+}
+void VulkanViewport::set_gizmo_target(std::string object_id,
+                                      std::optional<minirender::Transform> transform) {
+    if (object_id != gizmo_target_id_) {
+        finish_gizmo_drag(false);
+    }
+    gizmo_target_id_ = std::move(object_id);
+    gizmo_target_ = std::move(transform);
+    rebuild_gizmo();
+    mark_preview_changed();
+    requestUpdate();
+}
+void VulkanViewport::rebuild_gizmo() {
+    gizmo_layout_ = {};
+    if (gizmo_target_ && scene_ && !offline_visible_ && width() > 0 && height() > 0) {
+        const minirender::GizmoView view{camera_, {width(), height()}};
+        gizmo_layout_ = minirender::make_gizmo_layout(view, *gizmo_target_, gizmo_mode_);
+    }
+}
+const minirender::GizmoLayout& VulkanViewport::gizmo_layout() const noexcept {
+    return gizmo_layout_;
+}
+minirender::GizmoHandle VulkanViewport::highlighted_gizmo_handle() const noexcept {
+    return gizmo_drag_ ? gizmo_drag_->handle() : gizmo_hover_;
+}
+bool VulkanViewport::gizmo_dragging() const noexcept {
+    return gizmo_drag_.has_value();
+}
+void VulkanViewport::finish_gizmo_drag(bool commit) {
+    if (!gizmo_drag_) {
+        return;
+    }
+    // 先清空手势，再回调文档更新，允许回调重建场景或改变目标。
+    gizmo_drag_.reset();
+    gizmo_hover_ = minirender::GizmoHandle::none;
+    pressed_buttons_ = Qt::NoButton;
+    dragged_ = true;
+    if (on_transform_end) {
+        on_transform_end(commit);
+    }
+    rebuild_gizmo();
+    mark_preview_changed();
+    requestUpdate();
 }
 
 void VulkanViewport::set_shadows_enabled(bool enabled) {

@@ -1,4 +1,5 @@
 #include "geometry_smoke.hpp"
+#include "gizmo_smoke.hpp"
 #include "ibl_smoke.hpp"
 #include "interaction_smoke.hpp"
 #include "offline_smoke.hpp"
@@ -125,13 +126,15 @@ int main(int argc, char** argv) {
         {"ibl-smoke", "Verify IBL tasks, environment editing and CPU/GPU results.", "directory"});
     parser.addOption({"geometry-smoke",
                       "Verify background geometry, file tasks and CPU/GPU updates.", "directory"});
+    parser.addOption(
+        {"gizmo-smoke", "Verify object manipulation, history and GPU overlays.", "directory"});
     parser.process(application);
     const bool smoke = parser.isSet("smoke");
     const bool regression = smoke || parser.isSet("scene-smoke") || parser.isSet("texture-smoke") ||
                             parser.isSet("interaction-smoke") || parser.isSet("parameter-smoke") ||
                             parser.isSet("wire-smoke") || parser.isSet("offline-smoke") ||
                             parser.isSet("ssao-smoke") || parser.isSet("ibl-smoke") ||
-                            parser.isSet("geometry-smoke");
+                            parser.isSet("geometry-smoke") || parser.isSet("gizmo-smoke");
     const bool timing_only = parser.isSet("timing-only");
     if (timing_only && (!regression || parser.isSet("validation"))) {
         qCritical() << "--timing-only requires a regression mode and excludes --validation.";
@@ -225,6 +228,9 @@ int main(int argc, char** argv) {
         }
         if (parser.isSet("geometry-smoke")) {
             start_geometry_smoke(window, parser.value("geometry-smoke"), timing_only);
+        }
+        if (parser.isSet("gizmo-smoke")) {
+            start_gizmo_smoke(window, parser.value("gizmo-smoke"), timing_only);
         }
 
         int ticks = 0;
