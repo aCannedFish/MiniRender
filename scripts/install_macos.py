@@ -62,6 +62,19 @@ def remove_bundle(bundle: Path) -> None:
         shutil.rmtree(bundle)
 
 
+def unregister_bundle(bundle: Path) -> None:
+    """注销已识别的旧包；仅配置的包没有注册记录，-10814 可直接清理。"""
+    bundle_info(bundle, require_executable=False)
+    result = subprocess.run(
+        [str(LSREGISTER), "-u", str(bundle)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode and "-10814" not in result.stdout + result.stderr:
+        result.check_returncode()
+
+
 def publish_bundle(staged: Path, destination: Path, backup: Path) -> None:
     """在同一文件系统内更名替换；替换失败时恢复原应用。"""
     bundle_info(staged)
@@ -297,7 +310,7 @@ def main() -> int:
     for bundle in previous:
         if bundle == destination or not bundle.exists():
             continue
-        subprocess.run([str(LSREGISTER), "-u", str(bundle)], check=True)
+        unregister_bundle(bundle)
         remove_bundle(bundle)
         print(f"Removed old bundle: {bundle}", flush=True)
     subprocess.run([str(LSREGISTER), "-f", str(destination)], check=True)
