@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""运行真实桌面 GPU 验证并保存日志，超时或任何验证错误都返回失败。
+"""运行离屏 Vulkan GPU 验证并保存日志，超时或验证错误返回失败。
 
 独立进程超时不依赖 Qt event loop，能够捕获渲染提交阻塞主线程的情况。
-只有 GPU 窗口运行、图像像素、缩放、资源释放均通过，才能认定 A0 验收通过。
+默认隐藏 Qt 窗口；--onscreen 供人工检查呈现，窗口仍不主动激活。
 """
 
 import argparse
@@ -19,6 +19,9 @@ def main() -> int:
     parser.add_argument("executable", type=Path)
     parser.add_argument("--output", type=Path, default=Path("outputs/a0"))
     parser.add_argument("--timeout", type=float, default=35)
+    parser.add_argument(
+        "--onscreen", action="store_true", help="Show a non-activating window for manual checks"
+    )
     parser.add_argument(
         "--sync-validation",
         action="store_true",
@@ -92,6 +95,8 @@ def main() -> int:
         arguments = [str(executable), option, str(output / "gpu-smoke.png")]
     if args.timing_only:
         arguments.append("--timing-only")
+    if args.onscreen:
+        arguments.append("--onscreen-regression")
     with (output / "gpu-smoke.log").open("w", encoding="utf-8") as log:
         environment = os.environ.copy()
         if args.sync_validation:
@@ -123,6 +128,8 @@ def main() -> int:
         marker not in text
         or "Vulkan validation errors: 0" not in text
         or validation_mode not in text
+        or f"Vulkan rendering target: {'window' if args.onscreen else 'offscreen'}" not in text
+        or f"Regression window policy: {'visible' if args.onscreen else 'hidden'}, no activation" not in text
     ):
         print("Missing verification evidence.", file=sys.stderr)
         return 1

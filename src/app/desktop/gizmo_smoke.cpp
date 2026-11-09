@@ -233,9 +233,7 @@ void start_gizmo_smoke(Workbench& window, const QString& directory, bool measure
                 auto& viewport = *window.viewport();
                 require(++state->ticks < 3000 && viewport.failure().isEmpty(),
                         "Gizmo test timed out or renderer failed");
-                if (!viewport.isExposed()) {
-                    window.raise();
-                    window.activateWindow();
+                if (!viewport.can_render()) {
                     return;
                 }
                 if (viewport.rendered_frames() < 5 || !viewport.isValid()) {

@@ -167,9 +167,7 @@ void start_texture_smoke(Workbench& window, const QString& directory) {
             if (window.viewport()->rendered_frames() < 5) {
                 return;
             }
-            if (!window.viewport()->isExposed()) {
-                window.raise();
-                window.activateWindow();
+            if (!window.viewport()->can_render()) {
                 return;
             }
             if (state->stage == 0 &&

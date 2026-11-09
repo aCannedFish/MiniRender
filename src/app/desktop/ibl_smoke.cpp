@@ -293,8 +293,7 @@ void start_ibl_smoke(Workbench& window, const QString& directory) {
                 auto* controller = window.ibl_controller();
                 require(++state->ticks < state->maximum_ticks && viewport->failure().isEmpty(),
                         "IBL test timed out or GPU failed");
-                if (viewport->rendered_frames() < 5 || !viewport->isExposed()) {
-                    window.raise();
+                if (viewport->rendered_frames() < 5 || !viewport->can_render()) {
                     return;
                 }
                 const auto status = controller->status();

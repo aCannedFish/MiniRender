@@ -191,8 +191,7 @@ void start_ssao_smoke(Workbench& window, const QString& directory) {
             auto* viewport = window.viewport();
             require(++state->ticks < 160 && viewport->failure().isEmpty(),
                     "SSAO test timed out or renderer failed");
-            if (viewport->rendered_frames() < 5 || !viewport->isExposed()) {
-                window.raise();
+            if (viewport->rendered_frames() < 5 || !viewport->can_render()) {
                 return;
             }
             auto* mode = window.findChild<QComboBox*>("view_mode");

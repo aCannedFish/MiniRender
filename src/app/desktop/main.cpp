@@ -29,6 +29,7 @@
 
 #include <atomic>
 #include <cmath>
+#include <string_view>
 
 namespace {
 
@@ -91,9 +92,19 @@ bool validate_capture(const QImage& image) {
 } // namespace
 
 // 桌面入口管理窗口与 Vulkan instance 生命周期：窗口必须先于 instance 销毁。
-// --smoke 用真实窗口测试渲染、缩放和读回；没有 GPU 时失败，不能静默跳过。
+// 自动回归默认使用离屏 Vulkan 图像，保持 Qt 布局与事件循环运行。
+// --onscreen-regression 供人工检查窗口呈现；没有 GPU 时回归失败。
 int main(int argc, char** argv) {
+    bool regression_startup = false;
+    for (int i = 1; i < argc; ++i) {
+        const std::string_view argument(argv[i]);
+        regression_startup = regression_startup || argument == "--smoke" ||
+                             (argument.starts_with("--") && argument.ends_with("-smoke"));
+    }
 #ifdef Q_OS_MACOS
+    if (regression_startup) {
+        qputenv("QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM", "1");
+    }
     // 自有 Vulkan 提交由 timer 调度，不参与 Qt RHI 的事务内呈现协议。
     // 使用普通 CAMetalLayer，避免 QMetalLayer 暂存 drawable，阻塞后台 nextDrawable。
     qputenv("QT_MTL_NO_TRANSACTION", "1");
@@ -108,6 +119,8 @@ int main(int argc, char** argv) {
     parser.addHelpOption();
     parser.addOption({"smoke", "Run resize/readback checks and save a PNG.", "output"});
     parser.addOption({"validation", "Require Vulkan Validation Layers."});
+    parser.addOption({"onscreen-regression",
+                      "Use a visible non-activating window for manual presentation checks."});
     parser.addOption(
         {"timing-only",
          "Measure regression responsiveness without Vulkan validation instrumentation."});
@@ -136,6 +149,12 @@ int main(int argc, char** argv) {
                             parser.isSet("ssao-smoke") || parser.isSet("ibl-smoke") ||
                             parser.isSet("geometry-smoke") || parser.isSet("gizmo-smoke");
     const bool timing_only = parser.isSet("timing-only");
+    const bool offscreen = regression && !parser.isSet("onscreen-regression");
+    if (parser.isSet("onscreen-regression") && !regression) {
+        qCritical() << "--onscreen-regression requires a regression mode.";
+        return 1;
+    }
+    qInfo() << "Vulkan rendering target:" << (offscreen ? "offscreen" : "window");
     if (timing_only && (!regression || parser.isSet("validation"))) {
         qCritical() << "--timing-only requires a regression mode and excludes --validation.";
         return 1;
@@ -183,6 +202,7 @@ int main(int argc, char** argv) {
             window.setWindowTitle(window.windowTitle() + " [自动回归]");
         }
         auto* viewport = window.viewport();
+        viewport->set_offscreen_rendering(offscreen);
         if (!smoke) {
             const QString scene_path =
                 parser.isSet("scene")
@@ -241,6 +261,11 @@ int main(int argc, char** argv) {
         timer.setInterval(100);
         QObject::connect(&timer, &QTimer::timeout, &window, [&] {
             ++ticks;
+            if (offscreen && (window.isActiveWindow() || viewport->isExposed())) {
+                qCritical() << "Offscreen regression exposed or activated a window.";
+                application.exit(1);
+                return;
+            }
             if (!viewport->failure().isEmpty()) {
                 application.exit(1);
                 return;
@@ -289,9 +314,21 @@ int main(int argc, char** argv) {
         if (smoke) {
             window.resize(960, 640);
         }
+        if (regression) {
+            window.setAttribute(Qt::WA_ShowWithoutActivating);
+            window.setWindowFlag(Qt::WindowDoesNotAcceptFocus);
+            window.setAttribute(Qt::WA_DontShowOnScreen, offscreen);
+            qInfo() << "Regression window policy:"
+                    << (offscreen ? "hidden, no activation" : "visible, no activation");
+        }
         window.show();
-        window.raise();
-        window.activateWindow();
+        if (offscreen) {
+            viewport->requestUpdate();
+        }
+        if (!regression) {
+            window.raise();
+            window.activateWindow();
+        }
         timer.start();
         result = application.exec();
         if (parser.isSet("geometry-smoke")) {

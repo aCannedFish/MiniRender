@@ -36,11 +36,15 @@ build/macos-desktop-debug/src/app/desktop/minirender_desktop.app/Contents/MacOS/
 
 Qt 提供工作台和原生窗口，项目的 `VulkanViewport` 管理设备与交换链。默认打开 studio 场景与编辑工作台，使用方法见 VIEWPORT.md。A0 棋盘/深度诊断仍由 --smoke 参数运行。
 
-GPU 验证使用实际窗口、缩放和交换链回读：
+GPU 自动验证默认在隐藏窗口下运行离屏 Vulkan 渲染，检查尺寸变化与图像读回：
 
 ```sh
 python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirender_desktop.app
 ```
+
+测试不会激活或置顶窗口。Qt 继续运行布局和事件循环，Vulkan 使用同一套渲染管线，将最终结果写入独立图像。日志记录 `offscreen` 与 `hidden, no activation`，并检查视口未暴露、窗口未激活。人工检查窗口呈现时可以显式传入 `--onscreen`，该模式也不主动激活窗口。
+
+离屏测试覆盖渲染、尺寸变化、读回和资源释放；交换链呈现由人工窗口检查覆盖。
 
 结果写入 `outputs/a0/gpu-smoke.png` 和同目录日志。脚本检查退出码、像素检查成功和销毁之后的零 Validation 错误。日志缺失、超时、不能回读或缺少 Validation Layer 都是失败，不是跳过。
 
