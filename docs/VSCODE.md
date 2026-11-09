@@ -31,3 +31,5 @@ A0.1 检查了配置 JSON 和扩展支持的配置键。使用 desktop-debug 的
 这证明编译参数可被语言服务解析。VS Code 的初次索引仍需要所选 preset 配置成功；Windows 的本地 IntelliSense 界面将在 B 阶段实测。
 
 配置依据：[Microsoft IntelliSense 文档](https://code.visualstudio.com/docs/cpp/configure-intellisense)、[C/C++ 配置参考](https://code.visualstudio.com/docs/cpp/customize-cpp-settings)。
+
+macOS 桌面回归的 `regression_activity.mm` 使用 Objective-C++ 调用系统 activity API。desktop preset 配置该编译器并为文件记录 `-fobjc-arc`；C++ 头文件通过普通指针隔离原生类型，核心和 Windows 构建不编译该文件。

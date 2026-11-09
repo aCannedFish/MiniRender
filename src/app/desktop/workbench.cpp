@@ -1119,6 +1119,7 @@ void Workbench::apply_geometry() {
     input.loop = params.loop;
     input.height_settings = params.displacement;
     input.simplify = params.simplify;
+    input.remesh = params.remesh;
     input.target_name = object->name;
     if (params.displacement && params.displacement->scale != 0) {
         const auto height = std::find_if(

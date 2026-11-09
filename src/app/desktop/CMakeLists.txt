@@ -41,6 +41,10 @@ qt_add_executable(minirender_desktop
     scene_smoke.cpp scene_smoke.hpp texture_smoke.cpp texture_smoke.hpp interaction_smoke.cpp interaction_smoke.hpp
     parameter_smoke.cpp parameter_smoke.hpp wire_smoke.cpp wire_smoke.hpp)
 if(APPLE)
+    enable_language(OBJCXX)
+    target_sources(minirender_desktop PRIVATE regression_activity.mm regression_activity.hpp)
+    set_source_files_properties(regression_activity.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+    set_property(TARGET minirender_desktop PROPERTY OBJCXX_STANDARD 20)
     set_target_properties(minirender_desktop PROPERTIES
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_GUI_IDENTIFIER "org.minirender.desktop"

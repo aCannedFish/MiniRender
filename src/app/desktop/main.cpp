@@ -28,6 +28,10 @@
 #include <QToolBar>
 #include <QVulkanInstance>
 
+#ifdef Q_OS_MACOS
+#include "regression_activity.hpp"
+#endif
+
 #include <atomic>
 #include <cmath>
 #include <string_view>
@@ -171,6 +175,9 @@ int main(int argc, char** argv) {
                             parser.isSet("ssao-smoke") || parser.isSet("ibl-smoke") ||
                             parser.isSet("geometry-smoke") || parser.isSet("gizmo-smoke") ||
                             parser.isSet("sides-smoke");
+#ifdef Q_OS_MACOS
+    RegressionActivity regression_activity(regression);
+#endif
     const bool timing_only = parser.isSet("timing-only");
     const bool offscreen = regression && !parser.isSet("onscreen-regression");
     if (parser.isSet("onscreen-regression") && !regression) {

@@ -53,6 +53,22 @@ class InstallerTests(unittest.TestCase):
             self.assertTrue(foreign.exists())
             self.assertEqual(unrelated.read_text(encoding="utf-8"), "model")
 
+    def test_missing_registration_allows_cleanup_but_other_errors_stop(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            bundle = make_bundle(Path(temporary) / "old.app")
+            missing = installer.subprocess.CompletedProcess(
+                [], 1, stdout="failed to scan: -10814", stderr=""
+            )
+            with patch.object(installer.subprocess, "run", return_value=missing):
+                installer.unregister_bundle(bundle)
+            denied = installer.subprocess.CompletedProcess(
+                [], 1, stdout="", stderr="permission denied"
+            )
+            with patch.object(installer.subprocess, "run", return_value=denied):
+                with self.assertRaises(installer.subprocess.CalledProcessError):
+                    installer.unregister_bundle(bundle)
+            self.assertTrue(bundle.exists())
+
     def test_incomplete_owned_bundle_is_removed(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
