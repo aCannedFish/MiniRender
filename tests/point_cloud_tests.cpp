@@ -12,6 +12,7 @@
 #include <chrono>
 #include <cmath>
 #include <fstream>
+#include <locale>
 #include <numbers>
 
 using namespace minirender;
@@ -32,6 +33,26 @@ class TemporaryDirectory final {
         std::filesystem::remove_all(path, error);
     }
     std::filesystem::path path;
+};
+
+// 临时更改 C++ 小数点，检查 PLY 读写是否仍固定使用点号；析构恢复全局设置。
+class CommaLocale final {
+    class Punctuation final : public std::numpunct<char> {
+        char do_decimal_point() const override {
+            return ',';
+        }
+    };
+
+  public:
+    CommaLocale() : original_(std::locale()) {
+        std::locale::global(std::locale(original_, new Punctuation));
+    }
+    ~CommaLocale() {
+        std::locale::global(original_);
+    }
+
+  private:
+    std::locale original_;
 };
 void text_file(const std::filesystem::path& path, const std::string& text) {
     std::ofstream stream(path, std::ios::binary);
@@ -57,6 +78,7 @@ std::shared_ptr<PointCloud> sphere(std::size_t count, glm::vec3 translation = {}
 } // namespace
 
 TEST_CASE("PLY round trips positions normals and Unicode paths in all encodings", "[points][io]") {
+    CommaLocale locale;
     TemporaryDirectory directory;
     const auto file = directory.path / std::filesystem::path(u8"点云 空格.ply");
     auto input = *sphere(31);

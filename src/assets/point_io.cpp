@@ -302,8 +302,11 @@ class Reader final {
         const auto* last = text.data() + text.size();
         if (floating(type)) {
             double value = 0;
-            const auto parsed = std::from_chars(first, last, value);
-            if (parsed.ec != std::errc{} || parsed.ptr != last) {
+            // 与现有 CLI 保持一致，兼容尚无浮点 from_chars 的 libc++。
+            std::istringstream input(text);
+            input.imbue(std::locale::classic());
+            input >> std::noskipws >> value;
+            if (!input || input.peek() != std::char_traits<char>::eof()) {
                 throw std::invalid_argument("Invalid PLY floating point token");
             }
             return value;

@@ -6,12 +6,13 @@
 #include <minirender/render/path_tracer.hpp>
 
 #include <algorithm>
-#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <locale>
 #include <numbers>
+#include <sstream>
 #include <stdexcept>
 #include <string_view>
 
@@ -64,8 +65,10 @@ std::vector<double> parse_radii(std::string_view text) {
         const auto comma = text.find(',');
         const auto token = text.substr(0, comma);
         double radius = 0;
-        const auto parsed = std::from_chars(token.data(), token.data() + token.size(), radius);
-        if (parsed.ec != std::errc{} || parsed.ptr != token.data() + token.size()) {
+        std::istringstream input{std::string(token)};
+        input.imbue(std::locale::classic());
+        input >> std::noskipws >> radius;
+        if (!input || input.peek() != std::char_traits<char>::eof()) {
             throw std::invalid_argument("Radii must be comma-separated numbers");
         }
         radii.push_back(radius);
