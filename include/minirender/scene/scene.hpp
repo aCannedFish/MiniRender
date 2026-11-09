@@ -95,6 +95,8 @@ struct Material {
     float ior = 1.5F;
     std::string base_color_texture{};
     TextureFilter texture_filter = TextureFilter::trilinear;
+    // 正面由几何绕序决定，镜像变换保留原外侧。默认双面兼容已有场景。
+    bool double_sided = true;
     void validate() const;
 };
 

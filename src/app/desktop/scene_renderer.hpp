@@ -29,7 +29,8 @@ class SceneRenderer final : public ViewportRenderer {
 
   private:
     enum class Pass { surface, shadow, wire, background };
-    VkPipeline create_pipeline(Pass pass);
+    VkPipeline create_pipeline(Pass pass, VkCullModeFlags cull = VK_CULL_MODE_NONE,
+                               VkFrontFace front = VK_FRONT_FACE_COUNTER_CLOCKWISE);
     void render_wire(VkCommandBuffer command);
     void render_shadow_maps(VkCommandBuffer command);
     void upload_scene();
@@ -72,8 +73,9 @@ class SceneRenderer final : public ViewportRenderer {
     VkDescriptorPool descriptor_pool_ = VK_NULL_HANDLE;
     VkDescriptorSet descriptor_ = VK_NULL_HANDLE;
     VkPipelineLayout pipeline_layout_ = VK_NULL_HANDLE;
-    VkPipeline pipeline_ = VK_NULL_HANDLE;
-    VkPipeline shadow_pipeline_ = VK_NULL_HANDLE;
+    // 0 为双面，1/2 分别为普通/镜像变换下的单面。
+    std::array<VkPipeline, 3> surface_pipelines_{};
+    std::array<VkPipeline, 3> shadow_pipelines_{};
     VkPipeline wire_pipeline_ = VK_NULL_HANDLE;
     VkPipeline background_pipeline_ = VK_NULL_HANDLE;
     std::uint64_t scene_revision_ = std::numeric_limits<std::uint64_t>::max();

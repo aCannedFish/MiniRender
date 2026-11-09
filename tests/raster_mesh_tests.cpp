@@ -43,6 +43,12 @@ TEST_CASE("Raster preparation preserves face attributes line indices and local b
             REQUIRE(actual.position == mesh->positions[original.position]);
             REQUIRE(actual.normal == original.normal);
             REQUIRE(actual.uv == original.uv);
+            const auto& triangle = mesh->triangles[face];
+            const auto a = mesh->positions[triangle.corners[0].position];
+            const auto b = mesh->positions[triangle.corners[1].position];
+            const auto c = mesh->positions[triangle.corners[2].position];
+            REQUIRE(glm::length(actual.geometric_normal -
+                                glm::normalize(glm::cross(b - a, c - a))) < 1e-6F);
         }
     }
     REQUIRE_THROWS_AS(prepare_raster_mesh(MeshData{}), std::invalid_argument);

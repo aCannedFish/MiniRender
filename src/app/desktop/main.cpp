@@ -5,6 +5,7 @@
 #include "offline_smoke.hpp"
 #include "parameter_smoke.hpp"
 #include "scene_smoke.hpp"
+#include "sides_smoke.hpp"
 #include "ssao_smoke.hpp"
 #include "texture_smoke.hpp"
 #include "vulkan_viewport.hpp"
@@ -141,13 +142,16 @@ int main(int argc, char** argv) {
                       "Verify background geometry, file tasks and CPU/GPU updates.", "directory"});
     parser.addOption(
         {"gizmo-smoke", "Verify object manipulation, history and GPU overlays.", "directory"});
+    parser.addOption(
+        {"sides-smoke", "Verify material sidedness and coplanar contact views.", "directory"});
     parser.process(application);
     const bool smoke = parser.isSet("smoke");
     const bool regression = smoke || parser.isSet("scene-smoke") || parser.isSet("texture-smoke") ||
                             parser.isSet("interaction-smoke") || parser.isSet("parameter-smoke") ||
                             parser.isSet("wire-smoke") || parser.isSet("offline-smoke") ||
                             parser.isSet("ssao-smoke") || parser.isSet("ibl-smoke") ||
-                            parser.isSet("geometry-smoke") || parser.isSet("gizmo-smoke");
+                            parser.isSet("geometry-smoke") || parser.isSet("gizmo-smoke") ||
+                            parser.isSet("sides-smoke");
     const bool timing_only = parser.isSet("timing-only");
     const bool offscreen = regression && !parser.isSet("onscreen-regression");
     if (parser.isSet("onscreen-regression") && !regression) {
@@ -251,6 +255,10 @@ int main(int argc, char** argv) {
         }
         if (parser.isSet("gizmo-smoke")) {
             start_gizmo_smoke(window, parser.value("gizmo-smoke"), timing_only);
+        }
+
+        if (parser.isSet("sides-smoke")) {
+            start_sides_smoke(window, parser.value("sides-smoke"));
         }
 
         int ticks = 0;

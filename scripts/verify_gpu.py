@@ -49,11 +49,13 @@ def main() -> int:
     checks.add_argument(
         "--gizmo-check", action="store_true", help="Verify object translation and rotation"
     )
+    checks.add_argument("--sides-check", action="store_true", help="Verify single and double sided surfaces")
     args = parser.parse_args()
     if args.timing_only and args.sync_validation:
         parser.error("Timing measurements and synchronization validation must run separately")
     scene_check = (
-        args.texture_check
+        args.sides_check
+        or args.texture_check
         or args.interaction_check
         or args.parameter_check
         or args.wire_check
@@ -75,6 +77,7 @@ def main() -> int:
     mode = "GPU"
     option = "--smoke"
     for selected, candidate in [
+        (args.sides_check, "Sides"),
         (args.gizmo_check, "Gizmo"),
         (args.geometry_check, "Geometry"),
         (args.ibl_check, "IBL"),

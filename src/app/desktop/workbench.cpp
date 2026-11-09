@@ -558,6 +558,9 @@ void Workbench::build_object_panel() {
     texture_filter_ = new QComboBox;
     texture_filter_->setObjectName("texture_filter");
     texture_filter_->addItems({"最近邻", "双线性", "三线性 mipmap"});
+    double_sided_ = new QCheckBox("双面渲染");
+    double_sided_->setObjectName("material_double_sided");
+    double_sided_->setToolTip("关闭时只显示几何正面；镜像缩放保留原外侧。");
     roughness_ = spin(object_panel_, "roughness", 0, 1, 0.05);
     ior_ = spin(object_panel_, "ior", 0.1, 5, 0.05);
     layout->addRow("名称", object_name_);
@@ -565,6 +568,7 @@ void Workbench::build_object_panel() {
     layout->addRow("旋转 / °", rotation_);
     layout->addRow("缩放", scale_);
     layout->addRow("材质", material_kind_);
+    layout->addRow(double_sided_);
     layout->addRow("底色 / 线性 RGB", base_color_);
     layout->addRow("底色纹理 / RGB", texture_selector_);
     layout->addRow("纹理过滤", texture_filter_);
@@ -630,6 +634,10 @@ void Workbench::build_object_panel() {
             material.texture_filter =
                 static_cast<minirender::TextureFilter>(texture_filter_->currentIndex());
         });
+    });
+    connect(double_sided_, &QCheckBox::toggled, this, [this](bool checked) {
+        edit_material_property(
+            [&](minirender::Material& material) { material.double_sided = checked; });
     });
     object_panel_->setEnabled(false);
 }
@@ -799,6 +807,7 @@ void Workbench::refresh_properties() {
                 material_kind_->setCurrentIndex(static_cast<int>(material.kind));
                 roughness_->setValue(material.roughness);
                 ior_->setValue(material.ior);
+                double_sided_->setChecked(material.double_sided);
                 texture_selector_->setCurrentIndex(texture_selector_->findData(
                     QString::fromStdString(material.base_color_texture)));
                 texture_filter_->setCurrentIndex(static_cast<int>(material.texture_filter));

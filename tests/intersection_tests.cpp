@@ -36,6 +36,8 @@ struct ReferenceTriangle {
     std::array<glm::dvec3, 3> vertices;
     std::uint32_t instance;
     std::uint32_t triangle;
+    bool double_sided;
+    bool mirrored;
 };
 
 std::vector<ReferenceTriangle> reference_triangles(const SceneSnapshot& scene) {
@@ -46,6 +48,8 @@ std::vector<ReferenceTriangle> reference_triangles(const SceneSnapshot& scene) {
             ReferenceTriangle triangle{};
             triangle.instance = static_cast<std::uint32_t>(index);
             triangle.triangle = static_cast<std::uint32_t>(face);
+            triangle.double_sided = instance.material.double_sided;
+            triangle.mirrored = glm::determinant(glm::dmat3(instance.object_to_world)) < 0;
             for (std::size_t corner = 0; corner < 3; ++corner) {
                 const auto position =
                     instance.mesh
@@ -74,6 +78,9 @@ std::optional<ReferenceHit> brute_force(const std::vector<ReferenceTriangle>& tr
         const auto p = glm::cross(glm::dvec3(ray.direction), edge2);
         const double determinant = glm::dot(edge1, p);
         if (std::abs(determinant) < 1e-14) {
+            continue;
+        }
+        if (!triangle.double_sided && determinant * (triangle.mirrored ? -1 : 1) <= 0) {
             continue;
         }
         const auto offset = glm::dvec3(ray.origin) - triangle.vertices[0];

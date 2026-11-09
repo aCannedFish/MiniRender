@@ -10,6 +10,7 @@ class QTreeWidget;
 class QLineEdit;
 class QDoubleSpinBox;
 class QComboBox;
+class QCheckBox;
 class VectorField;
 class QProgressBar;
 class QLabel;
@@ -95,6 +96,7 @@ class Workbench final : public QMainWindow {
     QComboBox* material_kind_ = nullptr;
     QComboBox* texture_selector_ = nullptr;
     QComboBox* texture_filter_ = nullptr;
+    QCheckBox* double_sided_ = nullptr;
     QAction* import_texture_action_ = nullptr;
     QAction* import_object_action_ = nullptr;
     QAction* open_action_ = nullptr;

@@ -205,6 +205,7 @@ std::optional<std::string> pick_object(const SceneSnapshot& scene, const Ray& ra
     double nearest = std::numeric_limits<double>::infinity();
     std::optional<std::string> selected;
     for (const auto& instance : scene.instances) {
+        const bool mirrored = glm::determinant(glm::mat3(instance.object_to_world)) < 0;
         for (const auto& triangle : instance.mesh->triangles) {
             std::array<glm::dvec3, 3> p;
             for (std::size_t k = 0; k < 3; ++k) {
@@ -212,12 +213,15 @@ std::optional<std::string> pick_object(const SceneSnapshot& scene, const Ray& ra
                     glm::vec3(instance.object_to_world *
                               glm::vec4(instance.mesh->positions[triangle.corners[k].position], 1));
             }
-            // Möller–Trumbore，双面求交；t 采用世界空间单位以比较不同缩放的实例。
+            // Möller–Trumbore；t 使用世界空间距离，朝向规则与 BVH 和预览一致。
             const auto edge1 = p[1] - p[0];
             const auto edge2 = p[2] - p[0];
             const auto cross = glm::cross(ray.direction, edge2);
             const double determinant = glm::dot(edge1, cross);
             if (std::abs(determinant) < 1e-9F) {
+                continue;
+            }
+            if (!instance.material.double_sided && determinant * (mirrored ? -1 : 1) <= 0) {
                 continue;
             }
             const double inverse = 1.0 / determinant;

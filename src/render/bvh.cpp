@@ -196,10 +196,11 @@ const BvhBuildStatistics& SceneBvh::statistics() const noexcept {
     return statistics_;
 }
 
-std::optional<SceneBvh::PrimitiveHit> SceneBvh::trace(const RayQuery& query, RayInterval interval,
+std::optional<SceneBvh::PrimitiveHit> SceneBvh::trace(const Ray& ray, RayInterval interval,
                                                       bool any_hit, TraceStatistics* statistics,
                                                       const CancellationToken& cancellation) const {
     interval.validate();
+    const RayQuery query(ray);
     if (nodes_.empty()) {
         return std::nullopt;
     }
@@ -239,6 +240,22 @@ std::optional<SceneBvh::PrimitiveHit> SceneBvh::trace(const RayQuery& query, Ray
                     ++statistics->triangle_tests;
                 }
                 const auto hit = query.intersect(primitives_[primitive].vertices, interval);
+                if (hit) {
+                    const auto& candidate = primitives_[primitive];
+                    const auto& instance = scene_->instances[candidate.instance];
+                    if (!instance.material.double_sided) {
+                        // 用几何绕序判断朝向，不能用平滑或法线贴图改变可见性。
+                        const auto edge1 =
+                            glm::dvec3(candidate.vertices[1]) - glm::dvec3(candidate.vertices[0]);
+                        const auto edge2 =
+                            glm::dvec3(candidate.vertices[2]) - glm::dvec3(candidate.vertices[0]);
+                        const auto outward =
+                            glm::cross(edge1, edge2) * (mirrored_[candidate.instance] ? -1.0 : 1.0);
+                        if (glm::dot(ray.direction, outward) >= 0) {
+                            continue;
+                        }
+                    }
+                }
                 if (hit &&
                     (!result || hit->distance < result->hit.distance ||
                      (hit->distance == result->hit.distance && primitive < result->primitive))) {
@@ -315,13 +332,13 @@ std::optional<SurfaceHit> SceneBvh::intersect(const Ray& ray, RayInterval interv
                                               TraceStatistics* statistics,
                                               const CancellationToken& cancellation) const {
     cancellation.check();
-    const auto hit = trace(RayQuery(ray), interval, false, statistics, cancellation);
+    const auto hit = trace(ray, interval, false, statistics, cancellation);
     return hit ? std::optional(surface_hit(ray, *hit)) : std::nullopt;
 }
 bool SceneBvh::occluded(const Ray& ray, RayInterval interval, TraceStatistics* statistics,
                         const CancellationToken& cancellation) const {
     cancellation.check();
-    return trace(RayQuery(ray), interval, true, statistics, cancellation).has_value();
+    return trace(ray, interval, true, statistics, cancellation).has_value();
 }
 
 } // namespace minirender
