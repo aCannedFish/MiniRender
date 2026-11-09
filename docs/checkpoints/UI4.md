@@ -58,6 +58,14 @@ Release 与 ASan/UBSan 均为 143/143，通过。新增 4 个用例检查：
 
 日志包含 `Vulkan rendering target: offscreen` 与 `Regression window policy: hidden, no activation`。运行期间检查主窗口未激活、视口未暴露。离屏测试执行实际 GPU 渲染；人工窗口呈现检查通过显式 `--onscreen` 入口运行。
 
+## 文件占用
+
+Windows 的并发保存检查覆盖跨盘复制：目标文件已创建但写入句柄仍排他占用时，另一任务可能暂时无法比较内容。导出流程将该目标按已占名处理，改用新文件名，保留现有文件；源文件读取失败仍报错。Windows 专用用例用排他句柄固定重现这一状态。
+
+## 应用更新
+
+正式应用固定为 `/Applications/MiniRender.app`。安装脚本先在临时目录部署 Qt 依赖并执行离屏 GPU 检查，通过后替换正式应用，再清理同 bundle ID 的旧构建包和旧安装包。安装器的 6 个 Python 用例覆盖归属、清理范围、符号链接、替换、失败恢复、活动应用和构建检查。
+
 ## 复验
 
 ```sh

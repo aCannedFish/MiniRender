@@ -50,6 +50,22 @@ python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirend
 
 着色器在构建时编译并嵌入程序，因此可从其他工作目录运行。场景编辑、相机交互和材质参数面板已在 A1.2 加入；阴影、HDR 后处理与 EXR 输出已分别在 A1.3/A1.4 加入。
 
+## 更新应用
+
+本机正式应用固定为 `/Applications/MiniRender.app`，每次更新替换这一份，不保留按版本命名的旧应用。
+
+完成桌面构建和回归后执行：
+
+```sh
+python3 scripts/install_macos.py
+```
+
+脚本在临时目录复制 Release 应用，使用 `macdeployqt` 部署依赖，并执行隐藏窗口下的离屏 GPU 检查。检查通过后替换正式应用，再按 bundle ID 清理应用目录及本仓库全部工作树构建目录中的旧 `.app` 包。源码、资产、构建缓存和测试结果保留。
+
+旧构建包清理后，下次构建先运行 `cmake --preset macos-desktop-release`，再 build 和测试，重新生成应用包元数据。
+
+更新前应退出 MiniRender 并等待相关构建结束。替换失败时恢复原应用；正式包内的 `Contents/Resources/minirender-build.json` 记录提交和安装时间。部署方式参考 [Qt macOS 部署文档](https://doc.qt.io/qt-6/macos-deployment.html)。
+
 ## Windows
 
 CPU CI 使用 Windows 2022 runner 和 MSVC，桌面及 NVIDIA 运行仍按计划留到 B 阶段。在 VS Developer PowerShell 中可以使用 `windows-core-debug` 等 presets。Qt 与 Vulkan SDK 的私有位置通过不入库的 `CMakeUserPresets.json` 配置。

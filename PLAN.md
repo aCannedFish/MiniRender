@@ -266,6 +266,8 @@ Windows 阶段不重新组织场景格式和算法模块。确需平台修复时
 
 不要提交构建产物、用户 preset、Qt/Vulkan/CUDA/OptiX SDK、机器绝对路径、临时日志、大型模型或长视频。小型可再分发测试资产可入库；大型资产记录来源、许可、下载方式和校验值。仓库不发布本机 PDF 或个人路径。
 
+macOS 每次桌面更新后运行 `scripts/install_macos.py`，固定替换 `/Applications/MiniRender.app`，清理同 bundle ID 的旧安装包和工作树构建包。Windows 发布阶段沿用只保留最新版的要求。
+
 ### 持续集成
 
 从 A0 建立 macOS 与 Windows 的 CPU 构建/CTest 检查，Windows CI 可在换机前发现部分 MSVC 问题，但不算目标设备实测。Qt 构建与 SPIR-V 编译检查在依赖稳定后加入。
