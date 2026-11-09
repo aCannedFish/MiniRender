@@ -1,6 +1,7 @@
 """检查安装器的应用归属、清理范围和替换失败恢复，不调用系统部署工具。"""
 
 import importlib.util
+import json
 from pathlib import Path
 import plistlib
 import tempfile
@@ -60,6 +61,49 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(installer.old_bundles([root], []), [bundle])
             installer.remove_bundle(bundle)
             self.assertFalse(bundle.exists())
+
+    def test_vulkan_manifests_remain_valid_after_bundle_rename(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            staged = root / "staged.app"
+            prefixes = []
+            for formula, relative, section, library in [
+                (
+                    "molten",
+                    "etc/vulkan/icd.d/MoltenVK_icd.json",
+                    "ICD",
+                    "libMoltenVK.dylib",
+                ),
+                (
+                    "layers",
+                    "share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json",
+                    "layer",
+                    "libVkLayer_khronos_validation.dylib",
+                ),
+            ]:
+                prefix = root / formula
+                (prefix / "lib").mkdir(parents=True)
+                (prefix / "lib" / library).write_bytes(b"runtime")
+                manifest = prefix / relative
+                manifest.parent.mkdir(parents=True)
+                manifest.write_text(
+                    json.dumps({section: {"library_path": library}}), encoding="utf-8"
+                )
+                prefixes.append(str(prefix))
+            with patch.object(
+                installer.subprocess, "check_output", side_effect=prefixes
+            ):
+                self.assertEqual(len(installer.deploy_vulkan(staged)), 2)
+            destination = root / "MiniRender.app"
+            staged.rename(destination)
+            for manifest in (destination / "Contents/Resources/vulkan").glob(
+                "*/*.json"
+            ):
+                content = json.loads(manifest.read_text(encoding="utf-8"))
+                settings = content.get("ICD", content.get("layer"))
+                library = manifest.parent / settings["library_path"]
+                self.assertEqual(library.read_bytes(), b"runtime")
+                self.assertTrue(library.resolve().is_relative_to(destination.resolve()))
 
     def test_symlink_cleanup_preserves_the_target(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -114,6 +114,38 @@ def require_idle_builds(roots: list[Path]) -> None:
                     raise RuntimeError(f"Wait for the build to finish: {directory}")
 
 
+def deploy_vulkan(staged: Path) -> list[str]:
+    """复制本机 Homebrew 的 Vulkan 驱动与验证层，清单使用包内相对路径。"""
+    additional = []
+    for formula, manifest_path, section, library in [
+        ("molten-vk", "etc/vulkan/icd.d/MoltenVK_icd.json", "ICD", "libMoltenVK.dylib"),
+        (
+            "vulkan-validationlayers",
+            "share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json",
+            "layer",
+            "libVkLayer_khronos_validation.dylib",
+        ),
+    ]:
+        prefix = Path(
+            subprocess.check_output(["brew", "--prefix", formula], text=True).strip()
+        )
+        binary = staged / "Contents/Frameworks" / library
+        binary.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(prefix / "lib" / library, binary)
+        manifest = json.loads((prefix / manifest_path).read_text(encoding="utf-8"))
+        manifest[section]["library_path"] = "../../../Frameworks/" + library
+        target = (
+            staged
+            / "Contents/Resources/vulkan"
+            / Path(manifest_path).parent.name
+            / Path(manifest_path).name
+        )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        additional.append(f"-executable={binary}")
+    return additional
+
+
 def main() -> int:
     """部署、验证、发布和清理；整个流程不打开前台窗口。"""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -184,7 +216,7 @@ def main() -> int:
                 [qtpaths, "--query", "QT_INSTALL_PLUGINS"], text=True
             ).strip()
         )
-        additional = []
+        additional = deploy_vulkan(staged)
         for relative in [
             Path("platforms/libqcocoa.dylib"),
             Path("styles/libqmacstyle.dylib"),

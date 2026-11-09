@@ -121,6 +121,17 @@ int main(int argc, char** argv) {
     if (QFileInfo::exists(bundled_vulkan) && qEnvironmentVariableIsEmpty("QT_VULKAN_LIB")) {
         qputenv("QT_VULKAN_LIB", bundled_vulkan.toUtf8());
     }
+    const QString vulkan_resources =
+        QCoreApplication::applicationDirPath() + "/../Resources/vulkan/";
+    const QString driver_manifest = vulkan_resources + "icd.d/MoltenVK_icd.json";
+    if (QFileInfo::exists(driver_manifest) && qEnvironmentVariableIsEmpty("VK_DRIVER_FILES") &&
+        qEnvironmentVariableIsEmpty("VK_ICD_FILENAMES")) {
+        qputenv("VK_DRIVER_FILES", driver_manifest.toUtf8());
+    }
+    const QString layer_directory = vulkan_resources + "explicit_layer.d";
+    if (QDir(layer_directory).exists() && qEnvironmentVariableIsEmpty("VK_LAYER_PATH")) {
+        qputenv("VK_LAYER_PATH", layer_directory.toUtf8());
+    }
 #endif
     QApplication::setApplicationName("MiniRender");
     QCommandLineParser parser;

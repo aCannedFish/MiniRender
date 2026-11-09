@@ -60,7 +60,7 @@ python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirend
 python3 scripts/install_macos.py
 ```
 
-脚本在临时目录复制 Release 应用，使用 `macdeployqt` 部署 Cocoa、原生样式和运行库，校验包签名，并执行隐藏窗口下的离屏 GPU 检查和完整朝向回归。检查通过后替换正式应用，再按 bundle ID 清理应用目录及本仓库全部工作树构建目录中的旧 `.app` 包。源码、资产、构建缓存和测试结果保留。
+脚本在临时目录复制 Release 应用，使用 `macdeployqt` 部署 Cocoa、原生样式、Vulkan loader、MoltenVK、验证层和运行库，校验包签名，并执行隐藏窗口下的离屏 GPU 检查和完整朝向回归。检查通过后替换正式应用，再按 bundle ID 清理应用目录及本仓库全部工作树构建目录中的旧 `.app` 包。源码、资产、构建缓存和测试结果保留。
 
 macOS 示例与纹理放在包内 `Contents/Resources/scenes`。内置示例作为副本打开，首次保存时选择用户路径。
 
