@@ -12,6 +12,7 @@
 #include <QDir>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
+#include <QLabel>
 #include <QPainter>
 #include <QProgressBar>
 #include <QPushButton>
@@ -357,6 +358,18 @@ enum class Stage {
     save_cancel_wait,
     export_large,
     import_large,
+    qem_start,
+    qem_apply,
+    qem_offline,
+    qem_undo,
+    qem_redo,
+    qem_limited,
+    qem_constrained,
+    qem_export,
+    qem_save,
+    qem_cancel_start,
+    qem_cancel_phase,
+    qem_cancel_wait,
     shutdown
 };
 
@@ -373,9 +386,9 @@ struct State {
     int probe_event_type = 0;
     std::chrono::steady_clock::time_point measurement_started{};
     QElapsedTimer clock;
-    std::shared_ptr<const minirender::MeshData> source, generated, large;
+    std::shared_ptr<const minirender::MeshData> source, generated, large, simplified;
     std::shared_ptr<const minirender::SceneSnapshot> snapshot;
-    QImage baseline, after;
+    QImage baseline, after, qem_before, qem_after;
     std::size_t original_meshes = 0, original_objects = 0;
     float saved_x = 0;
     std::filesystem::path input_file;
@@ -467,6 +480,7 @@ void ready(Workbench& window) {
             "Geometry task did not finish successfully");
 }
 void generate(Workbench& window, int levels, bool displace) {
+    control<QComboBox>(window, "geometry_operation")->setCurrentIndex(0);
     control<QSpinBox>(window, "geometry_levels")->setValue(levels);
     control<QCheckBox>(window, "geometry_displacement")->setChecked(displace);
     auto* apply = control<QPushButton>(window, "geometry_apply");
@@ -781,11 +795,16 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
                     advance(Stage::large_apply);
                     return;
                 case Stage::large_apply:
-                    state->numeric_progress =
-                        state->numeric_progress ||
-                        (status.progress.total > 1 && status.progress.completed > 0 &&
-                         status.progress.completed < status.progress.total &&
-                         control<QProgressBar>(window, "geometry_progress")->maximum() == 1000);
+                    // 读取同一轮 UI 刷新的进度条与计数；worker 可能已经进入下一个阶段。
+                    // 将最新 worker 阶段与上一次 UI 刷新混用，会漏掉短阶段的真实显示。
+                    {
+                        const auto* bar = control<QProgressBar>(window, "geometry_progress");
+                        const auto* counts = control<QLabel>(window, "geometry_counts");
+                        state->numeric_progress =
+                            state->numeric_progress ||
+                            (bar->maximum() == 1000 && bar->value() > 0 && bar->value() < 1000 &&
+                             counts->text().contains('/'));
+                    }
                     if (!finished(window)) {
                         return;
                     }
@@ -856,6 +875,202 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
                     require(window.document().meshes.back().data->positions ==
                                 state->large->positions,
                             "Large geometry OBJ import changed shared positions");
+                    window.load_scene_file(directory + "/保存 场景.json");
+                    window.select_object("blue_cube");
+                    control<QComboBox>(window, "geometry_operation")->setCurrentIndex(1);
+                    control<QSpinBox>(window, "geometry_target_faces")->setValue(400);
+                    advance(Stage::qem_start);
+                    return;
+                case Stage::qem_start:
+                    if (!preview_ready() ||
+                        window.ibl_controller()->status().state != IblTaskState::ready) {
+                        return;
+                    }
+                    state->generated = mesh_for(window.document(), "blue_cube");
+                    state->source = mesh_for(window.document(), "metal_cube");
+                    verify(*state, [&] {
+                        verify_layout(window);
+                        state->qem_before = verify_gpu(window, directory, "qem-before");
+                    });
+                    state->snapshot = minirender::make_snapshot(window.document());
+                    window.offline_panel()->set_settings(offline_settings(), integrator(),
+                                                         {2, 4, 2});
+                    control<QPushButton>(window, "offline_start")->click();
+                    require(control<QPushButton>(window, "geometry_apply")->isEnabled(),
+                            "QEM apply control is disabled");
+                    control<QPushButton>(window, "geometry_apply")->click();
+                    require(tasks->busy(), "QEM did not start a background job");
+                    control<QSpinBox>(window, "geometry_target_faces")->setValue(300);
+                    control<QDoubleSpinBox>(window, "roughness")->setValue(0.28);
+                    advance(Stage::qem_apply);
+                    return;
+                case Stage::qem_apply:
+                    if (!finished(window) || !offline_done() || !preview_ready()) {
+                        return;
+                    }
+                    ready(window);
+                    state->simplified = mesh_for(window.document(), "blue_cube");
+                    require(state->simplified != state->generated &&
+                                state->simplified->triangles.size() <= 400,
+                            "QEM did not publish the requested simplification");
+                    require(mesh_for(window.document(), "metal_cube") == state->source,
+                            "QEM changed another shared asset");
+                    require(std::abs(control<QDoubleSpinBox>(window, "roughness")->value() - 0.28) <
+                                1e-6,
+                            "QEM overwrote an unrelated edit");
+                    require(
+                        control<QLabel>(window, "geometry_metrics")->text().contains("目标 400"),
+                        "QEM did not preserve its start-time settings");
+                    require(window.offline_panel()->stale(),
+                            "QEM did not mark an old render stale");
+                    verify(*state, [&] {
+                        verify_offline(window, state->snapshot);
+                        control<QCheckBox>(window, "offline_show")->setChecked(false);
+                        state->qem_after = verify_gpu(window, directory, "qem-after");
+                        require(changed_pixels(state->qem_before, state->qem_after) > 30,
+                                "QEM GPU geometry remained unchanged");
+                        require(QDir().mkpath(directory + "/qem-shadow"),
+                                "Cannot create the QEM shadow output directory");
+                        verify_shadows(window, directory + "/qem-shadow");
+                        capture_ui(window, directory + "/qem-ui.png");
+                    });
+                    state->snapshot = minirender::make_snapshot(window.document());
+                    control<QPushButton>(window, "offline_start")->click();
+                    advance(Stage::qem_offline);
+                    return;
+                case Stage::qem_offline:
+                    if (!offline_done()) {
+                        return;
+                    }
+                    verify(*state, [&] { verify_offline(window, state->snapshot); });
+                    control<QCheckBox>(window, "offline_show")->setChecked(false);
+                    control<QAction>(window, "undo")->trigger();
+                    require(mesh_for(window.document(), "blue_cube") == state->generated,
+                            "QEM undo did not restore its input");
+                    advance(Stage::qem_undo);
+                    return;
+                case Stage::qem_undo:
+                    if (!preview_ready()) {
+                        return;
+                    }
+                    verify(*state, [&] {
+                        require(changed_pixels(state->qem_before,
+                                               verify_gpu(window, directory, "qem-undo")) == 0,
+                                "QEM GPU undo image differs from its input");
+                    });
+                    control<QAction>(window, "redo")->trigger();
+                    require(mesh_for(window.document(), "blue_cube") == state->simplified,
+                            "QEM redo did not restore its output");
+                    advance(Stage::qem_redo);
+                    return;
+                case Stage::qem_redo:
+                    if (!preview_ready()) {
+                        return;
+                    }
+                    verify(*state, [&] {
+                        require(changed_pixels(state->qem_after,
+                                               verify_gpu(window, directory, "qem-redo")) == 0,
+                                "QEM GPU redo image differs from its output");
+                    });
+                    control<QSpinBox>(window, "geometry_target_faces")->setValue(100);
+                    control<QDoubleSpinBox>(window, "geometry_quadric_error")->setValue(0);
+                    control<QCheckBox>(window, "geometry_limit_error")->setChecked(true);
+                    window.apply_geometry();
+                    advance(Stage::qem_limited);
+                    return;
+                case Stage::qem_limited:
+                    if (!finished(window)) {
+                        return;
+                    }
+                    ready(window);
+                    require(control<QLabel>(window, "geometry_metrics")
+                                ->text()
+                                .contains("已达 QEM 代价上限"),
+                            "QEM error-limit reason is missing from the panel");
+                    state->simplified = mesh_for(window.document(), "blue_cube");
+                    require(state->simplified->triangles.size() > 100,
+                            "QEM ignored its error limit");
+                    window.select_object("metal_cube");
+                    control<QSpinBox>(window, "geometry_target_faces")->setValue(1);
+                    control<QCheckBox>(window, "geometry_limit_error")->setChecked(false);
+                    window.apply_geometry();
+                    advance(Stage::qem_constrained);
+                    return;
+                case Stage::qem_constrained:
+                    if (!finished(window)) {
+                        return;
+                    }
+                    ready(window);
+                    require(mesh_for(window.document(), "metal_cube") == state->source,
+                            "QEM constraint-only result changed a protected asset");
+                    require(control<QLabel>(window, "geometry_metrics")
+                                ->text()
+                                .contains("受拓扑或属性约束"),
+                            "QEM constraint reason is missing from the panel");
+                    window.select_object("blue_cube");
+                    window.export_geometry_file(directory + "/简化 模型.obj");
+                    advance(Stage::qem_export);
+                    return;
+                case Stage::qem_export:
+                    if (!finished(window)) {
+                        return;
+                    }
+                    ready(window);
+                    verify(*state, [&] {
+                        const auto loaded =
+                            minirender::load_obj(native(directory + "/简化 模型.obj"));
+                        require(loaded.positions == state->simplified->positions &&
+                                    loaded.triangles.size() == state->simplified->triangles.size(),
+                                "QEM OBJ round trip changed the simplified geometry");
+                    });
+                    window.save_scene_async(directory + "/简化 场景.json");
+                    advance(Stage::qem_save);
+                    return;
+                case Stage::qem_save:
+                    if (!finished(window)) {
+                        return;
+                    }
+                    ready(window);
+                    verify(*state, [&] {
+                        const auto loaded =
+                            minirender::load_scene(native(directory + "/简化 场景.json"));
+                        require(mesh_for(loaded, "blue_cube")->positions ==
+                                    state->simplified->positions,
+                                "QEM saved scene lost its generated asset");
+                    });
+                    // 重新导入压力网格，在候选边计算阶段检查取消。
+                    window.import_object_file(directory + "/large.obj");
+                    advance(Stage::qem_cancel_start);
+                    return;
+                case Stage::qem_cancel_start:
+                    if (window.asset_loading()) {
+                        return;
+                    }
+                    control<QSpinBox>(window, "geometry_target_faces")->setValue(10000);
+                    window.apply_geometry();
+                    advance(Stage::qem_cancel_phase);
+                    return;
+                case Stage::qem_cancel_phase:
+                    require(tasks->busy(),
+                            "QEM cancellation fixture finished before its candidate phase");
+                    if (status.progress.stage.find("计算候选边") == std::string::npos ||
+                        status.progress.completed == 0) {
+                        return;
+                    }
+                    state->cancel_at = state->clock.elapsed();
+                    tasks->cancel();
+                    advance(Stage::qem_cancel_wait);
+                    return;
+                case Stage::qem_cancel_wait:
+                    if (!finished(window)) {
+                        return;
+                    }
+                    require(status.state == GeometryTaskState::cancelled,
+                            "QEM cancel was not reported");
+                    require(state->clock.elapsed() - state->cancel_at < 2000,
+                            "QEM cancellation exceeded two seconds");
+                    require(mesh_for(window.document(), "blue_cube") == state->simplified,
+                            "Cancelled QEM changed an existing asset");
                     window.load_scene_file(directory + "/start.json");
                     window.select_object("blue_cube");
                     generate(window, 8, false);
@@ -877,7 +1092,7 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
                     qInfo() << "Geometry smoke PASS: controls, shared assets, undo/redo, CPU/GPU "
                                "geometry, "
                                "snapshot save, OBJ import/export, cancellation and stale results; "
-                               "event latency ms"
+                               "QEM controls, measured error and LOD history; event latency ms"
                             << state->maximum_event_latency << "heartbeat ms" << state->maximum_gap;
                     timer->stop();
                     QApplication::exit(0);

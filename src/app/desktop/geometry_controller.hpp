@@ -3,6 +3,7 @@
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/displacement.hpp>
 #include <minirender/geometry/loop.hpp>
+#include <minirender/geometry/simplify.hpp>
 #include <minirender/render/raster_mesh.hpp>
 
 #include <QElapsedTimer>
@@ -23,12 +24,13 @@ struct GeometryTaskProgress {
     std::size_t total = 0;
 };
 
-// 启动时固定参数和数据所有权。height_settings 为空时仅执行 Loop。
+// 启动时固定参数和数据所有权。simplify 有值时执行独立简化，否则执行 Loop/位移。
 struct GeometryTaskInput {
     std::shared_ptr<const minirender::MeshData> mesh;
     std::shared_ptr<const minirender::Texture> height;
     minirender::LoopSettings loop;
     std::optional<minirender::DisplacementSettings> height_settings;
+    std::optional<minirender::SimplifySettings> simplify;
     std::string target_name;
 };
 
@@ -40,6 +42,7 @@ struct GeometryTaskResult {
     minirender::MeshValidationCache validated_meshes;
     std::filesystem::path saved_path;
     double maximum_displacement = 0;
+    std::optional<minirender::SimplifyResult> simplification;
     std::string error;
     std::string summary;
     bool cancelled = false;

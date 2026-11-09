@@ -1,6 +1,6 @@
 # 几何工具
 
-右侧“几何”页对当前选中物体执行 Loop 细分和高度位移，并提供后台导出与取消。参数在点击“生成网格”时固定，修改参数会更新面数和内存估计。
+右侧“几何”页对当前选中物体执行 Loop 细分、高度位移或 QEM 简化，并提供后台导出与取消。参数在点击“生成网格”时固定，修改参数会更新面数和内存估计。
 
 ## 使用方法
 
@@ -9,6 +9,8 @@
 3. 需要位移时启用“高度位移”，导入或选择线性高度图，设置幅度和中值。
 4. 点击“生成网格”。阶段名称、处理数量和进度显示在面板与状态栏中。
 5. 完成后查看模型、法线、深度和阴影。可撤销、重做，或导出 OBJ。
+
+简化时将“操作”切换为“QEM 网格简化”，设置目标面数及边界/属性保护选项。结果显示请求与实际面数、停止原因、QEM 代价和独立双向表面距离。算法、参数和 LOD 示例见 [网格简化](SIMPLIFICATION.md)。
 
 生成以当前网格为输入。再次生成会继续细分当前结果，恢复前一次几何可使用撤销。共享原网格的其他物体保留原状，选中物体获得新的网格资产。
 
@@ -63,7 +65,8 @@ flowchart LR
 - `geometry_panel`：参数、规模估计、任务状态与结果统计。
 - `geometry_controller`：固定输入、工作线程、进度和取消生命周期。
 - `Workbench`：选中物体、资产事务、撤销历史和文件操作。
-- `geometry/loop`、`geometry/displacement`、`geometry/normals`：CPU 几何算法。
+- `geometry/loop`、`geometry/displacement`、`geometry/normals`：细分、位移和法线。
+- `geometry/simplify`、`geometry/surface`：QEM 边折叠、最近点与表面误差。
 - `render/raster_mesh`：实时顶点/索引准备、边界与 CPU 数据缓存。
 - `assets/obj_writer`、`assets/asset_writer`、`assets/staged_file`：文件写出与提交。
 - `geometry_smoke`：实际控件、后台任务、CPU/GPU 数据、历史和文件回归。
@@ -75,7 +78,7 @@ cmake --build --preset macos-desktop-debug
 python3 scripts/verify_gpu.py \
   build/macos-desktop-debug/src/app/desktop/minirender_desktop.app \
   --scene scenes/studio.json --geometry-check \
-  --output outputs/a4.2b/debug --sync-validation --timeout 200
+  --output outputs/a4.3/debug --sync-validation --timeout 400
 ```
 
 响应时间在普通运行模式下单独测量：
@@ -84,7 +87,7 @@ python3 scripts/verify_gpu.py \
 python3 scripts/verify_gpu.py \
   build/macos-desktop-debug/src/app/desktop/minirender_desktop.app \
   --scene scenes/studio.json --geometry-check --timing-only \
-  --output outputs/a4.2b/timing --timeout 220
+  --output outputs/a4.3/timing --timeout 300
 ```
 
-计时探针从独立线程投递界面事件，记录实际排队时延，并保留定时器间隔作诊断。计时排除图像读回和 CPU 参考计算的耗时，Vulkan 完整同步验证独立运行。Debug、Release、ASan/UBSan 和旧功能回归结果见 [A4.2b 验收](checkpoints/A4.2b.md)。
+计时探针从独立线程投递界面事件，记录实际排队时延，并保留定时器间隔作诊断。计时排除图像读回和 CPU 参考计算的耗时，Vulkan 完整同步验证独立运行。基础几何结果见 [A4.2b 验收](checkpoints/A4.2b.md)，简化及扩展回归见 [A4.3 验收](checkpoints/A4.3.md)。

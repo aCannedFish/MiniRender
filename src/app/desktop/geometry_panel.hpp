@@ -10,11 +10,13 @@ class QLabel;
 class QProgressBar;
 class QPushButton;
 class QSpinBox;
+class QFormLayout;
 
 struct GeometryParameters {
     minirender::LoopSettings loop;
     std::optional<minirender::DisplacementSettings> displacement;
     std::string height_id;
+    std::optional<minirender::SimplifySettings> simplify;
 };
 
 // 几何参数只在点击生成时提交，修改控件只更新基于数组规模的预算估计。
@@ -36,6 +38,13 @@ class GeometryPanel final : public QWidget {
     GeometryController& controller_;
     std::shared_ptr<const minirender::MeshData> mesh_;
     bool external_busy_ = false;
+    QFormLayout* form_;
+    QWidget *height_row_, *simplification_;
+    QComboBox* operation_;
+    QSpinBox* target_faces_;
+    QCheckBox *error_limit_, *boundary_, *uv_seams_, *hard_normals_, *creases_;
+    QDoubleSpinBox *quadric_error_, *crease_angle_;
+    QLabel* note_;
     QSpinBox *levels_, *budget_;
     QCheckBox* displace_;
     QComboBox* height_;

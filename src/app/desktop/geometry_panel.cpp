@@ -44,6 +44,7 @@ GeometryPanel::GeometryPanel(GeometryController& controller, QWidget* parent)
     : QWidget(parent), controller_(controller) {
     setObjectName("geometry_panel");
     auto* form = new QFormLayout(this);
+    form_ = form;
     form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     form->setRowWrapPolicy(QFormLayout::WrapLongRows);
     form->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
@@ -53,6 +54,45 @@ GeometryPanel::GeometryPanel(GeometryController& controller, QWidget* parent)
     form->setVerticalSpacing(8);
     target_ = text_label(this, "geometry_target");
     form->addRow(target_);
+    operation_ = new QComboBox(this);
+    operation_->setObjectName("geometry_operation");
+    operation_->addItems({"Loop 与高度位移", "QEM 网格简化"});
+    form->addRow("操作", operation_);
+    simplification_ = new QWidget(this);
+    auto* simplify_form = new QFormLayout(simplification_);
+    simplify_form->setContentsMargins(0, 0, 0, 0);
+    simplify_form->setRowWrapPolicy(QFormLayout::WrapLongRows);
+    simplify_form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+    target_faces_ = new QSpinBox(simplification_);
+    target_faces_->setObjectName("geometry_target_faces");
+    target_faces_->setRange(1, 2000000);
+    target_faces_->setValue(1000);
+    target_faces_->setKeyboardTracking(false);
+    simplify_form->addRow("目标面数", target_faces_);
+    const auto toggle = [&](const char* name, const char* label) {
+        auto* field = new QCheckBox(QString::fromUtf8(label), simplification_);
+        field->setObjectName(name);
+        field->setChecked(true);
+        simplify_form->addRow(field);
+        connect(field, &QCheckBox::toggled, this, [this] { update(); });
+        return field;
+    };
+    boundary_ = toggle("geometry_preserve_boundary", "固定边界位置");
+    uv_seams_ = toggle("geometry_preserve_uv", "保护 UV 接缝");
+    hard_normals_ = toggle("geometry_preserve_normals", "保护硬法线");
+    creases_ = toggle("geometry_preserve_creases", "固定几何折痕");
+    crease_angle_ = scalar(simplification_, "geometry_crease_angle", 1, 180, 60, 1, 5);
+    crease_angle_->setSuffix(" °");
+    simplify_form->addRow("折痕夹角", crease_angle_);
+    error_limit_ = toggle("geometry_limit_error", "限制 QEM 代价");
+    quadric_error_ = scalar(simplification_, "geometry_quadric_error", 0, 1000000, 0.01, 9, 0.001);
+    quadric_error_->setSuffix(" m²");
+    simplify_form->addRow("代价上限", quadric_error_);
+    // 控件建立完毕后再启用 update；构造中不触发未初始化成员的读取。
+    error_limit_->blockSignals(true);
+    error_limit_->setChecked(false);
+    error_limit_->blockSignals(false);
+    form->addRow(simplification_);
     levels_ = new QSpinBox(this);
     levels_->setObjectName("geometry_levels");
     levels_->setRange(0, 8);
@@ -72,6 +112,7 @@ GeometryPanel::GeometryPanel(GeometryController& controller, QWidget* parent)
     displace_->setObjectName("geometry_displacement");
     form->addRow(displace_);
     auto* height_row = new QWidget(this);
+    height_row_ = height_row;
     auto* height_layout = new QHBoxLayout(height_row);
     height_layout->setContentsMargins(0, 0, 0, 0);
     height_layout->setSpacing(6);
@@ -95,6 +136,7 @@ GeometryPanel::GeometryPanel(GeometryController& controller, QWidget* parent)
     form->addRow("高度中值", midlevel_);
     form->addRow("接缝容差", tolerance_);
     auto* note = text_label(this, "geometry_note");
+    note_ = note;
     note->setText("高度取线性 R 通道，距离为物体局部米。生成基于当前网格；再次生成会继续细分，"
                   "可通过撤销恢复。原始共享资产保留，仅更新启动任务时选中的物体。");
     form->addRow(note);
@@ -131,6 +173,10 @@ GeometryPanel::GeometryPanel(GeometryController& controller, QWidget* parent)
     connect(budget_, &QSpinBox::valueChanged, this, [this] { update(); });
     connect(displace_, &QCheckBox::toggled, this, [this] { update(); });
     connect(height_, &QComboBox::currentIndexChanged, this, [this] { update(); });
+    connect(operation_, &QComboBox::currentIndexChanged, this, [this] { update(); });
+    connect(target_faces_, &QSpinBox::valueChanged, this, [this] { update(); });
+    connect(quadric_error_, &QDoubleSpinBox::valueChanged, this, [this] { update(); });
+    connect(crease_angle_, &QDoubleSpinBox::valueChanged, this, [this] { update(); });
     connect(apply_, &QPushButton::clicked, this, [this] {
         if (on_apply) {
             on_apply();
@@ -156,6 +202,20 @@ GeometryPanel::GeometryPanel(GeometryController& controller, QWidget* parent)
 
 GeometryParameters GeometryPanel::parameters() const {
     GeometryParameters result;
+    if (operation_->currentIndex() == 1) {
+        minirender::SimplifySettings settings;
+        settings.target_triangles = static_cast<std::size_t>(target_faces_->value());
+        settings.preserve_boundary = boundary_->isChecked();
+        settings.preserve_uv_seams = uv_seams_->isChecked();
+        settings.preserve_hard_normals = hard_normals_->isChecked();
+        settings.preserve_creases = creases_->isChecked();
+        settings.crease_angle_degrees = crease_angle_->value();
+        if (error_limit_->isChecked()) {
+            settings.maximum_quadric_error = quadric_error_->value();
+        }
+        result.simplify = settings;
+        return result;
+    }
     result.loop.levels = static_cast<std::uint32_t>(levels_->value());
     result.loop.maximum_triangles = static_cast<std::size_t>(budget_->value());
     result.height_id = height_->currentData().toString().toStdString();
@@ -216,6 +276,28 @@ void GeometryPanel::select_height(const std::string& id) {
     update();
 }
 void GeometryPanel::show_result(const GeometryTaskResult& result) {
+    if (result.simplification) {
+        const auto& s = *result.simplification;
+        const QString reason = s.stop == minirender::SimplifyStop::target_reached ? "已达到目标"
+                               : s.stop == minirender::SimplifyStop::error_limit
+                                   ? "已达 QEM 代价上限"
+                                   : "剩余边受拓扑或属性约束";
+        metrics_->setText(QString("目标 %1 面，实际 %2 → %3 面\n%4，折叠 %5 条边，保护 %6 个顶点\n"
+                                  "最大折叠代价 %7 m²\n双向 RMS %8 m，采样最大距离 %9 m\n"
+                                  "原表面 %10 个样本，结果表面 %11 个样本")
+                              .arg(s.requested_triangles)
+                              .arg(s.input_topology.faces)
+                              .arg(s.topology.faces)
+                              .arg(reason)
+                              .arg(s.collapses)
+                              .arg(s.protected_vertices)
+                              .arg(s.maximum_quadric_error, 0, 'g', 6)
+                              .arg(s.error.symmetric_rms, 0, 'g', 6)
+                              .arg(s.error.sampled_maximum, 0, 'g', 6)
+                              .arg(s.error.original_to_result.samples)
+                              .arg(s.error.result_to_original.samples));
+        return;
+    }
     metrics_->setText(
         QString("结果：%1 个位置，%2 个三角形，%3 条边界边\n最大实际位移：%4 m")
             .arg(result.topology.referenced_vertices + result.topology.isolated_vertices)
@@ -230,6 +312,19 @@ void GeometryPanel::update() {
     const bool blocked = running || external_busy_;
     bool permitted = mesh_ != nullptr;
     const auto params = parameters();
+    const bool simplifying = params.simplify.has_value();
+    for (QWidget* field : std::array<QWidget*, 7>{levels_, budget_, displace_, height_row_, scale_,
+                                                  midlevel_, tolerance_}) {
+        form_->setRowVisible(field, !simplifying);
+    }
+    form_->setRowVisible(simplification_, simplifying);
+    crease_angle_->setEnabled(creases_->isChecked());
+    quadric_error_->setEnabled(error_limit_->isChecked());
+    note_->setText(
+        simplifying ? "在当前网格上执行边折叠。接缝与硬法线顶点的相邻边保留，边界与折痕位置固定。"
+                      "结果报告实际面数和双向采样误差；保护条件可能使目标面数不可达。"
+                    : "高度取线性 R 通道，距离为物体局部米。生成基于当前网格；再次生成会继续细分，"
+                      "可通过撤销恢复。原始共享资产保留，仅更新启动任务时选中的物体。");
     if (mesh_) {
         std::uint64_t faces = mesh_->triangles.size(), positions = mesh_->positions.size();
         bool over_budget = faces > params.loop.maximum_triangles;
@@ -252,6 +347,16 @@ void GeometryPanel::update() {
                                      .arg(over_memory ? "超过 2 GiB 预算，请减少层数。" : ""));
     } else {
         estimate_->clear();
+    }
+    if (mesh_ && simplifying) {
+        const auto faces = mesh_->triangles.size();
+        const auto estimated = faces * 1536 + mesh_->positions.size() * 256;
+        permitted = faces <= 2000000 && estimated <= 2ULL * 1024 * 1024 * 1024;
+        estimate_->setText(QString("输入 %1 面，目标 %2 面。工作内存估计 %3 MiB。%4")
+                               .arg(faces)
+                               .arg(params.simplify->target_triangles)
+                               .arg(static_cast<double>(estimated) / (1024 * 1024), 0, 'f', 1)
+                               .arg(permitted ? "" : "超过几何任务预算，请先缩小输入。"));
     }
     const bool height_needed = params.displacement && params.displacement->scale != 0;
     apply_->setEnabled(permitted && !blocked && (!height_needed || !params.height_id.empty()));
