@@ -37,8 +37,12 @@ add_library(minirender_core
     src/scene/shadow.cpp
     src/geometry/halfedge.cpp
     src/geometry/loop.cpp
+    src/geometry/loop_hierarchy.cpp
+    src/geometry/adaptive_surface.cpp
+    src/geometry/adaptive.cpp
     src/geometry/normals.cpp
     src/geometry/displacement.cpp
+    src/geometry/height_field.cpp
     src/geometry/surface.cpp
     src/geometry/simplify.cpp
     src/geometry/remesh_mesh.cpp
@@ -79,11 +83,16 @@ if(BUILD_TESTING)
     add_executable(minirender_remesh_example examples/remesh.cpp)
     target_compile_definitions(minirender_remesh_example PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_remesh_example PRIVATE minirender_core minirender_warnings)
+    add_executable(minirender_adaptive_example examples/adaptive.cpp)
+    target_compile_definitions(minirender_adaptive_example PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+    target_link_libraries(minirender_adaptive_example PRIVATE minirender_core minirender_warnings)
     add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp
         tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp tests/path_tests.cpp
         tests/session_tests.cpp tests/ssao_tests.cpp tests/ibl_tests.cpp tests/geometry_tests.cpp
         tests/displacement_tests.cpp tests/mesh_io_tests.cpp tests/raster_mesh_tests.cpp
-        tests/simplify_tests.cpp tests/gizmo_tests.cpp tests/sided_tests.cpp tests/remesh_tests.cpp tests/builtin_scene_tests.cpp)
+        tests/simplify_tests.cpp tests/gizmo_tests.cpp tests/sided_tests.cpp tests/remesh_tests.cpp
+        tests/builtin_scene_tests.cpp tests/adaptive_tests.cpp)
+    target_include_directories(minirender_tests PRIVATE src)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_tests PRIVATE
         minirender_core Catch2::Catch2WithMain minirender_warnings Threads::Threads)

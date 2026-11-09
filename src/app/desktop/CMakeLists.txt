@@ -29,6 +29,7 @@ qt_add_executable(minirender_desktop
     ibl_controller.cpp ibl_controller.hpp environment_panel.cpp environment_panel.hpp
     geometry_controller.cpp geometry_controller.hpp geometry_panel.cpp geometry_panel.hpp
     geometry_smoke.cpp geometry_smoke.hpp
+    adaptive_smoke.cpp adaptive_smoke.hpp
     gizmo_renderer.cpp gizmo_renderer.hpp
     gizmo_smoke.cpp gizmo_smoke.hpp
     ibl_smoke.cpp ibl_smoke.hpp

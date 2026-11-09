@@ -1,3 +1,4 @@
+#include "adaptive_smoke.hpp"
 #include "geometry_smoke.hpp"
 #include "gizmo_smoke.hpp"
 #include "ibl_smoke.hpp"
@@ -171,6 +172,8 @@ int main(int argc, char** argv) {
     parser.addOption({"presets-smoke",
                       "Verify editable built-in scene imports and offline rendering.",
                       "directory"});
+    parser.addOption(
+        {"adaptive-smoke", "Verify adaptive geometry, projection and rendering.", "directory"});
     parser.process(application);
     const bool smoke = parser.isSet("smoke");
     const bool regression = smoke || parser.isSet("scene-smoke") || parser.isSet("texture-smoke") ||
@@ -178,7 +181,8 @@ int main(int argc, char** argv) {
                             parser.isSet("wire-smoke") || parser.isSet("offline-smoke") ||
                             parser.isSet("ssao-smoke") || parser.isSet("ibl-smoke") ||
                             parser.isSet("geometry-smoke") || parser.isSet("gizmo-smoke") ||
-                            parser.isSet("sides-smoke") || parser.isSet("presets-smoke");
+                            parser.isSet("sides-smoke") || parser.isSet("presets-smoke") ||
+                            parser.isSet("adaptive-smoke");
 #ifdef Q_OS_MACOS
     RegressionActivity regression_activity(regression);
 #endif
@@ -300,6 +304,10 @@ int main(int argc, char** argv) {
             start_presets_smoke(window, parser.value("presets-smoke"));
         }
 
+        if (parser.isSet("adaptive-smoke")) {
+            start_adaptive_smoke(window, parser.value("adaptive-smoke"), timing_only);
+        }
+
         int ticks = 0;
         bool resized = false;
         QSize initial_size;
@@ -378,7 +386,7 @@ int main(int argc, char** argv) {
         }
         timer.start();
         result = application.exec();
-        if (parser.isSet("geometry-smoke")) {
+        if (parser.isSet("geometry-smoke") || parser.isSet("adaptive-smoke")) {
             geometry_cleanup.start();
         }
     }

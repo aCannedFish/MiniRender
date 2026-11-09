@@ -20,7 +20,9 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=Path("outputs/a0"))
     parser.add_argument("--timeout", type=float, default=35)
     parser.add_argument(
-        "--onscreen", action="store_true", help="Show a non-activating window for manual checks"
+        "--onscreen",
+        action="store_true",
+        help="Show a non-activating window for manual checks",
     )
     parser.add_argument(
         "--sync-validation",
@@ -32,30 +34,74 @@ def main() -> int:
         action="store_true",
         help="Measure responsiveness without Vulkan validation instrumentation",
     )
-    parser.add_argument("--scene", type=Path, help="Run scene editor checks instead of A0 diagnostics")
+    parser.add_argument(
+        "--scene", type=Path, help="Run scene editor checks instead of A0 diagnostics"
+    )
     checks = parser.add_mutually_exclusive_group()
-    checks.add_argument("--texture-check", action="store_true", help="Verify texture import and filtering")
-    checks.add_argument("--interaction-check", action="store_true", help="Verify repeated drags and layout")
-    checks.add_argument("--parameter-check", action="store_true", help="Verify edit latency and background progress")
-    checks.add_argument("--wire-check", action="store_true", help="Verify wireframe visibility and HDR isolation")
     checks.add_argument(
-        "--offline-check", action="store_true", help="Verify CPU task controls and Vulkan display"
-    )
-    checks.add_argument("--ssao-check", action="store_true", help="Verify SSAO and lighting isolation")
-    checks.add_argument("--ibl-check", action="store_true", help="Verify IBL tasks and CPU/GPU sampling")
-    checks.add_argument(
-        "--geometry-check", action="store_true", help="Verify geometry tasks and CPU/GPU updates"
+        "--texture-check",
+        action="store_true",
+        help="Verify texture import and filtering",
     )
     checks.add_argument(
-        "--gizmo-check", action="store_true", help="Verify object translation and rotation"
+        "--interaction-check",
+        action="store_true",
+        help="Verify repeated drags and layout",
     )
-    checks.add_argument("--sides-check", action="store_true", help="Verify single and double sided surfaces")
-    checks.add_argument("--presets-check",action="store_true",help="Verify built-in scene replacement and editing")
+    checks.add_argument(
+        "--parameter-check",
+        action="store_true",
+        help="Verify edit latency and background progress",
+    )
+    checks.add_argument(
+        "--wire-check",
+        action="store_true",
+        help="Verify wireframe visibility and HDR isolation",
+    )
+    checks.add_argument(
+        "--offline-check",
+        action="store_true",
+        help="Verify CPU task controls and Vulkan display",
+    )
+    checks.add_argument(
+        "--ssao-check", action="store_true", help="Verify SSAO and lighting isolation"
+    )
+    checks.add_argument(
+        "--ibl-check", action="store_true", help="Verify IBL tasks and CPU/GPU sampling"
+    )
+    checks.add_argument(
+        "--geometry-check",
+        action="store_true",
+        help="Verify geometry tasks and CPU/GPU updates",
+    )
+    checks.add_argument(
+        "--gizmo-check",
+        action="store_true",
+        help="Verify object translation and rotation",
+    )
+    checks.add_argument(
+        "--sides-check",
+        action="store_true",
+        help="Verify single and double sided surfaces",
+    )
+    checks.add_argument(
+        "--presets-check",
+        action="store_true",
+        help="Verify built-in scene replacement and editing",
+    )
+    checks.add_argument(
+        "--adaptive-check",
+        action="store_true",
+        help="Verify adaptive geometry and projection",
+    )
     args = parser.parse_args()
     if args.timing_only and args.sync_validation:
-        parser.error("Timing measurements and synchronization validation must run separately")
+        parser.error(
+            "Timing measurements and synchronization validation must run separately"
+        )
     scene_check = (
-        args.presets_check
+        args.adaptive_check
+        or args.presets_check
         or args.sides_check
         or args.texture_check
         or args.interaction_check
@@ -79,7 +125,8 @@ def main() -> int:
     mode = "GPU"
     option = "--smoke"
     for selected, candidate in [
-        (args.presets_check,"Presets"),
+        (args.adaptive_check, "Adaptive"),
+        (args.presets_check, "Presets"),
         (args.sides_check, "Sides"),
         (args.gizmo_check, "Gizmo"),
         (args.geometry_check, "Geometry"),
@@ -93,10 +140,18 @@ def main() -> int:
     ]:
         if selected:
             mode = candidate
+    if scene_check and mode == "GPU":
+        parser.error("Selected check has no executable mode")
     if args.scene:
         mode = "Scene" if mode == "GPU" else mode
         option = f"--{mode.lower()}-smoke"
-        arguments = [str(executable), "--scene", str(args.scene.resolve()), option, str(output)]
+        arguments = [
+            str(executable),
+            "--scene",
+            str(args.scene.resolve()),
+            option,
+            str(output),
+        ]
     else:
         arguments = [str(executable), option, str(output / "gpu-smoke.png")]
     if args.timing_only:
@@ -134,8 +189,10 @@ def main() -> int:
         marker not in text
         or "Vulkan validation errors: 0" not in text
         or validation_mode not in text
-        or f"Vulkan rendering target: {'window' if args.onscreen else 'offscreen'}" not in text
-        or f"Regression window policy: {'visible' if args.onscreen else 'hidden'}, no activation" not in text
+        or f"Vulkan rendering target: {'window' if args.onscreen else 'offscreen'}"
+        not in text
+        or f"Regression window policy: {'visible' if args.onscreen else 'hidden'}, no activation"
+        not in text
     ):
         print("Missing verification evidence.", file=sys.stderr)
         return 1
