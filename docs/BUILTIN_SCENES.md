@@ -1,0 +1,51 @@
+# 内置场景
+
+工具栏“快速导入”提供可编辑的离线渲染示例。选择后覆盖当前场景的物体、材质、灯光和相机，并填入推荐渲染参数。导入后可直接编辑，离线渲染由用户点击启动。
+
+## 场景列表
+
+| 场景 | 观察内容 | 默认设置 |
+| --- | --- | --- |
+| Cornell Box · 经典 | 间接照明、红绿墙颜色渗透、方块软阴影 | 320×320、64 spp、深度 10 |
+| Cornell Box · 玻璃与金属 | 玻璃透射、反射、粗糙金属 | 320×320、128 spp、深度 14 |
+| 材质球阵列 | 漫反射、金属和不同粗糙度 | 480×320、64 spp、深度 8 |
+| Cornell Box · 小光源 | 比较 BSDF、光源采样与 MIS 的噪声 | 320×320、128 spp、深度 10 |
+
+所有示例默认 MIS、seed=101 和 Russian roulette。参数可在“离线”页调整。提高分辨率或采样数会增加计算时间，界面持续显示已完成样本和进度。
+
+## 编辑与保存
+
+导入后，物体列表中的墙壁、方块、球体和面积光均为普通场景对象。可使用移动/旋转工具调整物体，也可编辑变换、材质、相机和灯光参数。面积光通过“顶部面积光”物体的“自发光”和变换字段调整。不同物体使用独立材质，修改一个方块或球体的材质不会同时改变其他物体。
+
+“保存”首次要求选择用户路径，内置模板保留原值。“另存”也可用于创建独立版本。重新快速导入会恢复模板。
+
+Cornell 场景由顶部面积光照明，环境设为黑色。实时预览暂不计算面积光的全局照明，导入时切换到法线视图，便于编辑几何；离线渲染使用场景实际光照和材质。已有离线任务会异步取消，旧离线图收起，推荐参数在任务结束后应用。
+
+## 数据来源
+
+这些场景使用项目自建几何，房间边长为 2 米，颜色为可编辑的线性 RGB。Cornell 场景的布局参考经典红绿墙、区域光和遮挡物配置。Cornell University 的 [官方介绍与数据](https://bowers.cornell.edu/cornell-box) 说明了该场景用于比较光传输模拟与实际测量的背景。
+
+场景 JSON 与球体 OBJ 由 `scripts/generate_builtin_scenes.py` 生成，脚本可重复执行。球体包含共享位置、径向法线和独立面角 UV；场景随程序打包，运行不依赖源码目录。
+
+## 实现位置
+
+- `scenes/cornell-*.json`、`scenes/material-balls.json`：场景和相机。
+- `scenes/assets/demo-sphere.obj`：闭合单位球。
+- `src/app/desktop/builtin_scenes.*`：菜单信息、推荐参数和包内路径。
+- `Workbench::import_builtin_scene`：后台覆盖导入、编辑状态和模板保存路径。
+- `OfflinePanel::prepare_import`：异步取消旧任务并应用新参数。
+- `presets_smoke.cpp`：真实菜单动作、手动编辑、历史、文件和渲染回归。
+
+## 复验
+
+```sh
+cmake --preset macos-desktop-release
+cmake --build --preset macos-desktop-release
+ctest --preset macos-desktop-release --output-on-failure
+python3 scripts/verify_gpu.py \
+  build/macos-desktop-release/src/app/desktop/minirender_desktop.app \
+  --scene scenes/studio.json --presets-check --sync-validation \
+  --output outputs/presets/ui --timeout 180
+```
+
+自动回归使用隐藏窗口，不激活或置顶。场景图像由实际 CPU 路径追踪生成；保存的 EXR 保留线性数据，PNG 应用显示变换。

@@ -19,6 +19,8 @@ endforeach()
 
 qt_add_executable(minirender_desktop
     main.cpp vulkan_viewport.cpp vulkan_viewport.hpp
+    builtin_scenes.cpp builtin_scenes.hpp
+    presets_smoke.cpp presets_smoke.hpp
     sides_smoke.cpp sides_smoke.hpp
     diagnostic_renderer.cpp diagnostic_renderer.hpp
     viewport_renderer.hpp gpu_buffer.cpp gpu_buffer.hpp

@@ -1,0 +1,340 @@
+{
+  "version": 1,
+  "camera": {
+    "position": [
+      2.7,
+      2.2,
+      4.8
+    ],
+    "target": [
+      0,
+      0.4,
+      0
+    ],
+    "up": [
+      0,
+      1,
+      0
+    ],
+    "vertical_fov": 35,
+    "near": 0.03,
+    "far": 100
+  },
+  "environment": [
+    0.08,
+    0.08,
+    0.08
+  ],
+  "materials": [
+    {
+      "id": "mat_floor",
+      "name": "floor",
+      "kind": "diffuse",
+      "base_color": [
+        0.73,
+        0.73,
+        0.73
+      ],
+      "roughness": 0.5,
+      "double_sided": false
+    },
+    {
+      "id": "mat_lamp",
+      "name": "lamp",
+      "kind": "diffuse",
+      "base_color": [
+        0,
+        0,
+        0
+      ],
+      "roughness": 0.5,
+      "double_sided": false,
+      "emission": [
+        14,
+        13.5,
+        12
+      ]
+    },
+    {
+      "id": "mat_ball_0",
+      "name": "ball_0",
+      "kind": "diffuse",
+      "base_color": [
+        0.12,
+        0.35,
+        0.65
+      ],
+      "roughness": 0.08,
+      "double_sided": false
+    },
+    {
+      "id": "mat_ball_1",
+      "name": "ball_1",
+      "kind": "diffuse",
+      "base_color": [
+        0.12,
+        0.35,
+        0.65
+      ],
+      "roughness": 0.3,
+      "double_sided": false
+    },
+    {
+      "id": "mat_ball_2",
+      "name": "ball_2",
+      "kind": "diffuse",
+      "base_color": [
+        0.12,
+        0.35,
+        0.65
+      ],
+      "roughness": 0.65,
+      "double_sided": false
+    },
+    {
+      "id": "mat_ball_3",
+      "name": "ball_3",
+      "kind": "conductor",
+      "base_color": [
+        0.95,
+        0.67,
+        0.3
+      ],
+      "roughness": 0.08,
+      "double_sided": false
+    },
+    {
+      "id": "mat_ball_4",
+      "name": "ball_4",
+      "kind": "conductor",
+      "base_color": [
+        0.95,
+        0.67,
+        0.3
+      ],
+      "roughness": 0.3,
+      "double_sided": false
+    },
+    {
+      "id": "mat_ball_5",
+      "name": "ball_5",
+      "kind": "conductor",
+      "base_color": [
+        0.95,
+        0.67,
+        0.3
+      ],
+      "roughness": 0.65,
+      "double_sided": false
+    }
+  ],
+  "meshes": [
+    {
+      "id": "plane",
+      "source": "assets/plane.obj"
+    },
+    {
+      "id": "cube",
+      "source": "assets/cube.obj"
+    },
+    {
+      "id": "sphere",
+      "source": "assets/demo-sphere.obj"
+    }
+  ],
+  "objects": [
+    {
+      "id": "floor",
+      "name": "地面",
+      "mesh": "plane",
+      "material": "mat_floor",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          3,
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "id": "lamp",
+      "name": "顶部面积光",
+      "mesh": "plane",
+      "material": "mat_lamp",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0,
+          3.5,
+          0.6
+        ],
+        "rotation": [
+          180,
+          0,
+          0
+        ],
+        "scale": [
+          1.2,
+          1,
+          1.0
+        ]
+      }
+    },
+    {
+      "id": "ball_0",
+      "name": "漫反射 0.08",
+      "mesh": "sphere",
+      "material": "mat_ball_0",
+      "visible": true,
+      "transform": {
+        "translation": [
+          -0.9,
+          0.38,
+          -0.475
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.38,
+          0.38,
+          0.38
+        ]
+      }
+    },
+    {
+      "id": "ball_1",
+      "name": "漫反射 0.3",
+      "mesh": "sphere",
+      "material": "mat_ball_1",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0.0,
+          0.38,
+          -0.475
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.38,
+          0.38,
+          0.38
+        ]
+      }
+    },
+    {
+      "id": "ball_2",
+      "name": "漫反射 0.65",
+      "mesh": "sphere",
+      "material": "mat_ball_2",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0.9,
+          0.38,
+          -0.475
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.38,
+          0.38,
+          0.38
+        ]
+      }
+    },
+    {
+      "id": "ball_3",
+      "name": "金属 0.08",
+      "mesh": "sphere",
+      "material": "mat_ball_3",
+      "visible": true,
+      "transform": {
+        "translation": [
+          -0.9,
+          0.38,
+          0.475
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.38,
+          0.38,
+          0.38
+        ]
+      }
+    },
+    {
+      "id": "ball_4",
+      "name": "金属 0.3",
+      "mesh": "sphere",
+      "material": "mat_ball_4",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0.0,
+          0.38,
+          0.475
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.38,
+          0.38,
+          0.38
+        ]
+      }
+    },
+    {
+      "id": "ball_5",
+      "name": "金属 0.65",
+      "mesh": "sphere",
+      "material": "mat_ball_5",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0.9,
+          0.38,
+          0.475
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.38,
+          0.38,
+          0.38
+        ]
+      }
+    }
+  ],
+  "directional_lights": []
+}

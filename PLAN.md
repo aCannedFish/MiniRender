@@ -182,6 +182,8 @@ A0 先证明 Qt + MoltenVK 路线可用，不在完成大量 UI 后才验证图�
 | A3.2a 预处理 | 漫反射卷积、GGX 粗糙度层、BRDF LUT、取消/进度及独立数值对照 | 本机通过；见 docs/checkpoints/A3.2a.md |
 | A3.2b 实时 IBL | Vulkan 上传/采样、Qt 后台任务与缓存、环境图编辑及 CPU/GPU 对照 | 本机通过；见 docs/checkpoints/A3.2b.md |
 
+内置场景 SCENES1 提供可编辑的 Cornell 与材质示例，通过工具栏快速覆盖导入，记录见 docs/checkpoints/SCENES1.md。
+
 ### A4 检查点
 
 交互补充 UI4 修复地面共面闪烁并加入材质单/双面设置，记录见 docs/checkpoints/UI4.md。自动回归默认离屏运行。

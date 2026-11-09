@@ -10,6 +10,7 @@ class QTreeWidget;
 class QLineEdit;
 class QDoubleSpinBox;
 class QComboBox;
+class QToolButton;
 class QCheckBox;
 class VectorField;
 class QProgressBar;
@@ -31,7 +32,8 @@ class Workbench final : public QMainWindow {
     const minirender::SceneDocument& document() const noexcept;
     void load_scene_file(const QString& path);
     // 用户操作采用后台文件解析；同步入口供自动回归与确定的场景设置使用。
-    void open_scene_file(const QString& path);
+    void open_scene_file(const QString& path, std::function<void()> after_load = {});
+    void import_builtin_scene(const QString& id);
     void import_object_file(const QString& path);
     void save_scene_file(const QString& path);
     // 工具栏及几何操作使用后台入口；同步保存保留给确定执行顺序的回归检查。
@@ -100,6 +102,7 @@ class Workbench final : public QMainWindow {
     QAction* import_texture_action_ = nullptr;
     QAction* import_object_action_ = nullptr;
     QAction* open_action_ = nullptr;
+    QToolButton* builtin_button_ = nullptr;
     QAction* save_action_ = nullptr;
     QAction* save_as_action_ = nullptr;
     QProgressBar* task_progress_ = nullptr;
