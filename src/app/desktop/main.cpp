@@ -114,6 +114,14 @@ int main(int argc, char** argv) {
     qputenv("MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS", "0");
 #endif
     QApplication application(argc, argv);
+#ifdef Q_OS_MACOS
+    // Qt 通过 QLibrary 独立加载 Vulkan，安装包需明确指向随包部署的 loader。
+    const QString bundled_vulkan =
+        QCoreApplication::applicationDirPath() + "/../Frameworks/libvulkan.1.dylib";
+    if (QFileInfo::exists(bundled_vulkan) && qEnvironmentVariableIsEmpty("QT_VULKAN_LIB")) {
+        qputenv("QT_VULKAN_LIB", bundled_vulkan.toUtf8());
+    }
+#endif
     QApplication::setApplicationName("MiniRender");
     QCommandLineParser parser;
     parser.setApplicationDescription("MiniRender — Vulkan scene workbench");
