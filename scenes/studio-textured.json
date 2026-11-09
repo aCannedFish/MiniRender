@@ -35,7 +35,8 @@
         0.38,
         0.42
       ],
-      "roughness": 0.8
+      "roughness": 0.8,
+      "double_sided": false
     },
     {
       "id": "blue",
@@ -47,7 +48,8 @@
         1
       ],
       "roughness": 0.4,
-      "base_color_texture": "checker"
+      "base_color_texture": "checker",
+      "double_sided": false
     },
     {
       "id": "metal",
@@ -58,7 +60,8 @@
         0.6,
         0.25
       ],
-      "roughness": 0.25
+      "roughness": 0.25,
+      "double_sided": false
     }
   ],
   "meshes": [

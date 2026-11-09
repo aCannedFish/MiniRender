@@ -40,10 +40,15 @@ std::shared_ptr<const RasterMeshData> prepare_raster_mesh(const MeshData& mesh,
         }
     }
     for (std::size_t face = 0; face < mesh.triangles.size(); ++face) {
+        const auto& triangle = mesh.triangles[face];
+        const auto a = glm::dvec3(mesh.positions.at(triangle.corners[0].position));
+        const auto b = glm::dvec3(mesh.positions.at(triangle.corners[1].position));
+        const auto c = glm::dvec3(mesh.positions.at(triangle.corners[2].position));
+        const auto geometric = glm::vec3(glm::normalize(glm::cross(b - a, c - a)));
         for (std::size_t corner = 0; corner < 3; ++corner) {
             const auto& source = mesh.triangles[face].corners[corner];
             data->vertices[face * 3 + corner] = {mesh.positions.at(source.position), source.normal,
-                                                 source.uv};
+                                                 source.uv, geometric};
             data->edges[face * 6 + corner * 2] = static_cast<std::uint32_t>(face * 3 + corner);
             data->edges[face * 6 + corner * 2 + 1] =
                 static_cast<std::uint32_t>(face * 3 + (corner + 1) % 3);

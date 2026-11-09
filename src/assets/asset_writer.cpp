@@ -34,8 +34,13 @@ bool equal_files(const std::filesystem::path& first, const std::filesystem::path
     const auto total = static_cast<std::size_t>(std::filesystem::file_size(first));
     report(cancellation, progress, SceneSaveStage::compare, index, count, 0, total);
     std::ifstream a(first, std::ios::binary), b(second, std::ios::binary);
-    if (!a || !b) {
-        throw std::runtime_error("Cannot compare exported scene assets");
+    if (!a) {
+        throw std::runtime_error("Cannot read source scene asset for comparison");
+    }
+    if (!b) {
+        // 并发复制可能已创建目标，但 Windows 写入句柄尚未允许读取。
+        // 无法确认内容相同就按占名处理，后续使用新文件名，保留已有文件。
+        return false;
     }
     std::array<char, block_size> ba{}, bb{};
     std::size_t completed = 0;

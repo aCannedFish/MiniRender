@@ -150,7 +150,7 @@ SDF 作为独立模式，不要求与三角网格共享阴影和离线求交。�
 | 阶段 | 内容 | 退出条件 | 状态 |
 | --- | --- | --- | --- |
 | A0 基础 | CMake 目标隔离、CPU CLI、测试入口、Qt、Vulkan/MoltenVK 冒烟测试；固定依赖 | 无 CUDA 环境可构建；Vulkan 三角形、纹理显示、深度附件、窗口缩放运行；初始化无 Validation 错误 | 本机通过；见 docs/checkpoints/A0.md |
-| A1 场景 | 场景/资产读写、相机、选中、参数编辑、保存恢复；实时深度、基础 PBR、阴影、HDR 与 FXAA | 可从文件加载和编辑场景，保存重开一致 | 本机通过；A1.1–A1.6、UI1–UI3 记录见 docs/checkpoints/ |
+| A1 场景 | 场景/资产读写、相机、选中、参数编辑、保存恢复；实时深度、基础 PBR、阴影、HDR 与 FXAA | 可从文件加载和编辑场景，保存重开一致 | 本机通过；A1.1–A1.6、UI1–UI4 记录见 docs/checkpoints/ |
 | A2 路径追踪 | BVH、多线程、基础材质、面积光、环境光、MIS、薄透镜、任务取消 | UI/CLI 结果一致，采样测试通过，保存线性参考图 | 本机通过；A2.1–A2.4b 记录见 docs/checkpoints/ |
 | A3 实时效果 | 深度/法线缓冲、SSAO、滤波、IBL 与调试视图 | AO 各阶段可检查，窗口/相机变化无错误；通过本机 GPU 回归 | 本机通过；A3.1–A3.2b 记录见 docs/checkpoints/ |
 | A4 几何 | 半边结构、Loop/位移、QEM、重网格、自适应细分 | 拓扑、接缝、误差检查通过，结果用于实时与 CPU 渲染 | 进行中；A4.1–A4.3 本机通过，继续重网格与自适应 |
@@ -183,6 +183,8 @@ A0 先证明 Qt + MoltenVK 路线可用，不在完成大量 UI 后才验证图�
 | A3.2b 实时 IBL | Vulkan 上传/采样、Qt 后台任务与缓存、环境图编辑及 CPU/GPU 对照 | 本机通过；见 docs/checkpoints/A3.2b.md |
 
 ### A4 检查点
+
+交互补充 UI4 修复地面共面闪烁并加入材质单/双面设置，记录见 docs/checkpoints/UI4.md。自动回归默认离屏运行。
 
 交互补充 UI3 已通过：视口移动轴、旋转环、单次手势历史及相机协调，记录见 docs/checkpoints/UI3.md。后续继续 A4.4 重网格。
 
@@ -263,6 +265,8 @@ Windows 阶段不重新组织场景格式和算法模块。确需平台修复时
 7. 发生分叉先检查双方提交；main 默认使用 pull --ff-only，不能快进时显式处理，不覆盖远端变化。
 
 不要提交构建产物、用户 preset、Qt/Vulkan/CUDA/OptiX SDK、机器绝对路径、临时日志、大型模型或长视频。小型可再分发测试资产可入库；大型资产记录来源、许可、下载方式和校验值。仓库不发布本机 PDF 或个人路径。
+
+macOS 每次桌面更新后运行 `scripts/install_macos.py`，固定替换 `/Applications/MiniRender.app`，清理同 bundle ID 的旧安装包和工作树构建包。Windows 发布阶段沿用只保留最新版的要求。
 
 ### 持续集成
 

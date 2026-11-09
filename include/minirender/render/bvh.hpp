@@ -77,7 +77,7 @@ class SceneBvh {
     };
     std::uint32_t build(std::uint32_t begin, std::uint32_t end, std::size_t depth,
                         std::span<const BuildPrimitive> primitives);
-    std::optional<PrimitiveHit> trace(const RayQuery& query, RayInterval interval, bool any_hit,
+    std::optional<PrimitiveHit> trace(const Ray& ray, RayInterval interval, bool any_hit,
                                       TraceStatistics* statistics,
                                       const CancellationToken& cancellation) const;
     SurfaceHit surface_hit(const Ray& ray, const PrimitiveHit& hit) const;

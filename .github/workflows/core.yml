@@ -15,6 +15,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Test application installer
+        run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} -B -m unittest discover -s tests -p test_install_macos.py -v
       - name: Configure without Qt or GPU SDKs
         run: cmake -S . -B build/ci -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DMINIRENDER_BUILD_DESKTOP=OFF -DMINIRENDER_ENABLE_OPTIX=OFF
       - name: Build

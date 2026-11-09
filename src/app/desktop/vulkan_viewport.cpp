@@ -38,10 +38,25 @@ VulkanViewport::~VulkanViewport() {
     release();
 }
 
+void VulkanViewport::set_offscreen_rendering(bool enabled) {
+    if (device_ != VK_NULL_HANDLE) {
+        throw std::logic_error("Select the rendering target before Vulkan initialization");
+    }
+    offscreen_ = enabled;
+}
+bool VulkanViewport::offscreen_rendering() const noexcept {
+    return offscreen_;
+}
+bool VulkanViewport::can_render() const noexcept {
+    return offscreen_ || isExposed();
+}
+
 void VulkanViewport::initialize() {
-    surface_ = QVulkanInstance::surfaceForWindow(this);
-    if (surface_ == VK_NULL_HANDLE) {
-        throw std::runtime_error("Qt could not create a Vulkan surface");
+    if (!offscreen_) {
+        surface_ = QVulkanInstance::surfaceForWindow(this);
+        if (surface_ == VK_NULL_HANDLE) {
+            throw std::runtime_error("Qt could not create a Vulkan surface");
+        }
     }
     std::uint32_t count = 0;
     check(vkEnumeratePhysicalDevices(vulkanInstance()->vkInstance(), &count, nullptr), "list GPUs");
@@ -54,9 +69,11 @@ void VulkanViewport::initialize() {
         std::vector<VkQueueFamilyProperties> properties(families);
         vkGetPhysicalDeviceQueueFamilyProperties(candidate, &families, properties.data());
         for (std::uint32_t index = 0; index < families; ++index) {
-            VkBool32 present = VK_FALSE;
-            check(vkGetPhysicalDeviceSurfaceSupportKHR(candidate, index, surface_, &present),
-                  "present support");
+            VkBool32 present = offscreen_ ? VK_TRUE : VK_FALSE;
+            if (!offscreen_) {
+                check(vkGetPhysicalDeviceSurfaceSupportKHR(candidate, index, surface_, &present),
+                      "present support");
+            }
             if (present && (properties[index].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
                 physical_ = candidate;
                 queue_family_ = index;
@@ -77,7 +94,10 @@ void VulkanViewport::initialize() {
     std::vector<VkExtensionProperties> extensions(count);
     check(vkEnumerateDeviceExtensionProperties(physical_, nullptr, &count, extensions.data()),
           "get extensions");
-    std::vector<const char*> enabled{VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+    std::vector<const char*> enabled;
+    if (!offscreen_) {
+        enabled.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    }
     for (const auto& extension : extensions) {
         if (std::strcmp(extension.extensionName, "VK_KHR_portability_subset") == 0) {
             enabled.push_back("VK_KHR_portability_subset");
@@ -141,72 +161,89 @@ std::uint32_t VulkanViewport::memory_type(std::uint32_t bits, VkMemoryPropertyFl
 void VulkanViewport::recreate_swapchain() {
     check(vkDeviceWaitIdle(device_), "wait before swapchain recreation");
     release_swapchain();
-    VkSurfaceCapabilitiesKHR capabilities{};
-    check(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_, surface_, &capabilities),
-          "surface capabilities");
-    std::uint32_t count = 0;
-    check(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_, surface_, &count, nullptr),
-          "surface formats");
-    std::vector<VkSurfaceFormatKHR> formats(count);
-    check(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_, surface_, &count, formats.data()),
-          "get formats");
-    const auto found = std::find_if(formats.begin(), formats.end(), [](const auto& format) {
-        return (format.format == VK_FORMAT_B8G8R8A8_SRGB ||
-                format.format == VK_FORMAT_R8G8B8A8_SRGB) &&
-               format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-    });
-    if (found == formats.end()) {
-        throw std::runtime_error("An sRGB swapchain format is required");
-    }
-    color_format_ = found->format;
-    extent_ = capabilities.currentExtent;
-    if (extent_.width == std::numeric_limits<std::uint32_t>::max()) {
-        extent_.width =
-            std::clamp(static_cast<std::uint32_t>(width() * devicePixelRatio()),
-                       capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
-        extent_.height =
-            std::clamp(static_cast<std::uint32_t>(height() * devicePixelRatio()),
-                       capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
-    }
-    std::uint32_t desired = capabilities.minImageCount + 1;
-    if (capabilities.maxImageCount != 0) {
-        desired = std::min(desired, capabilities.maxImageCount);
-    }
-    VkCompositeAlphaFlagBitsKHR alpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    for (auto choice :
-         {VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
-          VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR, VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR}) {
-        if ((capabilities.supportedCompositeAlpha & choice) != 0) {
-            alpha = choice;
-            break;
+    if (offscreen_) {
+        extent_ = {static_cast<std::uint32_t>(std::max(1, qRound(width() * devicePixelRatio()))),
+                   static_cast<std::uint32_t>(std::max(1, qRound(height() * devicePixelRatio())))};
+        color_format_ = VK_FORMAT_B8G8R8A8_SRGB;
+        offscreen_color_.create(device_, physical_, extent_, color_format_,
+                                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                                    VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                                VK_IMAGE_ASPECT_COLOR_BIT);
+        images_ = {offscreen_color_.image()};
+        can_grab_ = true;
+    } else {
+        VkSurfaceCapabilitiesKHR capabilities{};
+        check(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_, surface_, &capabilities),
+              "surface capabilities");
+        std::uint32_t count = 0;
+        check(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_, surface_, &count, nullptr),
+              "surface formats");
+        std::vector<VkSurfaceFormatKHR> formats(count);
+        check(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_, surface_, &count, formats.data()),
+              "get formats");
+        const auto found = std::find_if(formats.begin(), formats.end(), [](const auto& format) {
+            return (format.format == VK_FORMAT_B8G8R8A8_SRGB ||
+                    format.format == VK_FORMAT_R8G8B8A8_SRGB) &&
+                   format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+        });
+        if (found == formats.end()) {
+            throw std::runtime_error("An sRGB swapchain format is required");
         }
+        color_format_ = found->format;
+        extent_ = capabilities.currentExtent;
+        if (extent_.width == std::numeric_limits<std::uint32_t>::max()) {
+            extent_.width =
+                std::clamp(static_cast<std::uint32_t>(width() * devicePixelRatio()),
+                           capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+            extent_.height =
+                std::clamp(static_cast<std::uint32_t>(height() * devicePixelRatio()),
+                           capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+        }
+        std::uint32_t desired = capabilities.minImageCount + 1;
+        if (capabilities.maxImageCount != 0) {
+            desired = std::min(desired, capabilities.maxImageCount);
+        }
+        VkCompositeAlphaFlagBitsKHR alpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        for (auto choice :
+             {VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
+              VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR, VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR}) {
+            if ((capabilities.supportedCompositeAlpha & choice) != 0) {
+                alpha = choice;
+                break;
+            }
+        }
+        VkSwapchainCreateInfoKHR create{};
+        create.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        create.surface = surface_;
+        create.minImageCount = desired;
+        create.imageFormat = color_format_;
+        create.imageColorSpace = found->colorSpace;
+        create.imageExtent = extent_;
+        create.imageArrayLayers = 1;
+        create.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        can_grab_ = (capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0;
+        if (can_grab_) {
+            create.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        }
+        create.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        create.preTransform = capabilities.currentTransform;
+        create.compositeAlpha = alpha;
+        create.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+        create.clipped = VK_TRUE;
+        check(vkCreateSwapchainKHR(device_, &create, nullptr, &swapchain_), "create swapchain");
+        check(vkGetSwapchainImagesKHR(device_, swapchain_, &count, nullptr),
+              "count swapchain images");
+        images_.resize(count);
+        check(vkGetSwapchainImagesKHR(device_, swapchain_, &count, images_.data()),
+              "get swapchain images");
     }
-    VkSwapchainCreateInfoKHR create{};
-    create.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    create.surface = surface_;
-    create.minImageCount = desired;
-    create.imageFormat = color_format_;
-    create.imageColorSpace = found->colorSpace;
-    create.imageExtent = extent_;
-    create.imageArrayLayers = 1;
-    create.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    can_grab_ = (capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0;
-    if (can_grab_) {
-        create.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    }
-    create.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    create.preTransform = capabilities.currentTransform;
-    create.compositeAlpha = alpha;
-    create.presentMode = VK_PRESENT_MODE_FIFO_KHR;
-    create.clipped = VK_TRUE;
-    check(vkCreateSwapchainKHR(device_, &create, nullptr, &swapchain_), "create swapchain");
-    check(vkGetSwapchainImagesKHR(device_, swapchain_, &count, nullptr), "count swapchain images");
-    images_.resize(count);
-    check(vkGetSwapchainImagesKHR(device_, swapchain_, &count, images_.data()),
-          "get swapchain images");
-    views_.resize(count, VK_NULL_HANDLE);
-    rendered_.resize(count, VK_NULL_HANDLE);
+    views_.resize(images_.size(), VK_NULL_HANDLE);
+    rendered_.resize(images_.size(), VK_NULL_HANDLE);
     for (std::size_t index = 0; index < images_.size(); ++index) {
+        if (offscreen_) {
+            views_[index] = offscreen_color_.view();
+            continue;
+        }
         VkImageViewCreateInfo view{};
         view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         view.image = images_[index];
@@ -318,7 +355,7 @@ void VulkanViewport::recreate_swapchain() {
 }
 
 void VulkanViewport::render_frame(bool blocking_capture) {
-    if (!isExposed() || width() <= 0 || height() <= 0 || !failure_.isEmpty()) {
+    if (!can_render() || width() <= 0 || height() <= 0 || !failure_.isEmpty()) {
         return;
     }
     try {
@@ -342,22 +379,26 @@ void VulkanViewport::render_frame(bool blocking_capture) {
         if (dirty_) {
             recreate_swapchain();
         }
-        const auto acquired =
-            vkAcquireNextImageKHR(device_, swapchain_, blocking_capture ? timeout : 1'000'000ULL,
-                                  acquired_, VK_NULL_HANDLE, &image_index_);
-        if (acquired == VK_NOT_READY || acquired == VK_TIMEOUT) {
-            frame_wait_reason_ = "Swapchain acquisition pending";
-            requestUpdate();
-            return;
-        }
-        if (acquired == VK_ERROR_OUT_OF_DATE_KHR) {
-            frame_wait_reason_ = "Swapchain recreation pending";
-            dirty_ = true;
-            requestUpdate();
-            return;
-        }
-        if (acquired != VK_SUBOPTIMAL_KHR) {
-            check(acquired, "acquire swapchain image");
+        if (offscreen_) {
+            image_index_ = 0;
+        } else {
+            const auto acquired = vkAcquireNextImageKHR(device_, swapchain_,
+                                                        blocking_capture ? timeout : 1'000'000ULL,
+                                                        acquired_, VK_NULL_HANDLE, &image_index_);
+            if (acquired == VK_NOT_READY || acquired == VK_TIMEOUT) {
+                frame_wait_reason_ = "Swapchain acquisition pending";
+                requestUpdate();
+                return;
+            }
+            if (acquired == VK_ERROR_OUT_OF_DATE_KHR) {
+                frame_wait_reason_ = "Swapchain recreation pending";
+                dirty_ = true;
+                requestUpdate();
+                return;
+            }
+            if (acquired != VK_SUBOPTIMAL_KHR) {
+                check(acquired, "acquire swapchain image");
+            }
         }
         check(vkResetCommandBuffer(command_, 0), "reset command buffer");
         VkCommandBufferBeginInfo begin{};
@@ -384,7 +425,7 @@ void VulkanViewport::frameReady() {
         capture_ ? VK_ACCESS_TRANSFER_READ_BIT : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     transition.oldLayout =
         capture_ ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    transition.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    transition.newLayout = offscreen_ ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     transition.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     transition.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     transition.image = images_[image_index_];
@@ -398,30 +439,32 @@ void VulkanViewport::frameReady() {
     const VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     VkSubmitInfo submit{};
     submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit.waitSemaphoreCount = 1;
-    submit.pWaitSemaphores = &acquired_;
-    submit.pWaitDstStageMask = &wait_stage;
+    submit.waitSemaphoreCount = offscreen_ ? 0 : 1;
+    submit.pWaitSemaphores = offscreen_ ? nullptr : &acquired_;
+    submit.pWaitDstStageMask = offscreen_ ? nullptr : &wait_stage;
     submit.commandBufferCount = 1;
     submit.pCommandBuffers = &command_;
-    submit.signalSemaphoreCount = 1;
-    submit.pSignalSemaphores = &rendered_[image_index_];
+    submit.signalSemaphoreCount = offscreen_ ? 0 : 1;
+    submit.pSignalSemaphores = offscreen_ ? nullptr : &rendered_[image_index_];
     check(vkQueueSubmit(queue_, 1, &submit, frame_fence_), "submit frame");
     submitted_preview_revision_ = preview_revision_;
     frame_wait_reason_ = "Frame submitted";
-    VkPresentInfoKHR present{};
-    present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &rendered_[image_index_];
-    present.swapchainCount = 1;
-    present.pSwapchains = &swapchain_;
-    present.pImageIndices = &image_index_;
-    vulkanInstance()->presentAboutToBeQueued(this);
-    const auto result = vkQueuePresentKHR(queue_, &present);
-    vulkanInstance()->presentQueued(this);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        dirty_ = true;
-    } else {
-        check(result, "present frame");
+    if (!offscreen_) {
+        VkPresentInfoKHR present{};
+        present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        present.waitSemaphoreCount = 1;
+        present.pWaitSemaphores = &rendered_[image_index_];
+        present.swapchainCount = 1;
+        present.pSwapchains = &swapchain_;
+        present.pImageIndices = &image_index_;
+        vulkanInstance()->presentAboutToBeQueued(this);
+        const auto result = vkQueuePresentKHR(queue_, &present);
+        vulkanInstance()->presentQueued(this);
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+            dirty_ = true;
+        } else {
+            check(result, "present frame");
+        }
     }
     if (capture_) {
         finish_readback();
@@ -513,8 +556,10 @@ void VulkanViewport::release_swapchain() {
     depth_view_ = VK_NULL_HANDLE;
     depth_ = VK_NULL_HANDLE;
     depth_memory_ = VK_NULL_HANDLE;
-    for (auto view : views_) {
-        vkDestroyImageView(device_, view, nullptr);
+    if (!offscreen_) {
+        for (auto view : views_) {
+            vkDestroyImageView(device_, view, nullptr);
+        }
     }
     for (auto semaphore : rendered_) {
         vkDestroySemaphore(device_, semaphore, nullptr);
@@ -522,7 +567,10 @@ void VulkanViewport::release_swapchain() {
     views_.clear();
     rendered_.clear();
     images_.clear();
-    vkDestroySwapchainKHR(device_, swapchain_, nullptr);
+    if (!offscreen_) {
+        vkDestroySwapchainKHR(device_, swapchain_, nullptr);
+    }
+    offscreen_color_.release();
     swapchain_ = VK_NULL_HANDLE;
 }
 
@@ -599,7 +647,7 @@ void VulkanViewport::resizeEvent(QResizeEvent* event) {
 }
 
 bool VulkanViewport::isValid() const noexcept {
-    return swapchain_ != VK_NULL_HANDLE && failure_.isEmpty();
+    return render_pass_ != VK_NULL_HANDLE && failure_.isEmpty();
 }
 VkDevice VulkanViewport::device() const noexcept {
     return device_;
@@ -1046,7 +1094,7 @@ minirender::Image VulkanViewport::grab_hdr() {
     if (offline_visible_ && offline_image_) {
         return *offline_image_;
     }
-    if (!isValid() || !isExposed() || !scene_) {
+    if (!isValid() || !can_render() || !scene_) {
         throw std::logic_error("HDR capture requires a visible scene viewport");
     }
     const auto before = frame_count_;

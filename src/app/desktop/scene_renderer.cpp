@@ -13,13 +13,21 @@
 namespace {
 
 using Vertex = minirender::RasterVertex;
+
+// 镜像改变屏幕绕序，切换 frontFace 后仍以原网格外侧作为正面。
+std::size_t side_pipeline(const minirender::RenderInstance& instance) {
+    if (instance.material.double_sided) {
+        return 0;
+    }
+    return glm::determinant(glm::mat3(instance.object_to_world)) < 0 ? 2 : 1;
+}
 // std430 按 16 字节对齐。normal 使用 mat4，避免 CPU mat3 的紧密布局与 GLSL 不一致。
 struct alignas(16) GpuInstance {
     glm::mat4 object_to_world;
     glm::mat4 normal_to_world;
     glm::vec4 base_color;
     glm::vec4 emission;
-    glm::vec4 surface; // roughness, metallic, texture filter, reserved
+    glm::vec4 surface; // roughness, metallic, texture filter, double sided
 };
 static_assert(sizeof(GpuInstance) == 176);
 static_assert(offsetof(GpuInstance, normal_to_world) == 64);
@@ -107,8 +115,12 @@ void SceneRenderer::initResources() {
 
 void SceneRenderer::initSwapChainResources() {
     targets_.create(*window_);
-    pipeline_ = create_pipeline(Pass::surface);
-    shadow_pipeline_ = create_pipeline(Pass::shadow);
+    for (std::size_t side = 0; side < surface_pipelines_.size(); ++side) {
+        const auto cull = side == 0 ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT;
+        const auto front = side == 2 ? VK_FRONT_FACE_CLOCKWISE : VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        surface_pipelines_[side] = create_pipeline(Pass::surface, cull, front);
+        shadow_pipelines_[side] = create_pipeline(Pass::shadow, cull, front);
+    }
     wire_pipeline_ = create_pipeline(Pass::wire);
     background_pipeline_ = create_pipeline(Pass::background);
     ssao_.create(*window_, targets_, uniforms_.handle(), sizeof(FrameUniform));
@@ -118,7 +130,7 @@ void SceneRenderer::initSwapChainResources() {
     window_->report_swapchain();
 }
 
-VkPipeline SceneRenderer::create_pipeline(Pass pass) {
+VkPipeline SceneRenderer::create_pipeline(Pass pass, VkCullModeFlags cull, VkFrontFace front) {
     const bool shadow = pass == Pass::shadow;
     const bool wire = pass == Pass::wire;
     const bool background = pass == Pass::background;
@@ -142,16 +154,19 @@ VkPipeline SceneRenderer::create_pipeline(Pass pass) {
     stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
     stages[1].module = fragment ? fragment->handle() : VK_NULL_HANDLE;
     const VkVertexInputBindingDescription binding{0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX};
-    const std::array<VkVertexInputAttributeDescription, 3> attributes{
+    std::array<VkVertexInputAttributeDescription, 3> attributes{
         {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, position)},
          {1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, normal)},
          {5, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, uv)}}};
+    if (wire) {
+        attributes[1].offset = offsetof(Vertex, geometric_normal);
+    }
     VkPipelineVertexInputStateCreateInfo vertex_input{};
     vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertex_input.vertexBindingDescriptionCount = background ? 0 : 1;
     vertex_input.pVertexBindingDescriptions = &binding;
     vertex_input.vertexAttributeDescriptionCount =
-        background ? 0 : ((shadow || wire) ? 1 : static_cast<std::uint32_t>(attributes.size()));
+        background ? 0 : (shadow ? 1 : (wire ? 2 : static_cast<std::uint32_t>(attributes.size())));
     vertex_input.pVertexAttributeDescriptions = attributes.data();
     VkPipelineInputAssemblyStateCreateInfo assembly{};
     assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -164,7 +179,8 @@ VkPipeline SceneRenderer::create_pipeline(Pass pass) {
     VkPipelineRasterizationStateCreateInfo raster{};
     raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     raster.polygonMode = VK_POLYGON_MODE_FILL;
-    raster.cullMode = VK_CULL_MODE_NONE;
+    raster.cullMode = cull;
+    raster.frontFace = front;
     raster.lineWidth = 1;
     raster.depthBiasEnable = shadow;
     raster.depthBiasConstantFactor = 1.25F;
@@ -269,7 +285,8 @@ void SceneRenderer::upload_scene() {
              glm::mat4(instance.normal_to_world),
              glm::vec4(material.base_color, 1),
              glm::vec4(material.emission, 0),
-             {material.roughness, metallic, static_cast<float>(material.texture_filter), 0}});
+             {material.roughness, metallic, static_cast<float>(material.texture_filter),
+              material.double_sided ? 1.0F : 0.0F}});
     }
     // 一帧在途，当前帧开始前 fence 已完成，未引用的网格可以安全回收。
     std::erase_if(meshes_, [&](const auto& entry) { return !used.contains(entry.first); });
@@ -458,10 +475,11 @@ void SceneRenderer::render_shadow_maps(VkCommandBuffer command) {
         shadow_map_.begin(command, static_cast<std::uint32_t>(light));
         vkCmdSetViewport(command, 0, 1, &viewport);
         vkCmdSetScissor(command, 0, 1, &scissor);
-        vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, shadow_pipeline_);
         vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                 &descriptor_, 0, nullptr);
         for (std::size_t index = 0; index < draws_.size(); ++index) {
+            vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                              shadow_pipelines_[side_pipeline(window_->scene()->instances[index])]);
             const DrawIndex push{light, static_cast<std::int32_t>(index)};
             vkCmdPushConstants(command, pipeline_layout_,
                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
@@ -542,11 +560,12 @@ void SceneRenderer::startNextFrame() {
                                 &descriptor_, 0, nullptr);
         vkCmdDraw(command, 3, 1, 0, 0);
     }
-    vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
     vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                             &descriptor_, 0, nullptr);
     for (std::size_t index = 0; index < draws_.size(); ++index) {
         const auto& draw = draws_[index];
+        vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          surface_pipelines_[side_pipeline(window_->scene()->instances[index])]);
         const auto& mesh = meshes_.at(draw.mesh);
         const VkDeviceSize offset = 0;
         const auto buffer = mesh.vertices.handle();
@@ -576,13 +595,17 @@ void SceneRenderer::startNextFrame() {
 
 void SceneRenderer::releaseSwapChainResources() {
     if (device_ != VK_NULL_HANDLE) {
-        vkDestroyPipeline(device_, pipeline_, nullptr);
-        vkDestroyPipeline(device_, shadow_pipeline_, nullptr);
+        for (const auto pipeline : surface_pipelines_) {
+            vkDestroyPipeline(device_, pipeline, nullptr);
+        }
+        for (const auto pipeline : shadow_pipelines_) {
+            vkDestroyPipeline(device_, pipeline, nullptr);
+        }
         vkDestroyPipeline(device_, wire_pipeline_, nullptr);
         vkDestroyPipeline(device_, background_pipeline_, nullptr);
     }
-    pipeline_ = VK_NULL_HANDLE;
-    shadow_pipeline_ = VK_NULL_HANDLE;
+    surface_pipelines_.fill(VK_NULL_HANDLE);
+    shadow_pipelines_.fill(VK_NULL_HANDLE);
     wire_pipeline_ = VK_NULL_HANDLE;
     background_pipeline_ = VK_NULL_HANDLE;
     post_process_.release();

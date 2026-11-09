@@ -36,15 +36,37 @@ build/macos-desktop-debug/src/app/desktop/minirender_desktop.app/Contents/MacOS/
 
 Qt 提供工作台和原生窗口，项目的 `VulkanViewport` 管理设备与交换链。默认打开 studio 场景与编辑工作台，使用方法见 VIEWPORT.md。A0 棋盘/深度诊断仍由 --smoke 参数运行。
 
-GPU 验证使用实际窗口、缩放和交换链回读：
+GPU 自动验证默认在隐藏窗口下运行离屏 Vulkan 渲染，检查尺寸变化与图像读回：
 
 ```sh
 python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirender_desktop.app
 ```
 
+测试不会激活或置顶窗口。Qt 继续运行布局和事件循环，Vulkan 使用同一套渲染管线，将最终结果写入独立图像。日志记录 `offscreen` 与 `hidden, no activation`，并检查视口未暴露、窗口未激活。人工检查窗口呈现时可以显式传入 `--onscreen`，该模式也不主动激活窗口。
+
+离屏测试覆盖渲染、尺寸变化、读回和资源释放；交换链呈现由人工窗口检查覆盖。
+
 结果写入 `outputs/a0/gpu-smoke.png` 和同目录日志。脚本检查退出码、像素检查成功和销毁之后的零 Validation 错误。日志缺失、超时、不能回读或缺少 Validation Layer 都是失败，不是跳过。
 
 着色器在构建时编译并嵌入程序，因此可从其他工作目录运行。场景编辑、相机交互和材质参数面板已在 A1.2 加入；阴影、HDR 后处理与 EXR 输出已分别在 A1.3/A1.4 加入。
+
+## 更新应用
+
+本机正式应用固定为 `/Applications/MiniRender.app`，每次更新替换这一份，不保留按版本命名的旧应用。
+
+完成桌面构建和回归后执行：
+
+```sh
+python3 scripts/install_macos.py
+```
+
+脚本在临时目录复制 Release 应用，使用 `macdeployqt` 部署 Cocoa、原生样式、Vulkan loader、MoltenVK、验证层和运行库，校验包签名，并执行隐藏窗口下的离屏 GPU 检查和完整朝向回归。检查通过后替换正式应用，再按 bundle ID 清理应用目录及本仓库全部工作树构建目录中的旧 `.app` 包。源码、资产、构建缓存和测试结果保留。
+
+macOS 示例与纹理放在包内 `Contents/Resources/scenes`。内置示例作为副本打开，首次保存时选择用户路径。
+
+旧构建包清理后，下次构建先运行 `cmake --preset macos-desktop-release`，再 build 和测试，重新生成应用包元数据。
+
+更新前应退出 MiniRender 并等待相关构建结束。替换失败时恢复原应用；正式包内的 `Contents/Resources/minirender-build.json` 记录提交和安装时间。部署方式参考 [Qt macOS 部署文档](https://doc.qt.io/qt-6/macos-deployment.html)。
 
 ## Windows
 

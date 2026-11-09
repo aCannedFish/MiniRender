@@ -73,6 +73,7 @@ SceneDocument load_scene(const std::filesystem::path& path) {
             material.emission = vector3(value.value("emission", Json::array({0, 0, 0})));
             material.roughness = value.value("roughness", 0.35F);
             material.ior = value.value("ior", 1.5F);
+            material.double_sided = value.value("double_sided", true);
             material.base_color_texture = value.value("base_color_texture", std::string{});
             material.texture_filter =
                 parse_texture_filter(value.value("texture_filter", std::string("trilinear")));
@@ -191,6 +192,7 @@ void save_scene(const SceneDocument& document, const std::filesystem::path& path
              {"emission", vector3(material.emission)},
              {"roughness", material.roughness},
              {"ior", material.ior},
+             {"double_sided", material.double_sided},
              {"base_color_texture", material.base_color_texture},
              {"texture_filter", texture_filter_name(material.texture_filter)}});
     }

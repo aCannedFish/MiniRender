@@ -515,7 +515,7 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
     auto* heartbeat = new QTimer(&window);
     heartbeat->setInterval(10);
     QObject::connect(heartbeat, &QTimer::timeout, &window, [state, &window] {
-        state->exposed = window.viewport()->isExposed();
+        state->exposed = window.viewport()->can_render();
         record_gap(*state);
     });
     heartbeat->start();

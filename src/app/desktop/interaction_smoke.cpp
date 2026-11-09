@@ -99,9 +99,7 @@ void start_interaction_smoke(Workbench& window, const QString&) {
             if (viewport->rendered_frames() < 5) {
                 return;
             }
-            if (!viewport->isExposed() || !window.isActiveWindow()) {
-                window.raise();
-                window.activateWindow();
+            if (!viewport->can_render()) {
                 state->previous_tick = 0;
                 return;
             }

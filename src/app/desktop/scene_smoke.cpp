@@ -195,9 +195,7 @@ void start_scene_smoke(Workbench& window, const QString& directory) {
             if (viewport->rendered_frames() < 5) {
                 return;
             }
-            if (!viewport->isExposed()) {
-                window.raise();
-                window.activateWindow();
+            if (!viewport->can_render()) {
                 return;
             }
             if (state->stage == 0 &&

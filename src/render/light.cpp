@@ -214,8 +214,13 @@ LightSampler::LightSampler(std::shared_ptr<const SceneSnapshot> scene,
             area_choices_[{static_cast<std::uint32_t>(index), static_cast<std::uint32_t>(face)}] =
                 choices_.size();
             choices_.push_back({LightKind::area, areas_.size()});
-            areas_.push_back({vertices, cross / (2 * area), radiance, area});
-            weights.push_back(2 * pi * area * luminance(radiance));
+            // 镜像后的外侧与 BVH 一致；单面发光只覆盖外侧半球。
+            const double orientation =
+                glm::determinant(glm::dmat3(instance.object_to_world)) < 0 ? -1 : 1;
+            areas_.push_back({vertices, cross * orientation / (2 * area), radiance, area,
+                              instance.material.double_sided});
+            weights.push_back((instance.material.double_sided ? 2 : 1) * pi * area *
+                              luminance(radiance));
         }
     }
     // 投影包围球面积用于估计无限光穿过场景的功率；只影响选择效率，最终 PMF 始终计入 PDF。
@@ -269,6 +274,9 @@ std::optional<LightSample> LightSampler::sample(glm::dvec3 reference, double lig
     const auto barycentric = sample_triangle(surface_u);
     const auto point = barycentric.x * light.vertices[0] + barycentric.y * light.vertices[1] +
                        barycentric.z * light.vertices[2];
+    if (!light.double_sided && glm::dot(light.normal, reference - point) <= 0) {
+        return std::nullopt;
+    }
     const double density = area_density(reference, point, light.normal, light.area);
     if (density == 0) {
         return std::nullopt;
@@ -296,6 +304,9 @@ double LightSampler::area_pdf(glm::dvec3 reference, const SurfaceHit& hit) const
         return 0;
     }
     const auto& light = areas_[choices_[choice->second].index];
+    if (!light.double_sided && glm::dot(light.normal, reference - hit.position) <= 0) {
+        return 0;
+    }
     return selection_.probability(choice->second) *
            area_density(reference, hit.position, light.normal, light.area);
 }

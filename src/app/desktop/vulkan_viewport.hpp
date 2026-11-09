@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gpu_image.hpp"
 #include <minirender/core/image.hpp>
 #include <minirender/render/ibl.hpp>
 #include <minirender/render/raster_mesh.hpp>
@@ -33,6 +34,10 @@ class VulkanViewport final : public QWindow {
   public:
     VulkanViewport();
     ~VulkanViewport() override;
+    // 回归在独立 Vulkan 图像中执行同一套渲染管线，不依赖可见窗口或呈现队列。
+    void set_offscreen_rendering(bool enabled);
+    bool offscreen_rendering() const noexcept;
+    bool can_render() const noexcept;
 
     void set_scene(std::shared_ptr<const minirender::SceneSnapshot> scene);
     const std::shared_ptr<const minirender::SceneSnapshot>& scene() const noexcept;
@@ -172,6 +177,8 @@ class VulkanViewport final : public QWindow {
     std::uint32_t queue_family_ = 0;
     VkSurfaceKHR surface_ = VK_NULL_HANDLE; // Qt instance/window 拥有，不在此销毁。
     VkSwapchainKHR swapchain_ = VK_NULL_HANDLE;
+    bool offscreen_ = false;
+    GpuImage offscreen_color_;
     VkFormat color_format_ = VK_FORMAT_UNDEFINED;
     VkFormat depth_format_ = VK_FORMAT_UNDEFINED;
     VkExtent2D extent_{};

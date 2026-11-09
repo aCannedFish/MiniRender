@@ -113,8 +113,7 @@ void start_offline_smoke(Workbench& window, const QString& directory) {
                 }
                 require(state->ticks < 500 && viewport->failure().isEmpty(),
                         "Offline test timed out or GPU failed");
-                if (viewport->rendered_frames() < 5 || !viewport->isExposed()) {
-                    window.raise();
+                if (viewport->rendered_frames() < 5 || !viewport->can_render()) {
                     return;
                 }
                 const auto button = [&](const char* name) {

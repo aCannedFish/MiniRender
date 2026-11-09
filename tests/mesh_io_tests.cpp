@@ -6,10 +6,16 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
+#include <cstdio>
 #include <fstream>
 #include <future>
 #include <iterator>
 #include <locale>
+#include <memory>
+
+#ifdef _WIN32
+#include <share.h>
+#endif
 
 using namespace minirender;
 
@@ -361,3 +367,25 @@ TEST_CASE("Worker validation caches preserve transaction checks and reject faile
     REQUIRE_FALSE(editor.can_undo());
     REQUIRE_FALSE(editor.can_redo());
 }
+
+#ifdef _WIN32
+TEST_CASE("Scene save preserves an asset held by an exclusive Windows handle", "[scene][save]") {
+    TemporaryDirectory directory;
+    const auto scene = generated_scene(1);
+    const auto file = directory.path / "scene.json";
+    save_scene(scene, file);
+    const auto occupied = load_scene(file).meshes[0].source;
+    const auto original = bytes(directory.path / occupied);
+    // 模拟另一保存任务已创建目标、尚未释放排他写入句柄的时刻。
+    std::unique_ptr<FILE, decltype(&std::fclose)> locked(
+        _wfsopen((directory.path / occupied).c_str(), L"rb", _SH_DENYRW), &std::fclose);
+    REQUIRE(locked);
+    REQUIRE_NOTHROW(save_scene(scene, file));
+    const auto reopened = load_scene(file);
+    REQUIRE(reopened.meshes[0].source != occupied);
+    same_mesh(*reopened.meshes[0].data, *scene.meshes[0].data);
+    locked.reset();
+    REQUIRE(bytes(directory.path / occupied) == original);
+    no_staging_directories(directory.path);
+}
+#endif

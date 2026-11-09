@@ -57,7 +57,7 @@ struct LightSample {
     glm::dvec3 position_error{0};
 };
 
-// 发光三角形作为双面漫发射面积光，与现有 emission 预览约定一致。
+// 发光三角形按材质 double_sided 选择单/双面漫发射，与表面可见性一致。
 // 光源选择按估计功率加权。查询结果不包含可见性，积分器负责有限/无限阴影射线。
 // 接收 make_snapshot 生成的有效快照；构造完成后只读，可供渲染线程共享。
 class LightSampler {
@@ -78,6 +78,7 @@ class LightSampler {
         glm::dvec3 normal;
         glm::dvec3 radiance;
         double area;
+        bool double_sided;
     };
     struct Directional {
         glm::dvec3 direction;

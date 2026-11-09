@@ -5,6 +5,7 @@
 #include "offline_smoke.hpp"
 #include "parameter_smoke.hpp"
 #include "scene_smoke.hpp"
+#include "sides_smoke.hpp"
 #include "ssao_smoke.hpp"
 #include "texture_smoke.hpp"
 #include "vulkan_viewport.hpp"
@@ -29,6 +30,7 @@
 
 #include <atomic>
 #include <cmath>
+#include <string_view>
 
 namespace {
 
@@ -91,9 +93,19 @@ bool validate_capture(const QImage& image) {
 } // namespace
 
 // 桌面入口管理窗口与 Vulkan instance 生命周期：窗口必须先于 instance 销毁。
-// --smoke 用真实窗口测试渲染、缩放和读回；没有 GPU 时失败，不能静默跳过。
+// 自动回归默认使用离屏 Vulkan 图像，保持 Qt 布局与事件循环运行。
+// --onscreen-regression 供人工检查窗口呈现；没有 GPU 时回归失败。
 int main(int argc, char** argv) {
+    bool regression_startup = false;
+    for (int i = 1; i < argc; ++i) {
+        const std::string_view argument(argv[i]);
+        regression_startup = regression_startup || argument == "--smoke" ||
+                             (argument.starts_with("--") && argument.ends_with("-smoke"));
+    }
 #ifdef Q_OS_MACOS
+    if (regression_startup) {
+        qputenv("QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM", "1");
+    }
     // 自有 Vulkan 提交由 timer 调度，不参与 Qt RHI 的事务内呈现协议。
     // 使用普通 CAMetalLayer，避免 QMetalLayer 暂存 drawable，阻塞后台 nextDrawable。
     qputenv("QT_MTL_NO_TRANSACTION", "1");
@@ -102,12 +114,33 @@ int main(int argc, char** argv) {
     qputenv("MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS", "0");
 #endif
     QApplication application(argc, argv);
+#ifdef Q_OS_MACOS
+    // Qt 通过 QLibrary 独立加载 Vulkan，安装包需明确指向随包部署的 loader。
+    const QString bundled_vulkan =
+        QCoreApplication::applicationDirPath() + "/../Frameworks/libvulkan.1.dylib";
+    if (QFileInfo::exists(bundled_vulkan) && qEnvironmentVariableIsEmpty("QT_VULKAN_LIB")) {
+        qputenv("QT_VULKAN_LIB", bundled_vulkan.toUtf8());
+    }
+    const QString vulkan_resources =
+        QCoreApplication::applicationDirPath() + "/../Resources/vulkan/";
+    const QString driver_manifest = vulkan_resources + "icd.d/MoltenVK_icd.json";
+    if (QFileInfo::exists(driver_manifest) && qEnvironmentVariableIsEmpty("VK_DRIVER_FILES") &&
+        qEnvironmentVariableIsEmpty("VK_ICD_FILENAMES")) {
+        qputenv("VK_DRIVER_FILES", driver_manifest.toUtf8());
+    }
+    const QString layer_directory = vulkan_resources + "explicit_layer.d";
+    if (QDir(layer_directory).exists() && qEnvironmentVariableIsEmpty("VK_LAYER_PATH")) {
+        qputenv("VK_LAYER_PATH", layer_directory.toUtf8());
+    }
+#endif
     QApplication::setApplicationName("MiniRender");
     QCommandLineParser parser;
     parser.setApplicationDescription("MiniRender — Vulkan scene workbench");
     parser.addHelpOption();
     parser.addOption({"smoke", "Run resize/readback checks and save a PNG.", "output"});
     parser.addOption({"validation", "Require Vulkan Validation Layers."});
+    parser.addOption({"onscreen-regression",
+                      "Use a visible non-activating window for manual presentation checks."});
     parser.addOption(
         {"timing-only",
          "Measure regression responsiveness without Vulkan validation instrumentation."});
@@ -128,14 +161,23 @@ int main(int argc, char** argv) {
                       "Verify background geometry, file tasks and CPU/GPU updates.", "directory"});
     parser.addOption(
         {"gizmo-smoke", "Verify object manipulation, history and GPU overlays.", "directory"});
+    parser.addOption(
+        {"sides-smoke", "Verify material sidedness and coplanar contact views.", "directory"});
     parser.process(application);
     const bool smoke = parser.isSet("smoke");
     const bool regression = smoke || parser.isSet("scene-smoke") || parser.isSet("texture-smoke") ||
                             parser.isSet("interaction-smoke") || parser.isSet("parameter-smoke") ||
                             parser.isSet("wire-smoke") || parser.isSet("offline-smoke") ||
                             parser.isSet("ssao-smoke") || parser.isSet("ibl-smoke") ||
-                            parser.isSet("geometry-smoke") || parser.isSet("gizmo-smoke");
+                            parser.isSet("geometry-smoke") || parser.isSet("gizmo-smoke") ||
+                            parser.isSet("sides-smoke");
     const bool timing_only = parser.isSet("timing-only");
+    const bool offscreen = regression && !parser.isSet("onscreen-regression");
+    if (parser.isSet("onscreen-regression") && !regression) {
+        qCritical() << "--onscreen-regression requires a regression mode.";
+        return 1;
+    }
+    qInfo() << "Vulkan rendering target:" << (offscreen ? "offscreen" : "window");
     if (timing_only && (!regression || parser.isSet("validation"))) {
         qCritical() << "--timing-only requires a regression mode and excludes --validation.";
         return 1;
@@ -183,11 +225,17 @@ int main(int argc, char** argv) {
             window.setWindowTitle(window.windowTitle() + " [自动回归]");
         }
         auto* viewport = window.viewport();
+        viewport->set_offscreen_rendering(offscreen);
         if (!smoke) {
+#ifdef Q_OS_MACOS
+            const QString bundled_scene =
+                QCoreApplication::applicationDirPath() + "/../Resources/scenes/studio.json";
+#else
+            const QString bundled_scene =
+                QCoreApplication::applicationDirPath() + "/scenes/studio.json";
+#endif
             const QString scene_path =
-                parser.isSet("scene")
-                    ? parser.value("scene")
-                    : QCoreApplication::applicationDirPath() + "/scenes/studio.json";
+                parser.isSet("scene") ? parser.value("scene") : bundled_scene;
             try {
                 if (regression) {
                     window.load_scene_file(scene_path);
@@ -233,6 +281,10 @@ int main(int argc, char** argv) {
             start_gizmo_smoke(window, parser.value("gizmo-smoke"), timing_only);
         }
 
+        if (parser.isSet("sides-smoke")) {
+            start_sides_smoke(window, parser.value("sides-smoke"));
+        }
+
         int ticks = 0;
         bool resized = false;
         QSize initial_size;
@@ -241,6 +293,11 @@ int main(int argc, char** argv) {
         timer.setInterval(100);
         QObject::connect(&timer, &QTimer::timeout, &window, [&] {
             ++ticks;
+            if (offscreen && (window.isActiveWindow() || viewport->isExposed())) {
+                qCritical() << "Offscreen regression exposed or activated a window.";
+                application.exit(1);
+                return;
+            }
             if (!viewport->failure().isEmpty()) {
                 application.exit(1);
                 return;
@@ -289,9 +346,21 @@ int main(int argc, char** argv) {
         if (smoke) {
             window.resize(960, 640);
         }
+        if (regression) {
+            window.setAttribute(Qt::WA_ShowWithoutActivating);
+            window.setWindowFlag(Qt::WindowDoesNotAcceptFocus);
+            window.setAttribute(Qt::WA_DontShowOnScreen, offscreen);
+            qInfo() << "Regression window policy:"
+                    << (offscreen ? "hidden, no activation" : "visible, no activation");
+        }
         window.show();
-        window.raise();
-        window.activateWindow();
+        if (offscreen) {
+            viewport->requestUpdate();
+        }
+        if (!regression) {
+            window.raise();
+            window.activateWindow();
+        }
         timer.start();
         result = application.exec();
         if (parser.isSet("geometry-smoke")) {
