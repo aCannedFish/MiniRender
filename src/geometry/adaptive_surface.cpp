@@ -146,11 +146,12 @@ AdaptiveSample AdaptiveSurface::sample(MeshIndex root, glm::dvec3 barycentric) {
         }
         const auto& displacement = *settings_.displacement;
         const auto value = height_value(height_->level(0), parameter_uv(root, barycentric));
-        const auto length = glm::length(direction);
-        if (!std::isfinite(length) || length <= 1e-12) {
+        const auto direction_length = glm::length(direction);
+        if (!std::isfinite(direction_length) || direction_length <= 1e-12) {
             throw std::invalid_argument("Adaptive reference has no interpolated smooth normal");
         }
-        position = base + direction / length * displacement.scale * (value - displacement.midlevel);
+        position = base + direction / direction_length * displacement.scale *
+                              (value - displacement.midlevel);
     }
     return {position, normal / length};
 }
