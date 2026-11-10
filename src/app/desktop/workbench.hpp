@@ -20,6 +20,7 @@ class EnvironmentPanel;
 class IblController;
 class GeometryController;
 class GeometryPanel;
+class PointCloudPanel;
 struct GeometryTaskResult;
 
 // 桌面编辑控制器：控件编辑委托给 SceneEditor，渲染器只收到不可变快照。
@@ -43,6 +44,12 @@ class Workbench final : public QMainWindow {
     void export_geometry_file(const QString& path);
     GeometryController* geometry_controller() const noexcept;
     GeometryPanel* geometry_panel() const noexcept;
+    PointCloudPanel* point_cloud_panel() const noexcept;
+    void import_point_file(const QString& path);
+    void sample_point_cloud();
+    void prepare_point_cloud_normals();
+    void reconstruct_point_cloud();
+    void export_point_file(const QString& path);
     void select_object(const std::string& id);
     void import_texture_file(const QString& path, minirender::ColorEncoding encoding);
     bool texture_loading() const noexcept;
@@ -73,6 +80,8 @@ class Workbench final : public QMainWindow {
     void begin_asset_task(const QString& message);
     void finish_asset_task();
     bool finish_geometry_task(const GeometryTaskResult& result);
+    void connect_point_panel();
+    void update_point_selection();
     void install_scene(minirender::SceneDocument document, const QString& path,
                        const minirender::MeshValidationCache* validated = nullptr);
     minirender::SceneObject* selected(minirender::SceneDocument& scene) const;
@@ -89,6 +98,7 @@ class Workbench final : public QMainWindow {
     IblController* ibl_ = nullptr;
     GeometryController* geometry_tasks_ = nullptr;
     GeometryPanel* geometry_ = nullptr;
+    PointCloudPanel* points_ = nullptr;
     QLineEdit* object_name_ = nullptr;
     VectorField* translation_ = nullptr;
     VectorField* rotation_ = nullptr;

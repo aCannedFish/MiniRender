@@ -15,6 +15,7 @@ struct PointNormalSettings {
     bool estimate = true;
     bool orient = true;
     bool flip = false;
+    bool operator==(const PointNormalSettings&) const = default;
     void validate() const;
 };
 

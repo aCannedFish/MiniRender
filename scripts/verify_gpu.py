@@ -94,13 +94,19 @@ def main() -> int:
         action="store_true",
         help="Verify adaptive geometry and projection",
     )
+    checks.add_argument(
+        "--points-check",
+        action="store_true",
+        help="Verify point cloud editing and preview",
+    )
     args = parser.parse_args()
     if args.timing_only and args.sync_validation:
         parser.error(
             "Timing measurements and synchronization validation must run separately"
         )
     scene_check = (
-        args.adaptive_check
+        args.points_check
+        or args.adaptive_check
         or args.presets_check
         or args.sides_check
         or args.texture_check
@@ -125,6 +131,7 @@ def main() -> int:
     mode = "GPU"
     option = "--smoke"
     for selected, candidate in [
+        (args.points_check, "Points"),
         (args.adaptive_check, "Adaptive"),
         (args.presets_check, "Presets"),
         (args.sides_check, "Sides"),

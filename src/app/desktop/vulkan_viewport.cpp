@@ -1,6 +1,7 @@
 #include "vulkan_viewport.hpp"
 #include "diagnostic_renderer.hpp"
 #include "offline_renderer.hpp"
+#include "point_preview_renderer.hpp"
 #include "scene_renderer.hpp"
 #include <minirender/scene/editor.hpp>
 
@@ -144,6 +145,8 @@ void VulkanViewport::initialize() {
     renderer_->initResources();
     offline_renderer_ = std::make_unique<OfflineRenderer>(this);
     offline_renderer_->initResources();
+    point_renderer_ = std::make_unique<PointPreviewRenderer>(this);
+    point_renderer_->initResources();
 }
 
 std::uint32_t VulkanViewport::memory_type(std::uint32_t bits, VkMemoryPropertyFlags flags) const {
@@ -351,6 +354,7 @@ void VulkanViewport::recreate_swapchain() {
     }
     renderer_->initSwapChainResources();
     offline_renderer_->initSwapChainResources();
+    point_renderer_->initSwapChainResources();
     dirty_ = false;
 }
 
@@ -371,6 +375,7 @@ void VulkanViewport::render_frame(bool blocking_capture) {
             return;
         }
         check(ready, "wait frame fence");
+        point_renderer_->discard_if_unused();
         // 连续拖拽会不断发布新版本。只要旧版本持续完成，就没有等待停滞。
         if (completed_preview_revision_ != submitted_preview_revision_) {
             preview_wait_.restart();
@@ -405,8 +410,12 @@ void VulkanViewport::render_frame(bool blocking_capture) {
         begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         check(vkBeginCommandBuffer(command_, &begin), "begin frame");
-        // 两个实现共享交换链，同一时刻只有一个录制；选择发生在上一帧 fence 完成后。
-        (offline_visible_ ? offline_renderer_ : renderer_)->startNextFrame();
+        // 显示算法共享目标，选择和缓冲更新发生在上一帧 fence 完成后。
+        if (point_visible_) {
+            point_renderer_->startNextFrame();
+        } else {
+            (offline_visible_ ? offline_renderer_ : renderer_)->startNextFrame();
+        }
     } catch (const std::exception& error) {
         report_failure(QString::fromUtf8(error.what()));
     }
@@ -544,6 +553,9 @@ void VulkanViewport::release_swapchain() {
     if (offline_renderer_) {
         offline_renderer_->releaseSwapChainResources();
     }
+    if (point_renderer_) {
+        point_renderer_->releaseSwapChainResources();
+    }
     for (auto framebuffer : framebuffers_) {
         vkDestroyFramebuffer(device_, framebuffer, nullptr);
     }
@@ -587,6 +599,10 @@ void VulkanViewport::release() {
     if (offline_renderer_) {
         offline_renderer_->releaseResources();
         offline_renderer_.reset();
+    }
+    if (point_renderer_) {
+        point_renderer_->releaseResources();
+        point_renderer_.reset();
     }
     vkDestroyBuffer(device_, readback_, nullptr);
     vkFreeMemory(device_, readback_memory_, nullptr);
@@ -736,7 +752,11 @@ void VulkanViewport::set_scene(std::shared_ptr<const minirender::SceneSnapshot> 
     raster_meshes_.retain(scene_ ? std::span<const minirender::RenderInstance>(scene_->instances)
                                  : std::span<const minirender::RenderInstance>{});
     if (scene_) {
-        camera_ = scene_->camera;
+        if (point_visible_) {
+            scene_camera_before_points_ = scene_->camera;
+        } else {
+            camera_ = scene_->camera;
+        }
     }
     rebuild_gizmo();
     ++scene_revision_;
@@ -768,10 +788,86 @@ void VulkanViewport::set_camera(const minirender::Camera& camera) {
     camera_ = camera;
     rebuild_gizmo();
     mark_preview_changed();
-    if (on_camera_changed) {
+    if (on_camera_changed && !point_visible_) {
         on_camera_changed(camera_);
     }
     requestUpdate();
+}
+
+void VulkanViewport::set_point_preview_data(
+    std::shared_ptr<const minirender::PointPreviewData> data) {
+    if (data && data->points.empty()) {
+        throw std::invalid_argument("Point preview data must contain points");
+    }
+    if (!data) {
+        set_point_preview_visible(false);
+    }
+    const bool first = !point_data_;
+    point_data_ = std::move(data);
+    if (first && point_data_) {
+        reset_point_camera();
+    }
+    mark_preview_changed();
+    requestUpdate();
+}
+const std::shared_ptr<const minirender::PointPreviewData>&
+VulkanViewport::point_preview_data() const noexcept {
+    return point_data_;
+}
+void VulkanViewport::set_point_preview_settings(minirender::PointPreviewSettings settings) {
+    settings.validate();
+    point_settings_ = settings;
+    mark_preview_changed();
+    requestUpdate();
+}
+const minirender::PointPreviewSettings& VulkanViewport::point_preview_settings() const noexcept {
+    return point_settings_;
+}
+void VulkanViewport::set_point_preview_visible(bool visible) {
+    if (point_visible_ == visible) {
+        return;
+    }
+    if (visible && !point_data_) {
+        throw std::logic_error("Load a point cloud before opening its preview");
+    }
+    finish_gizmo_drag(false);
+    if (visible) {
+        set_offline_visible(false);
+        scene_camera_before_points_ = camera_;
+        camera_ = point_camera_;
+    } else {
+        point_camera_ = camera_;
+        camera_ = scene_camera_before_points_;
+    }
+    point_visible_ = visible;
+    pressed_buttons_ = Qt::NoButton;
+    dragged_ = false;
+    rebuild_gizmo();
+    mark_preview_changed();
+    if (on_point_preview_changed) {
+        on_point_preview_changed(visible);
+    }
+    requestUpdate();
+}
+bool VulkanViewport::point_preview_visible() const noexcept {
+    return point_visible_;
+}
+void VulkanViewport::reset_point_camera() {
+    minirender::Camera camera;
+    camera.position = {3, 2, 3};
+    camera.target = {0, 0, 0};
+    camera.near_plane = .01F;
+    camera.far_plane = 100;
+    point_camera_ = camera;
+    if (point_visible_) {
+        set_camera(camera);
+    }
+}
+void VulkanViewport::report_point_upload() {
+    ++point_uploads_;
+}
+std::uint64_t VulkanViewport::point_uploads() const noexcept {
+    return point_uploads_;
 }
 void VulkanViewport::set_exposure(float value) {
     exposure_ = value;
@@ -782,6 +878,7 @@ float VulkanViewport::exposure() const noexcept {
     return exposure_;
 }
 void VulkanViewport::set_view_mode(int mode) {
+    set_point_preview_visible(false);
     view_mode_ = mode;
     mark_preview_changed();
     requestUpdate();
@@ -830,6 +927,9 @@ std::uint64_t VulkanViewport::ibl_texture_updates() const noexcept {
 }
 
 void VulkanViewport::set_offline_visible(bool visible) {
+    if (visible) {
+        set_point_preview_visible(false);
+    }
     if (offline_visible_ == visible) {
         return;
     }
@@ -944,8 +1044,8 @@ void VulkanViewport::mouseReleaseEvent(QMouseEvent* event) {
     }
     const bool owned_press = pressed_buttons_.testFlag(event->button());
     pressed_buttons_ &= ~Qt::MouseButtons(event->button());
-    if (owned_press && scene_ && !offline_visible_ && event->button() == Qt::LeftButton &&
-        !dragged_ && width() > 0 && height() > 0) {
+    if (owned_press && scene_ && !offline_visible_ && !point_visible_ &&
+        event->button() == Qt::LeftButton && !dragged_ && width() > 0 && height() > 0) {
         const glm::vec2 uv{static_cast<float>(event->position().x()) / static_cast<float>(width()),
                            static_cast<float>(event->position().y()) /
                                static_cast<float>(height())};
@@ -1042,7 +1142,8 @@ void VulkanViewport::set_gizmo_target(std::string object_id,
 }
 void VulkanViewport::rebuild_gizmo() {
     gizmo_layout_ = {};
-    if (gizmo_target_ && scene_ && !offline_visible_ && width() > 0 && height() > 0) {
+    if (gizmo_target_ && scene_ && !offline_visible_ && !point_visible_ && width() > 0 &&
+        height() > 0) {
         const minirender::GizmoView view{camera_, {width(), height()}};
         gizmo_layout_ = minirender::make_gizmo_layout(view, *gizmo_target_, gizmo_mode_);
     }
@@ -1091,6 +1192,9 @@ bool VulkanViewport::fxaa_enabled() const noexcept {
     return fxaa_enabled_;
 }
 minirender::Image VulkanViewport::grab_hdr() {
+    if (point_visible_) {
+        throw std::logic_error("Return to the scene before exporting HDR");
+    }
     if (offline_visible_ && offline_image_) {
         return *offline_image_;
     }
