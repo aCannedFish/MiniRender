@@ -5,6 +5,7 @@
 #include "interaction_smoke.hpp"
 #include "offline_smoke.hpp"
 #include "parameter_smoke.hpp"
+#include "point_cloud_smoke.hpp"
 #include "presets_smoke.hpp"
 #include "scene_smoke.hpp"
 #include "sides_smoke.hpp"
@@ -174,6 +175,7 @@ int main(int argc, char** argv) {
                       "directory"});
     parser.addOption(
         {"adaptive-smoke", "Verify adaptive geometry, projection and rendering.", "directory"});
+    parser.addOption({"points-smoke", "Verify point cloud editing and preview.", "directory"});
     parser.process(application);
     const bool smoke = parser.isSet("smoke");
     const bool regression = smoke || parser.isSet("scene-smoke") || parser.isSet("texture-smoke") ||
@@ -182,7 +184,7 @@ int main(int argc, char** argv) {
                             parser.isSet("ssao-smoke") || parser.isSet("ibl-smoke") ||
                             parser.isSet("geometry-smoke") || parser.isSet("gizmo-smoke") ||
                             parser.isSet("sides-smoke") || parser.isSet("presets-smoke") ||
-                            parser.isSet("adaptive-smoke");
+                            parser.isSet("adaptive-smoke") || parser.isSet("points-smoke");
 #ifdef Q_OS_MACOS
     RegressionActivity regression_activity(regression);
 #endif
@@ -307,6 +309,9 @@ int main(int argc, char** argv) {
         if (parser.isSet("adaptive-smoke")) {
             start_adaptive_smoke(window, parser.value("adaptive-smoke"), timing_only);
         }
+        if (parser.isSet("points-smoke")) {
+            start_point_cloud_smoke(window, parser.value("points-smoke"), timing_only);
+        }
 
         int ticks = 0;
         bool resized = false;
@@ -386,7 +391,8 @@ int main(int argc, char** argv) {
         }
         timer.start();
         result = application.exec();
-        if (parser.isSet("geometry-smoke") || parser.isSet("adaptive-smoke")) {
+        if (parser.isSet("geometry-smoke") || parser.isSet("adaptive-smoke") ||
+            parser.isSet("points-smoke")) {
             geometry_cleanup.start();
         }
     }

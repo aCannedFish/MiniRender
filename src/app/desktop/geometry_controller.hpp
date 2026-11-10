@@ -2,10 +2,13 @@
 
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/adaptive.hpp>
+#include <minirender/geometry/ball_pivot.hpp>
 #include <minirender/geometry/displacement.hpp>
 #include <minirender/geometry/loop.hpp>
+#include <minirender/geometry/point_normals.hpp>
 #include <minirender/geometry/remesh.hpp>
 #include <minirender/geometry/simplify.hpp>
+#include <minirender/render/point_preview.hpp>
 #include <minirender/render/raster_mesh.hpp>
 
 #include <QElapsedTimer>
@@ -17,7 +20,36 @@
 #include <optional>
 
 enum class GeometryTaskState { idle, running, cancelling, ready, cancelled, failed, discarded };
-enum class GeometryTaskKind { mesh, height_import, obj_export, scene_save };
+enum class GeometryTaskKind {
+    mesh,
+    height_import,
+    obj_export,
+    scene_save,
+    point_import,
+    point_sample,
+    point_normals,
+    point_reconstruct,
+    point_export
+};
+
+// 法线结果固定来源所有权及完整参数，重建可复用同一份已完成的估计结果。
+struct PointNormalCache {
+    std::shared_ptr<const minirender::PointCloud> source;
+    minirender::PointNormalSettings settings;
+    minirender::PointNormalResult value;
+    bool matches(const std::shared_ptr<const minirender::PointCloud>& input,
+                 const minirender::PointNormalSettings& parameters) const noexcept {
+        return source == input && settings == parameters;
+    }
+};
+
+struct PointReconstructionInput {
+    std::shared_ptr<const minirender::PointCloud> cloud;
+    std::shared_ptr<const PointNormalCache> cached_normals;
+    minirender::PointNormalSettings normals;
+    minirender::BallPivotSettings balls;
+    bool automatic_radii = true;
+};
 
 // 每阶段独立计数，total<=1 的校验/解码/提交阶段适合用不确定进度条显示。
 struct GeometryTaskProgress {
@@ -49,6 +81,10 @@ struct GeometryTaskResult {
     std::optional<minirender::SimplifyResult> simplification;
     std::optional<minirender::RemeshResult> remeshing;
     std::optional<minirender::AdaptiveResult> adaptation;
+    std::shared_ptr<const minirender::PointCloud> point_cloud;
+    std::shared_ptr<const minirender::PointPreviewData> point_preview;
+    std::shared_ptr<const PointNormalCache> point_normals;
+    std::shared_ptr<const minirender::BallPivotResult> point_reconstruction;
     std::string error;
     std::string summary;
     bool cancelled = false;
@@ -80,6 +116,16 @@ class GeometryController final : public QObject {
     void save_scene(minirender::SceneDocument scene, std::filesystem::path destination,
                     Completion completion);
     void cancel();
+    void import_points(std::filesystem::path source, Completion completion);
+    void sample_points(std::shared_ptr<const minirender::MeshData> mesh, std::size_t count,
+                       std::uint64_t seed, Completion completion);
+    void prepare_points(std::shared_ptr<const minirender::PointCloud> cloud,
+                        minirender::PointNormalSettings settings, Completion completion);
+    void reconstruct_points(PointReconstructionInput input, Completion completion);
+    void export_points(minirender::SceneDocument sources,
+                       std::shared_ptr<const minirender::PointCloud> cloud,
+                       std::filesystem::path input_file, std::filesystem::path destination,
+                       Completion completion);
     bool busy() const noexcept;
     GeometryTaskStatus status() const;
 

@@ -131,7 +131,8 @@ void verify_layout(Workbench& window) {
 }
 
 // 使用 CPU 世界空间命中法线和相机深度，核对新网格的实际 GPU 缓冲内容。
-QImage verify_gpu(Workbench& window, const QString& directory, const QString& label) {
+QImage verify_gpu(Workbench& window, const QString& directory, const QString& label,
+                  const std::string& target_id = "blue_cube") {
     auto* viewport = window.viewport();
     const auto snapshot = minirender::make_snapshot(window.document());
     const minirender::SceneBvh bvh(snapshot);
@@ -174,7 +175,7 @@ QImage verify_gpu(Workbench& window, const QString& directory, const QString& la
             equal = equal && std::abs(depth.pixelColor(x, y).red() - depth_value) <= 3;
             ++checked;
             matched += equal;
-            target += snapshot->instances[hit->instance_index].object_id == "blue_cube";
+            target += snapshot->instances[hit->instance_index].object_id == target_id;
         }
     }
     qInfo() << "Geometry GPU normal/depth" << label << matched << "/" << checked << "target"
@@ -510,8 +511,9 @@ void generate(Workbench& window, int levels, bool displace) {
 
 } // namespace
 
-QImage verify_geometry_gpu(Workbench& window, const QString& directory, const QString& label) {
-    return verify_gpu(window, directory, label);
+QImage verify_geometry_gpu(Workbench& window, const QString& directory, const QString& label,
+                           const std::string& target_id) {
+    return verify_gpu(window, directory, label, target_id);
 }
 void verify_geometry_shadows(Workbench& window, const QString& directory) {
     verify_shadows(window, directory);

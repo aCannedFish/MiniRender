@@ -3,7 +3,9 @@
 #include "environment_panel.hpp"
 #include "geometry_panel.hpp"
 #include "offline_panel.hpp"
+#include "point_cloud_panel.hpp"
 #include "realtime_panel.hpp"
+#include "scene_id.hpp"
 
 #include <minirender/assets/scene_io.hpp>
 
@@ -43,6 +45,8 @@
 #include <array>
 
 namespace {
+
+using minirender::desktop::unique_id;
 
 // 工作线程不访问 UI 或 Vulkan。结果和异常均在 watcher 的 UI 线程回调处理。
 template <typename T> struct TaskResult {
@@ -86,17 +90,6 @@ template <typename Work, typename Done> void run_background(QObject* owner, Work
 std::filesystem::path native_path(const QString& path) {
     const auto bytes = path.toUtf8();
     return std::filesystem::path(std::u8string(bytes.begin(), bytes.end()));
-}
-
-template <typename Item>
-std::string unique_id(const std::vector<Item>& values, const std::string& prefix) {
-    for (unsigned index = 1;; ++index) {
-        const auto id = prefix + std::to_string(index);
-        if (std::none_of(values.begin(), values.end(),
-                         [&](const Item& value) { return value.id == id; })) {
-            return id;
-        }
-    }
 }
 
 QDoubleSpinBox* spin(QWidget* parent, const QString& name, double minimum, double maximum,
@@ -350,6 +343,9 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     geometry_tasks_ = new GeometryController(this);
     geometry_ = new GeometryPanel(*geometry_tasks_, this);
     right_tabs->addTab(scroll_panel(geometry_), "几何");
+    points_ = new PointCloudPanel(*geometry_tasks_, this);
+    right_tabs->addTab(scroll_panel(points_), "点云");
+    connect_point_panel();
     geometry_->on_apply = [this] {
         try {
             apply_geometry();
@@ -529,6 +525,12 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
             if (viewport_->offline_visible()) {
                 statusBar()->showMessage(
                     "CPU 路径追踪结果 | 曝光只影响显示 | 返回实时预览后可操作相机");
+                return;
+            }
+            if (viewport_->point_preview_visible()) {
+                statusBar()->showMessage(
+                    QString("点云预览 | %1 个点 | 拖拽查看 · 返回场景后编辑物体")
+                        .arg(viewport_->point_preview_data()->points.size()));
                 return;
             }
             auto message =
@@ -852,6 +854,7 @@ void Workbench::refresh_properties() {
         light_intensity_->setValue(light.intensity);
     }
     refreshing_ = false;
+    update_point_selection();
 }
 
 void Workbench::refresh_camera() {
@@ -971,6 +974,7 @@ void Workbench::begin_asset_task(const QString& message) {
     import_texture_action_->setEnabled(false);
     environment_->set_import_enabled(false);
     geometry_->set_asset_task_busy(true);
+    points_->set_asset_task_busy(true);
 }
 
 void Workbench::finish_asset_task() {
@@ -984,6 +988,7 @@ void Workbench::finish_asset_task() {
     import_texture_action_->setEnabled(true);
     environment_->set_import_enabled(true);
     geometry_->set_asset_task_busy(false);
+    points_->set_asset_task_busy(false);
 }
 
 bool Workbench::asset_loading() const noexcept {
@@ -1112,6 +1117,8 @@ void Workbench::install_scene(minirender::SceneDocument document, const QString&
     ++document_generation_;
     ++document_revision_;
     geometry_tasks_->cancel();
+    viewport_->set_point_preview_data({});
+    points_->clear_source();
     if (validated) {
         editor_.replace_prevalidated(std::move(document), *validated);
     } else {
@@ -1354,6 +1361,7 @@ Workbench::~Workbench() {
     viewport_->on_transform_end = {};
     viewport_->on_gizmo_mode_changed = {};
     viewport_->on_interaction_error = {};
+    viewport_->on_point_preview_changed = {};
 }
 
 bool Workbench::begin_transform() {

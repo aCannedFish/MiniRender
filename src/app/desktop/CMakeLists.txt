@@ -5,7 +5,7 @@ find_package(Vulkan 1.2 REQUIRED COMPONENTS glslangValidator)
 set(shader_outputs)
 foreach(shader diagnostic.vert diagnostic.frag scene.vert scene.frag shadow.vert
     wire.vert wire.frag post.vert post.frag offline.frag screen.vert ssao.frag ao_filter.frag ao_composite.frag environment.frag
-    gizmo.vert gizmo.frag)
+    gizmo.vert gizmo.frag point_preview.vert point_preview.frag)
     set(source "${PROJECT_SOURCE_DIR}/shaders/${shader}")
     set(output "${CMAKE_CURRENT_BINARY_DIR}/${shader}.spv")
     add_custom_command(OUTPUT "${output}"
@@ -30,6 +30,12 @@ qt_add_executable(minirender_desktop
     geometry_controller.cpp geometry_controller.hpp geometry_panel.cpp geometry_panel.hpp
     geometry_smoke.cpp geometry_smoke.hpp
     adaptive_smoke.cpp adaptive_smoke.hpp
+    point_preview_renderer.cpp point_preview_renderer.hpp
+    point_cloud_smoke.cpp point_cloud_smoke.hpp
+    point_cloud_editor_smoke.cpp point_cloud_editor_smoke.hpp ui_response_probe.hpp
+    point_cloud_tasks.cpp
+    point_cloud_panel.cpp point_cloud_panel.hpp
+    point_cloud_workbench.cpp scene_id.hpp
     gizmo_renderer.cpp gizmo_renderer.hpp
     gizmo_smoke.cpp gizmo_smoke.hpp
     ibl_smoke.cpp ibl_smoke.hpp
