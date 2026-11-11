@@ -2,8 +2,8 @@
 
 #include <QCoreApplication>
 
-const std::array<BuiltinScene, 4>& builtin_scenes() {
-    static const std::array<BuiltinScene, 4> scenes{
+const std::array<BuiltinScene, 7>& builtin_scenes() {
+    static const std::array<BuiltinScene, 7> scenes{
         {{"cornell",
           "Cornell Box · 经典",
           "cornell-box.json",
@@ -35,7 +35,31 @@ const std::array<BuiltinScene, 4>& builtin_scenes() {
           "short_box",
           true,
           {320, 320, 128, 101},
-          {.maximum_depth = 10}}}};
+          {.maximum_depth = 10}},
+         {"bounded_fog",
+          "有界雾",
+          "volume-bounded.json",
+          "有界 RGB 介质中的吸收、多次散射与阴影衰减，体积效果通过离线渲染显示。",
+          "blue_cube",
+          false,
+          {320, 320, 128, 101},
+          {.maximum_depth = 12}},
+         {"cornell_fog",
+          "Cornell Box · 雾",
+          "volume-cornell.json",
+          "顶部面积光照亮均匀介质，观察墙面与体积之间的光传输。",
+          "short_box",
+          true,
+          {320, 320, 128, 101},
+          {.maximum_depth = 12}},
+         {"light_beam",
+          "透光孔光束",
+          "volume-beam.json",
+          "移动透光顶板、调整方向光与介质，离线观察光束和遮挡。",
+          "aperture",
+          false,
+          {320, 320, 128, 101},
+          {.maximum_depth = 12}}}};
     return scenes;
 }
 QString builtin_scene_directory() {

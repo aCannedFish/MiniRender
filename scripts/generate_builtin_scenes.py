@@ -180,6 +180,91 @@ def sphere():
     (ROOT / "assets/demo-sphere.obj").write_text("\n".join(lines) + "\n")
 
 
+def volume_scenes(classic):
+    """复用工作室与 Cornell 场景，添加介质和带透光孔的顶板。"""
+
+    def medium(low, high, absorption, scattering, g):
+        return {
+            "id": "fog",
+            "name": "均匀体积",
+            "minimum": low,
+            "maximum": high,
+            "absorption": absorption,
+            "scattering": scattering,
+            "anisotropy": g,
+            "enabled": True,
+        }
+
+    studio = json.loads((ROOT / "studio.json").read_text(encoding="utf-8"))
+    bounded = copy.deepcopy(studio)
+    bounded["media"] = [
+        medium([-2, 0.01, -2], [2, 2.8, 2], [0.06, 0.12, 0.18], [0.3] * 3, 0.6)
+    ]
+    cornell = copy.deepcopy(classic)
+    cornell["media"] = [
+        medium(
+            [-0.99, 0.01, -0.99], [0.99, 1.99, 0.99], [0.08, 0.1, 0.13], [0.4] * 3, 0.25
+        )
+    ]
+    beam = copy.deepcopy(studio)
+    beam["objects"] = [o for o in beam["objects"] if o["id"] == "ground"]
+    beam["environment"] = [0.001] * 3
+    beam["directional_lights"] = [
+        {
+            "id": "sun",
+            "direction": [0.2, -1, 0.3],
+            "color": [1, 0.93, 0.8],
+            "intensity": 12,
+        }
+    ]
+    beam["camera"]["position"] = [3, 1.8, 4.5]
+    beam["camera"]["target"] = [0, 1.2, 0]
+    beam["materials"].append(
+        {
+            "id": "aperture",
+            "name": "透光顶板",
+            "kind": "diffuse",
+            "base_color": [0.08] * 3,
+            "double_sided": True,
+        }
+    )
+    beam["meshes"].append({"id": "aperture", "source": "assets/volume-aperture.obj"})
+    beam["objects"].append(
+        {
+            "id": "aperture",
+            "name": "透光顶板",
+            "mesh": "aperture",
+            "material": "aperture",
+            "transform": {
+                "translation": [0, 0, 0],
+                "rotation": [0, 0, 0],
+                "scale": [1, 1, 1],
+            },
+            "visible": True,
+        }
+    )
+    beam["media"] = [
+        medium([-2, 0.01, -2], [2, 2.5, 2], [0.05, 0.08, 0.13], [0.55] * 3, 0.15)
+    ]
+    quads = [
+        (-2, -0.35, -2, 2),
+        (0.35, 2, -2, 2),
+        (-0.35, 0.35, -2, -0.35),
+        (-0.35, 0.35, 0.35, 2),
+    ]
+    lines = ["# Four ceiling panels around a 0.7 m square aperture.", "vn 0 1 0"]
+    for i, (x0, x1, z0, z1) in enumerate(quads):
+        for x, z in [(x0, z0), (x0, z1), (x1, z1), (x1, z0)]:
+            lines.append(f"v {x} 2.6 {z}")
+        start = 4 * i + 1
+        lines.append(f"f {start}//1 {start + 1}//1 {start + 2}//1")
+        lines.append(f"f {start}//1 {start + 2}//1 {start + 3}//1")
+    (ROOT / "assets/volume-aperture.obj").write_text(
+        "\n".join(lines) + "\n", encoding="utf-8"
+    )
+    return {"volume-bounded": bounded, "volume-cornell": cornell, "volume-beam": beam}
+
+
 def main():
     sphere()
     classic = room()
@@ -278,6 +363,7 @@ def main():
         ("cornell-materials", glass),
         ("cornell-small-light", small),
         ("material-balls", balls),
+        *volume_scenes(classic).items(),
     ]:
         (ROOT / f"{name}.json").write_text(
             json.dumps(scene, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"

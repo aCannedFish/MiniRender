@@ -32,8 +32,36 @@ struct State {
     int stage = 0;
     int ticks = 0;
     QByteArray original;
+    minirender::SceneDocument original_scene;
     std::shared_ptr<const minirender::SceneSnapshot> snapshot;
 };
+
+const minirender::SceneObject& object(const minirender::SceneDocument& scene,
+                                      const std::string& id) {
+    const auto found = std::find_if(scene.objects.begin(), scene.objects.end(),
+                                    [&](const auto& value) { return value.id == id; });
+    require(found != scene.objects.end(), "Preset object is missing");
+    return *found;
+}
+
+// 按源模板的完整对象集合和变换验证覆盖导入，适用于物体数量不同的场景。
+void verify_import(const minirender::SceneDocument& actual,
+                   const minirender::SceneDocument& expected) {
+    require(actual.objects.size() == expected.objects.size() &&
+                actual.meshes.size() == expected.meshes.size() &&
+                actual.materials.size() == expected.materials.size() &&
+                actual.media == expected.media,
+            "Preset did not replace the complete scene");
+    for (const auto& source : expected.objects) {
+        const auto& loaded = object(actual, source.id);
+        require(loaded.mesh_id == source.mesh_id && loaded.material_id == source.material_id &&
+                    loaded.visible == source.visible &&
+                    loaded.transform.translation == source.transform.translation &&
+                    loaded.transform.rotation_degrees == source.transform.rotation_degrees &&
+                    loaded.transform.scale == source.transform.scale,
+                "Imported object differs from the template");
+    }
+}
 
 // 独立串行路径积分核对会话输出，线程调度和预览上传不改变固定种子结果。
 void verify_render(Workbench& window, const QString& directory, const BuiltinScene& preset,
@@ -77,6 +105,8 @@ void start_presets_smoke(Workbench& window, const QString& directory) {
                 QFile file(builtin_scene_directory() + "/" + preset.filename);
                 require(file.open(QIODevice::ReadOnly), "Cannot read source preset");
                 state->original = file.readAll();
+                state->original_scene = minirender::load_scene(std::filesystem::path(
+                    (builtin_scene_directory() + "/" + preset.filename).toStdU16String()));
                 auto* action = window.findChild<QAction*>("builtin_" + preset.id);
                 require(action && window.findChild<QToolButton*>("builtin_scenes")->isEnabled(),
                         "Quick import action missing");
@@ -94,12 +124,7 @@ void start_presets_smoke(Workbench& window, const QString& directory) {
                     static_cast<int>(preset.render.samples_per_pixel)) {
                     return;
                 }
-                require(window.document().objects.size() == 8,
-                        "Preset did not replace the previous scene");
-                require(std::none_of(window.document().objects.begin(),
-                                     window.document().objects.end(),
-                                     [](const auto& o) { return o.id == "blue_cube"; }),
-                        "Old scene object survived replacement");
+                verify_import(window.document(), state->original_scene);
                 require(!viewport->offline_visible(), "Old offline image hid the imported scene");
                 require(window.findChild<QSpinBox*>("offline_spp")->value() ==
                             static_cast<int>(preset.render.samples_per_pixel),
@@ -112,11 +137,36 @@ void start_presets_smoke(Workbench& window, const QString& directory) {
                 window.findChild<QAction*>("undo")->trigger();
                 require(std::abs(x->value() - before) < 1e-5, "Imported object undo failed");
                 window.findChild<QAction*>("redo")->trigger();
+                const auto edited_material_id =
+                    object(window.document(), preset.selected_object).material_id;
                 window.findChild<QDoubleSpinBox*>("roughness")->setValue(0.37);
-                window.select_object("lamp");
-                auto* emission = window.findChild<QDoubleSpinBox*>("emission.x");
-                const double new_emission = emission->value() + 1;
-                emission->setValue(new_emission);
+                std::string emitter_id, emitter_material_id;
+                for (const auto& source : state->original_scene.objects) {
+                    const auto material =
+                        std::find_if(state->original_scene.materials.begin(),
+                                     state->original_scene.materials.end(), [&](const auto& value) {
+                                         return value.id == source.material_id;
+                                     });
+                    if (material != state->original_scene.materials.end() &&
+                        glm::length(material->emission) > 0) {
+                        emitter_id = source.id;
+                        emitter_material_id = source.material_id;
+                        break;
+                    }
+                }
+                double new_light = 0;
+                if (!emitter_id.empty()) {
+                    window.select_object(emitter_id);
+                    auto* emission = window.findChild<QDoubleSpinBox*>("emission.x");
+                    new_light = emission->value() + 1;
+                    emission->setValue(new_light);
+                } else {
+                    require(!window.document().directional_lights.empty(),
+                            "Preset lighting fixture has no editable light");
+                    auto* intensity = window.findChild<QDoubleSpinBox*>("light_intensity");
+                    new_light = intensity->value() + 1;
+                    intensity->setValue(new_light);
+                }
                 auto* camera_x = window.findChild<QDoubleSpinBox*>("camera_position.x");
                 const double new_camera_x = camera_x->value() + 0.05;
                 camera_x->setValue(new_camera_x);
@@ -131,18 +181,26 @@ void start_presets_smoke(Workbench& window, const QString& directory) {
                         "Preset edits did not survive scene IO");
                 const auto& materials = window.document().materials;
                 const auto edited_material =
-                    std::find_if(materials.begin(), materials.end(), [&](const auto& m) {
-                        return m.id == "mat_" + preset.selected_object;
-                    });
-                const auto lamp_material =
                     std::find_if(materials.begin(), materials.end(),
-                                 [](const auto& m) { return m.id == "mat_lamp"; });
+                                 [&](const auto& m) { return m.id == edited_material_id; });
                 require(edited_material != materials.end() &&
                             std::abs(edited_material->roughness - .37F) < 1e-5F,
                         "Imported material edit was lost");
-                require(lamp_material != materials.end() &&
-                            std::abs(lamp_material->emission.x - new_emission) < 1e-5,
-                        "Area light edit was lost");
+                if (!emitter_id.empty()) {
+                    const auto lamp_material =
+                        std::find_if(materials.begin(), materials.end(), [&](const auto& value) {
+                            return value.id == emitter_material_id;
+                        });
+                    require(lamp_material != materials.end() &&
+                                std::abs(lamp_material->emission.x - new_light) < 1e-5,
+                            "Area light edit was lost");
+                } else {
+                    require(std::abs(window.document().directional_lights[0].intensity -
+                                     new_light) < 1e-5,
+                            "Directional light edit was lost");
+                }
+                require(window.document().media == state->original_scene.media,
+                        "Preset media changed during ordinary edits or scene IO");
                 require(std::abs(window.document().camera.position.x - new_camera_x) < 1e-5,
                         "Camera edit was lost");
                 window.offline_panel()->set_settings(

@@ -15,6 +15,7 @@ struct HomogeneousMedium {
     double anisotropy = 0;
     glm::dvec3 extinction() const noexcept;
     void validate() const;
+    bool operator==(const HomogeneousMedium&) const = default;
 };
 
 // 世界空间轴对齐盒，边界只有介质语义。enabled 独立于表面物体的显示状态。
@@ -27,6 +28,7 @@ struct MediumRegion {
     HomogeneousMedium medium;
     bool enabled = true;
     void validate() const;
+    bool operator==(const MediumRegion&) const = default;
 };
 
 inline constexpr std::size_t maximum_medium_regions = 32;

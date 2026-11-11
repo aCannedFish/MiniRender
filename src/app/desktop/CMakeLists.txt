@@ -32,6 +32,8 @@ qt_add_executable(minirender_desktop
     cloth_material_panel.cpp cloth_material_panel.hpp
     cloth_controller.cpp cloth_controller.hpp
     cloth_panel.cpp cloth_panel.hpp cloth_workbench.cpp
+    volume_panel.cpp volume_panel.hpp
+    volume_smoke.cpp volume_smoke.hpp
     cloth_collider_panel.cpp cloth_collider_panel.hpp
     cloth_playback_smoke.cpp cloth_playback_smoke.hpp
     cloth_playback_deep_smoke.cpp cloth_playback_deep_smoke.hpp

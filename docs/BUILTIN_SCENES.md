@@ -10,6 +10,9 @@
 | Cornell Box · 玻璃与金属 | 玻璃透射、反射、粗糙金属 | 320×320、128 spp、深度 14 |
 | 材质球阵列 | 漫反射、金属和不同粗糙度 | 480×320、64 spp、深度 8 |
 | Cornell Box · 小光源 | 比较 BSDF、光源采样与 MIS 的噪声 | 320×320、128 spp、深度 10 |
+| 有界雾 | RGB 吸收、散射和带介质衰减的阴影 | 320×320、128 spp、深度 12 |
+| Cornell Box · 雾 | 面积光、墙面与均匀介质之间的传输 | 320×320、128 spp、深度 12 |
+| 透光孔光束 | 方向光穿过真实顶板孔洞形成光束 | 320×320、128 spp、深度 12 |
 
 所有示例默认 MIS、seed=101 和 Russian roulette。参数可在“离线”页调整。提高分辨率或采样数会增加计算时间，界面持续显示已完成样本和进度。
 
@@ -21,16 +24,19 @@
 
 Cornell 场景由顶部面积光照明，环境设为黑色。实时预览暂不计算面积光的全局照明，导入时切换到法线视图，便于编辑几何；离线渲染使用场景实际光照和材质。已有离线任务会异步取消，旧离线图收起，推荐参数在任务结束后应用。
 
+体积场景导入后转到“介质”页，可编辑区域、RGB 系数和 g。体积效果通过离线渲染显示。方向光在“灯光”页调整，透光顶板可以使用视口操纵器移动、旋转。操作见 [介质界面](VOLUME_UI.md)。
+
 ## 数据来源
 
-这些场景使用项目自建几何，房间边长为 2 米，颜色为可编辑的线性 RGB。Cornell 场景的布局参考经典红绿墙、区域光和遮挡物配置。Cornell University 的 [官方介绍与数据](https://bowers.cornell.edu/cornell-box) 说明了该场景用于比较光传输模拟与实际测量的背景。
+这些场景使用项目自建几何，Cornell 房间边长为 2 米，颜色为可编辑的线性 RGB。Cornell 场景的布局参考经典红绿墙、区域光和遮挡物配置。Cornell University 的 [官方介绍与数据](https://bowers.cornell.edu/cornell-box) 说明了该场景用于比较光传输模拟与实际测量的背景。
 
-场景 JSON 与球体 OBJ 由 `scripts/generate_builtin_scenes.py` 生成，脚本可重复执行。球体包含共享位置、径向法线和独立面角 UV；场景随程序打包，运行不依赖源码目录。
+列表中的场景 JSON、球体和透光顶板 OBJ 由 `scripts/generate_builtin_scenes.py` 生成，脚本可重复执行。球体包含共享位置、径向法线和独立面角 UV；顶板由四块平面围成 0.7 米方孔。场景随程序打包，运行不依赖源码目录。
 
 ## 实现位置
 
 - `scenes/cornell-*.json`、`scenes/material-balls.json`：场景和相机。
 - `scenes/assets/demo-sphere.obj`：闭合单位球。
+- `scenes/volume-*.json`、`scenes/assets/volume-aperture.obj`：介质场景和透光顶板。
 - `src/app/desktop/builtin_scenes.*`：菜单信息、推荐参数和包内路径。
 - `Workbench::import_builtin_scene`：后台覆盖导入、编辑状态和模板保存路径。
 - `OfflinePanel::prepare_import`：异步取消旧任务并应用新参数。
