@@ -2,6 +2,7 @@
 
 #include <minirender/render/bsdf.hpp>
 #include <minirender/render/light.hpp>
+#include <minirender/render/medium.hpp>
 
 namespace minirender {
 
@@ -31,6 +32,7 @@ struct PathStatistics {
     std::uint64_t shadow_rays = 0;
     std::uint64_t scattering_events = 0;
     std::uint64_t roulette_terminations = 0;
+    std::uint64_t medium_scattering_events = 0;
 };
 
 // 单样本 power heuristic，先缩放再平方，避免两个大 PDF 的平方溢出。
@@ -56,10 +58,12 @@ class PathTracer {
     const SceneSnapshot& scene() const noexcept;
 
   private:
-    bool visible(const SurfaceHit& hit, const LightSample& light, PathStatistics* statistics) const;
+    glm::dvec3 shadow_transmittance(Ray ray, const LightSample& light,
+                                    PathStatistics* statistics) const;
     std::shared_ptr<const SceneSnapshot> scene_;
     SceneBvh bvh_;
     LightSampler lights_;
+    MediumField media_;
     IntegratorSettings settings_;
     CancellationToken cancellation_;
 };

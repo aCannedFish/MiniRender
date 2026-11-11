@@ -1,6 +1,7 @@
 #include "asset_writer.hpp"
 #include "cloth_material_io.hpp"
 #include "cloth_simulation_io.hpp"
+#include "medium_io.hpp"
 #include "staged_file.hpp"
 #include <minirender/assets/scene_io.hpp>
 
@@ -60,6 +61,9 @@ SceneDocument load_scene(const std::filesystem::path& path) {
         scene.camera.aperture_radius = camera.value("aperture_radius", 0.0F);
         scene.camera.focus_distance = camera.value("focus_distance", 4.0F);
         scene.environment = vector3(json.at("environment"));
+        if (json.contains("media")) {
+            scene.media = detail::read_media(json.at("media"));
+        }
         if (json.contains("environment_map")) {
             const auto& environment = json.at("environment_map");
             scene.environment_map.texture_id = environment.value("texture", std::string{});
@@ -195,6 +199,7 @@ void save_scene(const SceneDocument& document, const std::filesystem::path& path
                       {"aperture_radius", camera.aperture_radius},
                       {"focus_distance", camera.focus_distance}};
     json["environment"] = vector3(document.environment);
+    json["media"] = detail::write_media(document.media);
     json["environment_map"] = {{"texture", document.environment_map.texture_id},
                                {"strength", document.environment_map.strength},
                                {"rotation_degrees", document.environment_map.rotation_degrees}};

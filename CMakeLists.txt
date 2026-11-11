@@ -32,6 +32,7 @@ add_library(minirender_core
     src/core/raster_io.cpp
     src/core/exr_io.cpp
     src/scene/scene.cpp
+    src/scene/medium.cpp
     src/scene/cloth_material.cpp
     src/scene/editor.cpp
     src/scene/gizmo.cpp
@@ -66,6 +67,7 @@ add_library(minirender_core
     src/render/cloth_bsdf.cpp
     src/render/light.cpp
     src/render/path_tracer.cpp
+    src/render/medium.cpp
     src/render/render_session.cpp
     src/render/ssao.cpp
     src/render/ibl.cpp
@@ -80,6 +82,7 @@ add_library(minirender_core
     src/assets/staged_file.cpp
     src/assets/scene_io.cpp
     src/assets/cloth_material_io.cpp
+    src/assets/medium_io.cpp
     src/assets/cloth_simulation_io.cpp)
 target_include_directories(minirender_core PUBLIC include)
 target_link_libraries(minirender_core PUBLIC glm::glm Threads::Threads PRIVATE minirender_warnings nlohmann_json::nlohmann_json tinyobjloader minirender_exr_codec minirender_raster_codec)
@@ -117,6 +120,9 @@ if(BUILD_TESTING)
     add_executable(minirender_cloth_material_example examples/cloth_material.cpp)
     target_compile_definitions(minirender_cloth_material_example PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_cloth_material_example PRIVATE minirender_core minirender_warnings)
+    add_executable(minirender_volume_example examples/volume.cpp)
+    target_compile_definitions(minirender_volume_example PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+    target_link_libraries(minirender_volume_example PRIVATE minirender_core minirender_warnings)
     add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp
         tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp tests/path_tests.cpp
         tests/session_tests.cpp tests/ssao_tests.cpp tests/ibl_tests.cpp tests/geometry_tests.cpp
@@ -124,7 +130,8 @@ if(BUILD_TESTING)
         tests/simplify_tests.cpp tests/gizmo_tests.cpp tests/sided_tests.cpp tests/remesh_tests.cpp
         tests/builtin_scene_tests.cpp tests/adaptive_tests.cpp tests/point_cloud_tests.cpp
         tests/ball_pivot_tests.cpp tests/point_preview_tests.cpp tests/sdf_tests.cpp tests/cloth_tests.cpp
-        tests/cloth_bsdf_tests.cpp tests/cloth_component_tests.cpp)
+        tests/cloth_bsdf_tests.cpp tests/cloth_component_tests.cpp tests/medium_tests.cpp
+        tests/volume_path_tests.cpp)
     target_include_directories(minirender_tests PRIVATE src)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_tests PRIVATE
@@ -142,6 +149,12 @@ if(BUILD_TESTING)
         "${PROJECT_SOURCE_DIR}/scenes/studio.json" "${CMAKE_CURRENT_BINARY_DIR}/路径 空格/cli-path"
         --width 4 --height 4 --spp 4 --depth 3 --seed 9 --exposure 0.5 --threads 2 --tile 2 --batch 2)
     set_tests_properties(cli_path_render PROPERTIES PASS_REGULAR_EXPRESSION "paths: 64")
+    add_test(NAME cli_volume_render COMMAND minirender_cli --render
+        "${PROJECT_SOURCE_DIR}/tests/scenes/volume-slab.json"
+        "${CMAKE_CURRENT_BINARY_DIR}/路径 空格/volume-path"
+        --width 4 --height 4 --spp 4 --depth 3 --seed 9 --threads 2 --tile 2 --batch 2)
+    set_tests_properties(cli_volume_render PROPERTIES
+        PASS_REGULAR_EXPRESSION "medium scattering events: [1-9]")
     add_test(NAME cli_invalid_exposure COMMAND minirender_cli --render
         "${PROJECT_SOURCE_DIR}/scenes/studio.json" "${CMAKE_CURRENT_BINARY_DIR}/invalid-path"
         --exposure 1oops)

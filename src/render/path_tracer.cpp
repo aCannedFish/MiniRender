@@ -95,18 +95,18 @@ Ray spawn_ray(const SurfaceHit& hit, glm::dvec3 direction) {
 PathTracer::PathTracer(std::shared_ptr<const SceneSnapshot> scene, IntegratorSettings settings,
                        CancellationToken cancellation)
     : scene_(std::move(scene)), bvh_(scene_, cancellation), lights_(scene_, cancellation),
-      settings_(settings), cancellation_(std::move(cancellation)) {
+      media_(scene_->media, cancellation), settings_(settings),
+      cancellation_(std::move(cancellation)) {
     settings_.validate();
 }
 const SceneSnapshot& PathTracer::scene() const noexcept {
     return *scene_;
 }
-bool PathTracer::visible(const SurfaceHit& hit, const LightSample& light,
-                         PathStatistics* statistics) const {
+glm::dvec3 PathTracer::shadow_transmittance(Ray ray, const LightSample& light,
+                                            PathStatistics* statistics) const {
     if (statistics) {
         ++statistics->shadow_rays;
     }
-    auto ray = spawn_ray(hit, light.direction);
     double limit = std::numeric_limits<double>::infinity();
     if (std::isfinite(light.distance)) {
         SurfaceHit endpoint;
@@ -117,13 +117,16 @@ bool PathTracer::visible(const SurfaceHit& hit, const LightSample& light,
         const auto difference = target - ray.origin;
         limit = glm::length(difference);
         if (limit == 0) {
-            return false;
+            return glm::dvec3(0);
         }
         ray.direction = difference / limit;
         limit = std::nextafter(limit, 0.0);
     }
-    return !bvh_.occluded(ray, {0, limit}, statistics ? &statistics->geometry : nullptr,
-                          cancellation_);
+    if (bvh_.occluded(ray, {0, limit}, statistics ? &statistics->geometry : nullptr,
+                      cancellation_)) {
+        return glm::dvec3(0);
+    }
+    return media_.transmittance(ray, {0, limit}, cancellation_);
 }
 glm::dvec3 PathTracer::trace(Ray ray, Sampler& sampler, RayInterval primary_interval,
                              PathStatistics* statistics) const {
@@ -136,10 +139,64 @@ glm::dvec3 PathTracer::trace(Ray ray, Sampler& sampler, RayInterval primary_inte
     bool previous_delta = true;
     for (std::uint32_t depth = 0;; ++depth) {
         cancellation_.check();
-        const auto hit = bvh_.intersect(
-            ray,
-            depth == 0 ? primary_interval : RayInterval{0, std::numeric_limits<double>::infinity()},
-            statistics ? &statistics->geometry : nullptr, cancellation_);
+        const auto interval =
+            depth == 0 ? primary_interval : RayInterval{0, std::numeric_limits<double>::infinity()};
+        const auto hit = bvh_.intersect(ray, interval, statistics ? &statistics->geometry : nullptr,
+                                        cancellation_);
+        const auto medium =
+            media_.sample(ray, {interval.minimum, hit ? hit->distance : interval.maximum}, sampler,
+                          cancellation_);
+        beta *= medium.weight;
+        check_radiance(beta);
+        if (maximum(beta) == 0) {
+            break;
+        }
+        if (medium.interaction) {
+            if (depth == settings_.maximum_depth) {
+                break;
+            }
+            const auto& vertex = *medium.interaction;
+            const auto wo = -ray.direction;
+            const double light_u = sampler.next_1d();
+            const auto light_surface_u = sampler.next_2d();
+            const auto phase_u = sampler.next_2d();
+            const auto light = lights_.sample(vertex.position, light_u, light_surface_u);
+            if (light && (settings_.mode != SamplingMode::bsdf ||
+                          light->measure == SampleMeasure::discrete)) {
+                const double phase = henyey_greenstein(wo, light->direction, vertex.anisotropy);
+                const auto transmission =
+                    shadow_transmittance({vertex.position, light->direction}, *light, statistics);
+                double weight = 1;
+                if (settings_.mode == SamplingMode::mis &&
+                    light->measure == SampleMeasure::solid_angle) {
+                    weight = power_heuristic(light->probability, phase);
+                }
+                result +=
+                    beta * transmission * light->radiance * (phase * weight / light->probability);
+            }
+            const auto phase = sample_henyey_greenstein(wo, vertex.anisotropy, phase_u);
+            // HG 的采样 PDF 与相函数值相同，延续权重为 1；体积事件没有表面余弦。
+            previous_reference = vertex.position;
+            previous_pdf = phase.probability;
+            previous_delta = false;
+            ray = {vertex.position, phase.direction};
+            if (statistics) {
+                ++statistics->scattering_events;
+                ++statistics->medium_scattering_events;
+            }
+            const double roulette_u = sampler.next_1d();
+            if (settings_.russian_roulette && depth + 1 >= settings_.roulette_depth) {
+                const double survival = std::clamp(maximum(beta * eta_scale), 0.05, 0.95);
+                if (roulette_u >= survival) {
+                    if (statistics) {
+                        ++statistics->roulette_terminations;
+                    }
+                    break;
+                }
+                beta /= survival;
+            }
+            continue;
+        }
         const auto emission_weight = [&](double light_pdf) {
             if (depth == 0 || previous_delta || settings_.mode == SamplingMode::bsdf) {
                 return 1.0;
@@ -204,14 +261,18 @@ glm::dvec3 PathTracer::trace(Ray ray, Sampler& sampler, RayInterval primary_inte
                     glm::dot(wo_world, glm::dvec3(hit->geometric_normal)) *
                         glm::dot(light->direction, glm::dvec3(hit->geometric_normal)) >
                     0;
-                if (wi.z > 0 && reflection_side && visible(*hit, *light, statistics)) {
-                    double weight = 1;
-                    if (settings_.mode == SamplingMode::mis &&
-                        light->measure == SampleMeasure::solid_angle) {
-                        weight = power_heuristic(light->probability, bsdf.pdf(wo, wi));
+                if (wi.z > 0 && reflection_side) {
+                    const auto transmission =
+                        shadow_transmittance(spawn_ray(*hit, light->direction), *light, statistics);
+                    if (maximum(transmission) > 0) {
+                        double weight = 1;
+                        if (settings_.mode == SamplingMode::mis &&
+                            light->measure == SampleMeasure::solid_angle) {
+                            weight = power_heuristic(light->probability, bsdf.pdf(wo, wi));
+                        }
+                        result += beta * transmission * bsdf.evaluate(wo, wi) * wi.z *
+                                  light->radiance * (weight / light->probability);
                     }
-                    result += beta * bsdf.evaluate(wo, wi) * wi.z * light->radiance *
-                              (weight / light->probability);
                 }
             }
         }
