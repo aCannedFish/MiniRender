@@ -196,9 +196,10 @@ const BvhBuildStatistics& SceneBvh::statistics() const noexcept {
     return statistics_;
 }
 
-std::optional<SceneBvh::PrimitiveHit> SceneBvh::trace(const Ray& ray, RayInterval interval,
-                                                      bool any_hit, TraceStatistics* statistics,
-                                                      const CancellationToken& cancellation) const {
+std::optional<SceneBvh::PrimitiveHit>
+SceneBvh::trace(const Ray& ray, RayInterval interval, bool any_hit, TraceStatistics* statistics,
+                const CancellationToken& cancellation,
+                std::optional<std::uint32_t> instance_filter) const {
     interval.validate();
     const RayQuery query(ray);
     if (nodes_.empty()) {
@@ -236,6 +237,9 @@ std::optional<SceneBvh::PrimitiveHit> SceneBvh::trace(const Ray& ray, RayInterva
                     cancellation.check();
                 }
                 const auto primitive = order_[node.first + offset];
+                if (instance_filter && primitives_[primitive].instance != *instance_filter) {
+                    continue;
+                }
                 if (statistics) {
                     ++statistics->triangle_tests;
                 }
@@ -243,7 +247,8 @@ std::optional<SceneBvh::PrimitiveHit> SceneBvh::trace(const Ray& ray, RayInterva
                 if (hit) {
                     const auto& candidate = primitives_[primitive];
                     const auto& instance = scene_->instances[candidate.instance];
-                    if (!instance.material.double_sided) {
+                    if (!instance_filter && !instance.material.double_sided &&
+                        instance.material.kind != MaterialKind::subsurface) {
                         // 用几何绕序判断朝向，不能用平滑或法线贴图改变可见性。
                         const auto edge1 =
                             glm::dvec3(candidate.vertices[1]) - glm::dvec3(candidate.vertices[0]);
@@ -339,6 +344,18 @@ bool SceneBvh::occluded(const Ray& ray, RayInterval interval, TraceStatistics* s
                         const CancellationToken& cancellation) const {
     cancellation.check();
     return trace(ray, interval, true, statistics, cancellation).has_value();
+}
+
+std::optional<SurfaceHit>
+SceneBvh::intersect_instance(const Ray& ray, std::uint32_t instance, RayInterval interval,
+                             TraceStatistics* statistics,
+                             const CancellationToken& cancellation) const {
+    cancellation.check();
+    if (instance >= scene_->instances.size()) {
+        throw std::out_of_range("BSSRDF instance index is out of range");
+    }
+    const auto hit = trace(ray, interval, false, statistics, cancellation, instance);
+    return hit ? std::optional(surface_hit(ray, *hit)) : std::nullopt;
 }
 
 } // namespace minirender

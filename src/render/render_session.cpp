@@ -142,6 +142,8 @@ void add_statistics(PathStatistics& result, const PathStatistics& value) {
     result.scattering_events += value.scattering_events;
     result.roulette_terminations += value.roulette_terminations;
     result.medium_scattering_events += value.medium_scattering_events;
+    result.subsurface_events += value.subsurface_events;
+    result.subsurface_distance += value.subsurface_distance;
     result.geometry.bounds_tests += value.geometry.bounds_tests;
     result.geometry.triangle_tests += value.geometry.triangle_tests;
 }

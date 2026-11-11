@@ -159,6 +159,8 @@ int run_render_cli(int argc, char** argv) {
               << "\nshadow rays: " << statistics.shadow_rays
               << "\nscattering events: " << statistics.scattering_events
               << "\nmedium scattering events: " << statistics.medium_scattering_events
+              << "\nsubsurface events: " << statistics.subsurface_events
+              << "\nsubsurface distance m: " << statistics.subsurface_distance
               << "\ntriangle tests: " << statistics.geometry.triangle_tests << "\nelapsed ms: "
               << std::chrono::duration<double, std::milli>(finished - start).count()
               << "\nEXR and PNG saved.\n";

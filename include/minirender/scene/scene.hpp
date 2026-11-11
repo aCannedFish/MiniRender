@@ -5,6 +5,7 @@
 #include <minirender/scene/cloth_collider.hpp>
 #include <minirender/scene/cloth_material.hpp>
 #include <minirender/scene/medium.hpp>
+#include <minirender/scene/subsurface.hpp>
 
 #include <array>
 #include <cstdint>
@@ -90,7 +91,7 @@ struct Camera {
     Ray generate_lens_ray(glm::dvec2 pixel_uv, double aspect, glm::dvec2 lens_u) const;
 };
 
-enum class MaterialKind { diffuse, conductor, mirror, dielectric, cloth };
+enum class MaterialKind { diffuse, conductor, mirror, dielectric, cloth, subsurface };
 std::string material_kind_name(MaterialKind kind);
 MaterialKind parse_material_kind(const std::string& name);
 
@@ -106,8 +107,10 @@ struct Material {
     std::string base_color_texture{};
     TextureFilter texture_filter = TextureFilter::trilinear;
     // 正面由几何绕序决定，镜像变换保留原外侧。默认双面兼容已有场景。
+    // CPU 的 SSS 封闭边界始终保留双面，用于识别内部侧命中。
     bool double_sided = true;
     std::shared_ptr<const ClothAppearance> cloth{};
+    std::shared_ptr<const SubsurfaceParameters> subsurface{};
     void validate() const;
 };
 

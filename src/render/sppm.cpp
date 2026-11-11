@@ -163,6 +163,12 @@ struct SppmIntegrator::Impl {
         if (scene->camera.aperture_radius != 0) {
             throw std::invalid_argument("SPPM currently requires a pinhole camera");
         }
+        for (const auto& instance : scene->instances) {
+            if (instance.material.kind == MaterialKind::subsurface) {
+                throw std::invalid_argument(
+                    "SPPM does not support BSSRDF materials; use path tracing");
+            }
+        }
         for (const auto& region : scene->media) {
             if (region.enabled && maximum(region.medium.extinction()) > 0) {
                 throw std::invalid_argument(

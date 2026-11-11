@@ -33,6 +33,7 @@ add_library(minirender_core
     src/core/exr_io.cpp
     src/scene/scene.cpp
     src/scene/medium.cpp
+    src/scene/subsurface.cpp
     src/scene/cloth_material.cpp
     src/scene/editor.cpp
     src/scene/gizmo.cpp
@@ -63,6 +64,9 @@ add_library(minirender_core
     src/geometry/remesh.cpp
     src/render/intersection.cpp
     src/render/bvh.cpp
+    src/render/dipole.cpp
+    src/render/subsurface.cpp
+    src/render/subsurface_path.cpp
     src/render/bsdf.cpp
     src/render/cloth_bsdf.cpp
     src/render/light.cpp
@@ -86,6 +90,7 @@ add_library(minirender_core
     src/assets/staged_file.cpp
     src/assets/scene_io.cpp
     src/assets/cloth_material_io.cpp
+    src/assets/subsurface_io.cpp
     src/assets/medium_io.cpp
     src/assets/cloth_simulation_io.cpp)
 target_include_directories(minirender_core PUBLIC include)
@@ -130,6 +135,9 @@ if(BUILD_TESTING)
     add_executable(minirender_sppm_example examples/sppm.cpp)
     target_compile_definitions(minirender_sppm_example PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_sppm_example PRIVATE minirender_core minirender_warnings)
+    add_executable(minirender_subsurface_example examples/subsurface.cpp)
+    target_compile_definitions(minirender_subsurface_example PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+    target_link_libraries(minirender_subsurface_example PRIVATE minirender_core minirender_warnings)
     add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp
         tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp tests/path_tests.cpp
         tests/session_tests.cpp tests/ssao_tests.cpp tests/ibl_tests.cpp tests/geometry_tests.cpp
@@ -140,6 +148,9 @@ if(BUILD_TESTING)
         tests/cloth_bsdf_tests.cpp tests/cloth_component_tests.cpp tests/medium_tests.cpp
         tests/volume_path_tests.cpp tests/volume_scene_tests.cpp tests/sppm_tests.cpp
         tests/sppm_preset_tests.cpp
+        tests/dipole_tests.cpp
+        tests/subsurface_sampling_tests.cpp
+        tests/subsurface_path_tests.cpp
         tests/sppm_energy_tests.cpp)
     target_include_directories(minirender_tests PRIVATE src)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
