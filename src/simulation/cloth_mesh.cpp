@@ -62,7 +62,7 @@ FrozenCloth ClothSimulation::freeze(CancellationToken cancellation) const {
     }
     mesh->validate(cancellation);
     Transform transform;
-    transform.translation = grid_.origin;
+    transform.translation = glm::vec3(grid_.origin);
     return {mesh, transform};
 }
 

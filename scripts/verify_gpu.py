@@ -39,6 +39,11 @@ def main() -> int:
     )
     checks = parser.add_mutually_exclusive_group()
     checks.add_argument(
+        "--simulation-check",
+        action="store_true",
+        help="Verify cloth playback and dynamic geometry",
+    )
+    checks.add_argument(
         "--cloth-check", action="store_true", help="Verify microcylinder cloth shading"
     )
     checks.add_argument(
@@ -113,7 +118,8 @@ def main() -> int:
             "Timing measurements and synchronization validation must run separately"
         )
     scene_check = (
-        args.cloth_check
+        args.simulation_check
+        or args.cloth_check
         or args.sdf_check
         or args.points_check
         or args.adaptive_check
@@ -141,6 +147,7 @@ def main() -> int:
     mode = "GPU"
     option = "--smoke"
     for selected, candidate in [
+        (args.simulation_check, "Simulation"),
         (args.cloth_check, "Cloth"),
         (args.sdf_check, "SDF"),
         (args.points_check, "Points"),

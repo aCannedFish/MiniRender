@@ -44,8 +44,8 @@ void ClothGrid::validate() const {
     require(range(glm::length(u), minimum_length, 1000) &&
                 range(glm::length(v), minimum_length, 1000),
             "Cloth grid edge lengths must be in 0.01..1000 meters");
-    require(std::abs(glm::dot(u, v)) <= 1e-5 * glm::length(u) * glm::length(v),
-            "Cloth grid edges must be perpendicular");
+    require(glm::length(glm::cross(u, v)) > 1e-6 * glm::length(u) * glm::length(v),
+            "Cloth grid edges must be independent");
     std::set<std::uint32_t> seen;
     for (const auto index : pinned) {
         require(index < columns * rows && seen.insert(index).second,

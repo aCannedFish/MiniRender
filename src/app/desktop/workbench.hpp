@@ -23,6 +23,13 @@ class GeometryPanel;
 class PointCloudPanel;
 class SdfPanel;
 class ClothMaterialPanel;
+class ClothColliderPanel;
+class ClothController;
+class ClothPanel;
+struct ClothRuntimeFrame;
+namespace minirender {
+struct ClothDefinition;
+}
 struct GeometryTaskResult;
 
 // 桌面编辑控制器：控件编辑委托给 SceneEditor，渲染器只收到不可变快照。
@@ -48,6 +55,9 @@ class Workbench final : public QMainWindow {
     GeometryPanel* geometry_panel() const noexcept;
     PointCloudPanel* point_cloud_panel() const noexcept;
     SdfPanel* sdf_panel() const noexcept;
+    ClothController* cloth_controller() const noexcept;
+    void create_cloth_demo(int kind);
+    void freeze_cloth();
     void import_point_file(const QString& path);
     void sample_point_cloud();
     void prepare_point_cloud_normals();
@@ -85,6 +95,12 @@ class Workbench final : public QMainWindow {
     bool finish_geometry_task(const GeometryTaskResult& result);
     void connect_point_panel();
     void update_point_selection();
+    void sync_cloth_context();
+    void show_cloth_preview();
+    bool accept_cloth_frame(const ClothRuntimeFrame& frame);
+    void apply_cloth_definition(std::shared_ptr<const minirender::ClothDefinition> definition,
+                                bool reset);
+    std::shared_ptr<const minirender::SceneSnapshot> offline_snapshot();
     void install_scene(minirender::SceneDocument document, const QString& path,
                        const minirender::MeshValidationCache* validated = nullptr);
     minirender::SceneObject* selected(minirender::SceneDocument& scene) const;
@@ -104,6 +120,10 @@ class Workbench final : public QMainWindow {
     PointCloudPanel* points_ = nullptr;
     SdfPanel* sdf_ = nullptr;
     ClothMaterialPanel* cloth_material_ = nullptr;
+    ClothColliderPanel* cloth_collider_ = nullptr;
+    ClothController* cloth_controller_ = nullptr;
+    ClothPanel* cloth_panel_ = nullptr;
+    std::string cloth_target_;
     QLineEdit* object_name_ = nullptr;
     VectorField* translation_ = nullptr;
     VectorField* rotation_ = nullptr;

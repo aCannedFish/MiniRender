@@ -1,6 +1,7 @@
 #include <minirender/core/sampling.hpp>
 #include <minirender/geometry/uv_tangents.hpp>
 #include <minirender/scene/scene.hpp>
+#include <minirender/simulation/cloth_component.hpp>
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -295,6 +296,24 @@ void SceneDocument::validate(MeshValidationCache* cache, CancellationToken cance
         require(material_ids.contains(object.material_id),
                 "Object references missing material: " + object.material_id);
         object.transform.validate();
+        if (object.cloth) {
+            const auto mesh = std::find_if(meshes.begin(), meshes.end(), [&](const auto& value) {
+                return value.id == object.mesh_id;
+            });
+            require(mesh->data == object.cloth->mesh(),
+                    "Cloth state and scene mesh differ; freeze before changing geometry");
+            cloth_environment(*object.cloth->definition(), *this);
+        }
+        if (object.cloth_collider) {
+            object.cloth_collider->validate();
+            if (object.cloth_collider->enabled &&
+                object.cloth_collider->kind == ClothColliderKind::sphere) {
+                const auto scale = glm::abs(object.transform.scale);
+                require(std::abs(scale.x - scale.y) <= 1e-5F * scale.x &&
+                            std::abs(scale.x - scale.z) <= 1e-5F * scale.x,
+                        "Sphere cloth collider requires uniform scale");
+            }
+        }
         if (cloth_material_ids.contains(object.material_id)) {
             const auto mesh = std::find_if(meshes.begin(), meshes.end(), [&](const auto& value) {
                 return value.id == object.mesh_id;

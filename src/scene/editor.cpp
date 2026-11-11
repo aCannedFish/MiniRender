@@ -1,4 +1,5 @@
 #include <minirender/scene/editor.hpp>
+#include <minirender/simulation/cloth_component.hpp>
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -48,6 +49,58 @@ void SceneEditor::edit_prevalidated(const std::function<void(SceneDocument&)>& o
                                     const MeshValidationCache& validated) {
     validated_meshes_.merge_validated(validated);
     edit(operation);
+}
+
+bool SceneEditor::update_cloth_frame(const std::string& object_id,
+                                     const std::shared_ptr<const ClothComponent>& expected,
+                                     const Transform& expected_transform,
+                                     std::shared_ptr<const ClothComponent> frame,
+                                     const MeshValidationCache& validated, bool history) {
+    if (!frame || transform_edit_) {
+        return false;
+    }
+    const auto found = std::find_if(document_.objects.begin(), document_.objects.end(),
+                                    [&](const auto& object) { return object.id == object_id; });
+    if (found == document_.objects.end() || found->cloth != expected ||
+        found->transform.translation != expected_transform.translation ||
+        found->transform.rotation_degrees != expected_transform.rotation_degrees ||
+        found->transform.scale != expected_transform.scale) {
+        return false;
+    }
+    auto candidate = document_;
+    auto& object = candidate.objects[std::size_t(found - document_.objects.begin())];
+    auto mesh = std::find_if(candidate.meshes.begin(), candidate.meshes.end(),
+                             [&](const auto& value) { return value.id == object.mesh_id; });
+    const auto users =
+        std::count_if(candidate.objects.begin(), candidate.objects.end(),
+                      [&](const auto& value) { return value.mesh_id == object.mesh_id; });
+    if (users > 1) {
+        const auto base = "cloth-runtime-" + object.id;
+        auto id = base;
+        for (std::uint32_t suffix = 1;
+             std::any_of(candidate.meshes.begin(), candidate.meshes.end(),
+                         [&](const auto& value) { return value.id == id; });
+             ++suffix) {
+            id = base + '-' + std::to_string(suffix);
+        }
+        candidate.meshes.push_back({id, {}, frame->mesh()});
+        object.mesh_id = id;
+    } else {
+        mesh->data = frame->mesh();
+        mesh->source.clear();
+    }
+    object.cloth = std::move(frame);
+    validated_meshes_.merge_validated(validated);
+    candidate.validate(&validated_meshes_);
+    if (history) {
+        undo_.push_back(document_);
+        if (undo_.size() > 100) {
+            undo_.erase(undo_.begin());
+        }
+        redo_.clear();
+    }
+    document_ = std::move(candidate);
+    return true;
 }
 
 bool SceneEditor::undo() {

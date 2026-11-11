@@ -721,6 +721,13 @@ const SceneUploadStatistics& VulkanViewport::upload_statistics() const noexcept 
 void VulkanViewport::report_mesh_upload() {
     ++upload_statistics_.mesh_uploads;
 }
+void VulkanViewport::report_mesh_allocation() {
+    ++upload_statistics_.mesh_allocations;
+    ++upload_statistics_.index_uploads;
+}
+void VulkanViewport::report_vertex_buffer_reuse() {
+    ++upload_statistics_.vertex_buffer_reuses;
+}
 void VulkanViewport::report_descriptor_rebuild() {
     ++upload_statistics_.descriptor_rebuilds;
 }

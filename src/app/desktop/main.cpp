@@ -1,4 +1,5 @@
 #include "adaptive_smoke.hpp"
+#include "cloth_playback_smoke.hpp"
 #include "cloth_smoke.hpp"
 #include "geometry_smoke.hpp"
 #include "gizmo_smoke.hpp"
@@ -181,9 +182,12 @@ int main(int argc, char** argv) {
     parser.addOption(
         {"sdf-smoke", "Verify distance fields and analytic intersections.", "directory"});
     parser.addOption({"cloth-smoke", "Verify cloth shading and material updates.", "directory"});
+    parser.addOption(
+        {"simulation-smoke", "Verify cloth playback and dynamic geometry.", "directory"});
     parser.process(application);
     const bool smoke = parser.isSet("smoke");
-    const bool regression = smoke || parser.isSet("cloth-smoke") || parser.isSet("scene-smoke") ||
+    const bool regression = smoke || parser.isSet("simulation-smoke") ||
+                            parser.isSet("cloth-smoke") || parser.isSet("scene-smoke") ||
                             parser.isSet("texture-smoke") || parser.isSet("interaction-smoke") ||
                             parser.isSet("parameter-smoke") || parser.isSet("wire-smoke") ||
                             parser.isSet("offline-smoke") || parser.isSet("ssao-smoke") ||
@@ -325,6 +329,10 @@ int main(int argc, char** argv) {
             start_cloth_smoke(window, parser.value("cloth-smoke"), timing_only);
         }
 
+        if (parser.isSet("simulation-smoke")) {
+            start_cloth_playback_smoke(window, parser.value("simulation-smoke"), timing_only);
+        }
+
         int ticks = 0;
         bool resized = false;
         QSize initial_size;
@@ -404,7 +412,7 @@ int main(int argc, char** argv) {
         timer.start();
         result = application.exec();
         if (parser.isSet("geometry-smoke") || parser.isSet("adaptive-smoke") ||
-            parser.isSet("points-smoke")) {
+            parser.isSet("points-smoke") || parser.isSet("simulation-smoke")) {
             geometry_cleanup.start();
         }
     }
