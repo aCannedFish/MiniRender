@@ -5,6 +5,7 @@
 #include <minirender/render/ibl.hpp>
 #include <minirender/render/point_preview.hpp>
 #include <minirender/render/raster_mesh.hpp>
+#include <minirender/render/sdf_render.hpp>
 #include <minirender/render/ssao.hpp>
 #include <minirender/scene/gizmo.hpp>
 #include <minirender/scene/scene.hpp>
@@ -20,6 +21,7 @@
 
 class ViewportRenderer;
 class PointPreviewRenderer;
+class SdfRenderer;
 
 // 渲染更新的诊断计数，用于检测普通参数编辑是否触发多余的资产上传。
 struct SceneUploadStatistics {
@@ -60,6 +62,20 @@ class VulkanViewport final : public QWindow {
     void report_point_upload();
     std::uint64_t point_uploads() const noexcept;
     std::function<void(bool)> on_point_preview_changed;
+    void set_sdf_document(std::shared_ptr<const minirender::SdfDocument> document,
+                          bool reset_camera = false);
+    const std::shared_ptr<const minirender::SdfDocument>& sdf_document() const noexcept;
+    void set_sdf_visible(bool visible);
+    bool sdf_visible() const noexcept;
+    void set_sdf_view(minirender::SdfView view);
+    minirender::SdfView sdf_view() const noexcept;
+    void set_sdf_shadows(bool enabled);
+    bool sdf_shadows() const noexcept;
+    const minirender::Camera& sdf_camera() const noexcept;
+    std::function<void(bool)> on_sdf_visible_changed;
+    std::function<void()> on_sdf_display_changed;
+    void report_sdf_upload();
+    std::uint64_t sdf_uploads() const noexcept;
     void set_shadows_enabled(bool enabled);
     bool shadows_enabled() const noexcept;
     void set_fxaa_enabled(bool enabled);
@@ -152,9 +168,16 @@ class VulkanViewport final : public QWindow {
     std::unique_ptr<ViewportRenderer> renderer_;
     std::unique_ptr<ViewportRenderer> offline_renderer_;
     std::unique_ptr<PointPreviewRenderer> point_renderer_;
+    std::unique_ptr<SdfRenderer> sdf_renderer_;
+    std::shared_ptr<const minirender::SdfDocument> sdf_document_;
+    minirender::Camera sdf_camera_;
+    minirender::SdfView sdf_view_ = minirender::SdfView::surface;
+    bool sdf_shadows_ = true;
+    bool sdf_visible_ = false;
+    std::uint64_t sdf_uploads_ = 0;
     std::shared_ptr<const minirender::PointPreviewData> point_data_;
     minirender::PointPreviewSettings point_settings_;
-    minirender::Camera scene_camera_before_points_;
+    minirender::Camera scene_camera_before_tools_;
     minirender::Camera point_camera_;
     bool point_visible_ = false;
     std::uint64_t point_uploads_ = 0;

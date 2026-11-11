@@ -56,6 +56,14 @@ TEST_CASE("SDF primitive distances agree with analytic geometry", "[sdf]") {
     REQUIRE(field.sample({0, .5, 1}).distance == .25);
 }
 
+TEST_CASE("SDF demo cutter removes the spherical cap with clearance", "[sdf]") {
+    const auto scene = make_sdf_example();
+    const auto& ball = scene.nodes[0];
+    const glm::dvec3 top = glm::dvec3(ball.translation) + glm::dvec3(0, ball.parameters.x, 0);
+    REQUIRE(SdfField(scene).sample(top).distance > .05);
+    REQUIRE(SdfField(scene).sample(top + glm::dvec3(0, 1e-4, 0)).distance > .05);
+}
+
 TEST_CASE("SDF rigid transforms and uniform scale preserve distance units", "[sdf]") {
     auto scene = sphere();
     scene.nodes[0].translation = {2, -1, 3};

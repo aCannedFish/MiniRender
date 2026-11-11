@@ -3,6 +3,7 @@
 #include "offline_renderer.hpp"
 #include "point_preview_renderer.hpp"
 #include "scene_renderer.hpp"
+#include "sdf_renderer.hpp"
 #include <minirender/scene/editor.hpp>
 
 #include <QDebug>
@@ -147,6 +148,8 @@ void VulkanViewport::initialize() {
     offline_renderer_->initResources();
     point_renderer_ = std::make_unique<PointPreviewRenderer>(this);
     point_renderer_->initResources();
+    sdf_renderer_ = std::make_unique<SdfRenderer>(this);
+    sdf_renderer_->initResources();
 }
 
 std::uint32_t VulkanViewport::memory_type(std::uint32_t bits, VkMemoryPropertyFlags flags) const {
@@ -355,6 +358,7 @@ void VulkanViewport::recreate_swapchain() {
     renderer_->initSwapChainResources();
     offline_renderer_->initSwapChainResources();
     point_renderer_->initSwapChainResources();
+    sdf_renderer_->initSwapChainResources();
     dirty_ = false;
 }
 
@@ -411,7 +415,9 @@ void VulkanViewport::render_frame(bool blocking_capture) {
         begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         check(vkBeginCommandBuffer(command_, &begin), "begin frame");
         // 显示算法共享目标，选择和缓冲更新发生在上一帧 fence 完成后。
-        if (point_visible_) {
+        if (sdf_visible_) {
+            sdf_renderer_->startNextFrame();
+        } else if (point_visible_) {
             point_renderer_->startNextFrame();
         } else {
             (offline_visible_ ? offline_renderer_ : renderer_)->startNextFrame();
@@ -556,6 +562,9 @@ void VulkanViewport::release_swapchain() {
     if (point_renderer_) {
         point_renderer_->releaseSwapChainResources();
     }
+    if (sdf_renderer_) {
+        sdf_renderer_->releaseSwapChainResources();
+    }
     for (auto framebuffer : framebuffers_) {
         vkDestroyFramebuffer(device_, framebuffer, nullptr);
     }
@@ -603,6 +612,10 @@ void VulkanViewport::release() {
     if (point_renderer_) {
         point_renderer_->releaseResources();
         point_renderer_.reset();
+    }
+    if (sdf_renderer_) {
+        sdf_renderer_->releaseResources();
+        sdf_renderer_.reset();
     }
     vkDestroyBuffer(device_, readback_, nullptr);
     vkFreeMemory(device_, readback_memory_, nullptr);
@@ -752,8 +765,8 @@ void VulkanViewport::set_scene(std::shared_ptr<const minirender::SceneSnapshot> 
     raster_meshes_.retain(scene_ ? std::span<const minirender::RenderInstance>(scene_->instances)
                                  : std::span<const minirender::RenderInstance>{});
     if (scene_) {
-        if (point_visible_) {
-            scene_camera_before_points_ = scene_->camera;
+        if (point_visible_ || sdf_visible_) {
+            scene_camera_before_tools_ = scene_->camera;
         } else {
             camera_ = scene_->camera;
         }
@@ -788,7 +801,7 @@ void VulkanViewport::set_camera(const minirender::Camera& camera) {
     camera_ = camera;
     rebuild_gizmo();
     mark_preview_changed();
-    if (on_camera_changed && !point_visible_) {
+    if (on_camera_changed && !point_visible_ && !sdf_visible_) {
         on_camera_changed(camera_);
     }
     requestUpdate();
@@ -832,12 +845,13 @@ void VulkanViewport::set_point_preview_visible(bool visible) {
     }
     finish_gizmo_drag(false);
     if (visible) {
+        set_sdf_visible(false);
         set_offline_visible(false);
-        scene_camera_before_points_ = camera_;
+        scene_camera_before_tools_ = camera_;
         camera_ = point_camera_;
     } else {
         point_camera_ = camera_;
-        camera_ = scene_camera_before_points_;
+        camera_ = scene_camera_before_tools_;
     }
     point_visible_ = visible;
     pressed_buttons_ = Qt::NoButton;
@@ -869,6 +883,93 @@ void VulkanViewport::report_point_upload() {
 std::uint64_t VulkanViewport::point_uploads() const noexcept {
     return point_uploads_;
 }
+
+void VulkanViewport::set_sdf_document(std::shared_ptr<const minirender::SdfDocument> document,
+                                      bool reset_camera) {
+    if (document) {
+        document->validate();
+    } else {
+        set_sdf_visible(false);
+    }
+    if (document && (!sdf_document_ || reset_camera)) {
+        sdf_camera_ = document->camera;
+        if (sdf_visible_) {
+            set_camera(sdf_camera_);
+        }
+    }
+    sdf_document_ = std::move(document);
+    mark_preview_changed();
+    requestUpdate();
+}
+const std::shared_ptr<const minirender::SdfDocument>&
+VulkanViewport::sdf_document() const noexcept {
+    return sdf_document_;
+}
+void VulkanViewport::set_sdf_visible(bool visible) {
+    if (visible == sdf_visible_) {
+        return;
+    }
+    if (visible && !sdf_document_) {
+        throw std::logic_error("Load an SDF document before opening its view");
+    }
+    finish_gizmo_drag(false);
+    if (visible) {
+        set_point_preview_visible(false);
+        set_offline_visible(false);
+        scene_camera_before_tools_ = camera_;
+        camera_ = sdf_camera_;
+    } else {
+        sdf_camera_ = camera_;
+        camera_ = scene_camera_before_tools_;
+    }
+    sdf_visible_ = visible;
+    pressed_buttons_ = Qt::NoButton;
+    dragged_ = false;
+    rebuild_gizmo();
+    mark_preview_changed();
+    if (on_sdf_visible_changed) {
+        on_sdf_visible_changed(visible);
+    }
+    requestUpdate();
+}
+bool VulkanViewport::sdf_visible() const noexcept {
+    return sdf_visible_;
+}
+void VulkanViewport::set_sdf_view(minirender::SdfView view) {
+    if (view != minirender::SdfView::surface && view != minirender::SdfView::normals &&
+        view != minirender::SdfView::depth && view != minirender::SdfView::steps) {
+        throw std::invalid_argument("Unknown SDF view");
+    }
+    sdf_view_ = view;
+    if (on_sdf_display_changed) {
+        on_sdf_display_changed();
+    }
+    mark_preview_changed();
+    requestUpdate();
+}
+minirender::SdfView VulkanViewport::sdf_view() const noexcept {
+    return sdf_view_;
+}
+void VulkanViewport::set_sdf_shadows(bool enabled) {
+    sdf_shadows_ = enabled;
+    if (on_sdf_display_changed) {
+        on_sdf_display_changed();
+    }
+    mark_preview_changed();
+    requestUpdate();
+}
+bool VulkanViewport::sdf_shadows() const noexcept {
+    return sdf_shadows_;
+}
+const minirender::Camera& VulkanViewport::sdf_camera() const noexcept {
+    return sdf_visible_ ? camera_ : sdf_camera_;
+}
+void VulkanViewport::report_sdf_upload() {
+    ++sdf_uploads_;
+}
+std::uint64_t VulkanViewport::sdf_uploads() const noexcept {
+    return sdf_uploads_;
+}
 void VulkanViewport::set_exposure(float value) {
     exposure_ = value;
     mark_preview_changed();
@@ -878,6 +979,7 @@ float VulkanViewport::exposure() const noexcept {
     return exposure_;
 }
 void VulkanViewport::set_view_mode(int mode) {
+    set_sdf_visible(false);
     set_point_preview_visible(false);
     view_mode_ = mode;
     mark_preview_changed();
@@ -928,6 +1030,7 @@ std::uint64_t VulkanViewport::ibl_texture_updates() const noexcept {
 
 void VulkanViewport::set_offline_visible(bool visible) {
     if (visible) {
+        set_sdf_visible(false);
         set_point_preview_visible(false);
     }
     if (offline_visible_ == visible) {
@@ -1044,7 +1147,7 @@ void VulkanViewport::mouseReleaseEvent(QMouseEvent* event) {
     }
     const bool owned_press = pressed_buttons_.testFlag(event->button());
     pressed_buttons_ &= ~Qt::MouseButtons(event->button());
-    if (owned_press && scene_ && !offline_visible_ && !point_visible_ &&
+    if (owned_press && scene_ && !offline_visible_ && !point_visible_ && !sdf_visible_ &&
         event->button() == Qt::LeftButton && !dragged_ && width() > 0 && height() > 0) {
         const glm::vec2 uv{static_cast<float>(event->position().x()) / static_cast<float>(width()),
                            static_cast<float>(event->position().y()) /
@@ -1142,8 +1245,8 @@ void VulkanViewport::set_gizmo_target(std::string object_id,
 }
 void VulkanViewport::rebuild_gizmo() {
     gizmo_layout_ = {};
-    if (gizmo_target_ && scene_ && !offline_visible_ && !point_visible_ && width() > 0 &&
-        height() > 0) {
+    if (gizmo_target_ && scene_ && !offline_visible_ && !point_visible_ && !sdf_visible_ &&
+        width() > 0 && height() > 0) {
         const minirender::GizmoView view{camera_, {width(), height()}};
         gizmo_layout_ = minirender::make_gizmo_layout(view, *gizmo_target_, gizmo_mode_);
     }
@@ -1202,12 +1305,14 @@ minirender::Image VulkanViewport::grab_hdr() {
         throw std::logic_error("HDR capture requires a visible scene viewport");
     }
     const auto before = frame_count_;
-    renderer_->request_hdr_capture();
+    auto* active =
+        sdf_visible_ ? static_cast<ViewportRenderer*>(sdf_renderer_.get()) : renderer_.get();
+    active->request_hdr_capture();
     render_frame(true);
     if (!failure_.isEmpty() || frame_count_ == before) {
         throw std::runtime_error("HDR frame was not rendered");
     }
     check(vkWaitForFences(device_, 1, &frame_fence_, VK_TRUE, 2'000'000'000ULL),
           "wait HDR capture");
-    return renderer_->read_hdr_capture();
+    return active->read_hdr_capture();
 }

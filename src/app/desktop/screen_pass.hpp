@@ -17,7 +17,8 @@ class ScreenPass {
   public:
     ~ScreenPass();
     void create(VulkanViewport& viewport, VkFormat format, const char* fragment, VkBuffer uniform,
-                VkDeviceSize bytes, std::span<const ScreenInput> inputs);
+                VkDeviceSize bytes, std::span<const ScreenInput> inputs,
+                const char* vertex = ":/shaders/screen.vert.spv", std::uint32_t vertices = 3);
     void draw(VulkanViewport& viewport, std::int32_t mode = 0);
     void release();
     VkImage image() const noexcept;
@@ -35,4 +36,5 @@ class ScreenPass {
     VkDescriptorSet descriptor_ = VK_NULL_HANDLE;
     VkPipelineLayout layout_ = VK_NULL_HANDLE;
     VkPipeline pipeline_ = VK_NULL_HANDLE;
+    std::uint32_t vertices_ = 3;
 };
