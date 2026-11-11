@@ -24,8 +24,10 @@
 #include <QTimer>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <stdexcept>
+#include <vector>
 
 namespace {
 using namespace minirender;
@@ -440,7 +442,10 @@ void start_sppm_smoke(Workbench& window, const QString& directory, bool enforce_
                     if (p.state != RenderState::running ||
                         p.sppm_progress.phase != SppmPhase::photons ||
                         p.sppm_progress.completed == 0 ||
-                        control<QProgressBar>(window, "offline_phase_progress")->value() == 0) {
+                        control<QProgressBar>(window, "offline_phase_progress")->value() == 0 ||
+                        !control<QLabel>(window, "offline_phase_status")
+                             ->text()
+                             .contains("光子追踪")) {
                         return;
                     }
                     require(control<QProgressBar>(window, "offline_phase_progress")->value() > 0,

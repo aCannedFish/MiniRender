@@ -20,6 +20,7 @@
 #include <QVBoxLayout>
 #include <QtConcurrent/QtConcurrentRun>
 
+#include <algorithm>
 #include <thread>
 
 namespace {
@@ -213,6 +214,11 @@ OfflinePanel::OfflinePanel(
     sppm_details_->setWordWrap(true);
     sppm_details_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     layout->addWidget(sppm_details_);
+    // macOS 原生进度条省略条内文字，阶段与计数放在独立标签中。
+    phase_status_ = new QLabel(this);
+    phase_status_->setObjectName("offline_phase_status");
+    phase_status_->setWordWrap(true);
+    layout->addWidget(phase_status_);
     phase_progress_ = new QProgressBar(this);
     phase_progress_->setObjectName("offline_phase_progress");
     layout->addWidget(phase_progress_);
@@ -417,6 +423,7 @@ void OfflinePanel::poll() {
     const bool sppm_job = p.job_id && p.integrator == minirender::IntegratorKind::sppm;
     sppm_details_->setVisible(sppm_job);
     phase_progress_->setVisible(sppm_job);
+    phase_status_->setVisible(sppm_job);
     if (sppm_job) {
         details_->setText(QString("已完成 %1 / %2 轮（%3%）\n%4 个线程 · %5 秒")
                               .arg(p.sppm.iterations)
@@ -435,6 +442,13 @@ void OfflinePanel::poll() {
         phase_progress_->setRange(0, 10000);
         const bool advancing = p.state == RenderState::running;
         const auto& work = p.sppm_progress;
+        phase_status_->setText(
+            advancing ? QString("第 %1 轮 · %2：%3 / %4")
+                            .arg(std::min(p.sppm.iterations + 1, std::uint64_t(job_iterations_)))
+                            .arg(photon_phase(work.phase))
+                            .arg(work.completed)
+                            .arg(work.total)
+                      : stage(p.state));
         phase_progress_->setValue(advancing && work.total
                                       ? int(10000.0 * double(work.completed) / double(work.total))
                                       : 0);

@@ -57,7 +57,7 @@ class OfflinePanel final : public QWidget {
     QDoubleSpinBox *exposure_, *radius_, *alpha_;
     QWidget* sppm_settings_;
     QPushButton *start_, *pause_, *cancel_, *save_exr_, *save_png_;
-    QLabel *status_, *details_, *notice_, *samples_label_, *sppm_details_;
+    QLabel *status_, *details_, *notice_, *samples_label_, *sppm_details_, *phase_status_;
     QProgressBar *progress_, *phase_progress_;
     minirender::SessionSettings session_settings_;
     // 控件只更新用户改动的字段，导入时保留 double 和字节预算的完整精度。
