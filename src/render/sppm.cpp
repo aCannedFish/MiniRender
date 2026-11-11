@@ -69,18 +69,25 @@ void parallel(std::size_t count, std::uint32_t workers, CancellationToken token,
             failed.store(true, std::memory_order_relaxed);
         }
     };
-    std::vector<std::jthread> threads;
+    std::vector<std::thread> threads;
+    const auto join = [&] {
+        for (auto& thread : threads) {
+            if (thread.joinable()) {
+                thread.join();
+            }
+        }
+    };
     try {
         for (std::uint32_t worker = 1; worker < workers; ++worker) {
             threads.emplace_back(work, worker);
         }
     } catch (...) {
         failed.store(true, std::memory_order_relaxed);
-        threads.clear();
+        join();
         throw;
     }
     work(0);
-    threads.clear();
+    join();
     if (error) {
         std::rethrow_exception(error);
     }
