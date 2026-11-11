@@ -6,6 +6,7 @@
 #include <QAction>
 #include <QApplication>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QDebug>
 #include <QDir>
 #include <QDoubleSpinBox>
@@ -63,14 +64,34 @@ void verify_import(const minirender::SceneDocument& actual,
     }
 }
 
-// 独立串行路径积分核对会话输出，线程调度和预览上传不改变固定种子结果。
+minirender::IntegratorSettings test_integrator(const BuiltinScene& preset) {
+    auto result = preset.integrator;
+    result.maximum_depth = 8;
+    result.sppm.photons_per_iteration = 2000;
+    return result;
+}
+
+// 按模板积分器运行独立串行参考，覆盖 PT 与 SPPM 的真实结果。
 void verify_render(Workbench& window, const QString& directory, const BuiltinScene& preset,
                    const std::shared_ptr<const minirender::SceneSnapshot>& snapshot) {
     auto* panel = window.offline_panel();
     require(panel->session().progress().state == minirender::RenderState::completed,
             "Preset render did not complete");
-    const minirender::PathTracer reference(snapshot, {.maximum_depth = 8});
-    const auto expected = reference.render({24, 24, 16, 101});
+    const auto integrator = test_integrator(preset);
+    const auto expected = [&] {
+        if (integrator.kind == minirender::IntegratorKind::path_tracing) {
+            return minirender::PathTracer(snapshot, integrator).render({24, 24, 16, 101});
+        }
+        minirender::SppmIntegrator reference(snapshot, {24, 24, 16, 101}, integrator);
+        for (int iteration = 0; iteration < 16; ++iteration) {
+            reference.advance();
+        }
+        require(reference.statistics().specular_light_contributions > 0,
+                "Caustic preset has no specular light contributions");
+        return reference.image();
+    }();
+    require(panel->session().progress().integrator == integrator.kind,
+            "Preset selected the wrong integrator");
     const auto actual = panel->session().preview().image;
     require(actual && actual->width() == 24, "Preset preview dimensions differ");
     for (std::size_t y = 0; y < 24; ++y) {
@@ -129,6 +150,12 @@ void start_presets_smoke(Workbench& window, const QString& directory) {
                 require(window.findChild<QSpinBox*>("offline_spp")->value() ==
                             static_cast<int>(preset.render.samples_per_pixel),
                         "Preset recommendations missing");
+                require(window.findChild<QComboBox*>("offline_backend")->currentIndex() ==
+                            (preset.integrator.kind == minirender::IntegratorKind::sppm ? 1 : 0),
+                        "Preset backend recommendation missing");
+                require(window.findChild<QSpinBox*>("offline_photons")->value() ==
+                            int(preset.integrator.sppm.photons_per_iteration),
+                        "Preset photon recommendation missing");
                 window.select_object(preset.selected_object);
                 auto* x = window.findChild<QDoubleSpinBox*>("translation.x");
                 const auto before = x->value();
@@ -204,7 +231,7 @@ void start_presets_smoke(Workbench& window, const QString& directory) {
                 require(std::abs(window.document().camera.position.x - new_camera_x) < 1e-5,
                         "Camera edit was lost");
                 window.offline_panel()->set_settings(
-                    {24, 24, 16, 101}, {.maximum_depth = 8},
+                    {24, 24, 16, 101}, test_integrator(preset),
                     {.threads = 2, .tile_size = 8, .batch_samples = 4});
                 state->snapshot = minirender::make_snapshot(window.document());
                 window.offline_panel()->start();

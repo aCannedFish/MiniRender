@@ -33,10 +33,12 @@ class OfflinePanel final : public QWidget {
     void save_image(const QString& path, bool exr);
     bool exporting() const noexcept;
     bool stale() const noexcept;
+    minirender::IntegratorSettings integrator_settings() const;
     const minirender::RenderSession& session() const noexcept;
 
   private:
     void poll();
+    void update_backend_controls();
     void choose_export(bool exr);
     // 覆盖导入先异步取消旧任务，终止后再应用新建议，避免阻塞界面。
     struct ImportSettings {
@@ -48,15 +50,19 @@ class OfflinePanel final : public QWidget {
     std::function<std::shared_ptr<const minirender::SceneSnapshot>()> snapshot_;
     std::shared_ptr<minirender::RenderSession> session_;
     QWidget* settings_;
-    QSpinBox *width_, *height_, *spp_, *depth_, *threads_, *rr_depth_;
+    QSpinBox *width_, *height_, *spp_, *depth_, *threads_, *rr_depth_, *photons_, *memory_;
     QLineEdit* seed_;
-    QComboBox* mode_;
+    QComboBox *mode_, *backend_;
     QCheckBox *rr_, *show_;
-    QDoubleSpinBox* exposure_;
+    QDoubleSpinBox *exposure_, *radius_, *alpha_;
+    QWidget* sppm_settings_;
     QPushButton *start_, *pause_, *cancel_, *save_exr_, *save_png_;
-    QLabel *status_, *details_, *notice_;
-    QProgressBar* progress_;
+    QLabel *status_, *details_, *notice_, *samples_label_, *sppm_details_, *phase_status_;
+    QProgressBar *progress_, *phase_progress_;
     minirender::SessionSettings session_settings_;
+    // 控件只更新用户改动的字段，导入时保留 double 和字节预算的完整精度。
+    minirender::SppmOptions sppm_options_;
+    std::uint32_t job_iterations_ = 0;
     std::uint64_t preview_samples_ = 0;
     bool preview_terminal_ = false;
     bool stale_ = false;

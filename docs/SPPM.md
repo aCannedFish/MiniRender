@@ -102,6 +102,8 @@ SPPM 的 `--spp` 对应相机采样与完整迭代数。`--photons` 指每轮发
 
 ## 阅读顺序
 
+桌面端在“离线”页选择 SPPM。快速导入菜单提供“玻璃焦散”和“镜中焦散”，导入后仍可编辑物体、材质和相机。控件、迭代进度、暂停恢复和导出操作见[离线界面](OFFLINE_UI.md)。
+
 | 文件 | 内容 |
 | --- | --- |
 | `light_emission.cpp` | 光源发射与功率 PDF |
@@ -110,5 +112,7 @@ SPPM 的 `--spp` 对应相机采样与完整迭代数。`--photons` 指每轮发
 | `sppm.cpp` | 相机、光子、统计更新与原子迭代 |
 | `render_session.cpp` 的 `run_sppm` | 预览、暂停回滚、恢复与取消 |
 | `sppm_tests.cpp`、`sppm_energy_tests.cpp` | 功率、邻域、统计、任务和独立能量检查 |
+| `offline_panel.*` | 参数保存、后端选择、迭代与阶段状态、图像发布 |
+| `sppm_smoke.cpp`、`presets_smoke.cpp` | 真实控件、快照、串行参考、模板和显示回归 |
 
 渲染实现位于 `src/render`，公开接口位于 `include/minirender/render`，专项测试位于 `tests`。

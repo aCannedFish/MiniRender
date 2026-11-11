@@ -265,6 +265,18 @@ def volume_scenes(classic):
     return {"volume-bounded": bounded, "volume-cornell": cornell, "volume-beam": beam}
 
 
+def caustic_scenes(glass):
+    """保持玻璃场景的可编辑对象，镜面版本调整后墙材质与观察位置。"""
+    mirror = copy.deepcopy(glass)
+    back = next(m for m in mirror["materials"] if m["id"] == "mat_back")
+    back["kind"] = "mirror"
+    back["base_color"] = [0.95] * 3
+    mirror["camera"]["position"] = [-0.43, 1.5, 2.4]
+    mirror["camera"]["target"] = [-0.43, 0.45, -1]
+    mirror["camera"]["vertical_fov"] = 35
+    return {"sppm-glass": copy.deepcopy(glass), "sppm-mirror": mirror}
+
+
 def main():
     sphere()
     classic = room()
@@ -364,6 +376,7 @@ def main():
         ("cornell-small-light", small),
         ("material-balls", balls),
         *volume_scenes(classic).items(),
+        *caustic_scenes(glass).items(),
     ]:
         (ROOT / f"{name}.json").write_text(
             json.dumps(scene, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"

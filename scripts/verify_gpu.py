@@ -113,6 +113,11 @@ def main() -> int:
         help="Verify medium editing and offline rendering",
     )
     checks.add_argument(
+        "--sppm-check",
+        action="store_true",
+        help="Verify SPPM settings, caustic templates and offline tasks",
+    )
+    checks.add_argument(
         "--points-check",
         action="store_true",
         help="Verify point cloud editing and preview",
@@ -123,7 +128,8 @@ def main() -> int:
             "Timing measurements and synchronization validation must run separately"
         )
     scene_check = (
-        args.volume_check
+        args.sppm_check
+        or args.volume_check
         or args.simulation_check
         or args.cloth_check
         or args.sdf_check
@@ -153,6 +159,7 @@ def main() -> int:
     mode = "GPU"
     option = "--smoke"
     for selected, candidate in [
+        (args.sppm_check, "SPPM"),
         (args.volume_check, "Volume"),
         (args.simulation_check, "Simulation"),
         (args.cloth_check, "Cloth"),

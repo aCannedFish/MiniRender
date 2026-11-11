@@ -2,8 +2,8 @@
 
 #include <QCoreApplication>
 
-const std::array<BuiltinScene, 7>& builtin_scenes() {
-    static const std::array<BuiltinScene, 7> scenes{
+const std::array<BuiltinScene, 9>& builtin_scenes() {
+    static const std::array<BuiltinScene, 9> scenes{
         {{"cornell",
           "Cornell Box · 经典",
           "cornell-box.json",
@@ -59,7 +59,27 @@ const std::array<BuiltinScene, 7>& builtin_scenes() {
           "aperture",
           false,
           {320, 320, 128, 101},
-          {.maximum_depth = 12}}}};
+          {.maximum_depth = 12}},
+         {"glass_caustic",
+          "SPPM · 玻璃焦散",
+          "sppm-glass.json",
+          "玻璃球将顶部光源聚焦在地面上，使用 SPPM 观察焦散收敛。",
+          "glass_ball",
+          true,
+          {320, 320, 128, 101},
+          {.maximum_depth = 8,
+           .kind = minirender::IntegratorKind::sppm,
+           .sppm = {.photons_per_iteration = 40000, .initial_radius = .12}}},
+         {"mirror_caustic",
+          "SPPM · 镜中焦散",
+          "sppm-mirror.json",
+          "从镜面后墙观察玻璃球与地面焦散，展示两侧含镜面事件的光路。",
+          "glass_ball",
+          true,
+          {320, 320, 128, 101},
+          {.maximum_depth = 8,
+           .kind = minirender::IntegratorKind::sppm,
+           .sppm = {.photons_per_iteration = 40000, .initial_radius = .12}}}}};
     return scenes;
 }
 QString builtin_scene_directory() {

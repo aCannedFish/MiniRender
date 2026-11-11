@@ -10,6 +10,7 @@
 #include <QGridLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QLocale>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QRegularExpressionValidator>
@@ -19,9 +20,46 @@
 #include <QVBoxLayout>
 #include <QtConcurrent/QtConcurrentRun>
 
+#include <algorithm>
 #include <thread>
 
 namespace {
+
+// 显示最短可往返的数字，保留 QDoubleSpinBox 的输入、步进和范围校验。
+class SppmScalar final : public QDoubleSpinBox {
+  public:
+    using QDoubleSpinBox::QDoubleSpinBox;
+
+  protected:
+    QString textFromValue(double value) const override {
+        return locale().toString(value, 'g', QLocale::FloatingPointShortest);
+    }
+};
+
+QDoubleSpinBox* scalar(QWidget* parent, const char* name, double low, double high, double step) {
+    auto* spin = new SppmScalar(parent);
+    spin->setObjectName(name);
+    spin->setDecimals(323);
+    spin->setRange(low, high);
+    spin->setSingleStep(step);
+    spin->setKeyboardTracking(false);
+    return spin;
+}
+
+QString photon_phase(minirender::SppmPhase phase) {
+    using minirender::SppmPhase;
+    switch (phase) {
+    case SppmPhase::camera:
+        return "相机路径";
+    case SppmPhase::grid:
+        return "可见点网格";
+    case SppmPhase::photons:
+        return "光子追踪";
+    case SppmPhase::update:
+        return "统计更新";
+    }
+    return {};
+}
 
 QSpinBox* integer(QWidget* parent, const char* name, int low, int high, int value) {
     auto* spin = new QSpinBox(parent);
@@ -73,6 +111,9 @@ OfflinePanel::OfflinePanel(
     form->setContentsMargins(0, 0, 0, 0);
     form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     form->setRowWrapPolicy(QFormLayout::WrapLongRows);
+    backend_ = new QComboBox(settings_);
+    backend_->setObjectName("offline_backend");
+    backend_->addItems({"Path Tracing", "SPPM"});
     width_ = integer(settings_, "offline_width", 1, 16384, 256);
     height_ = integer(settings_, "offline_height", 1, 16384, 256);
     spp_ = integer(settings_, "offline_spp", 1, 1000000, 64);
@@ -91,15 +132,40 @@ OfflinePanel::OfflinePanel(
     rr_->setObjectName("offline_rr");
     rr_->setChecked(true);
     rr_depth_ = integer(settings_, "offline_rr_depth", 0, 128, 3);
+    form->addRow("积分器", backend_);
     form->addRow("宽 / px", width_);
     form->addRow("高 / px", height_);
-    form->addRow("每像素样本数", spp_);
+    samples_label_ = new QLabel("每像素样本数", settings_);
+    form->addRow(samples_label_, spp_);
     form->addRow("最大散射深度", depth_);
     form->addRow("采样方式", mode_);
     form->addRow("随机种子", seed_);
     form->addRow("工作线程", threads_);
     form->addRow(rr_);
     form->addRow("RR 起始深度", rr_depth_);
+    sppm_settings_ = new QWidget(settings_);
+    auto* photon_form = new QFormLayout(sppm_settings_);
+    photon_form->setContentsMargins(0, 0, 0, 0);
+    photon_form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+    photon_form->setRowWrapPolicy(QFormLayout::WrapLongRows);
+    photons_ = integer(sppm_settings_, "offline_photons", 1, 100000000, 100000);
+    radius_ = scalar(sppm_settings_, "offline_radius", 1e-6, 1e6, .01);
+    radius_->setValue(sppm_options_.initial_radius);
+    alpha_ = scalar(sppm_settings_, "offline_alpha", 0, 1, .05);
+    alpha_->setValue(sppm_options_.alpha);
+    memory_ = integer(sppm_settings_, "offline_sppm_memory", 1, 8192, 512);
+    radius_->setToolTip("初始合并半径，单位为场景中的米。后续迭代逐渐缩小半径。");
+    alpha_->setToolTip("半径更新系数，取值在 0 和 1 之间，通常使用 0.7。");
+    memory_->setToolTip("SPPM 工作缓冲预算，场景资产和 BVH 另计。");
+    photon_form->addRow("每轮发射光子数", photons_);
+    photon_form->addRow("初始半径 / m", radius_);
+    photon_form->addRow("更新系数 α", alpha_);
+    photon_form->addRow("内存预算 / MiB", memory_);
+    auto* hint = new QLabel("SPPM 使用针孔相机计算表面散射。每轮为每个像素追踪一条相机路径。",
+                            sppm_settings_);
+    hint->setWordWrap(true);
+    photon_form->addRow(hint);
+    form->addRow(sppm_settings_);
     layout->addWidget(settings_);
     auto* buttons = new QGridLayout;
     start_ = new QPushButton("开始", this);
@@ -143,6 +209,19 @@ OfflinePanel::OfflinePanel(
     progress_ = new QProgressBar(this);
     progress_->setObjectName("offline_progress");
     layout->addWidget(progress_);
+    sppm_details_ = new QLabel(this);
+    sppm_details_->setObjectName("offline_sppm_details");
+    sppm_details_->setWordWrap(true);
+    sppm_details_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    layout->addWidget(sppm_details_);
+    // macOS 原生进度条省略条内文字，阶段与计数放在独立标签中。
+    phase_status_ = new QLabel(this);
+    phase_status_->setObjectName("offline_phase_status");
+    phase_status_->setWordWrap(true);
+    layout->addWidget(phase_status_);
+    phase_progress_ = new QProgressBar(this);
+    phase_progress_->setObjectName("offline_phase_progress");
+    layout->addWidget(phase_progress_);
     layout->addStretch();
     connect(start_, &QPushButton::clicked, this, [this] { start(); });
     connect(pause_, &QPushButton::clicked, this, [this] {
@@ -171,6 +250,30 @@ OfflinePanel::OfflinePanel(
     connect(seed_, &QLineEdit::textChanged, this, parameters_changed);
     connect(mode_, &QComboBox::currentIndexChanged, this, parameters_changed);
     connect(rr_, &QCheckBox::toggled, this, parameters_changed);
+    connect(backend_, &QComboBox::currentIndexChanged, this, [this] {
+        update_backend_controls();
+        scene_changed();
+    });
+    connect(photons_, &QSpinBox::valueChanged, this, [this](int value) {
+        sppm_options_.photons_per_iteration = static_cast<std::uint32_t>(value);
+        scene_changed();
+    });
+    connect(radius_, &QDoubleSpinBox::valueChanged, this, [this](double value) {
+        sppm_options_.initial_radius = value;
+        scene_changed();
+    });
+    connect(alpha_, &QDoubleSpinBox::valueChanged, this, [this](double value) {
+        sppm_options_.alpha = value;
+        scene_changed();
+    });
+    connect(memory_, &QSpinBox::valueChanged, this, [this](int value) {
+        sppm_options_.memory_budget_bytes = static_cast<std::uint64_t>(value) * 1024 * 1024;
+        memory_->setToolTip(
+            QString("SPPM 工作缓冲预算，当前精确值为 %1 字节。场景资产和 BVH 另计。")
+                .arg(sppm_options_.memory_budget_bytes));
+        scene_changed();
+    });
+    update_backend_controls();
     auto* timer = new QTimer(this);
     timer->setInterval(200);
     connect(timer, &QTimer::timeout, this, [this] { poll(); });
@@ -204,6 +307,26 @@ void OfflinePanel::set_settings(minirender::RenderSettings render,
     rr_depth_->setValue(static_cast<int>(integrator.roulette_depth));
     threads_->setValue(static_cast<int>(session.threads));
     session_settings_ = session;
+    const QSignalBlocker photons_blocker(photons_), radius_blocker(radius_), alpha_blocker(alpha_),
+        memory_blocker(memory_);
+    sppm_options_ = integrator.sppm;
+    photons_->setValue(static_cast<int>(sppm_options_.photons_per_iteration));
+    radius_->setValue(sppm_options_.initial_radius);
+    alpha_->setValue(sppm_options_.alpha);
+    memory_->setValue(static_cast<int>(sppm_options_.memory_budget_bytes / (1024 * 1024)));
+    memory_->setToolTip(QString("SPPM 工作缓冲预算，当前精确值为 %1 字节。场景资产和 BVH 另计。")
+                            .arg(sppm_options_.memory_budget_bytes));
+    backend_->setCurrentIndex(integrator.kind == minirender::IntegratorKind::sppm ? 1 : 0);
+    update_backend_controls();
+}
+
+void OfflinePanel::update_backend_controls() {
+    const bool sppm = backend_->currentIndex() == 1;
+    sppm_settings_->setVisible(sppm);
+    samples_label_->setText(sppm ? "迭代次数" : "每像素样本数");
+    mode_->setEnabled(!sppm);
+    mode_->setToolTip(sppm ? "SPPM 固定组合直接光采样和光子合并，无须选择 PT 采样方式。"
+                           : "方向采样在表面使用 BSDF，在介质内使用相函数。");
 }
 void OfflinePanel::prepare_import(minirender::RenderSettings render,
                                   minirender::IntegratorSettings integrator) {
@@ -229,13 +352,24 @@ void OfflinePanel::start() {
         const minirender::RenderSettings render{static_cast<std::size_t>(width_->value()),
                                                 static_cast<std::size_t>(height_->value()),
                                                 static_cast<std::uint32_t>(spp_->value()), seed};
-        const minirender::IntegratorSettings integrator{
-            static_cast<minirender::SamplingMode>(mode_->currentIndex()),
-            static_cast<std::uint32_t>(depth_->value()), rr_->isChecked(),
-            static_cast<std::uint32_t>(rr_depth_->value())};
+        const auto integrator = integrator_settings();
         auto settings = session_settings_;
         settings.threads = static_cast<std::uint32_t>(threads_->value());
-        session_->start(snapshot_(), render, integrator, settings);
+        const auto snapshot = snapshot_();
+        if (integrator.kind == minirender::IntegratorKind::sppm) {
+            if (snapshot->camera.aperture_radius != 0) {
+                throw std::invalid_argument("SPPM 需要针孔相机，请将相机光圈半径设为 0。");
+            }
+            for (const auto& region : snapshot->media) {
+                if (region.enabled &&
+                    glm::any(glm::greaterThan(region.medium.extinction(), glm::dvec3(0)))) {
+                    throw std::invalid_argument(
+                        "SPPM 当前支持表面散射；含介质的场景请选择 Path Tracing。");
+                }
+            }
+        }
+        session_->start(snapshot, render, integrator, settings);
+        job_iterations_ = render.samples_per_pixel;
         stale_ = false;
         preview_samples_ = 0;
         preview_terminal_ = false;
@@ -265,6 +399,7 @@ void OfflinePanel::poll() {
     const auto p = session_->progress();
     const bool terminal = minirender::render_terminal(p.state);
     settings_->setEnabled(terminal && !exporting_);
+    update_backend_controls();
     rr_depth_->setEnabled(rr_->isChecked());
     start_->setEnabled(terminal && !exporting_);
     pause_->setEnabled(p.state == RenderState::running || p.state == RenderState::pausing ||
@@ -285,9 +420,47 @@ void OfflinePanel::poll() {
                           .arg(percentage, 0, 'f', 1)
                           .arg(p.worker_count)
                           .arg(p.elapsed_seconds, 0, 'f', 1));
+    const bool sppm_job = p.job_id && p.integrator == minirender::IntegratorKind::sppm;
+    sppm_details_->setVisible(sppm_job);
+    phase_progress_->setVisible(sppm_job);
+    phase_status_->setVisible(sppm_job);
+    if (sppm_job) {
+        details_->setText(QString("已完成 %1 / %2 轮（%3%）\n%4 个线程 · %5 秒")
+                              .arg(p.sppm.iterations)
+                              .arg(job_iterations_)
+                              .arg(percentage, 0, 'f', 1)
+                              .arg(p.worker_count)
+                              .arg(p.elapsed_seconds, 0, 'f', 1));
+        sppm_details_->setText(QString("完整迭代已发射 %1 个光子，合并 %2 次贡献\n"
+                                       "平均半径 %3 m（%4–%5 m）\n工作缓冲约 %6 MiB")
+                                   .arg(p.sppm.emitted_photons)
+                                   .arg(p.sppm.gathered_contributions)
+                                   .arg(p.sppm.mean_radius, 0, 'g', 6)
+                                   .arg(p.sppm.minimum_radius, 0, 'g', 6)
+                                   .arg(p.sppm.maximum_radius, 0, 'g', 6)
+                                   .arg(double(p.sppm.estimated_bytes) / (1024 * 1024), 0, 'f', 1));
+        phase_progress_->setRange(0, 10000);
+        const bool advancing = p.state == RenderState::running;
+        const auto& work = p.sppm_progress;
+        phase_status_->setText(
+            advancing ? QString("第 %1 轮 · %2：%3 / %4")
+                            .arg(std::min(p.sppm.iterations + 1, std::uint64_t(job_iterations_)))
+                            .arg(photon_phase(work.phase))
+                            .arg(work.completed)
+                            .arg(work.total)
+                      : stage(p.state));
+        phase_progress_->setValue(advancing && work.total
+                                      ? int(10000.0 * double(work.completed) / double(work.total))
+                                      : 0);
+        phase_progress_->setFormat(advancing ? photon_phase(work.phase) + " · %p%"
+                                             : stage(p.state));
+    }
     QString notice;
     if (stale_) {
         notice = "场景或参数已修改，当前结果对应启动时的快照。请重新开始以更新结果。";
+    }
+    if (sppm_job && (p.state == RenderState::paused || p.state == RenderState::pausing)) {
+        notice += "\n暂停保留完整迭代，恢复后重新计算尚未完成的一轮。";
     }
     if (!p.error.empty()) {
         notice += "\n" + QString::fromUtf8(p.error.c_str());
@@ -377,6 +550,16 @@ bool OfflinePanel::exporting() const noexcept {
 }
 bool OfflinePanel::stale() const noexcept {
     return stale_;
+}
+minirender::IntegratorSettings OfflinePanel::integrator_settings() const {
+    minirender::IntegratorSettings result{
+        static_cast<minirender::SamplingMode>(mode_->currentIndex()),
+        static_cast<std::uint32_t>(depth_->value()), rr_->isChecked(),
+        static_cast<std::uint32_t>(rr_depth_->value())};
+    result.kind = backend_->currentIndex() == 1 ? minirender::IntegratorKind::sppm
+                                                : minirender::IntegratorKind::path_tracing;
+    result.sppm = sppm_options_;
+    return result;
 }
 const minirender::RenderSession& OfflinePanel::session() const noexcept {
     return *session_;
