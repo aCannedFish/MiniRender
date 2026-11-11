@@ -1,6 +1,9 @@
 #include "workbench.hpp"
 #include "builtin_scenes.hpp"
+#include "cloth_collider_panel.hpp"
+#include "cloth_controller.hpp"
 #include "cloth_material_panel.hpp"
+#include "cloth_panel.hpp"
 #include "environment_panel.hpp"
 #include "geometry_panel.hpp"
 #include "offline_panel.hpp"
@@ -246,12 +249,18 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     redo_->setObjectName("redo");
     redo_->setShortcut(QKeySequence::Redo);
     connect(undo_, &QAction::triggered, this, [this] {
+        if (cloth_controller_) {
+            cloth_controller_->pause();
+        }
         if (editor_.undo()) {
             ++document_revision_;
             refresh();
         }
     });
     connect(redo_, &QAction::triggered, this, [this] {
+        if (cloth_controller_) {
+            cloth_controller_->pause();
+        }
         if (editor_.redo()) {
             ++document_revision_;
             refresh();
@@ -336,7 +345,7 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     right_tabs->addTab(scroll_panel(object_panel_), "物体");
     right_tabs->addTab(scroll_panel(light_panel_), "灯光");
     right_tabs->addTab(scroll_panel(camera_panel_), "相机");
-    offline_ = new OfflinePanel(*viewport_, [this] { return editor_.snapshot(); }, this);
+    offline_ = new OfflinePanel(*viewport_, [this] { return offline_snapshot(); }, this);
     right_tabs->addTab(scroll_panel(offline_), "离线");
     auto* realtime = new RealtimePanel(*viewport_, this);
     right_tabs->addTab(scroll_panel(realtime), "实时");
@@ -351,6 +360,26 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     connect_point_panel();
     sdf_ = new SdfPanel(*viewport_, this);
     right_tabs->addTab(scroll_panel(sdf_), "距离场");
+    cloth_controller_ = new ClothController(this);
+    cloth_panel_ = new ClothPanel(*cloth_controller_, this);
+    right_tabs->addTab(scroll_panel(cloth_panel_), "布料");
+    cloth_controller_->on_frame = [this](const auto& frame) { return accept_cloth_frame(frame); };
+    cloth_panel_->on_demo = [this](int kind) {
+        try {
+            create_cloth_demo(kind);
+        } catch (const std::exception& error) {
+            report_error(error);
+        }
+    };
+    cloth_panel_->on_target = [this](const std::string& id) {
+        cloth_target_ = id;
+        sync_cloth_context();
+    };
+    cloth_panel_->on_apply = [this](auto definition, bool reset) {
+        apply_cloth_definition(std::move(definition), reset);
+    };
+    cloth_panel_->on_freeze = [this] { freeze_cloth(); };
+    cloth_panel_->on_preview = [this] { show_cloth_preview(); };
     geometry_->on_apply = [this] {
         try {
             apply_geometry();
@@ -609,6 +638,12 @@ void Workbench::build_object_panel() {
     layout->addRow("位置 / m", translation_);
     layout->addRow("旋转 / °", rotation_);
     layout->addRow("缩放", scale_);
+    cloth_collider_ = new ClothColliderPanel(object_panel_);
+    layout->addRow(cloth_collider_);
+    cloth_collider_->on_changed = [this](const minirender::ClothCollider& collider) {
+        edit_object_property(
+            [&](minirender::SceneObject& object) { object.cloth_collider = collider; });
+    };
     layout->addRow("材质", material_kind_);
     layout->addRow(double_sided_);
     layout->addRow("底色 / 线性 RGB", base_color_);
@@ -839,6 +874,7 @@ void Workbench::refresh() {
     refresh_properties();
     refresh_camera();
     viewport_->set_scene(editor_.snapshot());
+    sync_cloth_context();
 }
 
 void Workbench::refresh_properties() {
@@ -855,6 +891,8 @@ void Workbench::refresh_properties() {
                                    QString::fromStdString(texture.id));
     }
     object_panel_->setEnabled(object != document.objects.end());
+    cloth_collider_->set_collider(object != document.objects.end() ? object->cloth_collider
+                                                                   : std::nullopt);
     if (object == document.objects.end()) {
         cloth_material_->set_material(nullptr, document_generation_);
     }
@@ -971,6 +1009,15 @@ void Workbench::duplicate_object() {
         if (const auto* original = selected(scene)) {
             auto copy = *original;
             copy.id = unique_id(scene.objects, "object_");
+            if (copy.cloth) {
+                const auto asset =
+                    std::find_if(scene.meshes.begin(), scene.meshes.end(),
+                                 [&](const auto& value) { return value.id == copy.mesh_id; });
+                auto mesh = *asset;
+                mesh.id = unique_id(scene.meshes, "cloth_mesh_");
+                copy.mesh_id = mesh.id;
+                scene.meshes.push_back(std::move(mesh));
+            }
             copy.name += " 副本";
             copy.transform.translation.x += 0.3F;
             selected_id_ = copy.id;
@@ -1158,6 +1205,10 @@ void Workbench::install_scene(minirender::SceneDocument document, const QString&
     }
     ++document_generation_;
     ++document_revision_;
+    if (cloth_controller_) {
+        cloth_controller_->pause();
+    }
+    cloth_target_.clear();
     geometry_tasks_->cancel();
     viewport_->set_point_preview_data({});
     points_->clear_source();
@@ -1208,6 +1259,9 @@ void Workbench::apply_geometry() {
                                      [&](const auto& item) { return item.id == selected_id_; });
     if (object == document.objects.end()) {
         throw std::invalid_argument("Select an object before generating geometry");
+    }
+    if (object->cloth) {
+        throw std::invalid_argument("请先冻结布料，再进行网格处理。");
     }
     const auto mesh = std::find_if(document.meshes.begin(), document.meshes.end(),
                                    [&](const auto& item) { return item.id == object->mesh_id; });
@@ -1396,6 +1450,10 @@ void Workbench::report_error(const std::exception& error) {
 }
 
 Workbench::~Workbench() {
+    if (cloth_controller_) {
+        cloth_controller_->on_frame = {};
+        cloth_controller_->pause();
+    }
     // 原生子窗口晚于派生类成员销毁；先结束手势，断开持有编辑器引用的回调。
     viewport_->finish_gizmo_drag(false);
     viewport_->on_transform_begin = {};
@@ -1421,6 +1479,9 @@ bool Workbench::begin_transform() {
             return false;
         }
         editor_.begin_transform_edit(selected_id_);
+        if (cloth_controller_) {
+            cloth_controller_->pause();
+        }
         transform_preview_ = object->transform;
         return true;
     } catch (const std::exception& error) {
@@ -1475,6 +1536,7 @@ void Workbench::finish_transform(bool commit) {
         viewport_->set_scene(editor_.snapshot());
         offline_->scene_changed();
     }
+    sync_cloth_context();
 }
 VulkanViewport* Workbench::viewport() const noexcept {
     return viewport_;

@@ -41,6 +41,7 @@ add_library(minirender_core
     src/geometry/sdf.cpp
     src/geometry/uv_tangents.cpp
     src/simulation/cloth.cpp
+    src/simulation/cloth_component.cpp
     src/simulation/cloth_collision.cpp
     src/simulation/cloth_mesh.cpp
     src/geometry/point_index.cpp
@@ -78,7 +79,8 @@ add_library(minirender_core
     src/assets/asset_writer.cpp
     src/assets/staged_file.cpp
     src/assets/scene_io.cpp
-    src/assets/cloth_material_io.cpp)
+    src/assets/cloth_material_io.cpp
+    src/assets/cloth_simulation_io.cpp)
 target_include_directories(minirender_core PUBLIC include)
 target_link_libraries(minirender_core PUBLIC glm::glm Threads::Threads PRIVATE minirender_warnings nlohmann_json::nlohmann_json tinyobjloader minirender_exr_codec minirender_raster_codec)
 target_compile_definitions(minirender_core PUBLIC
@@ -122,11 +124,12 @@ if(BUILD_TESTING)
         tests/simplify_tests.cpp tests/gizmo_tests.cpp tests/sided_tests.cpp tests/remesh_tests.cpp
         tests/builtin_scene_tests.cpp tests/adaptive_tests.cpp tests/point_cloud_tests.cpp
         tests/ball_pivot_tests.cpp tests/point_preview_tests.cpp tests/sdf_tests.cpp tests/cloth_tests.cpp
-        tests/cloth_bsdf_tests.cpp)
+        tests/cloth_bsdf_tests.cpp tests/cloth_component_tests.cpp)
     target_include_directories(minirender_tests PRIVATE src)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_tests PRIVATE
-        minirender_core Catch2::Catch2WithMain minirender_warnings Threads::Threads)
+        minirender_core Catch2::Catch2WithMain minirender_warnings Threads::Threads
+        nlohmann_json::nlohmann_json)
     include(Catch)
     catch_discover_tests(minirender_tests PROPERTIES TIMEOUT 120)
     add_test(NAME cli_capabilities COMMAND minirender_cli --capabilities)

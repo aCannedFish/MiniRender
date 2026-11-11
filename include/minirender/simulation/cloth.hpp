@@ -12,9 +12,9 @@ namespace minirender {
 struct ClothGrid {
     std::uint32_t columns = 25;
     std::uint32_t rows = 25;
-    glm::vec3 origin{-1, 1.7F, 1};
-    glm::vec3 span_u{2, 0, 0};
-    glm::vec3 span_v{0, 0, -2};
+    glm::dvec3 origin{-1, 1.7F, 1};
+    glm::dvec3 span_u{2, 0, 0};
+    glm::dvec3 span_v{0, 0, -2};
     std::vector<std::uint32_t> pinned;
     void validate() const;
 };
@@ -39,11 +39,13 @@ struct ClothPlane {
     glm::dvec3 point{0};
     glm::dvec3 normal{0, 1, 0};
     double friction = .3;
+    bool operator==(const ClothPlane&) const = default;
 };
 struct ClothSphere {
     glm::dvec3 center{0, .65, 0};
     double radius = .65;
     double friction = .3;
+    bool operator==(const ClothSphere&) const = default;
 };
 
 // 风速为世界空间 m/s。空气压力按三角形面积和相对法向速度的平方分配到三个端点。
@@ -56,6 +58,7 @@ struct ClothEnvironment {
     std::vector<ClothPlane> planes;
     std::vector<ClothSphere> spheres;
     void validate() const;
+    bool operator==(const ClothEnvironment&) const = default;
 };
 
 enum class ClothSpringKind { structural, shear, bending };

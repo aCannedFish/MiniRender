@@ -2,17 +2,21 @@
 
 #include <glm/glm.hpp>
 #include <minirender/core/texture.hpp>
+#include <minirender/scene/cloth_collider.hpp>
 #include <minirender/scene/cloth_material.hpp>
 
 #include <array>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
 
 namespace minirender {
+
+class ClothComponent;
 
 // CPU 世界空间射线。使用 double 保留光源采样方向和有限阴影线段的距离精度。
 // direction 为单位向量，t 的单位为米；网格存储和 GPU 数据仍采用 float。
@@ -126,6 +130,8 @@ struct SceneObject {
     std::string material_id;
     Transform transform;
     bool visible = true;
+    std::shared_ptr<const ClothComponent> cloth{};
+    std::optional<ClothCollider> cloth_collider{};
 };
 
 // direction 表示光传播方向；着色点朝向光源的方向为 -normalize(direction)。

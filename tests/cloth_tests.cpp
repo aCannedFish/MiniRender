@@ -349,7 +349,7 @@ TEST_CASE("Cloth freeze keeps local details UV topology and immutable geometry",
     ClothSimulation simulation(grid, free_particles(), vacuum());
     const auto frozen = simulation.freeze();
     frozen.mesh->validate();
-    REQUIRE(frozen.transform.translation == grid.origin);
+    REQUIRE(glm::dvec3(frozen.transform.translation) == grid.origin);
     REQUIRE(frozen.mesh->positions.size() == 20);
     REQUIRE(frozen.mesh->triangles.size() == 24);
     for (std::size_t i = 0; i < frozen.mesh->positions.size(); ++i) {

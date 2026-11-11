@@ -242,8 +242,11 @@ void SceneRenderer::upload_scene() {
     std::vector<GpuInstance> instances;
     glm::vec3 minimum(std::numeric_limits<float>::infinity());
     glm::vec3 maximum(-std::numeric_limits<float>::infinity());
+    // 先收集全部可见来源，避免复用仍被另一个实例引用的旧缓冲。
     for (const auto& instance : scene.instances) {
         used.insert(instance.mesh);
+    }
+    for (const auto& instance : scene.instances) {
         if (!meshes_.contains(instance.mesh)) {
             Mesh mesh;
             auto prepared = window_->raster_mesh(instance.mesh);
@@ -253,17 +256,28 @@ void SceneRenderer::upload_scene() {
                 window_->supply_raster_mesh(instance.mesh, prepared);
             }
             const auto count = prepared->vertices.size();
+            const auto reusable =
+                std::find_if(meshes_.begin(), meshes_.end(), [&](const auto& entry) {
+                    return !used.contains(entry.first) && entry.second.count == count;
+                });
+            if (reusable != meshes_.end()) {
+                mesh = std::move(reusable->second);
+                meshes_.erase(reusable);
+                window_->report_vertex_buffer_reuse();
+            } else {
+                mesh.vertices.create(device_, window_->physicalDevice(), count * sizeof(Vertex),
+                                     VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+                mesh.edges.create(device_, window_->physicalDevice(),
+                                  prepared->edges.size() * sizeof(std::uint32_t),
+                                  VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+                mesh.edges.write(prepared->edges.data(),
+                                 prepared->edges.size() * sizeof(std::uint32_t));
+                window_->report_mesh_allocation();
+            }
             mesh.count = static_cast<std::uint32_t>(count);
             mesh.minimum = prepared->minimum;
             mesh.maximum = prepared->maximum;
-            mesh.vertices.create(device_, window_->physicalDevice(), count * sizeof(Vertex),
-                                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
             mesh.vertices.write(prepared->vertices.data(), count * sizeof(Vertex));
-            mesh.edges.create(device_, window_->physicalDevice(),
-                              prepared->edges.size() * sizeof(std::uint32_t),
-                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-            mesh.edges.write(prepared->edges.data(),
-                             prepared->edges.size() * sizeof(std::uint32_t));
             meshes_.emplace(instance.mesh, std::move(mesh));
             window_->report_mesh_upload();
         }

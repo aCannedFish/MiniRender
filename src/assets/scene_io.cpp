@@ -1,5 +1,6 @@
 #include "asset_writer.hpp"
 #include "cloth_material_io.hpp"
+#include "cloth_simulation_io.hpp"
 #include "staged_file.hpp"
 #include <minirender/assets/scene_io.hpp>
 
@@ -115,6 +116,19 @@ SceneDocument load_scene(const std::filesystem::path& path) {
             object.transform.translation = vector3(transform.at("translation"));
             object.transform.rotation_degrees = vector3(transform.at("rotation"));
             object.transform.scale = vector3(transform.at("scale"));
+            if (value.contains("cloth_collider")) {
+                object.cloth_collider = detail::read_cloth_collider(value.at("cloth_collider"));
+            }
+            if (value.contains("cloth_simulation")) {
+                const auto mesh =
+                    std::find_if(scene.meshes.begin(), scene.meshes.end(),
+                                 [&](const auto& item) { return item.id == object.mesh_id; });
+                if (mesh == scene.meshes.end()) {
+                    throw std::invalid_argument("Cloth mesh is missing");
+                }
+                object.cloth =
+                    detail::read_cloth_component(value.at("cloth_simulation"), mesh->data);
+            }
             scene.objects.push_back(object);
         }
         for (const auto& value : json.at("directional_lights")) {
@@ -241,6 +255,14 @@ void save_scene(const SceneDocument& document, const std::filesystem::path& path
                                     {{"translation", vector3(transform.translation)},
                                      {"rotation", vector3(transform.rotation_degrees)},
                                      {"scale", vector3(transform.scale)}}}});
+        if (object.cloth) {
+            json["objects"].back()["cloth_simulation"] =
+                detail::write_cloth_component(*object.cloth);
+        }
+        if (object.cloth_collider) {
+            json["objects"].back()["cloth_collider"] =
+                detail::write_cloth_collider(*object.cloth_collider);
+        }
     }
     for (const auto& light : document.directional_lights) {
         json["directional_lights"].push_back({{"id", light.id},

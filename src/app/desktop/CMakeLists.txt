@@ -30,6 +30,11 @@ qt_add_executable(minirender_desktop
     gpu_cloth.cpp gpu_cloth.hpp
     cloth_smoke.cpp cloth_smoke.hpp
     cloth_material_panel.cpp cloth_material_panel.hpp
+    cloth_controller.cpp cloth_controller.hpp
+    cloth_panel.cpp cloth_panel.hpp cloth_workbench.cpp
+    cloth_collider_panel.cpp cloth_collider_panel.hpp
+    cloth_playback_smoke.cpp cloth_playback_smoke.hpp
+    cloth_playback_deep_smoke.cpp cloth_playback_deep_smoke.hpp
     cloth_material_editor_smoke.cpp cloth_material_editor_smoke.hpp
     ibl_controller.cpp ibl_controller.hpp environment_panel.cpp environment_panel.hpp
     geometry_controller.cpp geometry_controller.hpp geometry_panel.cpp geometry_panel.hpp

@@ -32,6 +32,12 @@ class SceneEditor {
     bool can_undo() const noexcept;
     bool can_redo() const noexcept;
     void update_navigation(const Camera& camera);
+    // 运行时完整帧不增加历史。来源组件与变换须仍相同，共享网格资产会先为目标拆分。
+    bool update_cloth_frame(const std::string& object_id,
+                            const std::shared_ptr<const ClothComponent>& expected,
+                            const Transform& expected_transform,
+                            std::shared_ptr<const ClothComponent> frame,
+                            const MeshValidationCache& validated = {}, bool history = false);
     // 快照仍校验全部参数与引用，已验证的不可变网格不再逐三角形扫描。
     std::shared_ptr<const SceneSnapshot> snapshot();
 

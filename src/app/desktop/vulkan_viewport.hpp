@@ -26,6 +26,9 @@ class SdfRenderer;
 // 渲染更新的诊断计数，用于检测普通参数编辑是否触发多余的资产上传。
 struct SceneUploadStatistics {
     std::uint64_t mesh_uploads = 0;
+    std::uint64_t mesh_allocations = 0;
+    std::uint64_t index_uploads = 0;
+    std::uint64_t vertex_buffer_reuses = 0;
     std::uint64_t descriptor_rebuilds = 0;
     std::uint64_t scene_updates = 0;
     double last_update_ms = 0;
@@ -136,6 +139,8 @@ class VulkanViewport final : public QWindow {
     int resource_generations() const noexcept;
     const SceneUploadStatistics& upload_statistics() const noexcept;
     void report_mesh_upload();
+    void report_mesh_allocation();
+    void report_vertex_buffer_reuse();
     void report_descriptor_rebuild();
     void report_scene_update(double milliseconds);
     qint64 preview_wait_ms() const noexcept;
