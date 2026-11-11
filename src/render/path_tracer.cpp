@@ -1,3 +1,4 @@
+#include <minirender/geometry/uv_tangents.hpp>
 #include <minirender/render/path_tracer.hpp>
 
 #include <algorithm>
@@ -170,7 +171,24 @@ glm::dvec3 PathTracer::trace(Ray ray, Sampler& sampler, RayInterval primary_inte
             instance.base_color_texture
                 ? instance.base_color_texture->sample(hit->uv, 0, instance.material.texture_filter)
                 : glm::vec3(1);
-        const Bsdf bsdf(instance.material, hit->front_face, texture_color);
+        ClothAxes cloth_axes;
+        if (instance.material.kind == MaterialKind::cloth) {
+            const auto& face = instance.mesh->triangles[hit->triangle_index];
+            std::array<glm::vec3, 3> positions;
+            std::array<glm::vec2, 3> coordinates;
+            for (std::size_t i = 0; i < 3; ++i) {
+                positions[i] = instance.mesh->positions[face.corners[i].position];
+                coordinates[i] = face.corners[i].uv;
+            }
+            const auto tangents = uv_tangents(positions, coordinates);
+            if (!tangents) {
+                throw std::logic_error("Cloth snapshot has invalid UV coordinates");
+            }
+            const glm::dmat3 linear(instance.object_to_world);
+            cloth_axes = {frame.to_local(linear * tangents->u),
+                          frame.to_local(linear * tangents->v)};
+        }
+        const Bsdf bsdf(instance.material, hit->front_face, texture_color, cloth_axes);
 
         // 每种模式按相同次序分配随机维度，切换估计器不改变后续 BSDF 的随机数。
         const double light_u = sampler.next_1d();

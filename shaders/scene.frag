@@ -2,6 +2,7 @@
 #extension GL_GOOGLE_include_directive : require
 #include "scene_frame.glsl"
 #include "scene_instance.glsl"
+#include "cloth.glsl"
 #include "ibl_sampling.glsl"
 
 
@@ -11,6 +12,8 @@ layout(location = 2) in vec3 base_color;
 layout(location = 3) in vec3 emission;
 layout(location = 4) in vec2 material;
 layout(location = 5) in vec2 mesh_uv;
+layout(location = 6) in vec3 world_tangent_u;
+layout(location = 7) in vec3 world_tangent_v;
 layout(binding = 2) uniform sampler2D base_texture;
 layout(location = 0) out vec4 color;
 layout(location = 1) out vec4 normal_output;
@@ -113,6 +116,16 @@ void main() {
         specular_environment+=frame.ibl.z*ibl_specular(reflect(-v,n),clamp(material.x,0.0,1.0));
     }
     vec3 ambient_diffuse=diffuse_environment*albedo*(1.0-metallic);
+    ClothData cloth = instances.values[draw_index.instance].cloth;
+    bool cloth_enabled = cloth.counts.y != 0;
+    vec3 cloth_u = vec3(0), cloth_v = vec3(0);
+    if (cloth_enabled) {
+        cloth_u = cloth_axis(world_tangent_u, n, cloth.settings.zw);
+        cloth_v = cloth_axis(world_tangent_v, n, cloth.settings.zw);
+        // 实时环境漫反射采用覆盖率加权的纱线颜色；直接光使用完整微圆柱模型。
+        vec3 average = cloth.coverage.x * cloth.albedo[0].rgb + cloth.coverage.y * cloth.albedo[1].rgb;
+        ambient_diffuse = diffuse_environment * albedo * average;
+    }
     vec3 specular_factor=albedo;
     if(frame.ibl.x>0.5) {
         vec2 ab=ibl_brdf(ndv,clamp(material.x,0.0,1.0));
@@ -124,6 +137,11 @@ void main() {
         vec3 l = -normalize(frame.lights[i].direction.xyz);
         float ndl = max(dot(n, l), 0.0);
         if (ndl <= 0.0 || ndv <= 0.0) { continue; }
+        if (cloth_enabled) {
+            result += cloth_response(cloth, n, cloth_u, cloth_v, v, l, albedo) *
+                      frame.lights[i].radiance.rgb * visibility(i, ndl, world_dx, world_dy);
+            continue;
+        }
         vec3 h = normalize(l + v);
         float ndh = max(dot(n, h), 0.0);
         float vdh = max(dot(v, h), 0.0);

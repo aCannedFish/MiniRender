@@ -1,4 +1,5 @@
 #include "scene_renderer.hpp"
+#include "gpu_cloth.hpp"
 #include "gpu_shader.hpp"
 #include <minirender/scene/shadow.hpp>
 
@@ -28,11 +29,13 @@ struct alignas(16) GpuInstance {
     glm::vec4 base_color;
     glm::vec4 emission;
     glm::vec4 surface; // roughness, metallic, texture filter, double sided
+    GpuCloth cloth;
 };
-static_assert(sizeof(GpuInstance) == 176);
+static_assert(sizeof(GpuInstance) == 800);
 static_assert(offsetof(GpuInstance, normal_to_world) == 64);
 static_assert(offsetof(GpuInstance, base_color) == 128);
 static_assert(offsetof(GpuInstance, surface) == 160);
+static_assert(offsetof(GpuInstance, cloth) == 176);
 struct DrawIndex {
     std::int32_t light;
     std::int32_t instance;
@@ -154,10 +157,12 @@ VkPipeline SceneRenderer::create_pipeline(Pass pass, VkCullModeFlags cull, VkFro
     stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
     stages[1].module = fragment ? fragment->handle() : VK_NULL_HANDLE;
     const VkVertexInputBindingDescription binding{0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX};
-    std::array<VkVertexInputAttributeDescription, 3> attributes{
+    std::array<VkVertexInputAttributeDescription, 5> attributes{
         {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, position)},
          {1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, normal)},
-         {5, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, uv)}}};
+         {5, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, uv)},
+         {6, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, tangent_u)},
+         {7, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, tangent_v)}}};
     if (wire) {
         attributes[1].offset = offsetof(Vertex, geometric_normal);
     }
@@ -286,7 +291,8 @@ void SceneRenderer::upload_scene() {
              glm::vec4(material.base_color, 1),
              glm::vec4(material.emission, 0),
              {material.roughness, metallic, static_cast<float>(material.texture_filter),
-              material.double_sided ? 1.0F : 0.0F}});
+              material.double_sided ? 1.0F : 0.0F},
+             pack_cloth(material)});
     }
     // 一帧在途，当前帧开始前 fence 已完成，未引用的网格可以安全回收。
     std::erase_if(meshes_, [&](const auto& entry) { return !used.contains(entry.first); });

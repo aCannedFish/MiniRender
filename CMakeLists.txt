@@ -32,12 +32,14 @@ add_library(minirender_core
     src/core/raster_io.cpp
     src/core/exr_io.cpp
     src/scene/scene.cpp
+    src/scene/cloth_material.cpp
     src/scene/editor.cpp
     src/scene/gizmo.cpp
     src/scene/shadow.cpp
     src/geometry/halfedge.cpp
     src/geometry/point_cloud.cpp
     src/geometry/sdf.cpp
+    src/geometry/uv_tangents.cpp
     src/simulation/cloth.cpp
     src/simulation/cloth_collision.cpp
     src/simulation/cloth_mesh.cpp
@@ -60,6 +62,7 @@ add_library(minirender_core
     src/render/intersection.cpp
     src/render/bvh.cpp
     src/render/bsdf.cpp
+    src/render/cloth_bsdf.cpp
     src/render/light.cpp
     src/render/path_tracer.cpp
     src/render/render_session.cpp
@@ -74,7 +77,8 @@ add_library(minirender_core
     src/assets/obj_writer.cpp
     src/assets/asset_writer.cpp
     src/assets/staged_file.cpp
-    src/assets/scene_io.cpp)
+    src/assets/scene_io.cpp
+    src/assets/cloth_material_io.cpp)
 target_include_directories(minirender_core PUBLIC include)
 target_link_libraries(minirender_core PUBLIC glm::glm Threads::Threads PRIVATE minirender_warnings nlohmann_json::nlohmann_json tinyobjloader minirender_exr_codec minirender_raster_codec)
 target_compile_definitions(minirender_core PUBLIC
@@ -108,13 +112,17 @@ if(BUILD_TESTING)
     add_executable(minirender_cloth_example examples/cloth.cpp)
     target_compile_definitions(minirender_cloth_example PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_cloth_example PRIVATE minirender_core minirender_warnings)
+    add_executable(minirender_cloth_material_example examples/cloth_material.cpp)
+    target_compile_definitions(minirender_cloth_material_example PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+    target_link_libraries(minirender_cloth_material_example PRIVATE minirender_core minirender_warnings)
     add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp
         tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp tests/path_tests.cpp
         tests/session_tests.cpp tests/ssao_tests.cpp tests/ibl_tests.cpp tests/geometry_tests.cpp
         tests/displacement_tests.cpp tests/mesh_io_tests.cpp tests/raster_mesh_tests.cpp
         tests/simplify_tests.cpp tests/gizmo_tests.cpp tests/sided_tests.cpp tests/remesh_tests.cpp
         tests/builtin_scene_tests.cpp tests/adaptive_tests.cpp tests/point_cloud_tests.cpp
-        tests/ball_pivot_tests.cpp tests/point_preview_tests.cpp tests/sdf_tests.cpp tests/cloth_tests.cpp)
+        tests/ball_pivot_tests.cpp tests/point_preview_tests.cpp tests/sdf_tests.cpp tests/cloth_tests.cpp
+        tests/cloth_bsdf_tests.cpp)
     target_include_directories(minirender_tests PRIVATE src)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_tests PRIVATE

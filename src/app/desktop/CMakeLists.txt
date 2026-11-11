@@ -13,7 +13,8 @@ foreach(shader diagnostic.vert diagnostic.frag scene.vert scene.frag shadow.vert
         DEPENDS "${source}" "${PROJECT_SOURCE_DIR}/shaders/scene_frame.glsl"
                 "${PROJECT_SOURCE_DIR}/shaders/scene_instance.glsl"
                 "${PROJECT_SOURCE_DIR}/shaders/screen_position.glsl"
-                "${PROJECT_SOURCE_DIR}/shaders/ibl_sampling.glsl" VERBATIM)
+                "${PROJECT_SOURCE_DIR}/shaders/ibl_sampling.glsl"
+                "${PROJECT_SOURCE_DIR}/shaders/cloth.glsl" VERBATIM)
     list(APPEND shader_outputs "${output}")
 endforeach()
 
@@ -26,6 +27,10 @@ qt_add_executable(minirender_desktop
     viewport_renderer.hpp gpu_buffer.cpp gpu_buffer.hpp
     gpu_texture.cpp gpu_texture.hpp
     gpu_ibl.cpp gpu_ibl.hpp
+    gpu_cloth.cpp gpu_cloth.hpp
+    cloth_smoke.cpp cloth_smoke.hpp
+    cloth_material_panel.cpp cloth_material_panel.hpp
+    cloth_material_editor_smoke.cpp cloth_material_editor_smoke.hpp
     ibl_controller.cpp ibl_controller.hpp environment_panel.cpp environment_panel.hpp
     geometry_controller.cpp geometry_controller.hpp geometry_panel.cpp geometry_panel.hpp
     geometry_smoke.cpp geometry_smoke.hpp

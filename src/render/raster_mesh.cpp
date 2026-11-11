@@ -1,3 +1,4 @@
+#include <minirender/geometry/uv_tangents.hpp>
 #include <minirender/render/raster_mesh.hpp>
 
 #include <algorithm>
@@ -45,10 +46,21 @@ std::shared_ptr<const RasterMeshData> prepare_raster_mesh(const MeshData& mesh,
         const auto b = glm::dvec3(mesh.positions.at(triangle.corners[1].position));
         const auto c = glm::dvec3(mesh.positions.at(triangle.corners[2].position));
         const auto geometric = glm::vec3(glm::normalize(glm::cross(b - a, c - a)));
+        std::array<glm::vec3, 3> positions;
+        std::array<glm::vec2, 3> coordinates;
+        for (std::size_t corner = 0; corner < 3; ++corner) {
+            positions[corner] = mesh.positions[triangle.corners[corner].position];
+            coordinates[corner] = triangle.corners[corner].uv;
+        }
+        const auto tangents = uv_tangents(positions, coordinates);
         for (std::size_t corner = 0; corner < 3; ++corner) {
             const auto& source = mesh.triangles[face].corners[corner];
-            data->vertices[face * 3 + corner] = {mesh.positions.at(source.position), source.normal,
-                                                 source.uv, geometric};
+            data->vertices[face * 3 + corner] = {mesh.positions.at(source.position),
+                                                 source.normal,
+                                                 source.uv,
+                                                 geometric,
+                                                 tangents ? glm::vec3(tangents->u) : glm::vec3(0),
+                                                 tangents ? glm::vec3(tangents->v) : glm::vec3(0)};
             data->edges[face * 6 + corner * 2] = static_cast<std::uint32_t>(face * 3 + corner);
             data->edges[face * 6 + corner * 2 + 1] =
                 static_cast<std::uint32_t>(face * 3 + (corner + 1) % 3);
