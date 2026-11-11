@@ -207,7 +207,10 @@ A0 先证明 Qt + MoltenVK 路线可用，不在完成大量 UI 后才验证图�
 | --- | --- | --- |
 | A5.1 点云核心 | PLY、k-d 树、PCA/MST、多半径 Ball Pivoting、拓扑/预算/取消及文件与 CPU 示例 | 本机通过；见 docs/checkpoints/A5.1.md |
 | A5.2 点云界面 | 导入、采样、点云/法线/边界显示、后台重建、历史与资产保存 | 本机通过；见 docs/checkpoints/A5.2.md |
-| A5.3 距离场 | SDF 核心、Vulkan sphere tracing、交互参数、解析及图像对照 | 计划 |
+| A5.3a 距离场核心 | 图元/CSG、变换、步进、独立文件、CPU 参照及解析对照 | 本机通过；见 docs/checkpoints/A5.3a.md |
+| A5.3b 距离场界面 | Vulkan 两个全屏三角形、交互参数、法线/阴影/步数热图及 CPU/GPU 对照 | 计划 |
+
+A5.3 分为核心和界面两个提交检查点，验收范围保持为完整 SDF 独立模式。
 
 ### 切换条件
 

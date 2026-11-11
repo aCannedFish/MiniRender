@@ -37,6 +37,7 @@ add_library(minirender_core
     src/scene/shadow.cpp
     src/geometry/halfedge.cpp
     src/geometry/point_cloud.cpp
+    src/geometry/sdf.cpp
     src/geometry/point_index.cpp
     src/geometry/symmetric_eigen.cpp
     src/geometry/point_normals.cpp
@@ -63,8 +64,10 @@ add_library(minirender_core
     src/render/ibl.cpp
     src/render/raster_mesh.cpp
     src/render/point_preview.cpp
+    src/render/sdf_render.cpp
     src/assets/obj_loader.cpp
     src/assets/point_io.cpp
+    src/assets/sdf_io.cpp
     src/assets/obj_writer.cpp
     src/assets/asset_writer.cpp
     src/assets/staged_file.cpp
@@ -97,13 +100,15 @@ if(BUILD_TESTING)
     add_executable(minirender_point_cloud_example examples/point_cloud.cpp)
     target_compile_definitions(minirender_point_cloud_example PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_point_cloud_example PRIVATE minirender_core minirender_warnings)
+    add_executable(minirender_sdf_example examples/sdf.cpp)
+    target_link_libraries(minirender_sdf_example PRIVATE minirender_core minirender_warnings)
     add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp
         tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp tests/path_tests.cpp
         tests/session_tests.cpp tests/ssao_tests.cpp tests/ibl_tests.cpp tests/geometry_tests.cpp
         tests/displacement_tests.cpp tests/mesh_io_tests.cpp tests/raster_mesh_tests.cpp
         tests/simplify_tests.cpp tests/gizmo_tests.cpp tests/sided_tests.cpp tests/remesh_tests.cpp
         tests/builtin_scene_tests.cpp tests/adaptive_tests.cpp tests/point_cloud_tests.cpp
-        tests/ball_pivot_tests.cpp tests/point_preview_tests.cpp)
+        tests/ball_pivot_tests.cpp tests/point_preview_tests.cpp tests/sdf_tests.cpp)
     target_include_directories(minirender_tests PRIVATE src)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_tests PRIVATE
