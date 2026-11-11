@@ -206,6 +206,8 @@ std::string material_kind_name(MaterialKind kind) {
         return "dielectric";
     case MaterialKind::cloth:
         return "cloth";
+    case MaterialKind::subsurface:
+        return "subsurface";
     }
     throw std::invalid_argument("Invalid material kind");
 }
@@ -226,6 +228,9 @@ MaterialKind parse_material_kind(const std::string& name) {
     if (name == "cloth") {
         return MaterialKind::cloth;
     }
+    if (name == "subsurface") {
+        return MaterialKind::subsurface;
+    }
     throw std::invalid_argument("Unsupported material kind: " + name);
 }
 
@@ -241,6 +246,15 @@ void Material::validate() const {
     if (kind == MaterialKind::cloth) {
         require(cloth != nullptr && ior >= 1 && ior <= 3,
                 "Cloth material requires appearance data and IOR in 1..3");
+    }
+    if (subsurface) {
+        subsurface->validate();
+    }
+    if (kind == MaterialKind::subsurface) {
+        require(subsurface != nullptr && ior >= 1 && ior <= 3,
+                "Subsurface material requires optical parameters and IOR in 1..3");
+        require(base_color_texture.empty(),
+                "Homogeneous subsurface material does not use a color texture");
     }
     material_kind_name(kind);
     texture_filter_name(texture_filter);

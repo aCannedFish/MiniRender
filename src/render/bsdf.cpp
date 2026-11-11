@@ -113,6 +113,10 @@ Bsdf::Bsdf(const Material& material, bool front_face, glm::vec3 texture_color, C
       alpha_(static_cast<double>(material.roughness) * material.roughness),
       eta_i_(front_face ? 1 : material.ior), eta_t_(front_face ? material.ior : 1) {
     material.validate();
+    if (kind_ == MaterialKind::subsurface) {
+        throw std::invalid_argument(
+            "Subsurface transport requires a BSSRDF surface position sample");
+    }
     if (!finite(glm::dvec3(texture_color))) {
         throw std::invalid_argument("BSDF texture color must be finite");
     }

@@ -99,7 +99,7 @@ Ray spawn_ray(const SurfaceHit& hit, glm::dvec3 direction) {
 PathTracer::PathTracer(std::shared_ptr<const SceneSnapshot> scene, IntegratorSettings settings,
                        CancellationToken cancellation)
     : scene_(std::move(scene)), bvh_(scene_, cancellation), lights_(scene_, cancellation),
-      media_(scene_->media, cancellation), settings_(settings),
+      media_(scene_->media, cancellation), subsurface_(bvh_, cancellation), settings_(settings),
       cancellation_(std::move(cancellation)) {
     settings_.validate();
     if (settings_.kind != IntegratorKind::path_tracing) {
@@ -221,6 +221,34 @@ glm::dvec3 PathTracer::trace(Ray ray, Sampler& sampler, RayInterval primary_inte
                   emission_weight(lights_.area_pdf(previous_reference, *hit));
         if (depth == settings_.maximum_depth) {
             break;
+        }
+        if (instance.material.kind == MaterialKind::subsurface) {
+            const auto step = scatter_subsurface(*hit, -ray.direction, sampler, statistics);
+            result += beta * step.radiance;
+            beta *= step.weight;
+            check_radiance(beta);
+            if (maximum(beta) == 0) {
+                break;
+            }
+            previous_reference = step.reference;
+            previous_pdf = step.probability;
+            previous_delta = step.delta;
+            ray = step.ray;
+            if (statistics) {
+                ++statistics->scattering_events;
+            }
+            const double roulette_u = sampler.next_1d();
+            if (settings_.russian_roulette && depth + 1 >= settings_.roulette_depth) {
+                const double survival = std::clamp(maximum(beta * eta_scale), 0.05, 0.95);
+                if (roulette_u >= survival) {
+                    if (statistics) {
+                        ++statistics->roulette_terminations;
+                    }
+                    break;
+                }
+                beta /= survival;
+            }
+            continue;
         }
         auto normal =
             glm::dvec3(instance.material.kind == MaterialKind::dielectric ? hit->geometric_normal

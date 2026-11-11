@@ -52,6 +52,11 @@ class SceneBvh {
     // 阴影查询在首次命中时返回，不计算 UV、法线或其余最近命中数据。
     bool occluded(const Ray& ray, RayInterval interval = {}, TraceStatistics* statistics = nullptr,
                   const CancellationToken& cancellation = {}) const;
+    // BSSRDF 探针查询指定实例的全部几何面，包含背面，不受材质单面显示设置影响。
+    std::optional<SurfaceHit> intersect_instance(const Ray& ray, std::uint32_t instance,
+                                                 RayInterval interval = {},
+                                                 TraceStatistics* statistics = nullptr,
+                                                 const CancellationToken& cancellation = {}) const;
 
   private:
     struct Primitive {
@@ -79,7 +84,8 @@ class SceneBvh {
                         std::span<const BuildPrimitive> primitives);
     std::optional<PrimitiveHit> trace(const Ray& ray, RayInterval interval, bool any_hit,
                                       TraceStatistics* statistics,
-                                      const CancellationToken& cancellation) const;
+                                      const CancellationToken& cancellation,
+                                      std::optional<std::uint32_t> instance_filter = {}) const;
     SurfaceHit surface_hit(const Ray& ray, const PrimitiveHit& hit) const;
     std::shared_ptr<const SceneSnapshot> scene_;
     std::vector<Primitive> primitives_;

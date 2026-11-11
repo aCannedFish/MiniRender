@@ -3,6 +3,7 @@
 #include "cloth_simulation_io.hpp"
 #include "medium_io.hpp"
 #include "staged_file.hpp"
+#include "subsurface_io.hpp"
 #include <minirender/assets/scene_io.hpp>
 
 #include <nlohmann/json.hpp>
@@ -81,6 +82,9 @@ SceneDocument load_scene(const std::filesystem::path& path) {
             material.ior = value.value("ior", 1.5F);
             if (value.contains("cloth")) {
                 material.cloth = detail::read_cloth_appearance(value.at("cloth"));
+            }
+            if (value.contains("subsurface")) {
+                material.subsurface = detail::read_subsurface(value.at("subsurface"));
             }
             material.double_sided = value.value("double_sided", true);
             material.base_color_texture = value.value("base_color_texture", std::string{});
@@ -220,6 +224,9 @@ void save_scene(const SceneDocument& document, const std::filesystem::path& path
              {"texture_filter", texture_filter_name(material.texture_filter)}});
         if (material.cloth) {
             json["materials"].back()["cloth"] = detail::write_cloth_appearance(*material.cloth);
+        }
+        if (material.subsurface) {
+            json["materials"].back()["subsurface"] = detail::write_subsurface(*material.subsurface);
         }
     }
     const auto destination_directory = std::filesystem::absolute(path).parent_path();

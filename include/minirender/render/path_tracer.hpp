@@ -4,6 +4,7 @@
 #include <minirender/render/light.hpp>
 #include <minirender/render/medium.hpp>
 #include <minirender/render/sppm_options.hpp>
+#include <minirender/render/subsurface.hpp>
 
 namespace minirender {
 
@@ -37,6 +38,8 @@ struct PathStatistics {
     std::uint64_t scattering_events = 0;
     std::uint64_t roulette_terminations = 0;
     std::uint64_t medium_scattering_events = 0;
+    std::uint64_t subsurface_events = 0;
+    double subsurface_distance = 0; // 已采样表面位置跳转的总世界距离，单位为米。
 };
 
 // 单样本 power heuristic，先缩放再平方，避免两个大 PDF 的平方溢出。
@@ -62,12 +65,22 @@ class PathTracer {
     const SceneSnapshot& scene() const noexcept;
 
   private:
+    // 一个闭合材质边界的反射或跨位置扩散，合并为一次外部散射事件。
+    struct SubsurfaceStep {
+        glm::dvec3 radiance{0}, weight{0}, reference{0};
+        Ray ray;
+        double probability = 0;
+        bool delta = false;
+    };
+    SubsurfaceStep scatter_subsurface(const SurfaceHit& hit, glm::dvec3 wo, Sampler& sampler,
+                                      PathStatistics* statistics) const;
     glm::dvec3 shadow_transmittance(Ray ray, const LightSample& light,
                                     PathStatistics* statistics) const;
     std::shared_ptr<const SceneSnapshot> scene_;
     SceneBvh bvh_;
     LightSampler lights_;
     MediumField media_;
+    SubsurfaceSampler subsurface_;
     IntegratorSettings settings_;
     CancellationToken cancellation_;
 };
