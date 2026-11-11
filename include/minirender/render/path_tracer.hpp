@@ -3,10 +3,12 @@
 #include <minirender/render/bsdf.hpp>
 #include <minirender/render/light.hpp>
 #include <minirender/render/medium.hpp>
+#include <minirender/render/sppm_options.hpp>
 
 namespace minirender {
 
 enum class SamplingMode { bsdf, light, mis };
+enum class IntegratorKind { path_tracing, sppm };
 std::string sampling_mode_name(SamplingMode mode);
 SamplingMode parse_sampling_mode(const std::string& name);
 
@@ -15,6 +17,8 @@ struct IntegratorSettings {
     std::uint32_t maximum_depth = 8; // 允许的散射事件数；0 只记录相机直接可见的发射/环境。
     bool russian_roulette = true;
     std::uint32_t roulette_depth = 3;
+    IntegratorKind kind = IntegratorKind::path_tracing;
+    SppmOptions sppm{};
     void validate() const;
 };
 
