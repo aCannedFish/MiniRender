@@ -1,6 +1,7 @@
 #pragma once
 
 #include <minirender/render/path_tracer.hpp>
+#include <minirender/render/sppm.hpp>
 
 #include <chrono>
 
@@ -38,6 +39,9 @@ struct RenderProgress {
     double elapsed_seconds = 0;
     std::string error;
     PathStatistics statistics; // 完成或取消、收回全部线程后归并。
+    IntegratorKind integrator = IntegratorKind::path_tracing;
+    SppmStatistics sppm{};
+    SppmProgress sppm_progress{};
 };
 
 // 不可变线性预览及对应的实际累计信息。忙时返回空 image，调用方可保留上一帧。

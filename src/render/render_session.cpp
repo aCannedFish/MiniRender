@@ -16,9 +16,22 @@ using Clock = std::chrono::steady_clock;
 // Film 不改变累加顺序。预览锁不会阻塞 UI，最终转换由 controller 负责。
 class Film {
   public:
-    explicit Film(RenderSettings settings)
-        : settings_(settings), sums_(settings.width * settings.height, glm::dvec3(0)),
+    explicit Film(RenderSettings settings, bool accumulate_samples = true)
+        : settings_(settings),
+          sums_(accumulate_samples ? settings.width * settings.height : 0, glm::dvec3(0)),
           counts_(sums_.size(), 0) {}
+
+    // SPPM 已生成当前完整迭代的估计，直接替换不可变图像，避免把半径变化当作逐样本加和。
+    void publish_image(std::shared_ptr<const Image> image, std::uint32_t iterations) {
+        std::lock_guard lock(mutex_);
+        final_ = std::move(image);
+        ++revision_;
+        recorded_.store(std::uint64_t(settings_.width) * settings_.height * iterations,
+                        std::memory_order_release);
+        completed_pixels_.store(
+            iterations == settings_.samples_per_pixel ? settings_.width * settings_.height : 0,
+            std::memory_order_release);
+    }
 
     void commit(std::size_t x, std::size_t y, std::size_t width, std::size_t height,
                 const std::vector<glm::dvec3>& sums, const std::vector<std::uint32_t>& counts) {
@@ -107,7 +120,7 @@ class Film {
                 const auto pixel = source_y * settings_.width + source_x;
                 image->at(x, y) =
                     final_ ? final_->at(source_x, source_y)
-                           : (counts_[pixel]
+                           : (!counts_.empty() && counts_[pixel]
                                   ? glm::vec3(sums_[pixel] / static_cast<double>(counts_[pixel]))
                                   : glm::vec3(0));
             }
@@ -190,6 +203,10 @@ struct RenderSession::Impl {
     std::shared_ptr<Film> retired_film;
     std::shared_ptr<const Image> retired_result;
     PathStatistics statistics;
+    IntegratorKind kind = IntegratorKind::path_tracing;
+    CancellationSource iteration_cancellation;
+    SppmStatistics sppm;
+    SppmProgress sppm_work;
 
     bool checkpoint(const CancellationToken& token) {
         if (token.requested()) {
@@ -227,6 +244,7 @@ struct RenderSession::Impl {
             error = message;
         }
         cancellation.request();
+        iteration_cancellation.request();
         pause_requested = false;
         pause_fast.store(false, std::memory_order_release);
         state = RenderState::cancelling;
@@ -239,6 +257,77 @@ struct RenderSession::Impl {
                     : terminal;
         finished = Clock::now();
         changed.notify_all();
+    }
+
+    // 暂停取消尚未提交的迭代；恢复从同一随机索引重算，Film 始终对应完整的统计状态。
+    void run_sppm(std::shared_ptr<const SceneSnapshot> scene, RenderSettings render,
+                  IntegratorSettings integrator, SessionSettings settings,
+                  CancellationToken token) {
+        SppmIntegrator renderer(std::move(scene), render, integrator, settings.threads, token);
+        auto target = std::make_shared<Film>(render, false);
+        {
+            std::lock_guard lock(control);
+            film = target;
+            workers = renderer.statistics().workers;
+            sppm = renderer.statistics();
+            live = 1;
+            if (!token.requested()) {
+                state = RenderState::running;
+            }
+        }
+        struct Lifetime {
+            Impl& owner;
+            ~Lifetime() {
+                owner.worker_finished();
+            }
+        } lifetime{*this};
+        while (renderer.statistics().iterations < render.samples_per_pixel) {
+            if (!checkpoint(token)) {
+                token.check();
+            }
+            CancellationToken iteration_token;
+            {
+                std::lock_guard lock(control);
+                if (pause_requested) {
+                    continue;
+                }
+                iteration_cancellation = CancellationSource();
+                iteration_token = iteration_cancellation.token();
+            }
+            try {
+                renderer.advance(iteration_token, [&](SppmProgress progress) {
+                    std::lock_guard lock(control);
+                    sppm_work = progress;
+                });
+            } catch (const OperationCancelled&) {
+                token.check();
+                continue;
+            }
+            token.check();
+            auto image = std::make_shared<const Image>(renderer.image(token));
+            target->publish_image(std::move(image),
+                                  std::uint32_t(renderer.statistics().iterations));
+            {
+                std::lock_guard lock(control);
+                sppm = renderer.statistics();
+                statistics.paths = sppm.camera_paths;
+                statistics.geometry = sppm.geometry;
+                statistics.shadow_rays = sppm.shadow_rays;
+                statistics.scattering_events =
+                    sppm.camera_scattering_events + sppm.photon_scattering_events;
+            }
+        }
+        {
+            std::lock_guard lock(control);
+            if (!token.requested()) {
+                state = RenderState::finalizing;
+            }
+        }
+        auto image = target->finish(token);
+        {
+            std::lock_guard lock(control);
+            result = std::move(image);
+        }
     }
 
     void run(std::shared_ptr<const SceneSnapshot> scene, RenderSettings render,
@@ -255,6 +344,11 @@ struct RenderSession::Impl {
             }
             retired.reset();
             retired_image.reset();
+            if (integrator.kind == IntegratorKind::sppm) {
+                run_sppm(std::move(scene), render, integrator, settings, token);
+                complete(RenderState::completed);
+                return;
+            }
             {
                 const PathTracer tracer(std::move(scene), integrator, token);
                 token.check();
@@ -418,6 +512,10 @@ void RenderSession::start(std::shared_ptr<const SceneSnapshot> scene, RenderSett
         impl_->pause_fast.store(false, std::memory_order_release);
         impl_->error.clear();
         impl_->statistics = {};
+        impl_->kind = integrator.kind;
+        impl_->sppm = {};
+        impl_->sppm_work = {};
+        impl_->iteration_cancellation = CancellationSource();
         impl_->started = Clock::now();
         impl_->finished = {};
         impl_->cancellation = std::move(cancellation);
@@ -438,6 +536,9 @@ bool RenderSession::pause() {
     }
     impl_->pause_requested = true;
     impl_->pause_fast.store(true, std::memory_order_release);
+    if (impl_->kind == IntegratorKind::sppm) {
+        impl_->iteration_cancellation.request();
+    }
     impl_->state = impl_->live != 0 && impl_->parked == impl_->live ? RenderState::paused
                                                                     : RenderState::pausing;
     return true;
@@ -459,6 +560,7 @@ void RenderSession::cancel() {
         return;
     }
     impl_->cancellation.request();
+    impl_->iteration_cancellation.request();
     impl_->pause_requested = false;
     impl_->pause_fast.store(false, std::memory_order_release);
     impl_->state = RenderState::cancelling;
@@ -489,7 +591,10 @@ RenderProgress RenderSession::progress() const {
                 ? 0
                 : std::chrono::duration<double>(end - impl_->started).count(),
             impl_->error,
-            impl_->statistics};
+            impl_->statistics,
+            impl_->kind,
+            impl_->sppm,
+            impl_->sppm_work};
 }
 RenderPreview RenderSession::preview(std::size_t maximum_dimension) const {
     std::shared_ptr<Film> film;

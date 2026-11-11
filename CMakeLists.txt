@@ -66,6 +66,10 @@ add_library(minirender_core
     src/render/bsdf.cpp
     src/render/cloth_bsdf.cpp
     src/render/light.cpp
+    src/render/light_emission.cpp
+    src/render/sppm.cpp
+    src/render/sppm_grid.cpp
+    src/render/sppm_surface.cpp
     src/render/path_tracer.cpp
     src/render/medium.cpp
     src/render/render_session.cpp
@@ -123,6 +127,9 @@ if(BUILD_TESTING)
     add_executable(minirender_volume_example examples/volume.cpp)
     target_compile_definitions(minirender_volume_example PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_volume_example PRIVATE minirender_core minirender_warnings)
+    add_executable(minirender_sppm_example examples/sppm.cpp)
+    target_compile_definitions(minirender_sppm_example PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+    target_link_libraries(minirender_sppm_example PRIVATE minirender_core minirender_warnings)
     add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp
         tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp tests/path_tests.cpp
         tests/session_tests.cpp tests/ssao_tests.cpp tests/ibl_tests.cpp tests/geometry_tests.cpp
@@ -131,7 +138,8 @@ if(BUILD_TESTING)
         tests/builtin_scene_tests.cpp tests/adaptive_tests.cpp tests/point_cloud_tests.cpp
         tests/ball_pivot_tests.cpp tests/point_preview_tests.cpp tests/sdf_tests.cpp tests/cloth_tests.cpp
         tests/cloth_bsdf_tests.cpp tests/cloth_component_tests.cpp tests/medium_tests.cpp
-        tests/volume_path_tests.cpp tests/volume_scene_tests.cpp)
+        tests/volume_path_tests.cpp tests/volume_scene_tests.cpp tests/sppm_tests.cpp
+        tests/sppm_energy_tests.cpp)
     target_include_directories(minirender_tests PRIVATE src)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_tests PRIVATE
@@ -155,6 +163,15 @@ if(BUILD_TESTING)
         --width 4 --height 4 --spp 4 --depth 3 --seed 9 --threads 2 --tile 2 --batch 2)
     set_tests_properties(cli_volume_render PROPERTIES
         PASS_REGULAR_EXPRESSION "medium scattering events: [1-9]")
+    add_test(NAME cli_sppm_render COMMAND minirender_cli --render
+        "${PROJECT_SOURCE_DIR}/scenes/cornell-box.json"
+        "${CMAKE_CURRENT_BINARY_DIR}/路径 空格/sppm"
+        --integrator sppm --width 4 --height 4 --spp 2 --photons 1000 --depth 3 --threads 2)
+    set_tests_properties(cli_sppm_render PROPERTIES PASS_REGULAR_EXPRESSION "photon trials: 2000")
+    add_test(NAME cli_sppm_reject_media COMMAND minirender_cli --render
+        "${PROJECT_SOURCE_DIR}/tests/scenes/volume-slab.json"
+        "${CMAKE_CURRENT_BINARY_DIR}/invalid-sppm" --integrator sppm --spp 1)
+    set_tests_properties(cli_sppm_reject_media PROPERTIES WILL_FAIL TRUE)
     add_test(NAME cli_invalid_exposure COMMAND minirender_cli --render
         "${PROJECT_SOURCE_DIR}/scenes/studio.json" "${CMAKE_CURRENT_BINARY_DIR}/invalid-path"
         --exposure 1oops)

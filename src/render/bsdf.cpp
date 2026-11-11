@@ -175,8 +175,11 @@ std::optional<BsdfSample> Bsdf::sample(glm::dvec3 wo, double component, glm::dve
             return std::nullopt;
         }
         const double density = cloth_->pdf(wo, *wi);
+        // 光子沿光源到相机传播，使用辐射传输算子的转置。采样提议和 PDF 保持相同。
+        const auto response = mode == TransportMode::importance ? cloth_->evaluate(*wi, wo) * wi->z
+                                                                : cloth_->response(wo, *wi);
         return BsdfSample{*wi,
-                          cloth_->response(wo, *wi) / density,
+                          response / density,
                           density,
                           SampleMeasure::solid_angle,
                           ScatteringEvent::glossy_reflection,

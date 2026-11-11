@@ -227,6 +227,10 @@ LightSampler::LightSampler(std::shared_ptr<const SceneSnapshot> scene,
     const auto extent = glm::dvec3(bounds.maximum) - glm::dvec3(bounds.minimum);
     const double projected_area =
         pi * (bounds.empty() ? 1 : std::max(glm::dot(extent, extent) * 0.25, 1e-12));
+    emission_radius_ = std::sqrt(projected_area / pi);
+    if (!bounds.empty()) {
+        emission_center_ = glm::dvec3(bounds.minimum) + extent * .5;
+    }
     for (const auto& light : scene_->directional_lights) {
         const auto radiance = glm::dvec3(light.color) * static_cast<double>(light.intensity);
         if (luminance(radiance) > 0) {

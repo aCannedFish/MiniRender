@@ -44,7 +44,8 @@ int run_render_cli(int argc, char** argv) {
         throw std::invalid_argument(
             "Usage: --render scene.json output-prefix [--width N --height N --spp N --depth N "
             "--mode mis|bsdf|light --seed N --exposure EV --no-rr --rr-depth N --threads N --tile "
-            "N --batch N]");
+            "N --batch N --integrator path|sppm --photons N --radius M --alpha A --sppm-memory-mb "
+            "N]");
     }
     minirender::RenderSettings render;
     minirender::IntegratorSettings integrator;
@@ -81,6 +82,24 @@ int run_render_cli(int argc, char** argv) {
             render.seed = number<std::uint64_t>(value);
         } else if (option == "--mode") {
             integrator.mode = minirender::parse_sampling_mode(std::string(value));
+        } else if (option == "--integrator") {
+            if (value != "path" && value != "sppm") {
+                throw std::invalid_argument("Integrator must be path or sppm");
+            }
+            integrator.kind = value == "sppm" ? minirender::IntegratorKind::sppm
+                                              : minirender::IntegratorKind::path_tracing;
+        } else if (option == "--photons") {
+            integrator.sppm.photons_per_iteration = number<std::uint32_t>(value);
+        } else if (option == "--radius") {
+            integrator.sppm.initial_radius = number<double>(value);
+        } else if (option == "--alpha") {
+            integrator.sppm.alpha = number<double>(value);
+        } else if (option == "--sppm-memory-mb") {
+            const auto mb = number<std::uint64_t>(value);
+            if (mb < 1 || mb > 8192) {
+                throw std::invalid_argument("SPPM memory must be in 1..8192 MiB");
+            }
+            integrator.sppm.memory_budget_bytes = mb * 1024 * 1024;
         } else if (option == "--exposure") {
             exposure = number<double>(value);
         } else {
@@ -100,7 +119,13 @@ int run_render_cli(int argc, char** argv) {
     while (!session.wait_for(std::chrono::milliseconds(200))) {
         const auto progress = session.progress();
         std::cerr << "progress: " << minirender::render_state_name(progress.state) << ' '
-                  << progress.recorded_samples << '/' << progress.total_samples << '\n';
+                  << progress.recorded_samples << '/' << progress.total_samples;
+        if (integrator.kind == minirender::IntegratorKind::sppm) {
+            std::cerr << ' ' << minirender::sppm_phase_name(progress.sppm_progress.phase) << ' '
+                      << progress.sppm_progress.completed << '/' << progress.sppm_progress.total
+                      << " iterations=" << progress.sppm.iterations;
+        }
+        std::cerr << '\n';
     }
     session.wait();
     const auto progress = session.progress();
@@ -123,10 +148,13 @@ int run_render_cli(int argc, char** argv) {
     png += ".png";
     image->write_exr(exr);
     minirender::display_image(*image, exposure).write_png(png);
-    std::cout << "CPU path render complete\nmode: "
-              << minirender::sampling_mode_name(integrator.mode) << "\nresolution: " << render.width
-              << 'x' << render.height << "\nspp: " << render.samples_per_pixel
-              << "\npaths: " << statistics.paths << "\nthreads: " << progress.worker_count
+    std::cout << (integrator.kind == minirender::IntegratorKind::sppm
+                      ? "CPU SPPM render complete\nmode: sppm"
+                      : "CPU path render complete\nmode: " +
+                            minirender::sampling_mode_name(integrator.mode))
+              << "\nresolution: " << render.width << 'x' << render.height
+              << "\nspp: " << render.samples_per_pixel << "\npaths: " << statistics.paths
+              << "\nthreads: " << progress.worker_count
               << "\nrecorded samples: " << progress.recorded_samples
               << "\nshadow rays: " << statistics.shadow_rays
               << "\nscattering events: " << statistics.scattering_events
@@ -134,5 +162,14 @@ int run_render_cli(int argc, char** argv) {
               << "\ntriangle tests: " << statistics.geometry.triangle_tests << "\nelapsed ms: "
               << std::chrono::duration<double, std::milli>(finished - start).count()
               << "\nEXR and PNG saved.\n";
+    if (integrator.kind == minirender::IntegratorKind::sppm) {
+        std::cout << "iterations: " << progress.sppm.iterations
+                  << "\nphoton trials: " << progress.sppm.emitted_photons
+                  << "\ngathered contributions: " << progress.sppm.gathered_contributions
+                  << "\nspecular light contributions: "
+                  << progress.sppm.specular_light_contributions
+                  << "\nSDS contributions: " << progress.sppm.sds_contributions
+                  << "\nmean radius: " << progress.sppm.mean_radius << '\n';
+    }
     return 0;
 }

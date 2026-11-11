@@ -47,6 +47,10 @@ SamplingMode parse_sampling_mode(const std::string& name) {
 }
 void IntegratorSettings::validate() const {
     sampling_mode_name(mode);
+    if (kind != IntegratorKind::path_tracing && kind != IntegratorKind::sppm) {
+        throw std::invalid_argument("Unknown integrator kind");
+    }
+    sppm.validate();
     if (maximum_depth > 128 || roulette_depth > 128) {
         throw std::invalid_argument("Path and roulette depths must not exceed 128");
     }
@@ -98,6 +102,9 @@ PathTracer::PathTracer(std::shared_ptr<const SceneSnapshot> scene, IntegratorSet
       media_(scene_->media, cancellation), settings_(settings),
       cancellation_(std::move(cancellation)) {
     settings_.validate();
+    if (settings_.kind != IntegratorKind::path_tracing) {
+        throw std::invalid_argument("PathTracer requires the path tracing backend");
+    }
 }
 const SceneSnapshot& PathTracer::scene() const noexcept {
     return *scene_;

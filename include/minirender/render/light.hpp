@@ -57,6 +57,17 @@ struct LightSample {
     glm::dvec3 position_error{0};
 };
 
+// 发射光子携带已经除以选灯、位置及方向概率的功率；累计结果再除以发射试验总数。
+// 无限光的方向 PDF 对方向光为离散质量，对环境光为 sr^-1；位置 PDF 始终为 m^-2。
+struct PhotonEmission {
+    Ray ray;
+    glm::dvec3 flux{0};
+    LightKind kind = LightKind::area;
+    double selection_pmf = 0;
+    double position_pdf = 0;
+    double direction_pdf = 0;
+};
+
 // 发光三角形按材质 double_sided 选择单/双面漫发射，与表面可见性一致。
 // 光源选择按估计功率加权。查询结果不包含可见性，积分器负责有限/无限阴影射线。
 // 接收 make_snapshot 生成的有效快照；构造完成后只读，可供渲染线程共享。
@@ -66,6 +77,8 @@ class LightSampler {
                           CancellationToken cancellation = {});
     std::optional<LightSample> sample(glm::dvec3 reference, double light_u,
                                       glm::dvec2 surface_u) const;
+    std::optional<PhotonEmission> sample_emission(double light_u, glm::dvec2 position_u,
+                                                  glm::dvec2 direction_u) const;
     double area_pdf(glm::dvec3 reference, const SurfaceHit& hit) const;
     double environment_pdf(glm::dvec3 direction) const;
     const EnvironmentLight& environment() const noexcept;
@@ -96,6 +109,8 @@ class LightSampler {
     std::map<std::pair<std::uint32_t, std::uint32_t>, std::size_t> area_choices_;
     std::optional<std::size_t> environment_choice_;
     DiscreteDistribution selection_;
+    glm::dvec3 emission_center_{0};
+    double emission_radius_ = 1;
 };
 
 } // namespace minirender
