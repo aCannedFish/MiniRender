@@ -16,5 +16,5 @@ struct BuiltinScene {
     minirender::RenderSettings render;
     minirender::IntegratorSettings integrator;
 };
-const std::array<BuiltinScene, 4>& builtin_scenes();
+const std::array<BuiltinScene, 7>& builtin_scenes();
 QString builtin_scene_directory();

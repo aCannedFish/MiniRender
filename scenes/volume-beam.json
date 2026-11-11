@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "camera": {
+    "position": [
+      3,
+      1.8,
+      4.5
+    ],
+    "target": [
+      0,
+      1.2,
+      0
+    ],
+    "up": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "vertical_fov": 45.0,
+    "near": 0.05,
+    "far": 100.0
+  },
+  "environment": [
+    0.001,
+    0.001,
+    0.001
+  ],
+  "materials": [
+    {
+      "id": "floor",
+      "name": "灰色地面",
+      "kind": "diffuse",
+      "base_color": [
+        0.35,
+        0.38,
+        0.42
+      ],
+      "roughness": 0.8,
+      "double_sided": false
+    },
+    {
+      "id": "blue",
+      "name": "蓝色漫反射",
+      "kind": "diffuse",
+      "base_color": [
+        0.05,
+        0.3,
+        0.65
+      ],
+      "roughness": 0.4,
+      "double_sided": false
+    },
+    {
+      "id": "metal",
+      "name": "金属",
+      "kind": "conductor",
+      "base_color": [
+        0.9,
+        0.6,
+        0.25
+      ],
+      "roughness": 0.25,
+      "double_sided": false
+    },
+    {
+      "id": "aperture",
+      "name": "透光顶板",
+      "kind": "diffuse",
+      "base_color": [
+        0.08,
+        0.08,
+        0.08
+      ],
+      "double_sided": true
+    }
+  ],
+  "meshes": [
+    {
+      "id": "cube",
+      "source": "assets/cube.obj"
+    },
+    {
+      "id": "plane",
+      "source": "assets/plane.obj"
+    },
+    {
+      "id": "aperture",
+      "source": "assets/volume-aperture.obj"
+    }
+  ],
+  "objects": [
+    {
+      "id": "ground",
+      "name": "地面",
+      "mesh": "plane",
+      "material": "floor",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          3,
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "id": "aperture",
+      "name": "透光顶板",
+      "mesh": "aperture",
+      "material": "aperture",
+      "transform": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "visible": true
+    }
+  ],
+  "directional_lights": [
+    {
+      "id": "sun",
+      "direction": [
+        0.2,
+        -1,
+        0.3
+      ],
+      "color": [
+        1,
+        0.93,
+        0.8
+      ],
+      "intensity": 12
+    }
+  ],
+  "media": [
+    {
+      "id": "fog",
+      "name": "均匀体积",
+      "minimum": [
+        -2,
+        0.01,
+        -2
+      ],
+      "maximum": [
+        2,
+        2.5,
+        2
+      ],
+      "absorption": [
+        0.05,
+        0.08,
+        0.13
+      ],
+      "scattering": [
+        0.55,
+        0.55,
+        0.55
+      ],
+      "anisotropy": 0.15,
+      "enabled": true
+    }
+  ]
+}

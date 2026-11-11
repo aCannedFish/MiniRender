@@ -84,7 +84,8 @@ OfflinePanel::OfflinePanel(
     seed_->setValidator(new QRegularExpressionValidator(QRegularExpression("[0-9]{1,20}"), seed_));
     mode_ = new QComboBox(settings_);
     mode_->setObjectName("offline_mode");
-    mode_->addItems({"BSDF", "光源采样", "MIS"});
+    mode_->addItems({"方向采样", "光源采样", "MIS"});
+    mode_->setToolTip("方向采样在表面使用 BSDF，在介质内使用相函数。");
     mode_->setCurrentIndex(2);
     rr_ = new QCheckBox("启用 Russian roulette", settings_);
     rr_->setObjectName("offline_rr");

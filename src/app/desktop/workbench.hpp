@@ -26,6 +26,7 @@ class ClothMaterialPanel;
 class ClothColliderPanel;
 class ClothController;
 class ClothPanel;
+class VolumePanel;
 struct ClothRuntimeFrame;
 namespace minirender {
 struct ClothDefinition;
@@ -123,6 +124,7 @@ class Workbench final : public QMainWindow {
     ClothColliderPanel* cloth_collider_ = nullptr;
     ClothController* cloth_controller_ = nullptr;
     ClothPanel* cloth_panel_ = nullptr;
+    VolumePanel* volume_ = nullptr;
     std::string cloth_target_;
     QLineEdit* object_name_ = nullptr;
     VectorField* translation_ = nullptr;

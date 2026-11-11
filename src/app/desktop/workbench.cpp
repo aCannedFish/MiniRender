@@ -11,6 +11,7 @@
 #include "realtime_panel.hpp"
 #include "scene_id.hpp"
 #include "sdf_panel.hpp"
+#include "volume_panel.hpp"
 
 #include <minirender/assets/scene_io.hpp>
 
@@ -380,6 +381,25 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     };
     cloth_panel_->on_freeze = [this] { freeze_cloth(); };
     cloth_panel_->on_preview = [this] { show_cloth_preview(); };
+    volume_ = new VolumePanel(this);
+    right_tabs->addTab(scroll_panel(volume_), "介质");
+    volume_->on_changed = [this](std::vector<minirender::MediumRegion> regions) {
+        editor_.edit([&](auto& scene) { scene.media = std::move(regions); });
+        ++document_revision_;
+        refresh();
+    };
+    volume_->on_demo = [this](const QString& id) { import_builtin_scene(id); };
+    volume_->on_render = [this, right_tabs] {
+        right_tabs->setCurrentIndex(3);
+        if (minirender::render_terminal(offline_->session().progress().state) &&
+            !offline_->exporting()) {
+            offline_->start();
+        }
+    };
+    volume_->render_active = [this] {
+        return !minirender::render_terminal(offline_->session().progress().state) ||
+               offline_->exporting();
+    };
     geometry_->on_apply = [this] {
         try {
             apply_geometry();
@@ -875,6 +895,7 @@ void Workbench::refresh() {
     refresh_camera();
     viewport_->set_scene(editor_.snapshot());
     sync_cloth_context();
+    volume_->set_document(editor_.document().media, document_generation_);
 }
 
 void Workbench::refresh_properties() {
@@ -1064,6 +1085,7 @@ void Workbench::begin_asset_task(const QString& message) {
     environment_->set_import_enabled(false);
     geometry_->set_asset_task_busy(true);
     points_->set_asset_task_busy(true);
+    volume_->set_asset_busy(true);
 }
 
 void Workbench::finish_asset_task() {
@@ -1078,6 +1100,7 @@ void Workbench::finish_asset_task() {
     environment_->set_import_enabled(true);
     geometry_->set_asset_task_busy(false);
     points_->set_asset_task_busy(false);
+    volume_->set_asset_busy(false);
 }
 
 bool Workbench::asset_loading() const noexcept {
@@ -1186,6 +1209,9 @@ void Workbench::import_builtin_scene(const QString& id) {
         offline_->prepare_import(preset.render, preset.integrator);
         select_object(preset.selected_object);
         findChild<QComboBox*>("view_mode")->setCurrentIndex(preset.normal_preview ? 1 : 0);
+        if (!editor_.document().media.empty()) {
+            findChild<QTabWidget*>("inspector_tabs")->setCurrentIndex(10);
+        }
         setWindowTitle("MiniRender — " + preset.name + "（示例副本）");
         statusBar()->showMessage(
             preset.name + " 已覆盖导入，可编辑后开始离线渲染。" +
