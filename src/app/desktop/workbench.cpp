@@ -6,6 +6,7 @@
 #include "point_cloud_panel.hpp"
 #include "realtime_panel.hpp"
 #include "scene_id.hpp"
+#include "sdf_panel.hpp"
 
 #include <minirender/assets/scene_io.hpp>
 
@@ -330,6 +331,7 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     auto* right_tabs = new QTabWidget;
     right_tabs->setObjectName("inspector_tabs");
     right_tabs->setDocumentMode(true);
+    right_tabs->setUsesScrollButtons(true);
     right_tabs->addTab(scroll_panel(object_panel_), "物体");
     right_tabs->addTab(scroll_panel(light_panel_), "灯光");
     right_tabs->addTab(scroll_panel(camera_panel_), "相机");
@@ -346,6 +348,8 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     points_ = new PointCloudPanel(*geometry_tasks_, this);
     right_tabs->addTab(scroll_panel(points_), "点云");
     connect_point_panel();
+    sdf_ = new SdfPanel(*viewport_, this);
+    right_tabs->addTab(scroll_panel(sdf_), "距离场");
     geometry_->on_apply = [this] {
         try {
             apply_geometry();
@@ -531,6 +535,12 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
                 statusBar()->showMessage(
                     QString("点云预览 | %1 个点 | 拖拽查看 · 返回场景后编辑物体")
                         .arg(viewport_->point_preview_data()->points.size()));
+                return;
+            }
+            if (viewport_->sdf_visible()) {
+                statusBar()->showMessage(
+                    QString("距离场 | %1 个节点 | 左拖环绕 · 右拖转向 · 中拖平移 · WASDQE 移动")
+                        .arg(viewport_->sdf_document()->nodes.size()));
                 return;
             }
             auto message =
@@ -1362,6 +1372,12 @@ Workbench::~Workbench() {
     viewport_->on_gizmo_mode_changed = {};
     viewport_->on_interaction_error = {};
     viewport_->on_point_preview_changed = {};
+    viewport_->on_sdf_visible_changed = {};
+    viewport_->on_sdf_display_changed = {};
+}
+
+SdfPanel* Workbench::sdf_panel() const noexcept {
+    return sdf_;
 }
 
 bool Workbench::begin_transform() {

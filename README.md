@@ -65,4 +65,4 @@ A5.1 加入点云重建核心，支持 PLY 三种编码、PCA 法线、最小生
 
 A5.2 接入右侧“点云”页，提供后台导入/采样、法线缓存、重建、取消、独立预览和 PLY 导出。生成结果可撤销、编辑、保存与离线渲染；同一份点云重复重建会更新目标物体。见 [点云工具](docs/POINT_CLOUD_UI.md) 与 [验收记录](docs/checkpoints/A5.2.md)。
 
-A5.3a 加入球、盒、圆环和 CSG 距离场核心，支持刚性变换、均匀缩放、独立 JSON、sphere tracing 与 CPU 参照图。Vulkan 独立视图和交互面板在 A5.3b 接入。实现与运行方法见 [距离场](docs/SDF.md)。
+A5.3 加入球、盒、圆环和 CSG 距离场，支持刚性变换、均匀缩放、独立 JSON、sphere tracing 与 CPU 参照图。右侧“距离场”页提供 Vulkan 视图、交互参数、布尔组合、独立历史和文件操作。实现见 [距离场](docs/SDF.md)，操作见 [距离场界面](docs/SDF_UI.md)，测试见 [验收记录](docs/checkpoints/A5.3b.md)。

@@ -39,6 +39,11 @@ def main() -> int:
     )
     checks = parser.add_mutually_exclusive_group()
     checks.add_argument(
+        "--sdf-check",
+        action="store_true",
+        help="Verify distance fields and analytic intersections",
+    )
+    checks.add_argument(
         "--texture-check",
         action="store_true",
         help="Verify texture import and filtering",
@@ -105,7 +110,8 @@ def main() -> int:
             "Timing measurements and synchronization validation must run separately"
         )
     scene_check = (
-        args.points_check
+        args.sdf_check
+        or args.points_check
         or args.adaptive_check
         or args.presets_check
         or args.sides_check
@@ -131,6 +137,7 @@ def main() -> int:
     mode = "GPU"
     option = "--smoke"
     for selected, candidate in [
+        (args.sdf_check, "SDF"),
         (args.points_check, "Points"),
         (args.adaptive_check, "Adaptive"),
         (args.presets_check, "Presets"),

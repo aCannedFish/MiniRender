@@ -10,8 +10,10 @@ ScreenPass::~ScreenPass() {
 }
 
 void ScreenPass::create(VulkanViewport& viewport, VkFormat format, const char* fragment,
-                        VkBuffer uniform, VkDeviceSize bytes, std::span<const ScreenInput> inputs) {
+                        VkBuffer uniform, VkDeviceSize bytes, std::span<const ScreenInput> inputs,
+                        const char* vertex_path, std::uint32_t vertices) {
     device_ = viewport.device();
+    vertices_ = vertices;
     const auto size = viewport.swapChainImageSize();
     extent_ = {static_cast<std::uint32_t>(size.width()), static_cast<std::uint32_t>(size.height())};
     target_.create(device_, viewport.physicalDevice(), extent_, format,
@@ -88,7 +90,7 @@ void ScreenPass::create(VulkanViewport& viewport, VkFormat format, const char* f
     VkDescriptorPoolCreateInfo pool{};
     pool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool.maxSets = 1;
-    pool.poolSizeCount = static_cast<std::uint32_t>(pool_sizes.size());
+    pool.poolSizeCount = inputs.empty() ? 1U : static_cast<std::uint32_t>(pool_sizes.size());
     pool.pPoolSizes = pool_sizes.data();
     check_vk(vkCreateDescriptorPool(device_, &pool, nullptr, &pool_), "screen descriptor pool");
     VkDescriptorSetAllocateInfo allocate{};
@@ -125,7 +127,7 @@ void ScreenPass::create(VulkanViewport& viewport, VkFormat format, const char* f
     layout.pPushConstantRanges = &push;
     check_vk(vkCreatePipelineLayout(device_, &layout, nullptr, &layout_), "screen pipeline layout");
 
-    GpuShader vertex(device_, ":/shaders/screen.vert.spv");
+    GpuShader vertex(device_, vertex_path);
     GpuShader pixel(device_, fragment);
     std::array<VkPipelineShaderStageCreateInfo, 2> stages{};
     for (auto& stage : stages) {
@@ -200,7 +202,7 @@ void ScreenPass::draw(VulkanViewport& viewport, std::int32_t mode) {
     vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, layout_, 0, 1, &descriptor_,
                             0, nullptr);
     vkCmdPushConstants(command, layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(mode), &mode);
-    vkCmdDraw(command, 3, 1, 0, 0);
+    vkCmdDraw(command, vertices_, 1, 0, 0);
     vkCmdEndRenderPass(command);
 }
 void ScreenPass::release() {
