@@ -249,6 +249,7 @@ void Material::validate() const {
 void SceneDocument::validate(MeshValidationCache* cache, CancellationToken cancellation) const {
     cancellation.check();
     camera.validate();
+    validate_medium_regions(media, cancellation);
     require(finite(environment) && glm::all(glm::greaterThanEqual(environment, glm::vec3(0))),
             "Environment must be finite and nonnegative");
     std::unordered_set<std::string> texture_ids;
@@ -338,6 +339,7 @@ std::shared_ptr<const SceneSnapshot> make_snapshot(const SceneDocument& document
     document.validate(cache);
     auto snapshot = std::make_shared<SceneSnapshot>();
     snapshot->camera = document.camera;
+    snapshot->media = document.media;
     snapshot->environment = document.environment;
     snapshot->directional_lights = document.directional_lights;
     snapshot->environment_strength = document.environment_map.strength;

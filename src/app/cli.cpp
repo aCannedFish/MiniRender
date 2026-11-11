@@ -21,7 +21,8 @@ int run_cli(int argc, char** argv) {
             return run_render_cli(argc - 2, argv + 2);
         }
         if (argc == 2 && std::string_view(argv[1]) == "--capabilities") {
-            std::cout << "MiniRender 0.1\nimage: linear RGB\noptix: unavailable (B2 pending)\n";
+            std::cout << "MiniRender 0.1\nimage: linear RGB\nvolume: homogeneous RGB\n"
+                         "optix: unavailable (B2 pending)\n";
             return 0;
         }
         if (argc == 3 && std::string_view(argv[1]) == "--inspect") {
@@ -33,7 +34,8 @@ int run_cli(int argc, char** argv) {
             }
             std::cout << "meshes: " << scene.meshes.size() << "\nobjects: " << scene.objects.size()
                       << "\nvisible instances: " << snapshot->instances.size()
-                      << "\ninstance triangles: " << triangles << '\n';
+                      << "\ninstance triangles: " << triangles
+                      << "\nmedium regions: " << scene.media.size() << '\n';
             return 0;
         }
         if (argc == 3 && std::string_view(argv[1]) == "--test-pattern") {

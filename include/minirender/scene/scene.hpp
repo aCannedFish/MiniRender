@@ -4,6 +4,7 @@
 #include <minirender/core/texture.hpp>
 #include <minirender/scene/cloth_collider.hpp>
 #include <minirender/scene/cloth_material.hpp>
+#include <minirender/scene/medium.hpp>
 
 #include <array>
 #include <cstdint>
@@ -160,6 +161,7 @@ struct SceneDocument {
     std::vector<SceneObject> objects;
     std::vector<DirectionalLight> directional_lights;
     EnvironmentMap environment_map;
+    std::vector<MediumRegion> media{};
     void validate(MeshValidationCache* cache = nullptr, CancellationToken cancellation = {}) const;
 };
 
@@ -181,6 +183,7 @@ struct SceneSnapshot {
     std::shared_ptr<const Texture> environment_texture;
     float environment_strength = 1;
     float environment_rotation_degrees = 0;
+    std::vector<MediumRegion> media{};
 };
 
 std::shared_ptr<const SceneSnapshot> make_snapshot(const SceneDocument& document,
