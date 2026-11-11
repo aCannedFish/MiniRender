@@ -107,7 +107,7 @@ double fresnel_dielectric(double cosine, double eta_i, double eta_t) {
     return fresnel_from_transmission(cosine, sin2, eta_i, eta_t);
 }
 
-Bsdf::Bsdf(const Material& material, bool front_face, glm::vec3 texture_color)
+Bsdf::Bsdf(const Material& material, bool front_face, glm::vec3 texture_color, ClothAxes cloth_axes)
     : kind_(material.kind),
       color_(glm::dvec3(material.base_color) * glm::clamp(glm::dvec3(texture_color), 0.0, 1.0)),
       alpha_(static_cast<double>(material.roughness) * material.roughness),
@@ -115,6 +115,9 @@ Bsdf::Bsdf(const Material& material, bool front_face, glm::vec3 texture_color)
     material.validate();
     if (!finite(glm::dvec3(texture_color))) {
         throw std::invalid_argument("BSDF texture color must be finite");
+    }
+    if (kind_ == MaterialKind::cloth) {
+        cloth_.emplace(material.cloth, material.ior, color_, cloth_axes);
     }
 }
 bool Bsdf::is_delta() const noexcept {
@@ -128,6 +131,9 @@ glm::dvec3 Bsdf::evaluate_normalized(glm::dvec3 wo, glm::dvec3 wi) const {
     if (kind_ == MaterialKind::diffuse) {
         return color_ / pi;
     }
+    if (cloth_) {
+        return cloth_->evaluate(wo, wi);
+    }
     const auto m = glm::normalize(wo + wi);
     // 约去 G1 中的余弦，避免掠射角下先计算极小乘积再相除。
     return schlick(color_, glm::dot(wo, m)) * distribution(m, alpha_) *
@@ -139,6 +145,9 @@ double Bsdf::pdf_normalized(glm::dvec3 wo, glm::dvec3 wi) const {
     }
     if (kind_ == MaterialKind::diffuse) {
         return cosine_hemisphere_pdf(wi);
+    }
+    if (cloth_) {
+        return cloth_->pdf(wo, wi);
     }
     const auto m = glm::normalize(wo + wi);
     // p_m = D(m) G1(wo) |wo.m| / cos(wo)；反射 Jacobian 为 1/(4 |wo.m|)。
@@ -160,6 +169,19 @@ std::optional<BsdfSample> Bsdf::sample(glm::dvec3 wo, double component, glm::dve
         return std::nullopt;
     }
     const glm::dvec3 reflected{-wo.x, -wo.y, wo.z};
+    if (cloth_) {
+        const auto wi = cloth_->sample(wo, component, u);
+        if (!wi) {
+            return std::nullopt;
+        }
+        const double density = cloth_->pdf(wo, *wi);
+        return BsdfSample{*wi,
+                          cloth_->response(wo, *wi) / density,
+                          density,
+                          SampleMeasure::solid_angle,
+                          ScatteringEvent::glossy_reflection,
+                          1};
+    }
     if (kind_ == MaterialKind::dielectric) {
         const double ratio = eta_i_ / eta_t_;
         const double sin2 = ratio * ratio * (wo.x * wo.x + wo.y * wo.y);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <minirender/core/sampling.hpp>
+#include <minirender/render/cloth_bsdf.hpp>
 #include <minirender/scene/scene.hpp>
 
 #include <optional>
@@ -49,7 +50,7 @@ double fresnel_dielectric(double cosine, double eta_i, double eta_t);
 class Bsdf {
   public:
     explicit Bsdf(const Material& material, bool front_face = true,
-                  glm::vec3 texture_color = glm::vec3(1));
+                  glm::vec3 texture_color = glm::vec3(1), ClothAxes cloth_axes = {});
     // eval 为 sr^-1，pdf 为立体角密度；delta 材质二者均返回零。
     glm::dvec3 evaluate(glm::dvec3 wo, glm::dvec3 wi) const;
     double pdf(glm::dvec3 wo, glm::dvec3 wi) const;
@@ -67,6 +68,7 @@ class Bsdf {
     double alpha_;
     double eta_i_;
     double eta_t_;
+    std::optional<ClothBsdf> cloth_;
 };
 
 } // namespace minirender

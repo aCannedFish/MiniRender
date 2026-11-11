@@ -15,8 +15,10 @@ struct RasterVertex {
     glm::vec2 uv;
     // 每个面角保存同一个几何法线，线框据此剔除所属三角形的背面。
     glm::vec3 geometric_normal;
+    glm::vec3 tangent_u{0};
+    glm::vec3 tangent_v{0};
 };
-static_assert(sizeof(RasterVertex) == 44);
+static_assert(sizeof(RasterVertex) == 68);
 
 // 展开面角后，每三项组成一个三角形；edges 每六项给出该面的三条线段。
 // 边界为局部坐标 AABB，和源网格包含的全部位置一致。

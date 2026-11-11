@@ -22,6 +22,7 @@ class GeometryController;
 class GeometryPanel;
 class PointCloudPanel;
 class SdfPanel;
+class ClothMaterialPanel;
 struct GeometryTaskResult;
 
 // 桌面编辑控制器：控件编辑委托给 SceneEditor，渲染器只收到不可变快照。
@@ -102,6 +103,7 @@ class Workbench final : public QMainWindow {
     GeometryPanel* geometry_ = nullptr;
     PointCloudPanel* points_ = nullptr;
     SdfPanel* sdf_ = nullptr;
+    ClothMaterialPanel* cloth_material_ = nullptr;
     QLineEdit* object_name_ = nullptr;
     VectorField* translation_ = nullptr;
     VectorField* rotation_ = nullptr;

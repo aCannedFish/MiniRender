@@ -2,6 +2,7 @@
 
 #include <glm/glm.hpp>
 #include <minirender/core/texture.hpp>
+#include <minirender/scene/cloth_material.hpp>
 
 #include <array>
 #include <cstdint>
@@ -43,12 +44,16 @@ struct MeshData {
 class MeshValidationCache {
   public:
     void validate(const std::shared_ptr<const MeshData>& mesh, CancellationToken cancellation = {});
+    void validate_cloth_uv(const std::shared_ptr<const MeshData>& mesh,
+                           CancellationToken cancellation = {});
     // 合并后台已完成的校验结果；私有条目只能由 validate 成功后创建。
     // 调用方须保证两个缓存此时均无其他线程写入，网格仍遵守发布后不可变约定。
     void merge_validated(const MeshValidationCache& other);
 
   private:
     std::set<std::weak_ptr<const MeshData>, std::owner_less<std::weak_ptr<const MeshData>>> meshes_;
+    std::set<std::weak_ptr<const MeshData>, std::owner_less<std::weak_ptr<const MeshData>>>
+        cloth_uv_meshes_;
 };
 
 // T * Rz * Ry * Rx * S；旋转在界面/文件中以度表示，渲染矩阵按弧度计算。
@@ -80,7 +85,7 @@ struct Camera {
     Ray generate_lens_ray(glm::dvec2 pixel_uv, double aspect, glm::dvec2 lens_u) const;
 };
 
-enum class MaterialKind { diffuse, conductor, mirror, dielectric };
+enum class MaterialKind { diffuse, conductor, mirror, dielectric, cloth };
 std::string material_kind_name(MaterialKind kind);
 MaterialKind parse_material_kind(const std::string& name);
 
@@ -97,6 +102,7 @@ struct Material {
     TextureFilter texture_filter = TextureFilter::trilinear;
     // 正面由几何绕序决定，镜像变换保留原外侧。默认双面兼容已有场景。
     bool double_sided = true;
+    std::shared_ptr<const ClothAppearance> cloth{};
     void validate() const;
 };
 

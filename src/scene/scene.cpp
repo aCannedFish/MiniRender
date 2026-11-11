@@ -1,4 +1,5 @@
 #include <minirender/core/sampling.hpp>
+#include <minirender/geometry/uv_tangents.hpp>
 #include <minirender/scene/scene.hpp>
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -70,11 +71,42 @@ void MeshValidationCache::validate(const std::shared_ptr<const MeshData>& mesh,
     }
 }
 
+void MeshValidationCache::validate_cloth_uv(const std::shared_ptr<const MeshData>& mesh,
+                                            CancellationToken cancellation) {
+    validate(mesh, cancellation);
+    std::erase_if(cloth_uv_meshes_, [](const auto& value) { return value.expired(); });
+    if (cloth_uv_meshes_.contains(mesh)) {
+        return;
+    }
+    for (std::size_t face = 0; face < mesh->triangles.size(); ++face) {
+        if (face % 512 == 0) {
+            cancellation.check();
+        }
+        std::array<glm::vec3, 3> positions;
+        std::array<glm::vec2, 3> coordinates;
+        for (std::size_t corner = 0; corner < 3; ++corner) {
+            const auto& value = mesh->triangles[face].corners[corner];
+            positions[corner] = mesh->positions[value.position];
+            coordinates[corner] = value.uv;
+        }
+        require(uv_tangents(positions, coordinates).has_value(),
+                "Cloth material requires nondegenerate mesh UV coordinates");
+    }
+    cancellation.check();
+    cloth_uv_meshes_.insert(mesh);
+}
+
 void MeshValidationCache::merge_validated(const MeshValidationCache& other) {
     std::erase_if(meshes_, [](const auto& value) { return value.expired(); });
     for (const auto& mesh : other.meshes_) {
         if (!mesh.expired()) {
             meshes_.insert(mesh);
+        }
+    }
+    std::erase_if(cloth_uv_meshes_, [](const auto& value) { return value.expired(); });
+    for (const auto& mesh : other.cloth_uv_meshes_) {
+        if (!mesh.expired()) {
+            cloth_uv_meshes_.insert(mesh);
         }
     }
 }
@@ -171,6 +203,8 @@ std::string material_kind_name(MaterialKind kind) {
         return "mirror";
     case MaterialKind::dielectric:
         return "dielectric";
+    case MaterialKind::cloth:
+        return "cloth";
     }
     throw std::invalid_argument("Invalid material kind");
 }
@@ -188,6 +222,9 @@ MaterialKind parse_material_kind(const std::string& name) {
     if (name == "dielectric") {
         return MaterialKind::dielectric;
     }
+    if (name == "cloth") {
+        return MaterialKind::cloth;
+    }
     throw std::invalid_argument("Unsupported material kind: " + name);
 }
 
@@ -200,6 +237,10 @@ void Material::validate() const {
     require(std::isfinite(roughness) && roughness >= 0 && roughness <= 1,
             "Roughness must be in [0,1]");
     require(std::isfinite(ior) && ior > 0, "IOR must be positive");
+    if (kind == MaterialKind::cloth) {
+        require(cloth != nullptr && ior >= 1 && ior <= 3,
+                "Cloth material requires appearance data and IOR in 1..3");
+    }
     material_kind_name(kind);
     texture_filter_name(texture_filter);
 }
@@ -221,10 +262,14 @@ void SceneDocument::validate(MeshValidationCache* cache, CancellationToken cance
                 std::isfinite(environment_map.rotation_degrees),
             "Environment strength and rotation must be finite; strength must be nonnegative");
     std::unordered_set<std::string> material_ids;
+    std::unordered_set<std::string> cloth_material_ids;
     for (const auto& material : materials) {
         cancellation.check();
         unique_id(material_ids, material.id, "Material");
         material.validate();
+        if (material.kind == MaterialKind::cloth) {
+            cloth_material_ids.insert(material.id);
+        }
         require(material.base_color_texture.empty() ||
                     texture_ids.contains(material.base_color_texture),
                 "Material references missing texture: " + material.base_color_texture);
@@ -241,6 +286,7 @@ void SceneDocument::validate(MeshValidationCache* cache, CancellationToken cance
         }
     }
     std::unordered_set<std::string> object_ids;
+    MeshValidationCache local_cloth_cache;
     for (const auto& object : objects) {
         cancellation.check();
         unique_id(object_ids, object.id, "Object");
@@ -249,6 +295,12 @@ void SceneDocument::validate(MeshValidationCache* cache, CancellationToken cance
         require(material_ids.contains(object.material_id),
                 "Object references missing material: " + object.material_id);
         object.transform.validate();
+        if (cloth_material_ids.contains(object.material_id)) {
+            const auto mesh = std::find_if(meshes.begin(), meshes.end(), [&](const auto& value) {
+                return value.id == object.mesh_id;
+            });
+            (cache ? cache : &local_cloth_cache)->validate_cloth_uv(mesh->data, cancellation);
+        }
     }
     std::unordered_set<std::string> light_ids;
     for (const auto& light : directional_lights) {

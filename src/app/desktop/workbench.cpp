@@ -1,5 +1,6 @@
 #include "workbench.hpp"
 #include "builtin_scenes.hpp"
+#include "cloth_material_panel.hpp"
 #include "environment_panel.hpp"
 #include "geometry_panel.hpp"
 #include "offline_panel.hpp"
@@ -591,7 +592,9 @@ void Workbench::build_object_panel() {
     base_color_ = new VectorField(object_panel_, "base_color", 0, 1);
     emission_ = new VectorField(object_panel_, "emission", 0, 1000000);
     material_kind_ = new QComboBox;
-    material_kind_->addItems({"漫反射", "金属", "镜面（预览近似）", "玻璃（预览近似）"});
+    material_kind_->setObjectName("material_kind");
+    material_kind_->addItems(
+        {"漫反射", "金属", "镜面（预览近似）", "玻璃（预览近似）", "布料（微圆柱）"});
     texture_selector_ = new QComboBox;
     texture_selector_->setObjectName("base_texture");
     texture_filter_ = new QComboBox;
@@ -617,6 +620,19 @@ void Workbench::build_object_panel() {
     auto* hint = new QLabel("同一材质的参数会同时影响引用它的物体。");
     hint->setWordWrap(true);
     layout->addRow(hint);
+    cloth_material_ = new ClothMaterialPanel(object_panel_);
+    layout->addRow(cloth_material_);
+    cloth_material_->on_changed =
+        [this](std::shared_ptr<const minirender::ClothAppearance> appearance,
+               std::optional<double> ior) {
+            edit_material_property([&](minirender::Material& material) {
+                material.cloth = appearance;
+                if (ior) {
+                    material.ior = static_cast<float>(*ior);
+                    material.base_color = glm::vec3(1);
+                }
+            });
+        };
     translation_->on_changed = [this] {
         edit_object_property([&](minirender::SceneObject& object) {
             object.transform.translation = translation_->value();
@@ -661,6 +677,15 @@ void Workbench::build_object_panel() {
     connect(material_kind_, &QComboBox::currentIndexChanged, this, [this] {
         edit_material_property([&](minirender::Material& material) {
             material.kind = static_cast<minirender::MaterialKind>(material_kind_->currentIndex());
+            if (material.kind == minirender::MaterialKind::cloth) {
+                material.ior = std::clamp(material.ior, 1.0F, 3.0F);
+                if (!material.cloth) {
+                    const auto preset = minirender::make_cloth_preset("linen");
+                    material.cloth = preset.appearance;
+                    material.ior = static_cast<float>(preset.ior);
+                    material.base_color = glm::vec3(1);
+                }
+            }
         });
     });
     connect(texture_selector_, &QComboBox::currentIndexChanged, this, [this] {
@@ -830,6 +855,9 @@ void Workbench::refresh_properties() {
                                    QString::fromStdString(texture.id));
     }
     object_panel_->setEnabled(object != document.objects.end());
+    if (object == document.objects.end()) {
+        cloth_material_->set_material(nullptr, document_generation_);
+    }
     viewport_->set_gizmo_target(
         object != document.objects.end() && object->visible ? object->id : "",
         object != document.objects.end() && object->visible ? std::optional(object->transform)
@@ -844,6 +872,10 @@ void Workbench::refresh_properties() {
                 base_color_->set_value(material.base_color);
                 emission_->set_value(material.emission);
                 material_kind_->setCurrentIndex(static_cast<int>(material.kind));
+                const bool cloth = material.kind == minirender::MaterialKind::cloth;
+                roughness_->setEnabled(!cloth);
+                ior_->setRange(cloth ? 1 : .1, cloth ? 3 : 5);
+                cloth_material_->set_material(&material, document_generation_);
                 roughness_->setValue(material.roughness);
                 ior_->setValue(material.ior);
                 double_sided_->setChecked(material.double_sided);
