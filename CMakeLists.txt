@@ -139,6 +139,7 @@ if(BUILD_TESTING)
         tests/ball_pivot_tests.cpp tests/point_preview_tests.cpp tests/sdf_tests.cpp tests/cloth_tests.cpp
         tests/cloth_bsdf_tests.cpp tests/cloth_component_tests.cpp tests/medium_tests.cpp
         tests/volume_path_tests.cpp tests/volume_scene_tests.cpp tests/sppm_tests.cpp
+        tests/sppm_preset_tests.cpp
         tests/sppm_energy_tests.cpp)
     target_include_directories(minirender_tests PRIVATE src)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")

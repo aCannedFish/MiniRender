@@ -12,6 +12,7 @@
 #include "scene_smoke.hpp"
 #include "sdf_smoke.hpp"
 #include "sides_smoke.hpp"
+#include "sppm_smoke.hpp"
 #include "ssao_smoke.hpp"
 #include "texture_smoke.hpp"
 #include "volume_smoke.hpp"
@@ -187,17 +188,20 @@ int main(int argc, char** argv) {
         {"simulation-smoke", "Verify cloth playback and dynamic geometry.", "directory"});
     parser.addOption(
         {"volume-smoke", "Verify medium editing and offline volume rendering.", "directory"});
+    parser.addOption(
+        {"sppm-smoke", "Verify SPPM settings, caustic templates and offline tasks.", "directory"});
     parser.process(application);
     const bool smoke = parser.isSet("smoke");
-    const bool regression =
-        smoke || parser.isSet("volume-smoke") || parser.isSet("simulation-smoke") ||
-        parser.isSet("cloth-smoke") || parser.isSet("scene-smoke") ||
-        parser.isSet("texture-smoke") || parser.isSet("interaction-smoke") ||
-        parser.isSet("parameter-smoke") || parser.isSet("wire-smoke") ||
-        parser.isSet("offline-smoke") || parser.isSet("ssao-smoke") || parser.isSet("ibl-smoke") ||
-        parser.isSet("geometry-smoke") || parser.isSet("gizmo-smoke") ||
-        parser.isSet("sides-smoke") || parser.isSet("presets-smoke") ||
-        parser.isSet("adaptive-smoke") || parser.isSet("points-smoke") || parser.isSet("sdf-smoke");
+    const bool regression = smoke || parser.isSet("sppm-smoke") || parser.isSet("volume-smoke") ||
+                            parser.isSet("simulation-smoke") || parser.isSet("cloth-smoke") ||
+                            parser.isSet("scene-smoke") || parser.isSet("texture-smoke") ||
+                            parser.isSet("interaction-smoke") || parser.isSet("parameter-smoke") ||
+                            parser.isSet("wire-smoke") || parser.isSet("offline-smoke") ||
+                            parser.isSet("ssao-smoke") || parser.isSet("ibl-smoke") ||
+                            parser.isSet("geometry-smoke") || parser.isSet("gizmo-smoke") ||
+                            parser.isSet("sides-smoke") || parser.isSet("presets-smoke") ||
+                            parser.isSet("adaptive-smoke") || parser.isSet("points-smoke") ||
+                            parser.isSet("sdf-smoke");
 #ifdef Q_OS_MACOS
     RegressionActivity regression_activity(regression);
 #endif
@@ -338,6 +342,9 @@ int main(int argc, char** argv) {
         if (parser.isSet("volume-smoke")) {
             start_volume_smoke(window, parser.value("volume-smoke"), timing_only);
         }
+        if (parser.isSet("sppm-smoke")) {
+            start_sppm_smoke(window, parser.value("sppm-smoke"), timing_only);
+        }
 
         int ticks = 0;
         bool resized = false;
@@ -419,7 +426,7 @@ int main(int argc, char** argv) {
         result = application.exec();
         if (parser.isSet("geometry-smoke") || parser.isSet("adaptive-smoke") ||
             parser.isSet("points-smoke") || parser.isSet("simulation-smoke") ||
-            parser.isSet("volume-smoke")) {
+            parser.isSet("volume-smoke") || parser.isSet("sppm-smoke")) {
             geometry_cleanup.start();
         }
     }
