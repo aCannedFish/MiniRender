@@ -24,7 +24,7 @@ build/macos-core-debug/minirender_cli --capabilities
 build/macos-core-debug/minirender_cli --test-pattern /tmp/minirender-pattern.ppm
 ```
 
-当前 CLI 的 `--test-pattern` 是用于检查线性 RGB 和 sRGB 输出的诊断图，不是场景渲染结果。A2 将加入路径追踪入口。
+`--test-pattern` 生成线性 RGB 与 sRGB 的诊断图。使用 `minirender_cli --render scenes/cornell-box.json cornell` 渲染场景并写出 EXR 与 PNG；`--help` 列出场景检查和光场命令。
 
 ## 桌面程序
 

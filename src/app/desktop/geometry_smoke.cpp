@@ -857,7 +857,9 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
                     }
                     ready(window);
                     state->large = mesh_for(window.document(), "blue_cube");
-                    require(state->large->triangles.size() == 786432 && state->numeric_progress,
+                    require(state->large->triangles.size() == 786432,
+                            "Large geometry task returned the wrong number of triangles");
+                    require(state->numeric_progress,
                             "Large geometry task did not show actual numeric progress");
                     advance(Stage::large_upload);
                     return;
