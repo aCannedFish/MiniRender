@@ -51,6 +51,33 @@ RenderPreview preview(RenderSession& session, std::size_t dimension) {
 
 } // namespace
 
+TEST_CASE("PT and SPPM sessions retain paused state during rapid resume pause toggles",
+          "[session]") {
+    for (const auto kind : {IntegratorKind::path_tracing, IntegratorKind::sppm}) {
+        IntegratorSettings integrator;
+        integrator.kind = kind;
+        integrator.maximum_depth = 1;
+        integrator.sppm.photons_per_iteration = 1000;
+        RenderSession session;
+        session.start(sky(), {8, 8, 1000000, 221}, integrator, {2, 4, 1});
+        wait_until([&] {
+            const auto p = session.progress();
+            return p.state == RenderState::running && p.recorded_samples > 0;
+        });
+        REQUIRE(session.pause());
+        wait_until([&] { return session.progress().state == RenderState::paused; });
+        for (int cycle = 0; cycle < 20; ++cycle) {
+            REQUIRE(session.resume());
+            REQUIRE(session.pause());
+            wait_until([&] { return session.progress().state == RenderState::paused; });
+        }
+        session.cancel();
+        REQUIRE(session.wait_for(2s));
+        session.wait();
+        REQUIRE(session.progress().state == RenderState::cancelled);
+    }
+}
+
 TEST_CASE("Render sessions agree bitwise with serial kernels across thread and batch counts",
           "[session]") {
     const auto scene = studio();

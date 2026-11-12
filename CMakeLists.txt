@@ -67,6 +67,9 @@ add_library(minirender_core
     src/render/dipole.cpp
     src/render/subsurface.cpp
     src/render/subsurface_path.cpp
+    src/render/lightfield_camera.cpp
+    src/render/lightfield_refocus.cpp
+    src/render/lightfield_capture.cpp
     src/render/bsdf.cpp
     src/render/cloth_bsdf.cpp
     src/render/light.cpp
@@ -91,6 +94,7 @@ add_library(minirender_core
     src/assets/scene_io.cpp
     src/assets/cloth_material_io.cpp
     src/assets/subsurface_io.cpp
+    src/assets/lightfield_io.cpp
     src/assets/medium_io.cpp
     src/assets/cloth_simulation_io.cpp)
 target_include_directories(minirender_core PUBLIC include)
@@ -98,7 +102,7 @@ target_link_libraries(minirender_core PUBLIC glm::glm Threads::Threads PRIVATE m
 target_compile_definitions(minirender_core PUBLIC
     GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
-add_executable(minirender_cli src/app/cli.cpp src/app/render_cli.cpp)
+add_executable(minirender_cli src/app/cli.cpp src/app/render_cli.cpp src/app/lightfield_cli.cpp)
 target_link_libraries(minirender_cli PRIVATE minirender_core minirender_warnings)
 
 if(BUILD_TESTING)
@@ -138,6 +142,8 @@ if(BUILD_TESTING)
     add_executable(minirender_subsurface_example examples/subsurface.cpp)
     target_compile_definitions(minirender_subsurface_example PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(minirender_subsurface_example PRIVATE minirender_core minirender_warnings)
+    add_executable(minirender_lightfield_example examples/lightfield.cpp)
+    target_link_libraries(minirender_lightfield_example PRIVATE minirender_core minirender_warnings)
     add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp
         tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp tests/path_tests.cpp
         tests/session_tests.cpp tests/ssao_tests.cpp tests/ibl_tests.cpp tests/geometry_tests.cpp
@@ -152,6 +158,7 @@ if(BUILD_TESTING)
         tests/subsurface_sampling_tests.cpp
         tests/subsurface_path_tests.cpp
         tests/subsurface_scene_tests.cpp
+        tests/lightfield_tests.cpp
         tests/sppm_energy_tests.cpp)
     target_include_directories(minirender_tests PRIVATE src)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
@@ -189,6 +196,21 @@ if(BUILD_TESTING)
         "${PROJECT_SOURCE_DIR}/scenes/studio.json" "${CMAKE_CURRENT_BINARY_DIR}/invalid-path"
         --exposure 1oops)
     set_tests_properties(cli_invalid_exposure PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME cli_lightfield_capture COMMAND minirender_cli --capture-lightfield
+        "${PROJECT_SOURCE_DIR}/scenes/studio.json"
+        "${CMAKE_CURRENT_BINARY_DIR}/光场 空格/capture.mrlf"
+        --width 8 --height 6 --spp 2 --columns 3 --rows 3 --depth 2 --threads 2 --no-rr)
+    set_tests_properties(cli_lightfield_capture PROPERTIES FIXTURES_SETUP lightfield_file
+        PASS_REGULAR_EXPRESSION "Capture paths: 864")
+    add_test(NAME cli_lightfield_refocus COMMAND minirender_cli --refocus
+        "${CMAKE_CURRENT_BINARY_DIR}/光场 空格/capture.mrlf"
+        "${CMAKE_CURRENT_BINARY_DIR}/光场 空格/refocused" --focus 2 --cache-mb 0)
+    set_tests_properties(cli_lightfield_refocus PROPERTIES FIXTURES_REQUIRED lightfield_file
+        PASS_REGULAR_EXPRESSION "New rays: 0")
+    add_test(NAME cli_lightfield_reject_grid COMMAND minirender_cli --capture-lightfield
+        "${PROJECT_SOURCE_DIR}/scenes/studio.json"
+        "${CMAKE_CURRENT_BINARY_DIR}/invalid-lightfield.mrlf" --columns 4)
+    set_tests_properties(cli_lightfield_reject_grid PROPERTIES WILL_FAIL TRUE)
 endif()
 
 if(MINIRENDER_BUILD_DESKTOP)
