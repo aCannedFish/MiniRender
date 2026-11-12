@@ -11,6 +11,7 @@
 #include "realtime_panel.hpp"
 #include "scene_id.hpp"
 #include "sdf_panel.hpp"
+#include "subsurface_material_panel.hpp"
 #include "volume_panel.hpp"
 
 #include <minirender/assets/scene_io.hpp>
@@ -642,8 +643,8 @@ void Workbench::build_object_panel() {
     emission_ = new VectorField(object_panel_, "emission", 0, 1000000);
     material_kind_ = new QComboBox;
     material_kind_->setObjectName("material_kind");
-    material_kind_->addItems(
-        {"漫反射", "金属", "镜面（预览近似）", "玻璃（预览近似）", "布料（微圆柱）"});
+    material_kind_->addItems({"漫反射", "金属", "镜面（预览近似）", "玻璃（预览近似）",
+                              "布料（微圆柱）", "次表面散射（SSS）"});
     texture_selector_ = new QComboBox;
     texture_selector_->setObjectName("base_texture");
     texture_filter_ = new QComboBox;
@@ -665,6 +666,10 @@ void Workbench::build_object_panel() {
             [&](minirender::SceneObject& object) { object.cloth_collider = collider; });
     };
     layout->addRow("材质", material_kind_);
+    material_notice_ = new QLabel(object_panel_);
+    material_notice_->setObjectName("material_notice");
+    material_notice_->setWordWrap(true);
+    layout->addRow(material_notice_);
     layout->addRow(double_sided_);
     layout->addRow("底色 / 线性 RGB", base_color_);
     layout->addRow("底色纹理 / RGB", texture_selector_);
@@ -688,6 +693,28 @@ void Workbench::build_object_panel() {
                 }
             });
         };
+    subsurface_material_ = new SubsurfaceMaterialPanel(object_panel_);
+    layout->addRow(subsurface_material_);
+    subsurface_material_->on_changed = [this](auto parameters, std::optional<double> ior) {
+        edit_material_property([&](minirender::Material& material) {
+            material.subsurface = parameters;
+            if (ior) {
+                material.ior = static_cast<float>(*ior);
+            }
+        });
+    };
+    subsurface_material_->render_active = [this] {
+        return offline_ && (!minirender::render_terminal(offline_->session().progress().state) ||
+                            offline_->exporting());
+    };
+    subsurface_material_->on_render = [this](bool start) {
+        if (start && minirender::render_terminal(offline_->session().progress().state) &&
+            !offline_->exporting()) {
+            offline_->set_integrator_kind(minirender::IntegratorKind::path_tracing);
+            offline_->start();
+        }
+        findChild<QTabWidget*>("inspector_tabs")->setCurrentIndex(3);
+    };
     translation_->on_changed = [this] {
         edit_object_property([&](minirender::SceneObject& object) {
             object.transform.translation = translation_->value();
@@ -730,8 +757,26 @@ void Workbench::build_object_panel() {
         });
     });
     connect(material_kind_, &QComboBox::currentIndexChanged, this, [this] {
+        if (refreshing_) {
+            return;
+        }
+        const auto kind = static_cast<minirender::MaterialKind>(material_kind_->currentIndex());
+        if (kind == minirender::MaterialKind::subsurface) {
+            for (const auto& object : editor_.document().objects) {
+                if (object.id != selected_id_) {
+                    continue;
+                }
+                for (const auto& material : editor_.document().materials) {
+                    if (material.id == object.material_id && !material.base_color_texture.empty()) {
+                        refresh_properties();
+                        material_notice_->setText("请先移除底色纹理，再使用均匀 SSS 材质。");
+                        return;
+                    }
+                }
+            }
+        }
         edit_material_property([&](minirender::Material& material) {
-            material.kind = static_cast<minirender::MaterialKind>(material_kind_->currentIndex());
+            material.kind = kind;
             if (material.kind == minirender::MaterialKind::cloth) {
                 material.ior = std::clamp(material.ior, 1.0F, 3.0F);
                 if (!material.cloth) {
@@ -739,6 +784,14 @@ void Workbench::build_object_panel() {
                     material.cloth = preset.appearance;
                     material.ior = static_cast<float>(preset.ior);
                     material.base_color = glm::vec3(1);
+                }
+            }
+            if (kind == minirender::MaterialKind::subsurface) {
+                material.ior = std::clamp(material.ior, 1.0F, 3.0F);
+                if (!material.subsurface) {
+                    const auto preset = minirender::make_subsurface_preset("marble");
+                    material.subsurface = preset.parameters;
+                    material.ior = static_cast<float>(preset.ior);
                 }
             }
         });
@@ -916,7 +969,9 @@ void Workbench::refresh_properties() {
                                                                    : std::nullopt);
     if (object == document.objects.end()) {
         cloth_material_->set_material(nullptr, document_generation_);
+        subsurface_material_->set_material(nullptr, document_generation_);
     }
+    material_notice_->clear();
     viewport_->set_gizmo_target(
         object != document.objects.end() && object->visible ? object->id : "",
         object != document.objects.end() && object->visible ? std::optional(object->transform)
@@ -932,9 +987,14 @@ void Workbench::refresh_properties() {
                 emission_->set_value(material.emission);
                 material_kind_->setCurrentIndex(static_cast<int>(material.kind));
                 const bool cloth = material.kind == minirender::MaterialKind::cloth;
-                roughness_->setEnabled(!cloth);
-                ior_->setRange(cloth ? 1 : .1, cloth ? 3 : 5);
+                const bool subsurface = material.kind == minirender::MaterialKind::subsurface;
+                roughness_->setEnabled(!cloth && !subsurface);
+                base_color_->setEnabled(!subsurface);
+                texture_selector_->setEnabled(!subsurface);
+                texture_filter_->setEnabled(!subsurface);
+                ior_->setRange(cloth || subsurface ? 1 : .1, cloth || subsurface ? 3 : 5);
                 cloth_material_->set_material(&material, document_generation_);
+                subsurface_material_->set_material(&material, document_generation_);
                 roughness_->setValue(material.roughness);
                 ior_->setValue(material.ior);
                 double_sided_->setChecked(material.double_sided);
@@ -1211,6 +1271,12 @@ void Workbench::import_builtin_scene(const QString& id) {
         findChild<QComboBox*>("view_mode")->setCurrentIndex(preset.normal_preview ? 1 : 0);
         if (!editor_.document().media.empty()) {
             findChild<QTabWidget*>("inspector_tabs")->setCurrentIndex(10);
+        }
+        for (const auto& material : editor_.document().materials) {
+            if (material.kind == minirender::MaterialKind::subsurface) {
+                findChild<QTabWidget*>("inspector_tabs")->setCurrentIndex(0);
+                break;
+            }
         }
         setWindowTitle("MiniRender — " + preset.name + "（示例副本）");
         statusBar()->showMessage(
@@ -1609,15 +1675,23 @@ void Workbench::import_texture_file(const QString& path, minirender::ColorEncodi
                 report_error(std::runtime_error(result.error));
                 return;
             }
+            bool subsurface_target = false;
             perform_edit([&](minirender::SceneDocument& scene) {
                 const auto id = unique_id(scene.textures, "texture_");
                 scene.textures.push_back({id, source, encoding, result.value});
                 for (auto& material : scene.materials) {
                     if (material.id == material_id) {
-                        material.base_color_texture = id;
+                        if (material.kind == minirender::MaterialKind::subsurface) {
+                            subsurface_target = true;
+                        } else {
+                            material.base_color_texture = id;
+                        }
                     }
                 }
             });
+            if (subsurface_target) {
+                material_notice_->setText("纹理已导入资源；均匀 SSS 材质不使用底色纹理。");
+            }
         });
 }
 

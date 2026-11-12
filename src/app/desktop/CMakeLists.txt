@@ -28,8 +28,11 @@ qt_add_executable(minirender_desktop
     gpu_texture.cpp gpu_texture.hpp
     gpu_ibl.cpp gpu_ibl.hpp
     gpu_cloth.cpp gpu_cloth.hpp
+    gpu_subsurface.cpp gpu_subsurface.hpp
     cloth_smoke.cpp cloth_smoke.hpp
     cloth_material_panel.cpp cloth_material_panel.hpp
+    subsurface_material_panel.cpp subsurface_material_panel.hpp
+    subsurface_smoke.cpp subsurface_smoke.hpp
     cloth_controller.cpp cloth_controller.hpp
     cloth_panel.cpp cloth_panel.hpp cloth_workbench.cpp
     volume_panel.cpp volume_panel.hpp

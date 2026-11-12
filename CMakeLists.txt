@@ -151,6 +151,7 @@ if(BUILD_TESTING)
         tests/dipole_tests.cpp
         tests/subsurface_sampling_tests.cpp
         tests/subsurface_path_tests.cpp
+        tests/subsurface_scene_tests.cpp
         tests/sppm_energy_tests.cpp)
     target_include_directories(minirender_tests PRIVATE src)
     target_compile_definitions(minirender_tests PRIVATE MINIRENDER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")

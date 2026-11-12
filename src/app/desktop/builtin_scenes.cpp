@@ -2,8 +2,8 @@
 
 #include <QCoreApplication>
 
-const std::array<BuiltinScene, 9>& builtin_scenes() {
-    static const std::array<BuiltinScene, 9> scenes{
+const std::array<BuiltinScene, 13>& builtin_scenes() {
+    static const std::array<BuiltinScene, 13> scenes{
         {{"cornell",
           "Cornell Box · 经典",
           "cornell-box.json",
@@ -79,7 +79,39 @@ const std::array<BuiltinScene, 9>& builtin_scenes() {
           {320, 320, 128, 101},
           {.maximum_depth = 8,
            .kind = minirender::IntegratorKind::sppm,
-           .sppm = {.photons_per_iteration = 40000, .initial_radius = .12}}}}};
+           .sppm = {.photons_per_iteration = 40000, .initial_radius = .12}}},
+         {"sss_marble",
+          "SSS · 大理石球",
+          "sss-marble.json",
+          "10cm Cornell 房间中的大理石球，使用测量光学系数观察离线扩散。",
+          "glass_ball",
+          true,
+          {320, 320, 128, 101},
+          {.maximum_depth = 8}},
+         {"sss_wax",
+          "SSS · 蜡球",
+          "sss-wax.json",
+          "编辑蜡的 RGB 吸收、约化散射与密度，比较离线扩散范围。",
+          "glass_ball",
+          true,
+          {320, 320, 128, 101},
+          {.maximum_depth = 8}},
+         {"sss_marble_edge",
+          "SSS · 大理石侧面扩散",
+          "sss-marble-edge.json",
+          "顶部方向光照射40mm方块，观察光沿表面进入侧面。实时使用表面近似。",
+          "block",
+          false,
+          {320, 320, 256, 101},
+          {.maximum_depth = 8}},
+         {"sss_wax_edge",
+          "SSS · 蜡侧面扩散",
+          "sss-wax-edge.json",
+          "暖色蜡方块的跨位置散射，导入后可编辑光学系数和照明。",
+          "block",
+          false,
+          {320, 320, 256, 101},
+          {.maximum_depth = 8}}}};
     return scenes;
 }
 QString builtin_scene_directory() {

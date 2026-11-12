@@ -1,0 +1,355 @@
+{
+  "version": 1,
+  "camera": {
+    "position": [
+      0.0,
+      0.051000000000000004,
+      0.17
+    ],
+    "target": [
+      0.0,
+      0.05,
+      0.0
+    ],
+    "up": [
+      0,
+      1,
+      0
+    ],
+    "vertical_fov": 39,
+    "near": 0.0015,
+    "far": 5.0,
+    "focus_distance": 0.2
+  },
+  "environment": [
+    0,
+    0,
+    0
+  ],
+  "materials": [
+    {
+      "id": "mat_floor",
+      "name": "floor",
+      "kind": "diffuse",
+      "base_color": [
+        0.73,
+        0.73,
+        0.73
+      ],
+      "roughness": 0.5,
+      "double_sided": false
+    },
+    {
+      "id": "mat_ceiling",
+      "name": "ceiling",
+      "kind": "diffuse",
+      "base_color": [
+        0.73,
+        0.73,
+        0.73
+      ],
+      "roughness": 0.5,
+      "double_sided": false
+    },
+    {
+      "id": "mat_back",
+      "name": "back",
+      "kind": "diffuse",
+      "base_color": [
+        0.73,
+        0.73,
+        0.73
+      ],
+      "roughness": 0.5,
+      "double_sided": false
+    },
+    {
+      "id": "mat_left",
+      "name": "left",
+      "kind": "diffuse",
+      "base_color": [
+        0.65,
+        0.05,
+        0.04
+      ],
+      "roughness": 0.5,
+      "double_sided": false
+    },
+    {
+      "id": "mat_right",
+      "name": "right",
+      "kind": "diffuse",
+      "base_color": [
+        0.12,
+        0.45,
+        0.15
+      ],
+      "roughness": 0.5,
+      "double_sided": false
+    },
+    {
+      "id": "mat_lamp",
+      "name": "lamp",
+      "kind": "diffuse",
+      "base_color": [
+        0,
+        0,
+        0
+      ],
+      "roughness": 0.5,
+      "double_sided": false,
+      "emission": [
+        14,
+        13.5,
+        12
+      ]
+    },
+    {
+      "id": "mat_glass_ball",
+      "name": "wax",
+      "kind": "subsurface",
+      "base_color": [
+        0.98,
+        1,
+        0.99
+      ],
+      "roughness": 0.5,
+      "double_sided": true,
+      "ior": 1.44,
+      "subsurface": {
+        "absorption": [
+          12,
+          35,
+          80
+        ],
+        "reduced_scattering": [
+          450,
+          550,
+          700
+        ],
+        "density": 0.5
+      }
+    },
+    {
+      "id": "mat_gold_ball",
+      "name": "gold_ball",
+      "kind": "conductor",
+      "base_color": [
+        0.95,
+        0.67,
+        0.3
+      ],
+      "roughness": 0.17,
+      "double_sided": false
+    }
+  ],
+  "meshes": [
+    {
+      "id": "plane",
+      "source": "assets/plane.obj"
+    },
+    {
+      "id": "cube",
+      "source": "assets/cube.obj"
+    },
+    {
+      "id": "sphere",
+      "source": "assets/demo-sphere.obj"
+    }
+  ],
+  "objects": [
+    {
+      "id": "floor",
+      "name": "地面",
+      "mesh": "plane",
+      "material": "mat_floor",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.05,
+          0.05,
+          0.05
+        ]
+      }
+    },
+    {
+      "id": "ceiling",
+      "name": "天花板",
+      "mesh": "plane",
+      "material": "mat_ceiling",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0.0,
+          0.1,
+          0.0
+        ],
+        "rotation": [
+          180,
+          0,
+          0
+        ],
+        "scale": [
+          0.05,
+          0.05,
+          0.05
+        ]
+      }
+    },
+    {
+      "id": "back",
+      "name": "后墙",
+      "mesh": "plane",
+      "material": "mat_back",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0.0,
+          0.05,
+          -0.05
+        ],
+        "rotation": [
+          90,
+          0,
+          0
+        ],
+        "scale": [
+          0.05,
+          0.05,
+          0.05
+        ]
+      }
+    },
+    {
+      "id": "left",
+      "name": "红色左墙",
+      "mesh": "plane",
+      "material": "mat_left",
+      "visible": true,
+      "transform": {
+        "translation": [
+          -0.05,
+          0.05,
+          0.0
+        ],
+        "rotation": [
+          0,
+          0,
+          -90
+        ],
+        "scale": [
+          0.05,
+          0.05,
+          0.05
+        ]
+      }
+    },
+    {
+      "id": "right",
+      "name": "绿色右墙",
+      "mesh": "plane",
+      "material": "mat_right",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0.05,
+          0.05,
+          0.0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ],
+        "scale": [
+          0.05,
+          0.05,
+          0.05
+        ]
+      }
+    },
+    {
+      "id": "lamp",
+      "name": "顶部面积光",
+      "mesh": "plane",
+      "material": "mat_lamp",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0.0,
+          0.09925,
+          -0.0075
+        ],
+        "rotation": [
+          180,
+          0,
+          0
+        ],
+        "scale": [
+          0.016,
+          0.05,
+          0.013500000000000002
+        ]
+      }
+    },
+    {
+      "id": "glass_ball",
+      "name": "玻璃球",
+      "mesh": "sphere",
+      "material": "mat_glass_ball",
+      "visible": true,
+      "transform": {
+        "translation": [
+          -0.021500000000000002,
+          0.020000000000000004,
+          0.015
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.020000000000000004,
+          0.020000000000000004,
+          0.020000000000000004
+        ]
+      }
+    },
+    {
+      "id": "gold_ball",
+      "name": "金属球",
+      "mesh": "sphere",
+      "material": "mat_gold_ball",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0.021500000000000002,
+          0.024,
+          -0.0125
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.024,
+          0.024,
+          0.024
+        ]
+      }
+    }
+  ],
+  "directional_lights": []
+}

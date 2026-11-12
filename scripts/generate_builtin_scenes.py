@@ -277,6 +277,79 @@ def caustic_scenes(glass):
     return {"sppm-glass": copy.deepcopy(glass), "sppm-mirror": mirror}
 
 
+def subsurface_scenes(glass):
+    """10cm Cornell 房间和40mm方块使用米制光学参数，保留普通场景编辑结构。"""
+    result = {}
+    for name, absorption, scattering, density, ior in [
+        ("marble", [2.1, 4.1, 7.1], [2190, 2620, 3000], 1, 1.5),
+        ("wax", [12, 35, 80], [450, 550, 700], 0.5, 1.44),
+    ]:
+        scene = copy.deepcopy(glass)
+        for obj in scene["objects"]:
+            for key in ("translation", "scale"):
+                obj["transform"][key] = [v * 0.05 for v in obj["transform"][key]]
+        for key in ("position", "target"):
+            scene["camera"][key] = [v * 0.05 for v in scene["camera"][key]]
+        for key in ("near", "far"):
+            scene["camera"][key] *= 0.05
+        scene["camera"]["focus_distance"] = 0.2
+        material_value = next(
+            m for m in scene["materials"] if m["id"] == "mat_glass_ball"
+        )
+        material_value["kind"] = "subsurface"
+        material_value["name"] = name
+        material_value["ior"] = ior
+        material_value["subsurface"] = {
+            "absorption": absorption,
+            "reduced_scattering": scattering,
+            "density": density,
+        }
+        result[f"sss-{name}"] = scene
+        edge = copy.deepcopy(scene)
+        block_material = copy.deepcopy(material_value)
+        block_material["id"] = "block"
+        edge["materials"] = [block_material, material("floor", [0.12] * 3)]
+        edge["objects"] = []
+        for identifier, mesh, mat, position, scale in [
+            ("block", "cube", "block", [0, 0, 0], [0.04] * 3),
+            ("floor", "plane", "mat_floor", [0, -0.0201, 0], [0.1, 1, 0.1]),
+        ]:
+            edge["objects"].append(
+                {
+                    "id": identifier,
+                    "name": "SSS 方块" if identifier == "block" else "地面",
+                    "mesh": mesh,
+                    "material": mat,
+                    "visible": True,
+                    "transform": {
+                        "translation": position,
+                        "rotation": [0, 0, 0],
+                        "scale": scale,
+                    },
+                }
+            )
+        edge["camera"].update(
+            {
+                "position": [0.065, 0.045, 0.12],
+                "target": [0, 0, 0],
+                "vertical_fov": 35,
+                "near": 0.001,
+                "far": 2,
+            }
+        )
+        edge["environment"] = [0.01] * 3
+        edge["directional_lights"] = [
+            {
+                "id": "sun",
+                "direction": [0, -1, 0],
+                "color": [1, 0.95, 0.9],
+                "intensity": 5,
+            }
+        ]
+        result[f"sss-{name}-edge"] = edge
+    return result
+
+
 def main():
     sphere()
     classic = room()
@@ -377,6 +450,7 @@ def main():
         ("material-balls", balls),
         *volume_scenes(classic).items(),
         *caustic_scenes(glass).items(),
+        *subsurface_scenes(glass).items(),
     ]:
         (ROOT / f"{name}.json").write_text(
             json.dumps(scene, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"

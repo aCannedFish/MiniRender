@@ -561,6 +561,16 @@ minirender::IntegratorSettings OfflinePanel::integrator_settings() const {
     result.sppm = sppm_options_;
     return result;
 }
+void OfflinePanel::set_integrator_kind(minirender::IntegratorKind kind) {
+    if (!minirender::render_terminal(session_->progress().state) || exporting_) {
+        throw std::logic_error("Cannot change an active render backend");
+    }
+    if (kind != minirender::IntegratorKind::path_tracing &&
+        kind != minirender::IntegratorKind::sppm) {
+        throw std::invalid_argument("Unknown render backend");
+    }
+    backend_->setCurrentIndex(kind == minirender::IntegratorKind::sppm ? 1 : 0);
+}
 const minirender::RenderSession& OfflinePanel::session() const noexcept {
     return *session_;
 }

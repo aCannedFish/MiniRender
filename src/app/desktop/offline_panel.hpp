@@ -34,6 +34,7 @@ class OfflinePanel final : public QWidget {
     bool exporting() const noexcept;
     bool stale() const noexcept;
     minirender::IntegratorSettings integrator_settings() const;
+    void set_integrator_kind(minirender::IntegratorKind kind);
     const minirender::RenderSession& session() const noexcept;
 
   private:

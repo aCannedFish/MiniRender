@@ -237,6 +237,7 @@ void SceneRenderer::upload_scene() {
     QElapsedTimer timer;
     timer.start();
     const auto& scene = *window_->scene();
+    subsurface_previews_.begin_scene();
     std::set<MeshHandle, std::owner_less<MeshHandle>> used;
     std::vector<Draw> draws;
     std::vector<GpuInstance> instances;
@@ -295,6 +296,8 @@ void SceneRenderer::upload_scene() {
             instance.base_color_texture ? instance.base_color_texture : white_texture_;
         draws.push_back({instance.mesh, texture});
         const auto& material = instance.material;
+        const bool subsurface = material.kind == minirender::MaterialKind::subsurface;
+        const auto color = subsurface ? subsurface_previews_.color(material) : material.base_color;
         const float metallic = material.kind == minirender::MaterialKind::conductor ||
                                        material.kind == minirender::MaterialKind::mirror
                                    ? 1.0F
@@ -302,12 +305,13 @@ void SceneRenderer::upload_scene() {
         instances.push_back(
             {instance.object_to_world,
              glm::mat4(instance.normal_to_world),
-             glm::vec4(material.base_color, 1),
+             glm::vec4(color, 1),
              glm::vec4(material.emission, 0),
-             {material.roughness, metallic, static_cast<float>(material.texture_filter),
-              material.double_sided ? 1.0F : 0.0F},
+             {subsurface ? .35F : material.roughness, metallic,
+              static_cast<float>(material.texture_filter), material.double_sided ? 1.0F : 0.0F},
              pack_cloth(material)});
     }
+    subsurface_previews_.end_scene();
     // 一帧在途，当前帧开始前 fence 已完成，未引用的网格可以安全回收。
     std::erase_if(meshes_, [&](const auto& entry) { return !used.contains(entry.first); });
     bool descriptors_changed = draws.size() != draws_.size();

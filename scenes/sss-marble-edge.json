@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "camera": {
+    "position": [
+      0.065,
+      0.045,
+      0.12
+    ],
+    "target": [
+      0,
+      0,
+      0
+    ],
+    "up": [
+      0,
+      1,
+      0
+    ],
+    "vertical_fov": 35,
+    "near": 0.001,
+    "far": 2,
+    "focus_distance": 0.2
+  },
+  "environment": [
+    0.01,
+    0.01,
+    0.01
+  ],
+  "materials": [
+    {
+      "id": "block",
+      "name": "marble",
+      "kind": "subsurface",
+      "base_color": [
+        0.98,
+        1,
+        0.99
+      ],
+      "roughness": 0.5,
+      "double_sided": true,
+      "ior": 1.5,
+      "subsurface": {
+        "absorption": [
+          2.1,
+          4.1,
+          7.1
+        ],
+        "reduced_scattering": [
+          2190,
+          2620,
+          3000
+        ],
+        "density": 1
+      }
+    },
+    {
+      "id": "mat_floor",
+      "name": "floor",
+      "kind": "diffuse",
+      "base_color": [
+        0.12,
+        0.12,
+        0.12
+      ],
+      "roughness": 0.5,
+      "double_sided": false
+    }
+  ],
+  "meshes": [
+    {
+      "id": "plane",
+      "source": "assets/plane.obj"
+    },
+    {
+      "id": "cube",
+      "source": "assets/cube.obj"
+    },
+    {
+      "id": "sphere",
+      "source": "assets/demo-sphere.obj"
+    }
+  ],
+  "objects": [
+    {
+      "id": "block",
+      "name": "SSS 方块",
+      "mesh": "cube",
+      "material": "block",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.04,
+          0.04,
+          0.04
+        ]
+      }
+    },
+    {
+      "id": "floor",
+      "name": "地面",
+      "mesh": "plane",
+      "material": "mat_floor",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0,
+          -0.0201,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.1,
+          1,
+          0.1
+        ]
+      }
+    }
+  ],
+  "directional_lights": [
+    {
+      "id": "sun",
+      "direction": [
+        0,
+        -1,
+        0
+      ],
+      "color": [
+        1,
+        0.95,
+        0.9
+      ],
+      "intensity": 5
+    }
+  ]
+}

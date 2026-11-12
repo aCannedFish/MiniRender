@@ -27,6 +27,7 @@ class ClothColliderPanel;
 class ClothController;
 class ClothPanel;
 class VolumePanel;
+class SubsurfaceMaterialPanel;
 struct ClothRuntimeFrame;
 namespace minirender {
 struct ClothDefinition;
@@ -121,6 +122,8 @@ class Workbench final : public QMainWindow {
     PointCloudPanel* points_ = nullptr;
     SdfPanel* sdf_ = nullptr;
     ClothMaterialPanel* cloth_material_ = nullptr;
+    SubsurfaceMaterialPanel* subsurface_material_ = nullptr;
+    QLabel* material_notice_ = nullptr;
     ClothColliderPanel* cloth_collider_ = nullptr;
     ClothController* cloth_controller_ = nullptr;
     ClothPanel* cloth_panel_ = nullptr;
