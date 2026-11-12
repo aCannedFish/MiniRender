@@ -5,6 +5,13 @@
 #include <stdexcept>
 
 namespace minirender {
+std::uint64_t lightfield_refocus_scratch_bytes(const RenderSettings& render) {
+    render.validate();
+    return std::uint64_t(render.width) * render.height *
+               (sizeof(glm::dvec3) + sizeof(std::uint16_t) + sizeof(float) +
+                2 * sizeof(glm::vec3)) +
+           65536;
+}
 
 LightFieldReconstruction refocus_lightfield(LightFieldReader& reader,
                                             LightFieldRefocusSettings settings,
@@ -21,10 +28,8 @@ LightFieldReconstruction refocus_lightfield(LightFieldReader& reader,
     }
     const auto pixels = c.render.width * c.render.height;
     const std::uint64_t required =
-        std::uint64_t(pixels) *
-            (sizeof(glm::dvec3) + sizeof(std::uint16_t) + sizeof(float) + sizeof(glm::vec3)) +
-        c.view_bytes() + std::min(reader.cache_budget_bytes(), c.view_bytes() * c.view_count()) +
-        65536;
+        lightfield_refocus_scratch_bytes(c.render) +
+        std::min(reader.cache_budget_bytes(), c.view_bytes() * c.view_count());
     if (required > settings.memory_budget_bytes) {
         throw std::length_error("Light field refocus memory budget exceeded; reduce image/cache "
                                 "size or increase the budget");

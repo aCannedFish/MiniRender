@@ -1,0 +1,139 @@
+{
+  "version": 1,
+  "camera": {
+    "position": [
+      0,
+      1,
+      5
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "up": [
+      0,
+      1,
+      0
+    ],
+    "vertical_fov": 45,
+    "near": 0.05,
+    "far": 100,
+    "aperture_radius": 0.2,
+    "focus_distance": 4
+  },
+  "environment": [
+    0,
+    0,
+    0
+  ],
+  "directional_lights": [
+    {
+      "id": "sun",
+      "direction": [
+        0,
+        0,
+        -1
+      ],
+      "color": [
+        1,
+        1,
+        1
+      ],
+      "intensity": 3.141592653589793
+    }
+  ],
+  "meshes": [
+    {
+      "id": "card",
+      "source": "assets/lightfield-card.obj"
+    }
+  ],
+  "textures": [
+    {
+      "id": "checker",
+      "source": "assets/lightfield-checker.png",
+      "encoding": "linear"
+    }
+  ],
+  "materials": [
+    {
+      "id": "mat_near",
+      "name": "near",
+      "kind": "diffuse",
+      "base_color": [
+        0.9,
+        0.15,
+        0.1
+      ],
+      "roughness": 0.5,
+      "double_sided": false,
+      "base_color_texture": "checker",
+      "texture_filter": "nearest"
+    },
+    {
+      "id": "mat_far",
+      "name": "far",
+      "kind": "diffuse",
+      "base_color": [
+        0.12,
+        0.35,
+        0.9
+      ],
+      "roughness": 0.5,
+      "double_sided": false,
+      "base_color_texture": "checker",
+      "texture_filter": "nearest"
+    }
+  ],
+  "objects": [
+    {
+      "id": "near",
+      "name": "近红棋盘",
+      "mesh": "card",
+      "material": "mat_near",
+      "visible": true,
+      "transform": {
+        "translation": [
+          -0.36,
+          1,
+          3
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.6,
+          0.9,
+          1
+        ]
+      }
+    },
+    {
+      "id": "far",
+      "name": "远蓝棋盘",
+      "mesh": "card",
+      "material": "mat_far",
+      "visible": true,
+      "transform": {
+        "translation": [
+          1.08,
+          1,
+          -1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.8,
+          2.7,
+          1
+        ]
+      }
+    }
+  ]
+}

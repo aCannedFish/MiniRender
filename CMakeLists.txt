@@ -158,6 +158,7 @@ if(BUILD_TESTING)
         tests/subsurface_sampling_tests.cpp
         tests/subsurface_path_tests.cpp
         tests/subsurface_scene_tests.cpp
+        tests/lightfield_scene_tests.cpp
         tests/lightfield_tests.cpp
         tests/sppm_energy_tests.cpp)
     target_include_directories(minirender_tests PRIVATE src)

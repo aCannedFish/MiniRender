@@ -35,6 +35,8 @@ qt_add_executable(minirender_desktop
     subsurface_smoke.cpp subsurface_smoke.hpp
     cloth_controller.cpp cloth_controller.hpp
     cloth_panel.cpp cloth_panel.hpp cloth_workbench.cpp
+    lightfield_smoke.cpp lightfield_smoke.hpp
+    lightfield_panel.cpp lightfield_panel.hpp lightfield_controller.cpp lightfield_controller.hpp
     volume_panel.cpp volume_panel.hpp
     volume_smoke.cpp volume_smoke.hpp
     sppm_smoke.cpp sppm_smoke.hpp

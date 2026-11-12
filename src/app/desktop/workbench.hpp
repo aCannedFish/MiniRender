@@ -27,6 +27,8 @@ class ClothColliderPanel;
 class ClothController;
 class ClothPanel;
 class VolumePanel;
+class LightFieldPanel;
+class LightFieldController;
 class SubsurfaceMaterialPanel;
 struct ClothRuntimeFrame;
 namespace minirender {
@@ -70,6 +72,9 @@ class Workbench final : public QMainWindow {
     bool texture_loading() const noexcept;
     bool asset_loading() const noexcept;
     OfflinePanel* offline_panel() const noexcept;
+    LightFieldController* lightfield_controller() const noexcept;
+    LightFieldPanel* lightfield_panel() const noexcept;
+    void export_display_hdr(const QString& path);
     IblController* ibl_controller() const noexcept;
     void import_environment_file(const QString& path);
 
@@ -128,6 +133,9 @@ class Workbench final : public QMainWindow {
     ClothController* cloth_controller_ = nullptr;
     ClothPanel* cloth_panel_ = nullptr;
     VolumePanel* volume_ = nullptr;
+    LightFieldPanel* lightfield_panel_ = nullptr;
+    LightFieldController* lightfield_ = nullptr;
+    void mark_snapshot_changed();
     std::string cloth_target_;
     QLineEdit* object_name_ = nullptr;
     VectorField* translation_ = nullptr;

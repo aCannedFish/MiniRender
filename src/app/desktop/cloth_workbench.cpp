@@ -136,7 +136,7 @@ bool Workbench::accept_cloth_frame(const ClothRuntimeFrame& frame) {
     const auto mesh = frame.frame.component->mesh();
     viewport_->supply_raster_mesh(mesh, frame.raster);
     viewport_->set_scene(editor_.snapshot());
-    offline_->scene_changed();
+    mark_snapshot_changed();
     if (frame.history) {
         undo_->setEnabled(editor_.can_undo());
         redo_->setEnabled(editor_.can_redo());
