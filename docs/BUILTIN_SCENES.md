@@ -15,8 +15,12 @@
 | 透光孔光束 | 方向光穿过真实顶板孔洞形成光束 | 320×320、128 spp、深度 12 |
 | SPPM · 玻璃焦散 | 玻璃球聚光及地面焦散 | 320×320、128 轮、每轮 40000 光子、深度 8 |
 | SPPM · 镜中焦散 | 通过镜面后墙观察玻璃球及焦散 | 320×320、128 轮、每轮 40000 光子、深度 8 |
+| SSS · 大理石球 | 10cm Cornell 房间中的测量光学参数 | 320×320、128 spp、深度 8 |
+| SSS · 蜡球 | 比较吸收、约化散射和密度 | 320×320、128 spp、深度 8 |
+| SSS · 大理石侧面扩散 | 顶部受光、侧面出射的40mm方块 | 320×320、256 spp、深度 8 |
+| SSS · 蜡侧面扩散 | 暖色蜡的跨位置散射 | 320×320、256 spp、深度 8 |
 
-所有示例使用 seed=101 和 Russian roulette。前七个示例默认 PT/MIS，两个焦散示例默认 SPPM、初始半径 0.12m 和 α=0.7。参数可在“离线”页调整。界面显示实际完成的样本或迭代，并报告当前阶段进度。
+所有示例使用 seed=101 和 Russian roulette。普通与 SSS 示例默认 PT/MIS，两个焦散示例默认 SPPM、初始半径 0.12m 和 α=0.7。参数可在“离线”页调整。界面显示实际完成的样本或迭代，并报告当前阶段进度。
 
 ## 编辑与保存
 
@@ -40,6 +44,7 @@ Cornell 场景由顶部面积光照明，环境设为黑色。实时预览暂不
 - `scenes/assets/demo-sphere.obj`：闭合单位球。
 - `scenes/volume-*.json`、`scenes/assets/volume-aperture.obj`：介质场景和透光顶板。
 - `scenes/sppm-*.json`：玻璃焦散和镜面观察场景。
+- `scenes/sss-*.json`：大理石、蜡和侧面扩散场景，操作见 [SSS 界面](SUBSURFACE_UI.md)。
 - `src/app/desktop/builtin_scenes.*`：菜单信息、推荐参数和包内路径。
 - `Workbench::import_builtin_scene`：后台覆盖导入、编辑状态和模板保存路径。
 - `OfflinePanel::prepare_import`：异步取消旧任务并应用新参数。

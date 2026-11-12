@@ -11,6 +11,7 @@
 #include <QDir>
 #include <QDoubleSpinBox>
 #include <QFile>
+#include <QPushButton>
 #include <QSpinBox>
 #include <QTimer>
 #include <QToolButton>
@@ -157,16 +158,27 @@ void start_presets_smoke(Workbench& window, const QString& directory) {
                             int(preset.integrator.sppm.photons_per_iteration),
                         "Preset photon recommendation missing");
                 window.select_object(preset.selected_object);
+                const bool subsurface =
+                    std::any_of(state->original_scene.materials.begin(),
+                                state->original_scene.materials.end(), [](const auto& material) {
+                                    return material.kind == minirender::MaterialKind::subsurface;
+                                });
+                const double displacement = subsurface ? .0007 : .07;
                 auto* x = window.findChild<QDoubleSpinBox*>("translation.x");
                 const auto before = x->value();
-                x->setValue(before + 0.07);
+                x->setValue(before + displacement);
                 require(x->value() != before, "Imported object cannot be edited");
                 window.findChild<QAction*>("undo")->trigger();
                 require(std::abs(x->value() - before) < 1e-5, "Imported object undo failed");
                 window.findChild<QAction*>("redo")->trigger();
                 const auto edited_material_id =
                     object(window.document(), preset.selected_object).material_id;
-                window.findChild<QDoubleSpinBox*>("roughness")->setValue(0.37);
+                if (subsurface) {
+                    window.findChild<QDoubleSpinBox*>("subsurface_density")->setValue(.73);
+                    window.findChild<QPushButton*>("subsurface_apply")->click();
+                } else {
+                    window.findChild<QDoubleSpinBox*>("roughness")->setValue(0.37);
+                }
                 std::string emitter_id, emitter_material_id;
                 for (const auto& source : state->original_scene.objects) {
                     const auto material =
@@ -195,7 +207,7 @@ void start_presets_smoke(Workbench& window, const QString& directory) {
                     intensity->setValue(new_light);
                 }
                 auto* camera_x = window.findChild<QDoubleSpinBox*>("camera_position.x");
-                const double new_camera_x = camera_x->value() + 0.05;
+                const double new_camera_x = camera_x->value() + (subsurface ? .0005 : .05);
                 camera_x->setValue(new_camera_x);
                 const auto saved = directory + "/编辑 " + preset.id + ".json";
                 window.save_scene_file(saved);
@@ -204,15 +216,22 @@ void start_presets_smoke(Workbench& window, const QString& directory) {
                     std::find_if(window.document().objects.begin(), window.document().objects.end(),
                                  [&](const auto& o) { return o.id == preset.selected_object; });
                 require(object != window.document().objects.end() &&
-                            std::abs(object->transform.translation.x - before - 0.07) < 1e-5,
+                            std::abs(object->transform.translation.x - before - displacement) <
+                                1e-5,
                         "Preset edits did not survive scene IO");
                 const auto& materials = window.document().materials;
                 const auto edited_material =
                     std::find_if(materials.begin(), materials.end(),
                                  [&](const auto& m) { return m.id == edited_material_id; });
-                require(edited_material != materials.end() &&
-                            std::abs(edited_material->roughness - .37F) < 1e-5F,
-                        "Imported material edit was lost");
+                require(edited_material != materials.end(), "Imported material is missing");
+                if (subsurface) {
+                    require(edited_material->subsurface &&
+                                edited_material->subsurface->density == .73,
+                            "Imported subsurface edit was lost");
+                } else {
+                    require(std::abs(edited_material->roughness - .37F) < 1e-5F,
+                            "Imported material edit was lost");
+                }
                 if (!emitter_id.empty()) {
                     const auto lamp_material =
                         std::find_if(materials.begin(), materials.end(), [&](const auto& value) {

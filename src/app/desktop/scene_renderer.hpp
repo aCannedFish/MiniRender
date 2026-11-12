@@ -3,6 +3,7 @@
 #include "gizmo_renderer.hpp"
 #include "gpu_buffer.hpp"
 #include "gpu_ibl.hpp"
+#include "gpu_subsurface.hpp"
 #include "gpu_texture.hpp"
 #include "hdr_targets.hpp"
 #include "post_process.hpp"
@@ -53,6 +54,7 @@ class SceneRenderer final : public ViewportRenderer {
     };
     std::map<MeshHandle, Mesh, std::owner_less<MeshHandle>> meshes_;
     std::vector<Draw> draws_;
+    SubsurfacePreviewCache subsurface_previews_;
     TextureHandle white_texture_;
     std::map<TextureHandle, std::unique_ptr<GpuTexture>, std::owner_less<TextureHandle>> textures_;
     void update_uniforms();
