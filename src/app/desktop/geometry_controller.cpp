@@ -295,9 +295,17 @@ void GeometryController::build_mesh(GeometryTaskInput input, Completion completi
             } else {
                 auto refined =
                     minirender::subdivide_loop(input.mesh, input.loop, token, [&](auto p) {
-                        report({prefix + "Loop " + std::to_string(p.level) + "/" +
-                                    std::to_string(input.loop.levels) + " · " + loop_stage(p.stage),
-                                p.completed, p.total});
+                        auto stage = prefix + "Loop " + std::to_string(p.level) + "/" +
+                                     std::to_string(input.loop.levels) + " · " +
+                                     loop_stage(p.stage);
+                        // 拓扑检查只有开始和结束两个回调。按已通过检查的层数显示进度，
+                        // 以便在较慢的最后一层仍能读到真实计数。
+                        if (p.stage == minirender::LoopStage::output_topology) {
+                            const auto verified = p.completed == p.total ? p.level : p.level - 1;
+                            report({stage + "（已校验层数）", verified, input.loop.levels});
+                        } else {
+                            report({std::move(stage), p.completed, p.total});
+                        }
                     });
                 result.mesh = std::move(refined.mesh);
                 result.topology = refined.levels.back();

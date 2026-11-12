@@ -1,6 +1,6 @@
 # MiniRender
 
-A0 工程基础已在本机通过验收：CPU 图像模块、CLI、Qt/Vulkan 纹理与深度诊断。记录见 [A0 验收](docs/checkpoints/A0.md)。课程选题仍在后续阶段实现。功能范围、实现顺序、测试要求与仓库工作流见 [项目计划](PLAN.md)。
+MiniRender 的 macOS 基线集成 11 个课程选题，提供 CPU 路径追踪和 Qt/Vulkan 编辑器。打开“快速导入”可载入 Cornell Box、体积光束、玻璃焦散、蜡材质或光场棋盘，导入后可继续编辑和另存。综合演示与参考图见[本机验收](docs/checkpoints/A9.md)，阅读实现可从[学习路线](docs/LEARNING.md)开始。Windows/NVIDIA 接手步骤见[迁移说明](docs/WINDOWS_HANDOFF.md)。
 
 开发分为两个阶段：
 
