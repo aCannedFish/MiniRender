@@ -51,6 +51,9 @@ struct LightFieldReconstruction {
     std::uint64_t estimated_bytes = 0;
 };
 
+// 计算重建图像、解码视图和行缓冲的工作字节数，缓存另计。
+std::uint64_t lightfield_refocus_scratch_bytes(const RenderSettings& render);
+
 // 只访问文件读者和标定，不接收场景或积分器；改变焦点不会创建新射线。
 LightFieldReconstruction refocus_lightfield(LightFieldReader& reader,
                                             LightFieldRefocusSettings settings,

@@ -6,6 +6,7 @@
 #include "cloth_panel.hpp"
 #include "environment_panel.hpp"
 #include "geometry_panel.hpp"
+#include "lightfield_panel.hpp"
 #include "offline_panel.hpp"
 #include "point_cloud_panel.hpp"
 #include "realtime_panel.hpp"
@@ -292,11 +293,7 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
         const auto path = QFileDialog::getSaveFileName(this, "导出线性 HDR", {}, "OpenEXR (*.exr)");
         if (!path.isEmpty()) {
             try {
-                if (viewport_->offline_visible()) {
-                    offline_->save_image(path, true);
-                } else {
-                    viewport_->grab_hdr().write_exr(native_path(path));
-                }
+                export_display_hdr(path);
             } catch (const std::exception& error) {
                 report_error(error);
             }
@@ -347,7 +344,14 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     right_tabs->addTab(scroll_panel(object_panel_), "物体");
     right_tabs->addTab(scroll_panel(light_panel_), "灯光");
     right_tabs->addTab(scroll_panel(camera_panel_), "相机");
-    offline_ = new OfflinePanel(*viewport_, [this] { return offline_snapshot(); }, this);
+    offline_ = new OfflinePanel(
+        *viewport_,
+        [this] {
+            if (lightfield_ && lightfield_->capture_active())
+                throw std::logic_error("请先结束光场采集，再开始离线渲染。");
+            return offline_snapshot();
+        },
+        this);
     right_tabs->addTab(scroll_panel(offline_), "离线");
     auto* realtime = new RealtimePanel(*viewport_, this);
     right_tabs->addTab(scroll_panel(realtime), "实时");
@@ -401,6 +405,20 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
         return !minirender::render_terminal(offline_->session().progress().state) ||
                offline_->exporting();
     };
+    lightfield_ = new LightFieldController(*viewport_, this);
+    lightfield_->other_render_active = [this] {
+        return !minirender::render_terminal(offline_->session().progress().state) ||
+               offline_->exporting();
+    };
+    lightfield_panel_ = new LightFieldPanel(*lightfield_, *viewport_, this);
+    lightfield_panel_->integrator = [this] {
+        auto s = offline_->integrator_settings();
+        s.kind = minirender::IntegratorKind::path_tracing;
+        return s;
+    };
+    lightfield_panel_->snapshot = [this] { return offline_snapshot(); };
+    lightfield_panel_->on_demo = [this] { import_builtin_scene("lightfield"); };
+    right_tabs->addTab(scroll_panel(lightfield_panel_), "光场");
     geometry_->on_apply = [this] {
         try {
             apply_geometry();
@@ -465,7 +483,7 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     viewport_->on_camera_changed = [this](const minirender::Camera& camera) {
         editor_.update_navigation(camera);
         ++document_revision_;
-        offline_->scene_changed();
+        mark_snapshot_changed();
         if (camera_panel_->isVisible() && !camera_refresh_pending_) {
             camera_refresh_pending_ = true;
             QTimer::singleShot(33, this, [this] {
@@ -579,7 +597,9 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
         } else if (viewport_->isValid()) {
             if (viewport_->offline_visible()) {
                 statusBar()->showMessage(
-                    "CPU 路径追踪结果 | 曝光只影响显示 | 返回实时预览后可操作相机");
+                    viewport_->offline_source() == OfflineImageSource::lightfield
+                        ? "光场图像 | 曝光只影响显示 | 返回实时预览后可操作相机"
+                        : "CPU 离线结果 | 曝光只影响显示 | 返回实时预览后可操作相机");
                 return;
             }
             if (viewport_->point_preview_visible()) {
@@ -905,7 +925,7 @@ void Workbench::refresh() {
     if (!editor_.transforming()) {
         viewport_->finish_gizmo_drag(false);
     }
-    offline_->scene_changed();
+    mark_snapshot_changed();
     environment_->set_document(editor_.document());
     refreshing_ = true;
     tree_->clear();
@@ -1146,6 +1166,7 @@ void Workbench::begin_asset_task(const QString& message) {
     geometry_->set_asset_task_busy(true);
     points_->set_asset_task_busy(true);
     volume_->set_asset_busy(true);
+    lightfield_panel_->set_asset_busy(true);
 }
 
 void Workbench::finish_asset_task() {
@@ -1161,6 +1182,7 @@ void Workbench::finish_asset_task() {
     geometry_->set_asset_task_busy(false);
     points_->set_asset_task_busy(false);
     volume_->set_asset_busy(false);
+    lightfield_panel_->set_asset_busy(false);
 }
 
 bool Workbench::asset_loading() const noexcept {
@@ -1266,6 +1288,7 @@ void Workbench::import_builtin_scene(const QString& id) {
     open_scene_file(builtin_scene_directory() + "/" + preset.filename, [this, preset] {
         scene_path_.clear();
         findChild<QDoubleSpinBox*>("exposure")->setValue(0);
+        lightfield_->cancel();
         offline_->prepare_import(preset.render, preset.integrator);
         select_object(preset.selected_object);
         findChild<QComboBox*>("view_mode")->setCurrentIndex(preset.normal_preview ? 1 : 0);
@@ -1277,6 +1300,14 @@ void Workbench::import_builtin_scene(const QString& id) {
                 findChild<QTabWidget*>("inspector_tabs")->setCurrentIndex(0);
                 break;
             }
+        }
+        if (preset.id == "lightfield") {
+            minirender::LightFieldCaptureSettings settings;
+            settings.render = preset.render;
+            settings.reference_focus = 4;
+            settings.aperture_radius = .2;
+            lightfield_panel_->set_capture_settings(settings);
+            findChild<QTabWidget*>("inspector_tabs")->setCurrentIndex(11);
         }
         setWindowTitle("MiniRender — " + preset.name + "（示例副本）");
         statusBar()->showMessage(
@@ -1541,7 +1572,29 @@ void Workbench::report_error(const std::exception& error) {
     QMessageBox::warning(this, "操作失败", QString::fromUtf8(error.what()));
 }
 
+LightFieldController* Workbench::lightfield_controller() const noexcept {
+    return lightfield_;
+}
+LightFieldPanel* Workbench::lightfield_panel() const noexcept {
+    return lightfield_panel_;
+}
+void Workbench::mark_snapshot_changed() {
+    offline_->scene_changed();
+    if (lightfield_)
+        lightfield_->scene_changed();
+}
+void Workbench::export_display_hdr(const QString& path) {
+    if (viewport_->offline_visible()) {
+        if (viewport_->offline_source() == OfflineImageSource::lightfield)
+            lightfield_->export_image(path, true);
+        else
+            offline_->save_image(path, true);
+    } else
+        viewport_->grab_hdr().write_exr(native_path(path));
+}
 Workbench::~Workbench() {
+    if (lightfield_)
+        lightfield_->shutdown();
     if (cloth_controller_) {
         cloth_controller_->on_frame = {};
         cloth_controller_->pause();
@@ -1604,7 +1657,7 @@ bool Workbench::preview_transform(const minirender::Transform& transform) {
         redo_->setEnabled(editor_.can_redo());
         viewport_->set_gizmo_target(selected_id_, transform);
         viewport_->set_scene(editor_.snapshot());
-        offline_->scene_changed();
+        mark_snapshot_changed();
         return true;
     } catch (const std::exception& error) {
         statusBar()->showMessage(QString::fromUtf8(error.what()), 5000);
@@ -1626,7 +1679,7 @@ void Workbench::finish_transform(bool commit) {
     if (changed && !commit) {
         refresh_properties();
         viewport_->set_scene(editor_.snapshot());
-        offline_->scene_changed();
+        mark_snapshot_changed();
     }
     sync_cloth_context();
 }

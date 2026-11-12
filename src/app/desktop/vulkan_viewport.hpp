@@ -19,6 +19,8 @@
 #include <memory>
 #include <vector>
 
+enum class OfflineImageSource { render, lightfield };
+
 class ViewportRenderer;
 class PointPreviewRenderer;
 class SdfRenderer;
@@ -99,7 +101,12 @@ class VulkanViewport final : public QWindow {
     std::uint64_t ibl_texture_updates() const noexcept;
     void set_offline_visible(bool visible);
     bool offline_visible() const noexcept;
-    void set_offline_image(std::shared_ptr<const minirender::Image> image);
+    void set_offline_image(std::shared_ptr<const minirender::Image> image,
+                           OfflineImageSource source = OfflineImageSource::render);
+    OfflineImageSource offline_source() const noexcept;
+    std::uint64_t display_revision() const noexcept {
+        return display_revision_;
+    }
     const std::shared_ptr<const minirender::Image>& offline_image() const noexcept;
     std::function<void(bool)> on_display_changed;
     std::function<void(const minirender::Camera&)> on_camera_changed;
@@ -188,6 +195,8 @@ class VulkanViewport final : public QWindow {
     std::uint64_t point_uploads_ = 0;
     std::shared_ptr<const minirender::Image> offline_image_;
     bool offline_visible_ = false;
+    std::uint64_t display_revision_ = 0;
+    OfflineImageSource offline_source_ = OfflineImageSource::render;
     std::shared_ptr<const minirender::SceneSnapshot> scene_;
     minirender::RasterMeshCache raster_meshes_;
     minirender::Camera camera_;

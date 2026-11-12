@@ -239,8 +239,17 @@ OfflinePanel::OfflinePanel(
     });
     connect(save_exr_, &QPushButton::clicked, this, [this] { choose_export(true); });
     connect(save_png_, &QPushButton::clicked, this, [this] { choose_export(false); });
-    connect(show_, &QCheckBox::toggled, this,
-            [this](bool visible) { viewport_.set_offline_visible(visible); });
+    connect(show_, &QCheckBox::toggled, this, [this](bool visible) {
+        if (visible && viewport_.offline_source() != OfflineImageSource::render) {
+            preview_samples_ = 0;
+            preview_terminal_ = false;
+            viewport_.set_offline_image(nullptr);
+        }
+        if (viewport_.offline_source() == OfflineImageSource::render) {
+            viewport_.set_offline_visible(visible);
+        }
+        poll();
+    });
     connect(exposure_, &QDoubleSpinBox::valueChanged, this,
             [this](double value) { viewport_.set_exposure(static_cast<float>(value)); });
     const auto parameters_changed = [this] { scene_changed(); };
@@ -375,6 +384,7 @@ void OfflinePanel::start() {
         preview_terminal_ = false;
         export_message_.clear();
         viewport_.set_offline_image(nullptr);
+        viewport_.set_offline_visible(true);
         show_->setChecked(true);
         poll();
     } catch (const std::exception& error) {
@@ -480,7 +490,7 @@ void OfflinePanel::poll() {
         progress_->setFormat("%p%");
     }
     // 实时预览期间只更新任务状态，避免为不可见的离线图反复复制和上传像素。
-    if (viewport_.offline_visible() &&
+    if (viewport_.offline_source() == OfflineImageSource::render && viewport_.offline_visible() &&
         (p.recorded_samples > preview_samples_ || (terminal && !preview_terminal_ && p.job_id))) {
         const auto preview = session_->preview();
         if (preview.image) {
@@ -492,7 +502,8 @@ void OfflinePanel::poll() {
     const QSignalBlocker exposure_blocker(exposure_);
     exposure_->setValue(viewport_.exposure());
     const QSignalBlocker show_blocker(show_);
-    show_->setChecked(viewport_.offline_visible());
+    show_->setChecked(viewport_.offline_visible() &&
+                      viewport_.offline_source() == OfflineImageSource::render);
 }
 
 void OfflinePanel::choose_export(bool exr) {

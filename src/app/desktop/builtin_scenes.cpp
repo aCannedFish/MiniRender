@@ -2,8 +2,8 @@
 
 #include <QCoreApplication>
 
-const std::array<BuiltinScene, 13>& builtin_scenes() {
-    static const std::array<BuiltinScene, 13> scenes{
+const std::array<BuiltinScene, 14>& builtin_scenes() {
+    static const std::array<BuiltinScene, 14> scenes{
         {{"cornell",
           "Cornell Box · 经典",
           "cornell-box.json",
@@ -111,7 +111,15 @@ const std::array<BuiltinScene, 13>& builtin_scenes() {
           "block",
           false,
           {320, 320, 256, 101},
-          {.maximum_depth = 8}}}};
+          {.maximum_depth = 8}},
+         {"lightfield",
+          "光场 · 近远棋盘",
+          "lightfield-charts.json",
+          "采集近红、远蓝棋盘，调节焦距比较两侧清晰度。",
+          "near",
+          false,
+          {128, 128, 32, 101},
+          {.maximum_depth = 1}}}};
     return scenes;
 }
 QString builtin_scene_directory() {

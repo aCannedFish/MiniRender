@@ -1044,6 +1044,7 @@ void VulkanViewport::set_offline_visible(bool visible) {
         return;
     }
     finish_gizmo_drag(true);
+    ++display_revision_;
     offline_visible_ = visible;
     rebuild_gizmo();
     pressed_buttons_ = Qt::NoButton;
@@ -1057,7 +1058,14 @@ void VulkanViewport::set_offline_visible(bool visible) {
 bool VulkanViewport::offline_visible() const noexcept {
     return offline_visible_;
 }
-void VulkanViewport::set_offline_image(std::shared_ptr<const minirender::Image> image) {
+OfflineImageSource VulkanViewport::offline_source() const noexcept {
+    return offline_source_;
+}
+void VulkanViewport::set_offline_image(std::shared_ptr<const minirender::Image> image,
+                                       OfflineImageSource source) {
+    if (source != offline_source_ || !image)
+        ++display_revision_;
+    offline_source_ = source;
     offline_image_ = std::move(image);
     mark_preview_changed();
     requestUpdate();

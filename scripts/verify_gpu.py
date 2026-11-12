@@ -127,13 +127,19 @@ def main() -> int:
         action="store_true",
         help="Verify point cloud editing and preview",
     )
+    checks.add_argument(
+        "--lightfield-check",
+        action="store_true",
+        help="Verify light field editing and capture",
+    )
     args = parser.parse_args()
     if args.timing_only and args.sync_validation:
         parser.error(
             "Timing measurements and synchronization validation must run separately"
         )
     scene_check = (
-        args.subsurface_check
+        args.lightfield_check
+        or args.subsurface_check
         or args.sppm_check
         or args.volume_check
         or args.simulation_check
@@ -165,6 +171,7 @@ def main() -> int:
     mode = "GPU"
     option = "--smoke"
     for selected, candidate in [
+        (args.lightfield_check, "Lightfield"),
         (args.subsurface_check, "Subsurface"),
         (args.sppm_check, "SPPM"),
         (args.volume_check, "Volume"),

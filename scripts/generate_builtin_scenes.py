@@ -4,6 +4,8 @@
 import copy
 import json
 import math
+import struct
+import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1] / "scenes"
@@ -350,6 +352,75 @@ def subsurface_scenes(glass):
     return result
 
 
+def lightfield_scene():
+    """生成两个具有相同投影尺寸的棋盘，线性纹理由标准 PNG 数据块写出。"""
+
+    def chunk(name, payload):
+        return (
+            struct.pack(">I", len(payload))
+            + name
+            + payload
+            + struct.pack(">I", zlib.crc32(name + payload))
+        )
+
+    rows = b"".join(
+        bytes([0]) + bytes(230 if (x // 8 + y // 8) % 2 == 0 else 6 for x in range(64))
+        for y in range(64)
+    )
+    png = (
+        bytes.fromhex("89504e470d0a1a0a")
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", 64, 64, 8, 0, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(rows))
+        + chunk(b"IEND", b"")
+    )
+    (ROOT / "assets/lightfield-checker.png").write_bytes(png)
+    (ROOT / "assets/lightfield-card.obj").write_text(
+        "v -0.5 -0.5 0\nv 0.5 -0.5 0\nv 0.5 0.5 0\nv -0.5 0.5 0\nvt 0 0\nvt 1 0\nvt 1 1\nvt 0 1\nvn 0 0 1\nf 1/1/1 2/2/1 3/3/1\nf 1/1/1 3/3/1 4/4/1\n",
+        encoding="utf-8",
+    )
+    scene = {
+        "version": 1,
+        "camera": {
+            "position": [0, 1, 5],
+            "target": [0, 1, 0],
+            "up": [0, 1, 0],
+            "vertical_fov": 45,
+            "near": 0.05,
+            "far": 100,
+            "aperture_radius": 0.2,
+            "focus_distance": 4,
+        },
+        "environment": [0, 0, 0],
+        "directional_lights": [
+            {
+                "id": "sun",
+                "direction": [0, 0, -1],
+                "color": [1, 1, 1],
+                "intensity": math.pi,
+            }
+        ],
+        "meshes": [{"id": "card", "source": "assets/lightfield-card.obj"}],
+        "textures": [
+            {
+                "id": "checker",
+                "source": "assets/lightfield-checker.png",
+                "encoding": "linear",
+            }
+        ],
+        "materials": [],
+        "objects": [],
+    }
+    for name, label, color, position, scale in [
+        ("near", "近红棋盘", [0.9, 0.15, 0.1], [-0.36, 1, 3], [0.6, 0.9, 1]),
+        ("far", "远蓝棋盘", [0.12, 0.35, 0.9], [1.08, 1, -1], [1.8, 2.7, 1]),
+    ]:
+        add(scene, name, label, "card", color, position, scale)
+        scene["materials"][-1].update(
+            {"base_color_texture": "checker", "texture_filter": "nearest"}
+        )
+    return scene
+
+
 def main():
     sphere()
     classic = room()
@@ -451,6 +522,7 @@ def main():
         *volume_scenes(classic).items(),
         *caustic_scenes(glass).items(),
         *subsurface_scenes(glass).items(),
+        ("lightfield-charts", lightfield_scene()),
     ]:
         (ROOT / f"{name}.json").write_text(
             json.dumps(scene, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
