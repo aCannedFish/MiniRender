@@ -1,3 +1,4 @@
+#include "lightfield_cli.hpp"
 #include "render_cli.hpp"
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/core/image.hpp>
@@ -17,11 +18,17 @@ std::filesystem::path native_path(std::string_view text) {
 // 无窗口入口，仅依赖 core。后续算法在此提供与 UI 相同的场景/任务接口。
 int run_cli(int argc, char** argv) {
     try {
+        if (argc >= 2 && (std::string_view(argv[1]) == "--capture-lightfield" ||
+                          std::string_view(argv[1]) == "--refocus")) {
+            return run_lightfield_cli(argc - 2, argv + 2,
+                                      std::string_view(argv[1]) == "--capture-lightfield");
+        }
         if (argc >= 2 && std::string_view(argv[1]) == "--render") {
             return run_render_cli(argc - 2, argv + 2);
         }
         if (argc == 2 && std::string_view(argv[1]) == "--capabilities") {
             std::cout << "MiniRender 0.1\nimage: linear RGB\nvolume: homogeneous RGB\n"
+                         "lightfield: streamed RGB32f capture/refocus\n"
                          "optix: unavailable (B2 pending)\n";
             return 0;
         }
@@ -83,7 +90,8 @@ int run_cli(int argc, char** argv) {
         }
         std::cout << "Usage: minirender_cli --capabilities | --test-pattern output.ppm | --inspect "
                      "scene.json | --trace-normals scene.json output.png | --render scene.json "
-                     "output-prefix [options]\n";
+                     "output-prefix [options] | --capture-lightfield scene.json output.mrlf "
+                     "[options] | --refocus input.mrlf output-prefix [options]\n";
         return argc == 1 ? 0 : 2;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
