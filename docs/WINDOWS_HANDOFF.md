@@ -1,6 +1,6 @@
 # Windows 迁移
 
-本机基线标签为 `macos-baseline`。基线覆盖 CPU 核心和 macOS/MoltenVK 桌面。Windows 托管 CI 已验证 MSVC 的 CPU 构建与测试，NVIDIA 驱动、Windows 桌面和 OptiX 需要在目标设备上验证。
+本机基线标签为 `macos-baseline`，对应提交 [`57d0919c066958db88e525c6d28b507ba5355d96`](https://github.com/aCannedFish/MiniRender/commit/57d0919c066958db88e525c6d28b507ba5355d96)。基线覆盖 CPU 核心和 macOS/MoltenVK 桌面。Windows 托管 CI 已验证 MSVC 的 CPU 构建与测试，NVIDIA 驱动、Windows 桌面和 OptiX 需要在目标设备上验证。
 
 ## 获取源码
 
