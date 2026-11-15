@@ -146,6 +146,8 @@ void start_presets_smoke(Workbench& window, const QString& directory) {
                     static_cast<int>(preset.render.samples_per_pixel)) {
                     return;
                 }
+                require(viewport->view_mode() == VulkanViewport::base_color_preview_mode,
+                        "Builtin scene did not enter base color preview");
                 verify_import(window.document(), state->original_scene);
                 require(!viewport->offline_visible(), "Old offline image hid the imported scene");
                 require(window.findChild<QSpinBox*>("offline_spp")->value() ==

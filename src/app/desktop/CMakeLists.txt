@@ -19,6 +19,7 @@ foreach(shader diagnostic.vert diagnostic.frag scene.vert scene.frag shadow.vert
 endforeach()
 
 qt_add_executable(minirender_desktop
+    preview_smoke.cpp preview_smoke.hpp
     main.cpp vulkan_viewport.cpp vulkan_viewport.hpp
     editor_theme.cpp editor_theme.hpp workbench_panels.cpp workbench_panels.hpp theme_smoke.cpp theme_smoke.hpp
     builtin_scenes.cpp builtin_scenes.hpp

@@ -12,7 +12,6 @@ struct BuiltinScene {
     QString filename;
     QString description;
     std::string selected_object;
-    bool normal_preview;
     minirender::RenderSettings render;
     minirender::IntegratorSettings integrator;
 };

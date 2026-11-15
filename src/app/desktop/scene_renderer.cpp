@@ -330,6 +330,10 @@ void SceneRenderer::upload_scene() {
     if (!instances.empty()) {
         instances_.write(instances.data(), instances.size() * sizeof(GpuInstance));
     }
+    // 接触半径随场景几何尺度变化，滚轮缩放相机不会改变其世界空间范围。
+    preview_radius_ = scene.instances.empty()
+                          ? 0.2F
+                          : std::clamp(glm::length(maximum - minimum) * 0.04F, 1e-5F, 1000.0F);
     for (std::size_t index = 0; index < scene.directional_lights.size(); ++index) {
         shadow_matrices_[index] =
             scene.instances.empty()
@@ -473,9 +477,16 @@ void SceneRenderer::update_uniforms() {
                                                 static_cast<float>(size.height()));
     frame.inverse_projection = glm::inverse(frame.projection);
     const auto& ao = window_->ssao_settings();
-    frame.ao_settings = {ao.enabled ? 1.0F : 0.0F, ao.radius, ao.bias, ao.strength};
-    frame.ao_filter = {static_cast<float>(ao.samples), std::max(ao.radius * 0.25F, 1e-6F), 16,
-                       ao.filtered ? 1.0F : 0.0F};
+    const bool preview = window_->view_mode() == VulkanViewport::base_color_preview_mode;
+    const float radius = preview ? preview_radius_ : ao.radius;
+    frame.ao_settings = {preview ? (window_->preview_occlusion() ? 1.0F : 0.0F)
+                                 : (ao.enabled ? 1.0F : 0.0F),
+                         radius, preview ? radius * 0.02F : ao.bias, ao.strength};
+    frame.ao_filter = {preview ? 32.0F : static_cast<float>(ao.samples),
+                       std::max(radius * 0.25F, 1e-6F), 16, preview || ao.filtered ? 1.0F : 0.0F};
+    if (preview) {
+        frame.ao_settings.w = 1.0F;
+    }
     static const auto kernel = minirender::make_ssao_kernel();
     frame.ao_kernel = kernel;
     frame.ibl = {
@@ -487,7 +498,8 @@ void SceneRenderer::update_uniforms() {
 
 void SceneRenderer::render_shadow_maps(VkCommandBuffer command) {
     shadow_map_.prepare(command);
-    if (!window_->shadows_enabled()) {
+    if (!window_->shadows_enabled() ||
+        window_->view_mode() == VulkanViewport::base_color_preview_mode) {
         return;
     }
     const VkViewport viewport{
@@ -578,7 +590,8 @@ void SceneRenderer::startNextFrame() {
     const VkRect2D scissor{{0, 0}, extent};
     vkCmdSetViewport(command, 0, 1, &viewport);
     vkCmdSetScissor(command, 0, 1, &scissor);
-    if (window_->ibl_maps() && window_->environment_background()) {
+    if (window_->ibl_maps() && window_->environment_background() &&
+        window_->view_mode() != VulkanViewport::base_color_preview_mode) {
         vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, background_pipeline_);
         vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                 &descriptor_, 0, nullptr);

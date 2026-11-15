@@ -104,6 +104,20 @@ void main() {
     vec3 v = normalize(frame.camera_position.xyz - world_position);
     if (dot(n, v) < 0.0) { n = -n; }
     normal_output = vec4(n, 1.0);
+    ClothData cloth = instances.values[draw_index.instance].cloth;
+    bool cloth_enabled = cloth.counts.y != 0;
+    if (base_color_preview()) {
+        // 均匀白色环境只展示原色；不计算直接光、镜面反射、阴影或 IBL。
+        if (cloth_enabled) {
+            albedo *= cloth.coverage.x * cloth.albedo[0].rgb + cloth.coverage.y * cloth.albedo[1].rgb;
+        }
+        // 发光面显示色相，亮度归一化，避免灯具自身的高亮淹没材质。
+        float peak = max(emission.r, max(emission.g, emission.b));
+        if (peak > 0.0) { albedo = max(albedo, emission / max(peak, 1.0)); }
+        color = vec4(albedo, 1.0);
+        ambient_output = color;
+        return;
+    }
     float roughness = max(material.x, 0.045);
     float metallic = material.y;
     float alpha = roughness * roughness;
@@ -116,8 +130,6 @@ void main() {
         specular_environment+=frame.ibl.z*ibl_specular(reflect(-v,n),clamp(material.x,0.0,1.0));
     }
     vec3 ambient_diffuse=diffuse_environment*albedo*(1.0-metallic);
-    ClothData cloth = instances.values[draw_index.instance].cloth;
-    bool cloth_enabled = cloth.counts.y != 0;
     vec3 cloth_u = vec3(0), cloth_v = vec3(0);
     if (cloth_enabled) {
         cloth_u = cloth_axis(world_tangent_u, n, cloth.settings.zw);

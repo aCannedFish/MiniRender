@@ -514,6 +514,8 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     };
     viewport_->on_display_changed = [this, realtime](bool offline) {
         findChild<QComboBox*>("view_mode")->setEnabled(!offline);
+        if (auto* quick = findChild<QComboBox*>("viewport_view_mode"))
+            quick->setEnabled(!offline);
         findChild<QCheckBox*>("fxaa_enabled")->setEnabled(!offline);
         findChild<QCheckBox*>("shadows_enabled")->setEnabled(!offline);
         realtime->setEnabled(!offline);
@@ -586,7 +588,8 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     auto* manipulation = new QToolBar("物体操纵", viewport_frame);
     viewport_layout->insertWidget(0, manipulation);
     manipulation->setIconSize(QSize(16, 16));
-    manipulation->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    // 图标工具为视图选择保留空间，窄窗口也能直接切换原色与光照。
+    manipulation->setToolButtonStyle(Qt::ToolButtonIconOnly);
     manipulation->setObjectName("gizmo_toolbar");
     manipulation->setMovable(false);
     auto* tool_group = new QActionGroup(manipulation);
@@ -614,13 +617,24 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
                 });
     }
     tools[0]->setChecked(true);
-    auto* tool_hint = new QLabel("世界坐标", manipulation);
-    tool_hint->setObjectName("gizmo_hint");
-    tool_hint->setToolTip("拖动坐标轴移动物体，拖动圆环旋转；Esc 取消。");
+    manipulation->setToolTip("世界坐标轴：拖动轴移动物体，拖动圆环旋转；Esc 取消。");
     auto* tool_space = new QWidget(manipulation);
     tool_space->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     manipulation->addWidget(tool_space);
-    manipulation->addWidget(tool_hint);
+    auto* view_selector = new QComboBox(manipulation);
+    view_selector->setObjectName("viewport_view_mode");
+    view_selector->setAccessibleName("视口显示模式");
+    view_selector->setToolTip("切换原色、光照及诊断视图");
+    view_selector->setMinimumWidth(100);
+    view_selector->setMaximumWidth(136);
+    auto* camera_mode = findChild<QComboBox*>("view_mode");
+    view_selector->setModel(camera_mode->model());
+    view_selector->setCurrentIndex(camera_mode->currentIndex());
+    connect(view_selector, &QComboBox::currentIndexChanged, camera_mode,
+            &QComboBox::setCurrentIndex);
+    connect(camera_mode, &QComboBox::currentIndexChanged, view_selector,
+            &QComboBox::setCurrentIndex);
+    manipulation->addWidget(view_selector);
     viewport_->on_gizmo_mode_changed = [tools, tool_modes](auto mode) {
         for (std::size_t index = 0; index < tools.size(); ++index) {
             tools[index]->setChecked(tool_modes[index] == mode);
@@ -701,9 +715,12 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
                 return;
             }
             auto message =
-                QString("%1  ·  %2 个物体  ·  实时预览")
+                QString("%1  ·  %2 个物体  ·  %3")
                     .arg(QString::fromUtf8(viewport_->physicalDeviceProperties()->deviceName))
-                    .arg(editor_.document().objects.size());
+                    .arg(editor_.document().objects.size())
+                    .arg(viewport_->view_mode() == VulkanViewport::base_color_preview_mode
+                             ? "原色预览"
+                             : "实时预览");
             QStringList offline_features;
             if (viewport_->ibl_maps()) {
                 message += " | IBL 环境光";
@@ -971,7 +988,10 @@ void Workbench::build_camera_panel() {
     focus_ = spin(camera_panel_, "focus_distance", 0.0001, 100000, 0.1);
     auto* mode = new QComboBox;
     mode->setObjectName("view_mode");
-    mode->addItems({"光照合成", "法线", "线性深度", "线框", "原始 AO", "滤波 AO"});
+    mode->addItems({"光照合成", "法线", "线性深度", "线框", "原始 AO", "滤波 AO", "原色预览"});
+    mode->setItemData(VulkanViewport::base_color_preview_mode,
+                      "均匀亮度显示材质和纹理，保留深度与接触遮蔽；不依赖场景光源。",
+                      Qt::ToolTipRole);
     layout->addRow(editor::section("相机", camera_panel_));
     layout->addRow("位置", camera_position_);
     layout->addRow("目标", camera_target_);
@@ -1011,8 +1031,11 @@ void Workbench::build_camera_panel() {
     connect(focus_, &QDoubleSpinBox::valueChanged, this, update);
     connect(exposure_, &QDoubleSpinBox::valueChanged, this,
             [this](double value) { viewport_->set_exposure(static_cast<float>(value)); });
-    connect(mode, &QComboBox::currentIndexChanged, this,
-            [this](int index) { viewport_->set_view_mode(index); });
+    connect(mode, &QComboBox::currentIndexChanged, this, [this](int index) {
+        viewport_->set_view_mode(index);
+        exposure_->setEnabled(index != VulkanViewport::base_color_preview_mode);
+    });
+    mode->setCurrentIndex(VulkanViewport::base_color_preview_mode);
 }
 
 void Workbench::refresh() {
@@ -1386,7 +1409,8 @@ void Workbench::import_builtin_scene(const QString& id) {
         lightfield_->cancel();
         offline_->prepare_import(preset.render, preset.integrator);
         select_object(preset.selected_object);
-        findChild<QComboBox*>("view_mode")->setCurrentIndex(preset.normal_preview ? 1 : 0);
+        findChild<QComboBox*>("view_mode")
+            ->setCurrentIndex(VulkanViewport::base_color_preview_mode);
         if (!editor_.document().media.empty()) {
             panels_->setCurrentIndex(10);
         }
@@ -1406,9 +1430,7 @@ void Workbench::import_builtin_scene(const QString& id) {
         }
         setWindowTitle("MiniRender — " + preset.name + "（示例副本）");
         statusBar()->showMessage(
-            preset.name + " 已覆盖导入，可编辑后开始离线渲染。" +
-                (preset.normal_preview ? " 当前法线视图便于编辑，离线渲染使用场景实际光照。" : ""),
-            12000);
+            preset.name + " 已覆盖导入，当前为原色预览；可编辑后开始离线渲染。", 12000);
     });
 }
 

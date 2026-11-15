@@ -87,6 +87,9 @@ class VulkanViewport final : public QWindow {
     bool fxaa_enabled() const noexcept;
     void set_exposure(float value);
     float exposure() const noexcept;
+    static constexpr int base_color_preview_mode = 6;
+    void set_preview_occlusion(bool enabled);
+    bool preview_occlusion() const noexcept;
     void set_view_mode(int mode);
     int view_mode() const noexcept;
     void set_ssao_settings(minirender::SsaoSettings settings);
@@ -211,6 +214,7 @@ class VulkanViewport final : public QWindow {
     bool fxaa_enabled_ = true;
     float exposure_ = 0.0F;
     int view_mode_ = 0;
+    bool preview_occlusion_ = true;
     minirender::SsaoSettings ssao_;
     std::shared_ptr<const minirender::IblEnvironment> ibl_maps_;
     std::shared_ptr<const minirender::Image> ibl_lut_;

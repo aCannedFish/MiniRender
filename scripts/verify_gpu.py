@@ -137,13 +137,19 @@ def main() -> int:
         action="store_true",
         help="Verify editor theme and panel layout",
     )
+    checks.add_argument(
+        "--preview-check",
+        action="store_true",
+        help="Verify base color preview and occlusion",
+    )
     args = parser.parse_args()
     if args.timing_only and args.sync_validation:
         parser.error(
             "Timing measurements and synchronization validation must run separately"
         )
     scene_check = (
-        args.theme_check
+        args.preview_check
+        or args.theme_check
         or args.lightfield_check
         or args.subsurface_check
         or args.sppm_check
@@ -177,6 +183,7 @@ def main() -> int:
     mode = "GPU"
     option = "--smoke"
     for selected, candidate in [
+        (args.preview_check, "Preview"),
         (args.theme_check, "Theme"),
         (args.lightfield_check, "Lightfield"),
         (args.subsurface_check, "Subsurface"),
