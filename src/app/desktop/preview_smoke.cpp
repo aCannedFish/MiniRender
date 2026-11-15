@@ -175,6 +175,8 @@ void start_preview_smoke(Workbench& window, const QString& directory) {
                         "Cornell lighting fixture changed");
                 capture_workbench_ui(window, directory + "/cornell-preview.png");
                 occlusion(window, false);
+                // 原色数学对照使用未叠加显示轮廓的图像；轮廓由独立专项检查。
+                window.findChild<QCheckBox*>("preview_outline")->setChecked(false);
                 advance();
                 return;
             case 2:

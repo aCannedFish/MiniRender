@@ -34,6 +34,22 @@ RealtimePanel::RealtimePanel(VulkanViewport& viewport, QWidget* parent) : QWidge
     preview_occlusion->setToolTip("原色预览独立使用轻微接触遮蔽，关闭后显示未暗化的材质原色。");
     connect(preview_occlusion, &QCheckBox::toggled, this,
             [&viewport](bool enabled) { viewport.set_preview_occlusion(enabled); });
+    auto* outline = new QCheckBox("原色预览轮廓", this);
+    outline->setObjectName("preview_outline");
+    outline->setChecked(viewport.preview_outline());
+    outline->setToolTip("用细轮廓区分前景与背景，并轻微显示明显折角。");
+    auto* outline_strength =
+        value("preview_outline_strength", 0, 1, viewport.preview_outline_strength(), .05);
+    outline_strength->setEnabled(outline->isChecked());
+    connect(outline, &QCheckBox::toggled, this, [&viewport, outline_strength](bool enabled) {
+        viewport.set_preview_outline(enabled);
+        outline_strength->setEnabled(enabled);
+    });
+    connect(outline_strength, &QDoubleSpinBox::valueChanged, this, [&viewport](double strength) {
+        viewport.set_preview_outline_strength(static_cast<float>(strength));
+    });
+    layout->addRow(outline);
+    layout->addRow("轮廓强度", outline_strength);
     layout->addRow(preview_occlusion);
     const auto defaults = viewport.ssao_settings();
     enabled->setChecked(defaults.enabled);

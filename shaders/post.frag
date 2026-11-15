@@ -7,6 +7,7 @@ layout(binding = 3) uniform sampler2D depth_image;
 layout(binding = 4) uniform sampler2D wire_image;
 layout(binding = 5) uniform sampler2D raw_ao_image;
 layout(binding = 6) uniform sampler2D filtered_ao_image;
+layout(binding = 7) uniform sampler2D outlined_image;
 layout(location = 0) in vec2 uv;
 layout(location = 0) out vec4 color;
 
@@ -21,6 +22,9 @@ vec3 decode_srgb(vec3 encoded) {
 vec3 display_texel(ivec2 pixel) {
     ivec2 size = textureSize(hdr_image, 0);
     vec3 linear = max(texelFetch(hdr_image, clamp(pixel, ivec2(0), size - 1), 0).rgb, vec3(0.0));
+    if (base_color_preview() && frame.preview_edges.x > 0.0) {
+        linear = max(texelFetch(outlined_image, clamp(pixel, ivec2(0), size - 1), 0).rgb, vec3(0.0));
+    }
     // 材质颜色直接做 sRGB 编码，白色保持白色，曝光与色调映射用于光照模式。
     if (base_color_preview()) { return encode_srgb(clamp(linear, vec3(0.0), vec3(1.0))); }
     linear *= exp2(frame.display.x);

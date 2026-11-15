@@ -11,6 +11,11 @@ void PostProcess::create(VulkanViewport& viewport, const HdrTargets& targets,
                          VkBuffer uniform_buffer, VkDeviceSize uniform_size, VkImageView hdr,
                          VkImageView raw_ao, VkImageView filtered_ao) {
     device_ = viewport.device();
+    const std::array<ScreenInput, 3> outline_inputs{
+        ScreenInput{hdr}, ScreenInput{targets.normal_view()},
+        ScreenInput{targets.depth_view(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL}};
+    outline_.create(viewport, VK_FORMAT_R32G32B32A32_SFLOAT, ":/shaders/preview_outline.frag.spv",
+                    uniform_buffer, uniform_size, outline_inputs);
     VkSamplerCreateInfo sampler{};
     sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     sampler.magFilter = VK_FILTER_NEAREST;
@@ -19,7 +24,7 @@ void PostProcess::create(VulkanViewport& viewport, const HdrTargets& targets,
     sampler.addressModeU = sampler.addressModeV = sampler.addressModeW =
         VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     check_vk(vkCreateSampler(device_, &sampler, nullptr, &sampler_), "create post sampler");
-    std::array<VkDescriptorSetLayoutBinding, 7> bindings{};
+    std::array<VkDescriptorSetLayoutBinding, 8> bindings{};
     bindings[0] = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     for (std::uint32_t i = 1; i < bindings.size(); ++i) {
         bindings[i] = {i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
@@ -32,7 +37,7 @@ void PostProcess::create(VulkanViewport& viewport, const HdrTargets& targets,
     check_vk(vkCreateDescriptorSetLayout(device_, &descriptor_layout, nullptr, &descriptor_layout_),
              "post descriptor layout");
     const std::array<VkDescriptorPoolSize, 2> sizes{
-        {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}, {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6}}};
+        {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}, {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 7}}};
     VkDescriptorPoolCreateInfo pool{};
     pool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool.maxSets = 1;
@@ -47,14 +52,15 @@ void PostProcess::create(VulkanViewport& viewport, const HdrTargets& targets,
     allocate.pSetLayouts = &descriptor_layout_;
     check_vk(vkAllocateDescriptorSets(device_, &allocate, &descriptor_), "post descriptor set");
     VkDescriptorBufferInfo buffer{uniform_buffer, 0, uniform_size};
-    const std::array<VkDescriptorImageInfo, 6> images{
+    const std::array<VkDescriptorImageInfo, 7> images{
         {{sampler_, hdr, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
          {sampler_, targets.normal_view(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
          {sampler_, targets.depth_view(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL},
          {sampler_, targets.wire_view(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
          {sampler_, raw_ao, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-         {sampler_, filtered_ao, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}}};
-    std::array<VkWriteDescriptorSet, 7> writes{};
+         {sampler_, filtered_ao, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+         {sampler_, outline_.view(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}}};
+    std::array<VkWriteDescriptorSet, 8> writes{};
     for (std::uint32_t i = 0; i < writes.size(); ++i) {
         writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[i].dstSet = descriptor_;
@@ -136,6 +142,13 @@ void PostProcess::create(VulkanViewport& viewport, const HdrTargets& targets,
 }
 
 void PostProcess::draw(VulkanViewport& viewport, const std::function<void()>& overlay) {
+    // 首帧使已绑定附件的布局有效；仅在原色轮廓启用时持续计算。
+    if (!outline_initialized_ ||
+        (viewport.view_mode() == VulkanViewport::base_color_preview_mode &&
+         viewport.preview_outline() && viewport.preview_outline_strength() > 0)) {
+        outline_.draw(viewport);
+        outline_initialized_ = true;
+    }
     const auto size = viewport.swapChainImageSize();
     const VkExtent2D extent{static_cast<std::uint32_t>(size.width()),
                             static_cast<std::uint32_t>(size.height())};
@@ -167,6 +180,8 @@ void PostProcess::draw(VulkanViewport& viewport, const std::function<void()>& ov
 }
 
 void PostProcess::release() {
+    outline_.release();
+    outline_initialized_ = false;
     if (device_ == VK_NULL_HANDLE) {
         return;
     }
