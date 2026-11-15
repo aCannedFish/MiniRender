@@ -123,7 +123,7 @@ void start_offline_smoke(Workbench& window, const QString& directory) {
                 using minirender::RenderState;
                 switch (state->step) {
                 case 0:
-                    window.findChild<QTabWidget*>("inspector_tabs")->setCurrentIndex(3);
+                    window.panels()->setCurrentIndex(3);
                     window.findChild<QDoubleSpinBox*>("aperture_radius")->setValue(0.015);
                     window.findChild<QDoubleSpinBox*>("focus_distance")->setValue(4);
                     require(window.document().camera.aperture_radius > 0,
@@ -258,8 +258,7 @@ void start_offline_smoke(Workbench& window, const QString& directory) {
                         minirender::Image::read_exr(file(directory + "/result.exr"));
                     require(result.at(12, 8) == panel->session().result()->at(12, 8),
                             "EXR export applied exposure");
-                    auto* area = qobject_cast<QScrollArea*>(
-                        window.findChild<QTabWidget*>("inspector_tabs")->currentWidget());
+                    auto* area = qobject_cast<QScrollArea*>(window.panels()->currentWidget());
                     require(area && area->widget()->width() <= area->viewport()->width(),
                             "Offline controls require hidden horizontal scrolling");
                     auto* progress = panel->findChild<QProgressBar*>("offline_progress");

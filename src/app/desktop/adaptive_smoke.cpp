@@ -90,7 +90,7 @@ void start_adaptive_smoke(Workbench& window, const QString& directory,
     const auto state = std::make_shared<State>();
     state->original = mesh_for(window.document(), "blue_cube");
     window.select_object("blue_cube");
-    control<QTabWidget>(window, "inspector_tabs")->setCurrentIndex(6);
+    window.panels()->setCurrentIndex(6);
     auto* timer = new QTimer(&window);
     auto* probe = new UiResponseProbe(&window, "Adaptive");
     timer->setInterval(60);

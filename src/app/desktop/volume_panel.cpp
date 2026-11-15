@@ -38,13 +38,17 @@ QWidget* row(QWidget* parent, std::initializer_list<QWidget*> controls) {
     auto* layout = new QHBoxLayout(widget);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(6);
+    int minimum_width = 0;
     for (auto* value : controls) {
         layout->addWidget(value, 1);
+        minimum_width += value->minimumWidth();
     }
+    // 给表单明确的最小行宽，窄检查器会将标签换行，保持三个数值框完整。
+    widget->setMinimumWidth(minimum_width + layout->spacing() * (int(controls.size()) - 1));
     return widget;
 }
 void configure(QFormLayout& form) {
-    form.setVerticalSpacing(12);
+    form.setVerticalSpacing(8);
     form.setRowWrapPolicy(QFormLayout::WrapLongRows);
     form.setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
 }
@@ -133,26 +137,22 @@ VolumePanel::VolumePanel(QWidget* parent) : QWidget(parent) {
     });
     connect(enabled_, &QCheckBox::toggled, this,
             [this](bool enabled) { edit([&](auto& region) { region.enabled = enabled; }); });
-    parameters->addRow("最小坐标 / m",
-                       vector_field(
-                           "volume_min", minimum_,
-                           [](auto& region) -> glm::dvec3& { return region.minimum; }, -1e9, 1e9,
-                           false));
-    parameters->addRow("最大坐标 / m",
-                       vector_field(
-                           "volume_max", maximum_,
-                           [](auto& region) -> glm::dvec3& { return region.maximum; }, -1e9, 1e9,
-                           false));
-    parameters->addRow("吸收 / m⁻¹",
-                       vector_field(
-                           "volume_absorption", absorption_,
-                           [](auto& region) -> glm::dvec3& { return region.medium.absorption; }, 0,
-                           1e6, true));
-    parameters->addRow("散射 / m⁻¹",
-                       vector_field(
-                           "volume_scattering", scattering_,
-                           [](auto& region) -> glm::dvec3& { return region.medium.scattering; }, 0,
-                           1e6, true));
+    parameters->addRow(new QLabel("最小坐标 / m", parameters_));
+    parameters->addRow(vector_field(
+        "volume_min", minimum_, [](auto& region) -> glm::dvec3& { return region.minimum; }, -1e9,
+        1e9, false));
+    parameters->addRow(new QLabel("最大坐标 / m", parameters_));
+    parameters->addRow(vector_field(
+        "volume_max", maximum_, [](auto& region) -> glm::dvec3& { return region.maximum; }, -1e9,
+        1e9, false));
+    parameters->addRow(new QLabel("吸收 / m⁻¹", parameters_));
+    parameters->addRow(vector_field(
+        "volume_absorption", absorption_,
+        [](auto& region) -> glm::dvec3& { return region.medium.absorption; }, 0, 1e6, true));
+    parameters->addRow(new QLabel("散射 / m⁻¹", parameters_));
+    parameters->addRow(vector_field(
+        "volume_scattering", scattering_,
+        [](auto& region) -> glm::dvec3& { return region.medium.scattering; }, 0, 1e6, true));
     g_ = scalar(parameters_, "volume_g", -.999999, .999999, 6);
     g_->setToolTip("正值以前向散射为主，负值以后向散射为主，0 为各向同性。");
     parameters->addRow("各向异性 g", g_);

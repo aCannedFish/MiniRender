@@ -1,6 +1,7 @@
 #include "adaptive_smoke.hpp"
 #include "cloth_playback_smoke.hpp"
 #include "cloth_smoke.hpp"
+#include "editor_theme.hpp"
 #include "geometry_smoke.hpp"
 #include "gizmo_smoke.hpp"
 #include "ibl_smoke.hpp"
@@ -17,6 +18,7 @@
 #include "ssao_smoke.hpp"
 #include "subsurface_smoke.hpp"
 #include "texture_smoke.hpp"
+#include "theme_smoke.hpp"
 #include "volume_smoke.hpp"
 #include "vulkan_viewport.hpp"
 #include "wire_smoke.hpp"
@@ -128,6 +130,7 @@ int main(int argc, char** argv) {
     qputenv("MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS", "0");
 #endif
     QApplication application(argc, argv);
+    editor::apply_theme(application);
 #ifdef Q_OS_MACOS
     // Qt 通过 QLibrary 独立加载 Vulkan，安装包需明确指向随包部署的 loader。
     const QString bundled_vulkan =
@@ -196,19 +199,20 @@ int main(int argc, char** argv) {
         {"subsurface-smoke", "Verify SSS editing, preview and offline tasks.", "directory"});
     parser.addOption({"lightfield-smoke", "Verify light field capture and interactive refocusing.",
                       "directory"});
+    parser.addOption({"theme-smoke", "Verify editor theme and layout.", "directory"});
     parser.process(application);
     const bool smoke = parser.isSet("smoke");
-    const bool regression = smoke || parser.isSet("lightfield-smoke") ||
-                            parser.isSet("subsurface-smoke") || parser.isSet("sppm-smoke") ||
-                            parser.isSet("volume-smoke") || parser.isSet("simulation-smoke") ||
-                            parser.isSet("cloth-smoke") || parser.isSet("scene-smoke") ||
-                            parser.isSet("texture-smoke") || parser.isSet("interaction-smoke") ||
-                            parser.isSet("parameter-smoke") || parser.isSet("wire-smoke") ||
-                            parser.isSet("offline-smoke") || parser.isSet("ssao-smoke") ||
-                            parser.isSet("ibl-smoke") || parser.isSet("geometry-smoke") ||
-                            parser.isSet("gizmo-smoke") || parser.isSet("sides-smoke") ||
-                            parser.isSet("presets-smoke") || parser.isSet("adaptive-smoke") ||
-                            parser.isSet("points-smoke") || parser.isSet("sdf-smoke");
+    const bool regression =
+        smoke || parser.isSet("theme-smoke") || parser.isSet("lightfield-smoke") ||
+        parser.isSet("subsurface-smoke") || parser.isSet("sppm-smoke") ||
+        parser.isSet("volume-smoke") || parser.isSet("simulation-smoke") ||
+        parser.isSet("cloth-smoke") || parser.isSet("scene-smoke") ||
+        parser.isSet("texture-smoke") || parser.isSet("interaction-smoke") ||
+        parser.isSet("parameter-smoke") || parser.isSet("wire-smoke") ||
+        parser.isSet("offline-smoke") || parser.isSet("ssao-smoke") || parser.isSet("ibl-smoke") ||
+        parser.isSet("geometry-smoke") || parser.isSet("gizmo-smoke") ||
+        parser.isSet("sides-smoke") || parser.isSet("presets-smoke") ||
+        parser.isSet("adaptive-smoke") || parser.isSet("points-smoke") || parser.isSet("sdf-smoke");
 #ifdef Q_OS_MACOS
     RegressionActivity regression_activity(regression);
 #endif
@@ -358,6 +362,9 @@ int main(int argc, char** argv) {
 
         if (parser.isSet("lightfield-smoke"))
             start_lightfield_smoke(window, parser.value("lightfield-smoke"), timing_only);
+        if (parser.isSet("theme-smoke")) {
+            start_theme_smoke(window, parser.value("theme-smoke"));
+        }
         int ticks = 0;
         bool resized = false;
         QSize initial_size;

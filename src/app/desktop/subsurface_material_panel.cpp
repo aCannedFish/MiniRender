@@ -65,8 +65,11 @@ SubsurfaceMaterialPanel::SubsurfaceMaterialPanel(QWidget* parent) : QWidget(pare
     preset_layout->addWidget(preset_, 1);
     preset_layout->addWidget(preset_button);
     form->addRow("光学预置", preset_row);
-    form->addRow("吸收 / m⁻¹", vector_field("subsurface_absorption", absorption_, true));
-    form->addRow("约化散射 / m⁻¹", vector_field("subsurface_scattering", scattering_, false));
+    // RGB 参数占整行，较长物理系数不会与标签争用检查器宽度。
+    form->addRow(new QLabel("吸收 / m⁻¹", this));
+    form->addRow(vector_field("subsurface_absorption", absorption_, true));
+    form->addRow(new QLabel("约化散射 / m⁻¹", this));
+    form->addRow(vector_field("subsurface_scattering", scattering_, false));
     density_ = scalar(this, "subsurface_density", 1e-6, 1e6, .1);
     form->addRow("密度倍率", density_);
     connect(density_, &QDoubleSpinBox::valueChanged, this, [this](double value) {
@@ -141,6 +144,7 @@ QWidget* SubsurfaceMaterialPanel::vector_field(const char* name,
             }
         });
     }
+    row->setMinimumWidth(layout->minimumSize().width());
     return row;
 }
 void SubsurfaceMaterialPanel::set_material(const minirender::Material* material,

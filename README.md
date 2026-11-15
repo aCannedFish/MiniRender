@@ -11,6 +11,8 @@ MiniRender 的 macOS 基线集成 11 个课程选题，提供 CPU 路径追踪�
 
 main 保存基线，后续开发通过功能分支和 PR 管理。构建和测试见 [构建说明](docs/BUILD.md)，代码阅读见 [基础实现](docs/FOUNDATION.md)。每完成一个 CKPT 即提交并 push，计划中的功能不代表已通过验收。
 
+桌面采用深色工作台，物体检查器与场景渲染配置分开停靠。操作与样式代码见[编辑器界面](docs/EDITOR_UI.md)。
+
 VS Code 工作区配置见 [编辑器说明](docs/VSCODE.md)。请使用 desktop preset 生成包含 Qt/Vulkan 的编译参数。
 
 A1.1 场景数据层已通过本机测试，支持 OBJ、JSON 场景、相机/变换和只读快照。见 [场景说明](docs/SCENE.md) 与 [A1.1 验收](docs/checkpoints/A1.1.md)。A1.2 已接入真实场景预览与编辑界面，见 [视口说明](docs/VIEWPORT.md) 和 [验收记录](docs/checkpoints/A1.2.md)。后续进展按各检查点记录。

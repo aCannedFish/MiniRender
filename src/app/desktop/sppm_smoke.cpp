@@ -122,7 +122,7 @@ void verify_display(Workbench& window, const QString& directory, const QString& 
 }
 
 void verify_layout(Workbench& window, const QString& directory) {
-    auto* tabs = control<QTabWidget>(window, "inspector_tabs");
+    auto* tabs = window.panels();
     tabs->setCurrentIndex(3);
     auto* area = qobject_cast<QScrollArea*>(tabs->currentWidget());
     auto* panel = window.offline_panel();
@@ -237,7 +237,7 @@ void start_sppm_smoke(Workbench& window, const QString& directory, bool enforce_
                         control<QComboBox>(window, "offline_backend")->currentIndex() != 1) {
                         return;
                     }
-                    control<QTabWidget>(window, "inspector_tabs")->setCurrentIndex(3);
+                    window.panels()->setCurrentIndex(3);
                     require(control<QSpinBox>(window, "offline_photons")->value() == 40000 &&
                                 control<QDoubleSpinBox>(window, "offline_radius")->value() == .12 &&
                                 !control<QComboBox>(window, "offline_mode")->isEnabled(),

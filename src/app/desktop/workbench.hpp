@@ -1,5 +1,7 @@
 #pragma once
 
+#include "workbench_panels.hpp"
+
 #include "vulkan_viewport.hpp"
 
 #include <QElapsedTimer>
@@ -40,6 +42,9 @@ struct GeometryTaskResult;
 // file/undo/selection 都通过这里协调，不在 Vulkan 命令录制代码中读取控件。
 class Workbench final : public QMainWindow {
   public:
+    WorkbenchPanels* panels() const noexcept {
+        return panels_;
+    }
     explicit Workbench(QVulkanInstance* instance, bool diagnostic = false);
     ~Workbench() override;
     VulkanViewport* viewport() const noexcept;
@@ -112,6 +117,7 @@ class Workbench final : public QMainWindow {
                        const minirender::MeshValidationCache* validated = nullptr);
     minirender::SceneObject* selected(minirender::SceneDocument& scene) const;
 
+    WorkbenchPanels* panels_ = nullptr;
     VulkanViewport* viewport_ = nullptr;
     minirender::SceneEditor editor_{minirender::SceneDocument{}};
     QTreeWidget* tree_ = nullptr;

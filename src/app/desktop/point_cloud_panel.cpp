@@ -54,7 +54,7 @@ PointCloudPanel::PointCloudPanel(GeometryController& controller, QWidget* parent
     form->setContentsMargins(10, 12, 10, 12);
     form->setRowWrapPolicy(QFormLayout::WrapLongRows);
     form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
-    form->setVerticalSpacing(12);
+    form->setVerticalSpacing(8);
     source_label_ = label(this, "points_source");
     form->addRow(source_label_);
     const auto button = [&](const char* name, const char* text) {

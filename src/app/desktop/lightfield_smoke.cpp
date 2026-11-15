@@ -93,7 +93,7 @@ void display(Workbench& w, const Image& source) {
     }
 }
 void layout(Workbench& w, const QString& dir) {
-    auto* area = qobject_cast<QScrollArea*>(get<QTabWidget>(w, "inspector_tabs")->currentWidget());
+    auto* area = qobject_cast<QScrollArea*>(w.panels()->currentWidget());
     auto* page = w.lightfield_panel();
     require(area, "LF tab is not scrollable");
     for (auto size : {QSize(1200, 800), QSize(960, 700)}) {
@@ -195,8 +195,7 @@ void start_lightfield_smoke(Workbench& w, const QString& dir, bool enforce) {
                 next();
                 return;
             case Stage::ready:
-                if (w.asset_loading() ||
-                    get<QTabWidget>(w, "inspector_tabs")->currentIndex() != 11) {
+                if (w.asset_loading() || w.panels()->currentIndex() != 11) {
                     return;
                 }
                 s->settings = panel->capture_settings();

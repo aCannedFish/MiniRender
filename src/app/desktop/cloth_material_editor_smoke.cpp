@@ -50,7 +50,7 @@ void text(Workbench& window, const char* name, const QString& value) {
 
 // 将嵌套参数映射到物体页，检查命名字段之间的遮挡、水平边界与滚动可达性。
 void verify_layout(Workbench& window, const QString& directory, const QString& label) {
-    auto* tabs = control<QTabWidget>(window, "inspector_tabs");
+    auto* tabs = window.panels();
     auto* area = qobject_cast<QScrollArea*>(tabs->currentWidget());
     require(area != nullptr, "Object inspector is not scrollable");
     auto* page = area->widget();
@@ -108,7 +108,7 @@ void start_cloth_material_editor_smoke(Workbench& window, const QString& directo
     minirender::save_scene(scene, path);
     window.load_scene_file(QString::fromStdU16String(path.u16string()));
     window.select_object("cloth");
-    control<QTabWidget>(window, "inspector_tabs")->setCurrentIndex(0);
+    window.panels()->setCurrentIndex(0);
     window.resize(1200, 800);
     auto state = std::make_shared<State>();
     state->probe = new UiResponseProbe(&window, "Cloth");

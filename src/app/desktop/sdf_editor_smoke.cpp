@@ -66,8 +66,7 @@ void drag(VulkanViewport& viewport) {
 // 控件映射到页面坐标后检查边界和交叠，覆盖嵌套表单中的三分量控件。
 void layout(Workbench& window) {
     auto* panel = window.sdf_panel();
-    auto* area =
-        qobject_cast<QScrollArea*>(control<QTabWidget>(window, "inspector_tabs")->currentWidget());
+    auto* area = qobject_cast<QScrollArea*>(window.panels()->currentWidget());
     require(area && area->widget() == panel, "SDF page is not selected");
     require(panel->width() <= area->viewport()->width(), "SDF panel needs horizontal scrolling");
     std::vector<std::pair<QWidget*, QRect>> fields;
@@ -145,7 +144,7 @@ void start_sdf_editor_smoke(Workbench& window, const QString& directory, bool en
                 };
                 switch (state->stage) {
                 case 0:
-                    control<QTabWidget>(window, "inspector_tabs")->setCurrentIndex(8);
+                    window.panels()->setCurrentIndex(8);
                     window.resize(1200, 800);
                     click(window, "sdf_example");
                     viewport->set_sdf_view(minirender::SdfView::surface);
@@ -298,7 +297,7 @@ void start_sdf_editor_smoke(Workbench& window, const QString& directory, bool en
                     state->probe->verify([&] {
                         layout(window);
                         capture_workbench_ui(window, directory + "/sdf-layout-960-bottom.png");
-                        auto* tabs = control<QTabWidget>(window, "inspector_tabs");
+                        auto* tabs = window.panels();
                         auto* area = qobject_cast<QScrollArea*>(tabs->currentWidget());
                         area->ensureWidgetVisible(control<QCheckBox>(window, "sdf_visible"));
                         capture_workbench_ui(window, directory + "/sdf-layout-960-top.png");

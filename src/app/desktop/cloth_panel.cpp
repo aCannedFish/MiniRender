@@ -39,9 +39,13 @@ QWidget* row(QWidget* parent, std::initializer_list<QWidget*> values) {
     auto* layout = new QHBoxLayout(widget);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(6);
+    int minimum_width = 0;
     for (auto* value : values) {
         layout->addWidget(value, 1);
+        minimum_width += value->minimumWidth();
     }
+    // 让父表单按整行最小宽度决定换行，避免压缩三分量控件。
+    widget->setMinimumWidth(minimum_width + layout->spacing() * (int(values.size()) - 1));
     return widget;
 }
 } // namespace
@@ -51,7 +55,7 @@ ClothPanel::ClothPanel(ClothController& controller, QWidget* parent)
     setObjectName("cloth_panel");
     auto* layout = new QFormLayout(this);
     layout->setContentsMargins(10, 12, 10, 12);
-    layout->setVerticalSpacing(12);
+    layout->setVerticalSpacing(8);
     layout->setRowWrapPolicy(QFormLayout::WrapLongRows);
     layout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     demo_ = new QComboBox(this);

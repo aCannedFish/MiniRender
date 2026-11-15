@@ -20,6 +20,7 @@ endforeach()
 
 qt_add_executable(minirender_desktop
     main.cpp vulkan_viewport.cpp vulkan_viewport.hpp
+    editor_theme.cpp editor_theme.hpp workbench_panels.cpp workbench_panels.hpp theme_smoke.cpp theme_smoke.hpp
     builtin_scenes.cpp builtin_scenes.hpp
     presets_smoke.cpp presets_smoke.hpp
     sides_smoke.cpp sides_smoke.hpp
@@ -83,6 +84,7 @@ if(APPLE)
 endif()
 qt_add_resources(minirender_desktop diagnostic_shaders
     PREFIX "/shaders" BASE "${CMAKE_CURRENT_BINARY_DIR}" FILES ${shader_outputs})
+qt_add_resources(minirender_desktop editor_styles PREFIX "/editor" FILES editor.qss icons/down.xpm icons/up.xpm icons/check.xpm)
 target_link_libraries(minirender_desktop PRIVATE
     minirender_core minirender_warnings Qt6::Widgets Qt6::Concurrent Vulkan::Vulkan)
 
