@@ -19,4 +19,6 @@ layout(binding = 0, std140) uniform Frame {
     vec4 ao_kernel[64];
     vec4 ibl;
 } frame;
+// 原色预览保留独立模式号；既有法线、深度和 AO 模式不改变编号。
+bool base_color_preview() { return frame.display.y > 5.5; }
 #endif

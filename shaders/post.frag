@@ -21,6 +21,8 @@ vec3 decode_srgb(vec3 encoded) {
 vec3 display_texel(ivec2 pixel) {
     ivec2 size = textureSize(hdr_image, 0);
     vec3 linear = max(texelFetch(hdr_image, clamp(pixel, ivec2(0), size - 1), 0).rgb, vec3(0.0));
+    // 材质颜色直接做 sRGB 编码，白色保持白色，曝光与色调映射用于光照模式。
+    if (base_color_preview()) { return encode_srgb(clamp(linear, vec3(0.0), vec3(1.0))); }
     linear *= exp2(frame.display.x);
     return encode_srgb(linear / (vec3(1.0) + linear));
 }
@@ -100,6 +102,11 @@ vec3 fxaa(vec2 coordinate) {
 
 void main() {
     ivec2 pixel = clamp(ivec2(gl_FragCoord.xy), ivec2(0), textureSize(hdr_image, 0) - 1);
+    if (base_color_preview()) {
+        vec3 encoded = frame.display.z > 0.5 ? fxaa(uv) : display_texel(pixel);
+        color = vec4(decode_srgb(encoded), 1.0);
+        return;
+    }
     if (frame.display.y > 3.5) {
         float ao = frame.display.y > 4.5 ? texelFetch(filtered_ao_image, pixel, 0).r
                                          : texelFetch(raw_ao_image, pixel, 0).r;

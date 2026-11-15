@@ -985,6 +985,14 @@ void VulkanViewport::set_exposure(float value) {
 float VulkanViewport::exposure() const noexcept {
     return exposure_;
 }
+void VulkanViewport::set_preview_occlusion(bool enabled) {
+    preview_occlusion_ = enabled;
+    mark_preview_changed();
+    requestUpdate();
+}
+bool VulkanViewport::preview_occlusion() const noexcept {
+    return preview_occlusion_;
+}
 void VulkanViewport::set_view_mode(int mode) {
     set_sdf_visible(false);
     set_point_preview_visible(false);

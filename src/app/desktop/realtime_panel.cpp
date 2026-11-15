@@ -28,6 +28,13 @@ RealtimePanel::RealtimePanel(VulkanViewport& viewport, QWidget* parent) : QWidge
         spin->setValue(initial);
         return spin;
     };
+    auto* preview_occlusion = new QCheckBox("原色预览接触遮蔽", this);
+    preview_occlusion->setObjectName("preview_occlusion");
+    preview_occlusion->setChecked(viewport.preview_occlusion());
+    preview_occlusion->setToolTip("原色预览独立使用轻微接触遮蔽，关闭后显示未暗化的材质原色。");
+    connect(preview_occlusion, &QCheckBox::toggled, this,
+            [&viewport](bool enabled) { viewport.set_preview_occlusion(enabled); });
+    layout->addRow(preview_occlusion);
     const auto defaults = viewport.ssao_settings();
     enabled->setChecked(defaults.enabled);
     filtered->setChecked(defaults.filtered);

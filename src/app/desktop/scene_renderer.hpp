@@ -65,6 +65,7 @@ class SceneRenderer final : public ViewportRenderer {
     SsaoPass ssao_;
     PostProcess post_process_;
     GizmoRenderer gizmo_;
+    float preview_radius_ = 0.2F;
     bool capture_hdr_ = false;
     std::array<glm::mat4, 8> shadow_matrices_{};
     GpuBuffer instances_;
