@@ -108,7 +108,7 @@ void start_interaction_smoke(Workbench& window, const QString&) {
                 state->maximum_gap = std::max(state->maximum_gap, now - state->previous_tick);
             }
             state->previous_tick = now;
-            auto* tabs = window.findChild<QTabWidget*>("inspector_tabs");
+            auto* tabs = window.panels();
             if (state->gesture < 6) {
                 const auto button = state->gesture % 3 == 1 ? Qt::RightButton : Qt::LeftButton;
                 const auto modifiers = state->gesture % 3 == 2 ? Qt::ShiftModifier : Qt::NoModifier;

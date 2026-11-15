@@ -127,7 +127,7 @@ void finish_gesture(Workbench& window, const Gesture& gesture, GizmoMode mode) {
 }
 
 void verify_layout(Workbench& window, const QString& directory) {
-    auto* tabs = control<QTabWidget>(window, "inspector_tabs");
+    auto* tabs = window.panels();
     tabs->setCurrentIndex(9);
     auto* area = qobject_cast<QScrollArea*>(tabs->currentWidget());
     auto* panel = control<QWidget>(window, "cloth_panel");
@@ -241,7 +241,7 @@ void verify_step(Workbench& window, State& state) {
             "Edited simulation differs from independently restored world-space step");
 }
 void heavy_parameters(Workbench& window) {
-    control<QTabWidget>(window, "inspector_tabs")->setCurrentIndex(9);
+    window.panels()->setCurrentIndex(9);
     control<QSpinBox>(window, "cloth_columns")->setValue(128);
     control<QSpinBox>(window, "cloth_rows")->setValue(128);
     control<QSpinBox>(window, "cloth_substeps")->setValue(4096);

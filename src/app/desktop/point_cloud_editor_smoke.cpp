@@ -131,7 +131,7 @@ void verify_offline(Workbench& window,
 
 // 检查停靠页实际布局、字段重叠和底部可达性，尺寸变化保持窗口隐藏。
 void verify_layout(Workbench& window, const QString& directory) {
-    auto* tabs = control<QTabWidget>(window, "inspector_tabs");
+    auto* tabs = window.panels();
     tabs->setCurrentIndex(7);
     auto* area = qobject_cast<QScrollArea*>(tabs->currentWidget());
     auto* panel = window.point_cloud_panel();
@@ -293,7 +293,7 @@ void start_point_cloud_editor_smoke(Workbench& window, const QString& directory,
                     state->original = mesh_for(window.document(), "blue_cube");
                     require(mesh_for(window.document(), "metal_cube") == state->original,
                             "Point fixture lost shared mesh input");
-                    control<QTabWidget>(window, "inspector_tabs")->setCurrentIndex(7);
+                    window.panels()->setCurrentIndex(7);
                     window.offline_panel()->set_settings(
                         {24, 24, 8, 101}, {.maximum_depth = 5},
                         {.threads = 2, .tile_size = 8, .batch_samples = 4});

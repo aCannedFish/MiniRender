@@ -117,7 +117,7 @@ void verify_display(Workbench& window, const QString& directory, const QString& 
     qInfo() << "Subsurface GPU display" << label << source->width() * source->height();
 }
 void verify_layout(Workbench& window, const QString& directory) {
-    auto* tabs = control<QTabWidget>(window, "inspector_tabs");
+    auto* tabs = window.panels();
     tabs->setCurrentIndex(0);
     auto* area = qobject_cast<QScrollArea*>(tabs->currentWidget());
     auto* panel = control<QWidget>(window, "subsurface_material_panel");
@@ -138,8 +138,12 @@ void verify_layout(Workbench& window, const QString& directory) {
                 continue;
             }
             const QRect rect(field->mapTo(panel, QPoint()), field->size());
-            require(rect.left() >= 0 && rect.right() < panel->width(),
-                    "SSS field exceeds panel width");
+            if (rect.left() < 0 || rect.right() >= panel->width()) {
+                qCritical() << "SSS clipped" << field->objectName() << rect << panel->size()
+                            << field->parentWidget()->size() << area->widget()->size();
+                capture_workbench_ui(window, directory + "/layout-overflow.png");
+                throw std::runtime_error("SSS field exceeds panel width");
+            }
             for (const auto& other : rectangles) {
                 const auto overlap = rect.intersected(other);
                 require(overlap.width() <= 1 || overlap.height() <= 1, "SSS controls overlap");
@@ -427,7 +431,7 @@ void start_subsurface_smoke(Workbench& window, const QString& directory, bool en
                     click(window, "subsurface_apply");
                     require(offline->stale() && p.job_id == state->job,
                             "SSS edit restarted the frozen task");
-                    control<QTabWidget>(window, "inspector_tabs")->setCurrentIndex(0);
+                    window.panels()->setCurrentIndex(0);
                     click(window, "subsurface_render");
                     require(offline->session().progress().job_id == state->job,
                             "View task restarted SSS rendering");
@@ -496,7 +500,7 @@ void start_subsurface_smoke(Workbench& window, const QString& directory, bool en
                     control<QCheckBox>(window, "offline_show")->setChecked(false);
                     set(window, "offline_exposure", 0);
                     state->uploads = viewport->upload_statistics();
-                    control<QTabWidget>(window, "inspector_tabs")->setCurrentIndex(0);
+                    window.panels()->setCurrentIndex(0);
                     next();
                     return;
                 case Stage::stress:

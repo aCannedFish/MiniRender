@@ -12,6 +12,7 @@
 #include <QComboBox>
 #include <QDebug>
 #include <QDoubleSpinBox>
+#include <QEvent>
 #include <QLabel>
 #include <QLayout>
 #include <QLineEdit>
@@ -109,7 +110,7 @@ void verify_display(Workbench& window, const QString& directory, const QString& 
 }
 
 void verify_layout(Workbench& window, const QString& directory) {
-    auto* tabs = control<QTabWidget>(window, "inspector_tabs");
+    auto* tabs = window.panels();
     tabs->setCurrentIndex(10);
     auto* area = qobject_cast<QScrollArea*>(tabs->currentWidget());
     auto* panel = control<QWidget>(window, "volume_panel");
@@ -121,6 +122,9 @@ void verify_layout(Workbench& window, const QString& directory) {
             layout->activate();
         }
         panel->layout()->activate();
+        // 停靠区调整后，内层介质表单还会发布布局请求；送达后检查稳定的控件位置。
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::LayoutRequest);
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::LayoutRequest);
         area->verticalScrollBar()->setValue(0);
         require(panel->width() <= area->viewport()->width(),
                 "Volume page needs horizontal scrolling");
@@ -135,7 +139,10 @@ void verify_layout(Workbench& window, const QString& directory) {
                     "Volume field exceeds page bounds");
             for (const auto& previous : rectangles) {
                 const auto overlap = previous.intersected(rectangle);
-                require(overlap.width() <= 1 || overlap.height() <= 1, "Volume controls overlap");
+                if (overlap.width() > 1 && overlap.height() > 1) {
+                    qCritical() << "Volume overlap" << field->objectName() << rectangle << previous;
+                    throw std::runtime_error("Volume controls overlap");
+                }
             }
             rectangles.push_back(rectangle);
         }
@@ -222,7 +229,7 @@ void start_volume_smoke(Workbench& window, const QString& directory, bool enforc
                 };
                 switch (state->stage) {
                 case Stage::create:
-                    control<QTabWidget>(window, "inspector_tabs")->setCurrentIndex(10);
+                    window.panels()->setCurrentIndex(10);
                     require(window.document().media.empty(),
                             "Volume fixture must initially have no media");
                     click(window, "volume_add");
@@ -368,7 +375,7 @@ void start_volume_smoke(Workbench& window, const QString& directory, bool enforc
                     require(!render_terminal(offline->session().progress().state),
                             "Volume button did not start a live render");
                     state->job = offline->session().progress().job_id;
-                    control<QTabWidget>(window, "inspector_tabs")->setCurrentIndex(10);
+                    window.panels()->setCurrentIndex(10);
                     set(window, "volume_g", .55);
                     set(window, "volume_scattering.2", .32);
                     click(window, "volume_apply");

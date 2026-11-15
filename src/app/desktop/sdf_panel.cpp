@@ -38,7 +38,7 @@ QDoubleSpinBox* scalar(QWidget* parent, const QString& name, double low, double 
 QFormLayout* form(QWidget* widget) {
     auto* result = new QFormLayout(widget);
     result->setContentsMargins(0, 0, 0, 0);
-    result->setVerticalSpacing(12);
+    result->setVerticalSpacing(8);
     result->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     result->setRowWrapPolicy(QFormLayout::WrapLongRows);
     return result;

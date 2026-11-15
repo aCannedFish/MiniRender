@@ -208,7 +208,7 @@ void start_ssao_smoke(Workbench& window, const QString& directory) {
                 install(window, state->scene, directory);
                 viewport->set_shadows_enabled(false);
                 viewport->set_fxaa_enabled(false);
-                window.findChild<QTabWidget*>("inspector_tabs")->setCurrentIndex(4);
+                window.panels()->setCurrentIndex(4);
                 break;
             case 1:
                 // Qt/Cocoa 的布局与原生 surface 尺寸可能分多次更新，先等待实际像素尺寸稳定。
@@ -236,7 +236,7 @@ void start_ssao_smoke(Workbench& window, const QString& directory) {
                             camera.up == state->camera.up &&
                             camera.vertical_fov_degrees == state->camera.vertical_fov_degrees,
                         "AO camera changed between baseline and sampling");
-                window.findChild<QTabWidget*>("inspector_tabs")->setCurrentIndex(4);
+                window.panels()->setCurrentIndex(4);
                 window.findChild<QDoubleSpinBox*>("ssao_radius")->setValue(0.9);
                 window.findChild<QSpinBox*>("ssao_samples")->setValue(64);
                 window.findChild<QCheckBox*>("ssao_filtered")->setChecked(false);

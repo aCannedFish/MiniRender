@@ -72,7 +72,7 @@ void start_cloth_playback_smoke(Workbench& window, const QString& directory,
                 };
                 switch (state->stage) {
                 case 0:
-                    control<QTabWidget>(window, "inspector_tabs")->setCurrentIndex(9);
+                    window.panels()->setCurrentIndex(9);
                     click(window, "cloth_demo");
                     require(target(window).cloth != nullptr, "Demo has no simulation component");
                     state->initial = target(window).cloth;

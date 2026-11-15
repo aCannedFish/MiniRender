@@ -4,6 +4,7 @@
 #include "cloth_controller.hpp"
 #include "cloth_material_panel.hpp"
 #include "cloth_panel.hpp"
+#include "editor_theme.hpp"
 #include "environment_panel.hpp"
 #include "geometry_panel.hpp"
 #include "lightfield_panel.hpp"
@@ -32,6 +33,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QLocale>
 #include <QMenu>
 #include <QMessageBox>
 #include <QProgressBar>
@@ -46,6 +48,7 @@
 #include <QToolBar>
 #include <QToolButton>
 #include <QTreeWidget>
+#include <QVBoxLayout>
 #include <QVulkanInstance>
 #include <QtConcurrent/QtConcurrentRun>
 
@@ -100,9 +103,31 @@ std::filesystem::path native_path(const QString& path) {
     return std::filesystem::path(std::u8string(bytes.begin(), bytes.end()));
 }
 
+// 去掉固定小数尾部的零，为三轴输入保留可读空间。精度与解析仍由 QDoubleSpinBox 管理。
+class CompactScalar final : public QDoubleSpinBox {
+  public:
+    using QDoubleSpinBox::QDoubleSpinBox;
+
+  protected:
+    QString textFromValue(double value) const override {
+        auto format = locale();
+        format.setNumberOptions(format.numberOptions() | QLocale::OmitGroupSeparator);
+        auto text = format.toString(value, 'f', decimals());
+        if (decimals() > 0) {
+            while (text.endsWith('0')) {
+                text.chop(1);
+            }
+            if (text.endsWith(format.decimalPoint())) {
+                text.chop(format.decimalPoint().size());
+            }
+        }
+        return text;
+    }
+};
+
 QDoubleSpinBox* spin(QWidget* parent, const QString& name, double minimum, double maximum,
                      double step) {
-    auto* value = new QDoubleSpinBox(parent);
+    auto* value = new CompactScalar(parent);
     value->setObjectName(name);
     value->setRange(minimum, maximum);
     value->setDecimals(4);
@@ -128,8 +153,8 @@ void configure_form(QFormLayout* form) {
     form->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     form->setFormAlignment(Qt::AlignTop | Qt::AlignLeft);
     form->setHorizontalSpacing(10);
-    form->setVerticalSpacing(8);
-    form->setContentsMargins(10, 12, 10, 12);
+    form->setVerticalSpacing(6);
+    form->setContentsMargins(12, 8, 12, 12);
 }
 
 } // namespace
@@ -142,13 +167,21 @@ class VectorField final : public QWidget {
         : QWidget(parent) {
         auto* layout = new QHBoxLayout(this);
         layout->setContentsMargins(0, 0, 0, 0);
-        layout->setSpacing(6);
+        layout->setSpacing(4);
+        // QFormLayout 根据整行宽度换行，避免分量采用 Ignored 策略时被压入标签旁。
+        setMinimumWidth(3 * 88 + 2 * layout->spacing());
         const std::array<QString, 3> axes{"x", "y", "z"};
         for (std::size_t index = 0; index < values_.size(); ++index) {
             values_[index] = spin(this, prefix + "." + axes[index], minimum, maximum, 0.1);
-            values_[index]->setPrefix(axes[index] + " ");
+            const bool color = prefix == "base_color" || prefix == "emission";
+            const std::array<QString, 3> channels{"r", "g", "b"};
+            values_[index]->setPrefix((color ? channels[index] : axes[index]) + " ");
+            if (color) {
+                values_[index]->setToolTip("线性 RGB");
+            }
             values_[index]->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
             values_[index]->setMinimumWidth(88);
+            values_[index]->setProperty("axis", axes[index]);
             layout->addWidget(values_[index], 1);
             connect(values_[index], &QDoubleSpinBox::valueChanged, this, [this] {
                 if (on_changed) {
@@ -179,9 +212,22 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     viewport_->setVulkanInstance(instance);
     auto* container = QWidget::createWindowContainer(viewport_, this);
     container->setFocusPolicy(Qt::StrongFocus);
-    container->setMinimumSize(320, 240);
-    setCentralWidget(container);
+    container->setMinimumSize(280, 240);
+    auto* viewport_frame = new QWidget(this);
+    auto* viewport_layout = new QVBoxLayout(viewport_frame);
+    viewport_layout->setContentsMargins(0, 0, 0, 0);
+    viewport_layout->setSpacing(0);
+    viewport_layout->addWidget(container, 1);
+    setCentralWidget(viewport_frame);
     auto* toolbar = addToolBar("项目");
+    toolbar->setObjectName("project_toolbar");
+    toolbar->setMovable(false);
+    toolbar->setIconSize(QSize(16, 16));
+    toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    auto* brand = new QLabel("MiniRender", toolbar);
+    brand->setProperty("role", "brand");
+    toolbar->addWidget(brand);
+    toolbar->addSeparator();
     open_action_ = toolbar->addAction("打开");
     open_action_->setShortcut(QKeySequence::Open);
     connect(open_action_, &QAction::triggered, this, [this] {
@@ -303,6 +349,8 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     tree_ = new QTreeWidget;
     tree_->setObjectName("scene_tree");
     tree_->setHeaderLabel("物体");
+    tree_->setHeaderHidden(true);
+    tree_->setUniformRowHeights(true);
     assets_ = new QTreeWidget;
     assets_->setHeaderLabels({"资源", "规模"});
     auto* left_tabs = new QTabWidget;
@@ -337,18 +385,17 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     build_object_panel();
     build_light_panel();
     build_camera_panel();
-    auto* right_tabs = new QTabWidget;
-    right_tabs->setObjectName("inspector_tabs");
-    right_tabs->setDocumentMode(true);
-    right_tabs->setUsesScrollButtons(true);
+    panels_ = new WorkbenchPanels(*this);
+    auto* right_tabs = panels_;
     right_tabs->addTab(scroll_panel(object_panel_), "物体");
     right_tabs->addTab(scroll_panel(light_panel_), "灯光");
     right_tabs->addTab(scroll_panel(camera_panel_), "相机");
     offline_ = new OfflinePanel(
         *viewport_,
         [this] {
-            if (lightfield_ && lightfield_->capture_active())
+            if (lightfield_ && lightfield_->capture_active()) {
                 throw std::logic_error("请先结束光场采集，再开始离线渲染。");
+            }
             return offline_snapshot();
         },
         this);
@@ -471,15 +518,11 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
         findChild<QCheckBox*>("shadows_enabled")->setEnabled(!offline);
         realtime->setEnabled(!offline);
     };
-    auto* inspector = new QDockWidget("属性", this);
-    inspector->setMinimumWidth(340);
-    inspector->setMaximumWidth(620);
-    inspector->setWidget(right_tabs);
-    addDockWidget(Qt::RightDockWidgetArea, inspector);
-    inspector->setObjectName("inspector_dock");
     scene_dock->setObjectName("scene_dock");
     scene_dock->setMinimumWidth(160);
-    resizeDocks({scene_dock, inspector}, {200, 430}, Qt::Horizontal);
+    editor::decorate_dock(scene_dock);
+    panels_->build(scene_dock);
+    auto* inspector = panels_->objectDock();
     viewport_->on_camera_changed = [this](const minirender::Camera& camera) {
         editor_.update_navigation(camera);
         ++document_revision_;
@@ -492,29 +535,65 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
             });
         }
     };
-    connect(right_tabs, &QTabWidget::currentChanged, this, [this](int index) {
+    panels_->on_current_changed = [this](int index) {
         if (index == 2) {
             refresh_camera();
         }
-    });
+    };
     auto* restore = toolbar->addAction("恢复布局");
     restore->setObjectName("restore_layout");
-    connect(restore, &QAction::triggered, this, [this, scene_dock, inspector] {
-        scene_dock->setFloating(false);
-        inspector->setFloating(false);
-        addDockWidget(Qt::LeftDockWidgetArea, scene_dock);
-        addDockWidget(Qt::RightDockWidgetArea, inspector);
-        scene_dock->show();
-        inspector->show();
-        resizeDocks({scene_dock, inspector}, {200, 430}, Qt::Horizontal);
+    connect(restore, &QAction::triggered, this, [this] { panels_->restore(); });
+    const std::array<std::pair<QAction*, editor::Icon>, 12> action_icons{
+        {{open_action_, editor::Icon::open},
+         {save_action_, editor::Icon::save},
+         {save_as_action_, editor::Icon::save_as},
+         {undo_, editor::Icon::undo},
+         {redo_, editor::Icon::redo},
+         {import_object_action_, editor::Icon::import_mesh},
+         {import_texture_action_, editor::Icon::texture},
+         {duplicate, editor::Icon::duplicate},
+         {remove, editor::Icon::remove},
+         {screenshot, editor::Icon::camera},
+         {hdr_export, editor::Icon::export_image},
+         {restore, editor::Icon::layout}}};
+    for (const auto& [action, kind] : action_icons) {
+        action->setIcon(editor::icon(kind));
+        const auto shortcut = action->shortcut().toString(QKeySequence::NativeText);
+        action->setToolTip(action->text() + (shortcut.isEmpty() ? "" : " (" + shortcut + ")"));
+    }
+    auto* render_toggle = panels_->sceneDock()->toggleViewAction();
+    render_toggle->setText("渲染设置");
+    render_toggle->setToolTip("显示 / 收起场景与渲染面板");
+    render_toggle->setObjectName("toggle_render_dock");
+    render_toggle->setIcon(editor::icon(editor::Icon::settings));
+    auto* render_button = new QToolButton(toolbar);
+    render_button->setDefaultAction(render_toggle);
+    render_button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    toolbar->addSeparator();
+    toolbar->addWidget(render_button);
+    connect(render_toggle, &QAction::triggered, this, [this, scene_dock](bool visible) {
+        if (!panels_->sceneDock()->isFloating()) {
+            resizeDocks({scene_dock}, {visible ? 320 : 190}, Qt::Horizontal);
+        }
     });
+    builtin_button_->setIcon(editor::icon(editor::Icon::cube));
+    builtin_button_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    toolbar->insertSeparator(import_object_action_);
+    toolbar->insertSeparator(duplicate);
+    toolbar->insertSeparator(screenshot);
+    toolbar->insertSeparator(restore);
     viewport_->on_object_picked = [this](const std::string& id) { select_object(id); };
-    addToolBarBreak();
-    auto* manipulation = addToolBar("物体操纵");
+    auto* manipulation = new QToolBar("物体操纵", viewport_frame);
+    viewport_layout->insertWidget(0, manipulation);
+    manipulation->setIconSize(QSize(16, 16));
+    manipulation->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     manipulation->setObjectName("gizmo_toolbar");
     manipulation->setMovable(false);
     auto* tool_group = new QActionGroup(manipulation);
-    const std::array<QString, 3> tool_names{"选择 V", "移动 T", "旋转 R"};
+    const std::array<QString, 3> tool_names{"选择", "移动", "旋转"};
+    const std::array<editor::Icon, 3> tool_icons{editor::Icon::select, editor::Icon::move,
+                                                 editor::Icon::rotate};
+    const std::array<QString, 3> shortcuts{"V", "T", "R"};
     const std::array<QString, 3> tool_ids{"gizmo_select", "gizmo_translate", "gizmo_rotate"};
     const std::array<minirender::GizmoMode, 3> tool_modes{minirender::GizmoMode::select,
                                                           minirender::GizmoMode::translate,
@@ -523,6 +602,8 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     for (std::size_t index = 0; index < tools.size(); ++index) {
         tools[index] = manipulation->addAction(tool_names[index]);
         tools[index]->setObjectName(tool_ids[index]);
+        tools[index]->setIcon(editor::icon(tool_icons[index]));
+        tools[index]->setToolTip(tool_names[index] + " (" + shortcuts[index] + ")");
         tools[index]->setCheckable(true);
         tool_group->addAction(tools[index]);
         connect(tools[index], &QAction::toggled, this,
@@ -533,9 +614,12 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
                 });
     }
     tools[0]->setChecked(true);
-    auto* tool_hint =
-        new QLabel("  世界坐标轴 · 拖动轴移动，拖动圆环旋转 · Esc 取消", manipulation);
+    auto* tool_hint = new QLabel("世界坐标", manipulation);
     tool_hint->setObjectName("gizmo_hint");
+    tool_hint->setToolTip("拖动坐标轴移动物体，拖动圆环旋转；Esc 取消。");
+    auto* tool_space = new QWidget(manipulation);
+    tool_space->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    manipulation->addWidget(tool_space);
     manipulation->addWidget(tool_hint);
     viewport_->on_gizmo_mode_changed = [tools, tool_modes](auto mode) {
         for (std::size_t index = 0; index < tools.size(); ++index) {
@@ -559,6 +643,9 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     task_progress_->setRange(0, 0);
     task_progress_->setFixedWidth(110);
     task_progress_->setTextVisible(false);
+    statusBar()->setSizeGripEnabled(false);
+    statusBar()->setToolTip(
+        "左拖环绕 · 右拖转向 · 中拖平移 · WASDQE 移动；V 选择 / T 移动 / R 旋转。");
     statusBar()->addPermanentWidget(task_label_);
     statusBar()->addPermanentWidget(task_progress_);
     task_label_->hide();
@@ -596,10 +683,10 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
                                      geometry_notice_extra_);
         } else if (viewport_->isValid()) {
             if (viewport_->offline_visible()) {
-                statusBar()->showMessage(
-                    viewport_->offline_source() == OfflineImageSource::lightfield
-                        ? "光场图像 | 曝光只影响显示 | 返回实时预览后可操作相机"
-                        : "CPU 离线结果 | 曝光只影响显示 | 返回实时预览后可操作相机");
+                statusBar()->showMessage(viewport_->offline_source() ==
+                                                 OfflineImageSource::lightfield
+                                             ? "光场图像  ·  曝光只影响显示"
+                                             : "CPU 离线结果  ·  曝光只影响显示");
                 return;
             }
             if (viewport_->point_preview_visible()) {
@@ -610,12 +697,11 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
             }
             if (viewport_->sdf_visible()) {
                 statusBar()->showMessage(
-                    QString("距离场 | %1 个节点 | 左拖环绕 · 右拖转向 · 中拖平移 · WASDQE 移动")
-                        .arg(viewport_->sdf_document()->nodes.size()));
+                    QString("距离场  ·  %1 个节点").arg(viewport_->sdf_document()->nodes.size()));
                 return;
             }
             auto message =
-                QString("%1 | %2 个物体 | 实时预览 | 左拖环绕 · 右拖转向 · 中拖平移 · WASDQE 移动")
+                QString("%1  ·  %2 个物体  ·  实时预览")
                     .arg(QString::fromUtf8(viewport_->physicalDeviceProperties()->deviceName))
                     .arg(editor_.document().objects.size());
             QStringList offline_features;
@@ -645,6 +731,7 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     if (diagnostic_) {
         scene_dock->hide();
         inspector->hide();
+        panels_->sceneDock()->hide();
     } else {
         viewport_->set_scene(editor_.snapshot());
     }
@@ -676,6 +763,7 @@ void Workbench::build_object_panel() {
     roughness_ = spin(object_panel_, "roughness", 0, 1, 0.05);
     ior_ = spin(object_panel_, "ior", 0.1, 5, 0.05);
     layout->addRow("名称", object_name_);
+    layout->addRow(editor::section("变换", object_panel_));
     layout->addRow("位置 / m", translation_);
     layout->addRow("旋转 / °", rotation_);
     layout->addRow("缩放", scale_);
@@ -685,20 +773,23 @@ void Workbench::build_object_panel() {
         edit_object_property(
             [&](minirender::SceneObject& object) { object.cloth_collider = collider; });
     };
+    layout->addRow(editor::section("表面材质", object_panel_));
     layout->addRow("材质", material_kind_);
     material_notice_ = new QLabel(object_panel_);
     material_notice_->setObjectName("material_notice");
     material_notice_->setWordWrap(true);
+    material_notice_->setProperty("role", "muted");
     layout->addRow(material_notice_);
     layout->addRow(double_sided_);
-    layout->addRow("底色 / 线性 RGB", base_color_);
-    layout->addRow("底色纹理 / RGB", texture_selector_);
+    layout->addRow("底色", base_color_);
+    layout->addRow("底色纹理", texture_selector_);
     layout->addRow("纹理过滤", texture_filter_);
     layout->addRow("自发光", emission_);
     layout->addRow("粗糙度", roughness_);
     layout->addRow("折射率", ior_);
     auto* hint = new QLabel("同一材质的参数会同时影响引用它的物体。");
     hint->setWordWrap(true);
+    hint->setProperty("role", "muted");
     layout->addRow(hint);
     cloth_material_ = new ClothMaterialPanel(object_panel_);
     layout->addRow(cloth_material_);
@@ -733,7 +824,7 @@ void Workbench::build_object_panel() {
             offline_->set_integrator_kind(minirender::IntegratorKind::path_tracing);
             offline_->start();
         }
-        findChild<QTabWidget*>("inspector_tabs")->setCurrentIndex(3);
+        panels_->setCurrentIndex(3);
     };
     translation_->on_changed = [this] {
         edit_object_property([&](minirender::SceneObject& object) {
@@ -790,6 +881,7 @@ void Workbench::build_object_panel() {
                     if (material.id == object.material_id && !material.base_color_texture.empty()) {
                         refresh_properties();
                         material_notice_->setText("请先移除底色纹理，再使用均匀 SSS 材质。");
+                        material_notice_->show();
                         return;
                     }
                 }
@@ -880,11 +972,13 @@ void Workbench::build_camera_panel() {
     auto* mode = new QComboBox;
     mode->setObjectName("view_mode");
     mode->addItems({"光照合成", "法线", "线性深度", "线框", "原始 AO", "滤波 AO"});
+    layout->addRow(editor::section("相机", camera_panel_));
     layout->addRow("位置", camera_position_);
     layout->addRow("目标", camera_target_);
     layout->addRow("垂直 FOV / °", fov_);
     layout->addRow("光圈半径 / m", aperture_);
     layout->addRow("对焦距离 / m", focus_);
+    layout->addRow(editor::section("视口显示", camera_panel_));
     layout->addRow("曝光 / EV", exposure_);
     layout->addRow("显示", mode);
     auto* fxaa = new QCheckBox("启用 FXAA");
@@ -992,6 +1086,7 @@ void Workbench::refresh_properties() {
         subsurface_material_->set_material(nullptr, document_generation_);
     }
     material_notice_->clear();
+    material_notice_->hide();
     viewport_->set_gizmo_target(
         object != document.objects.end() && object->visible ? object->id : "",
         object != document.objects.end() && object->visible ? std::optional(object->transform)
@@ -1293,11 +1388,11 @@ void Workbench::import_builtin_scene(const QString& id) {
         select_object(preset.selected_object);
         findChild<QComboBox*>("view_mode")->setCurrentIndex(preset.normal_preview ? 1 : 0);
         if (!editor_.document().media.empty()) {
-            findChild<QTabWidget*>("inspector_tabs")->setCurrentIndex(10);
+            panels_->setCurrentIndex(10);
         }
         for (const auto& material : editor_.document().materials) {
             if (material.kind == minirender::MaterialKind::subsurface) {
-                findChild<QTabWidget*>("inspector_tabs")->setCurrentIndex(0);
+                panels_->setCurrentIndex(0);
                 break;
             }
         }
@@ -1307,7 +1402,7 @@ void Workbench::import_builtin_scene(const QString& id) {
             settings.reference_focus = 4;
             settings.aperture_radius = .2;
             lightfield_panel_->set_capture_settings(settings);
-            findChild<QTabWidget*>("inspector_tabs")->setCurrentIndex(11);
+            panels_->setCurrentIndex(11);
         }
         setWindowTitle("MiniRender — " + preset.name + "（示例副本）");
         statusBar()->showMessage(
@@ -1580,21 +1675,28 @@ LightFieldPanel* Workbench::lightfield_panel() const noexcept {
 }
 void Workbench::mark_snapshot_changed() {
     offline_->scene_changed();
-    if (lightfield_)
+    if (lightfield_) {
         lightfield_->scene_changed();
+    }
 }
 void Workbench::export_display_hdr(const QString& path) {
     if (viewport_->offline_visible()) {
-        if (viewport_->offline_source() == OfflineImageSource::lightfield)
+        if (viewport_->offline_source() == OfflineImageSource::lightfield) {
             lightfield_->export_image(path, true);
-        else
+        } else {
             offline_->save_image(path, true);
-    } else
+        }
+    } else {
         viewport_->grab_hdr().write_exr(native_path(path));
+    }
 }
 Workbench::~Workbench() {
-    if (lightfield_)
+    // 先断开面板导航回调，随后 QMainWindow 可以销毁停靠布局和子窗口。
+    delete panels_;
+    panels_ = nullptr;
+    if (lightfield_) {
         lightfield_->shutdown();
+    }
     if (cloth_controller_) {
         cloth_controller_->on_frame = {};
         cloth_controller_->pause();
@@ -1744,6 +1846,7 @@ void Workbench::import_texture_file(const QString& path, minirender::ColorEncodi
             });
             if (subsurface_target) {
                 material_notice_->setText("纹理已导入资源；均匀 SSS 材质不使用底色纹理。");
+                material_notice_->show();
             }
         });
 }

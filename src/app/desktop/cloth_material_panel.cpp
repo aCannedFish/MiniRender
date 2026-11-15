@@ -32,7 +32,7 @@ QDoubleSpinBox* scalar(QWidget* parent, const QString& name, double low, double 
 QFormLayout* form(QWidget* widget) {
     auto* layout = new QFormLayout(widget);
     layout->setContentsMargins(0, 0, 0, 0);
-    layout->setVerticalSpacing(12);
+    layout->setVerticalSpacing(8);
     layout->setRowWrapPolicy(QFormLayout::WrapLongRows);
     layout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     return layout;
@@ -168,10 +168,12 @@ void ClothMaterialPanel::build_thread(std::size_t index, QFormLayout* layout) {
                 edit([&](auto& settings) { settings.threads[index].albedo[int(channel)] = value; });
             });
     }
+    color->setMinimumWidth(components->minimumSize().width());
     controls.kd = scalar(group, prefix + ".kd", 0, 1, .05);
     controls.surface = scalar(group, prefix + ".surface_width", 1, 90, .5);
     controls.volume = scalar(group, prefix + ".volume_width", 1, 90, .5);
-    fields->addRow("颜色 RGB", color);
+    fields->addRow(new QLabel("颜色 RGB", group));
+    fields->addRow(color);
     fields->addRow("各向同性比例", controls.kd);
     fields->addRow("表面宽度 °", controls.surface);
     fields->addRow("内部宽度 °", controls.volume);

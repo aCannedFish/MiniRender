@@ -92,13 +92,12 @@ void prepare(Workbench& window, const QString& directory) {
     ao.enabled = false;
     window.viewport()->set_ssao_settings(ao);
     window.select_object("blue_cube");
-    control<QTabWidget>(window, "inspector_tabs")->setCurrentIndex(6);
+    window.panels()->setCurrentIndex(6);
 }
 
 // 检查表单边界及行间遮挡，并让滚动区实际定位到底部控件。
 void verify_layout(Workbench& window) {
-    auto* area =
-        qobject_cast<QScrollArea*>(control<QTabWidget>(window, "inspector_tabs")->widget(6));
+    auto* area = qobject_cast<QScrollArea*>(window.panels()->widget(6));
     require(area && area->widget()->width() <= area->viewport()->width(),
             "Geometry panel requires hidden horizontal scrolling");
     auto* panel = area->widget();

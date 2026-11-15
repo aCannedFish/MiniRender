@@ -214,8 +214,7 @@ void verify_ao(Workbench& window, const QString& directory) {
 }
 
 void verify_panel(Workbench& window) {
-    auto* area =
-        qobject_cast<QScrollArea*>(window.findChild<QTabWidget*>("inspector_tabs")->widget(5));
+    auto* area = qobject_cast<QScrollArea*>(window.panels()->widget(5));
     require(area && area->widget()->width() <= area->viewport()->width(),
             "Environment panel requires hidden horizontal scrolling");
     auto* panel = area->widget();
@@ -310,7 +309,7 @@ void start_ibl_smoke(Workbench& window, const QString& directory) {
                 switch (state->step) {
                 case 0:
                     prepare(window, directory);
-                    window.findChild<QTabWidget*>("inspector_tabs")->setCurrentIndex(5);
+                    window.panels()->setCurrentIndex(5);
                     state->last = state->clock.elapsed();
                     state->monitor = true;
                     ++state->step;
