@@ -985,6 +985,25 @@ void VulkanViewport::set_exposure(float value) {
 float VulkanViewport::exposure() const noexcept {
     return exposure_;
 }
+void VulkanViewport::set_preview_outline(bool enabled) {
+    preview_outline_ = enabled;
+    mark_preview_changed();
+    requestUpdate();
+}
+bool VulkanViewport::preview_outline() const noexcept {
+    return preview_outline_;
+}
+void VulkanViewport::set_preview_outline_strength(float strength) {
+    if (!std::isfinite(strength) || strength < 0 || strength > 1) {
+        throw std::invalid_argument("Preview outline strength must be in [0, 1]");
+    }
+    preview_outline_strength_ = strength;
+    mark_preview_changed();
+    requestUpdate();
+}
+float VulkanViewport::preview_outline_strength() const noexcept {
+    return preview_outline_strength_;
+}
 void VulkanViewport::set_preview_occlusion(bool enabled) {
     preview_occlusion_ = enabled;
     mark_preview_changed();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "hdr_targets.hpp"
+#include "screen_pass.hpp"
 #include <functional>
 
 // 独立显示 pass：从线性 HDR、法线、深度生成 swapchain 图像。
@@ -19,6 +20,9 @@ class PostProcess {
     void release();
 
   private:
+    // 显示轮廓使用独立附件，HDR 导出继续读取原始合成图。
+    ScreenPass outline_;
+    bool outline_initialized_ = false;
     VkDevice device_ = VK_NULL_HANDLE;
     VkSampler sampler_ = VK_NULL_HANDLE;
     VkDescriptorSetLayout descriptor_layout_ = VK_NULL_HANDLE;

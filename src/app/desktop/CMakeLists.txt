@@ -5,7 +5,7 @@ find_package(Vulkan 1.2 REQUIRED COMPONENTS glslangValidator)
 set(shader_outputs)
 foreach(shader diagnostic.vert diagnostic.frag scene.vert scene.frag shadow.vert
     wire.vert wire.frag post.vert post.frag offline.frag screen.vert ssao.frag ao_filter.frag ao_composite.frag environment.frag
-    gizmo.vert gizmo.frag point_preview.vert point_preview.frag sdf.vert sdf.frag sdf_display.frag)
+    preview_outline.frag gizmo.vert gizmo.frag point_preview.vert point_preview.frag sdf.vert sdf.frag sdf_display.frag)
     set(source "${PROJECT_SOURCE_DIR}/shaders/${shader}")
     set(output "${CMAKE_CURRENT_BINARY_DIR}/${shader}.spv")
     add_custom_command(OUTPUT "${output}"
@@ -19,7 +19,7 @@ foreach(shader diagnostic.vert diagnostic.frag scene.vert scene.frag shadow.vert
 endforeach()
 
 qt_add_executable(minirender_desktop
-    preview_smoke.cpp preview_smoke.hpp
+    preview_smoke.cpp preview_smoke.hpp outline_smoke.cpp outline_smoke.hpp
     main.cpp vulkan_viewport.cpp vulkan_viewport.hpp
     editor_theme.cpp editor_theme.hpp workbench_panels.cpp workbench_panels.hpp theme_smoke.cpp theme_smoke.hpp
     builtin_scenes.cpp builtin_scenes.hpp

@@ -8,6 +8,7 @@
 #include "interaction_smoke.hpp"
 #include "lightfield_smoke.hpp"
 #include "offline_smoke.hpp"
+#include "outline_smoke.hpp"
 #include "parameter_smoke.hpp"
 #include "point_cloud_smoke.hpp"
 #include "presets_smoke.hpp"
@@ -203,20 +204,21 @@ int main(int argc, char** argv) {
                       "directory"});
     parser.addOption({"theme-smoke", "Verify editor theme and layout.", "directory"});
     parser.addOption({"preview-smoke", "Verify base color preview and occlusion.", "directory"});
+    parser.addOption({"outline-smoke", "Verify preview contours and creases.", "directory"});
     parser.process(application);
     const bool smoke = parser.isSet("smoke");
-    const bool regression = smoke || parser.isSet("preview-smoke") || parser.isSet("theme-smoke") ||
-                            parser.isSet("lightfield-smoke") || parser.isSet("subsurface-smoke") ||
-                            parser.isSet("sppm-smoke") || parser.isSet("volume-smoke") ||
-                            parser.isSet("simulation-smoke") || parser.isSet("cloth-smoke") ||
-                            parser.isSet("scene-smoke") || parser.isSet("texture-smoke") ||
-                            parser.isSet("interaction-smoke") || parser.isSet("parameter-smoke") ||
-                            parser.isSet("wire-smoke") || parser.isSet("offline-smoke") ||
-                            parser.isSet("ssao-smoke") || parser.isSet("ibl-smoke") ||
-                            parser.isSet("geometry-smoke") || parser.isSet("gizmo-smoke") ||
-                            parser.isSet("sides-smoke") || parser.isSet("presets-smoke") ||
-                            parser.isSet("adaptive-smoke") || parser.isSet("points-smoke") ||
-                            parser.isSet("sdf-smoke");
+    const bool regression =
+        smoke || parser.isSet("outline-smoke") || parser.isSet("preview-smoke") ||
+        parser.isSet("theme-smoke") || parser.isSet("lightfield-smoke") ||
+        parser.isSet("subsurface-smoke") || parser.isSet("sppm-smoke") ||
+        parser.isSet("volume-smoke") || parser.isSet("simulation-smoke") ||
+        parser.isSet("cloth-smoke") || parser.isSet("scene-smoke") ||
+        parser.isSet("texture-smoke") || parser.isSet("interaction-smoke") ||
+        parser.isSet("parameter-smoke") || parser.isSet("wire-smoke") ||
+        parser.isSet("offline-smoke") || parser.isSet("ssao-smoke") || parser.isSet("ibl-smoke") ||
+        parser.isSet("geometry-smoke") || parser.isSet("gizmo-smoke") ||
+        parser.isSet("sides-smoke") || parser.isSet("presets-smoke") ||
+        parser.isSet("adaptive-smoke") || parser.isSet("points-smoke") || parser.isSet("sdf-smoke");
 #ifdef Q_OS_MACOS
     RegressionActivity regression_activity(regression);
 #endif
@@ -297,7 +299,8 @@ int main(int argc, char** argv) {
             }
         }
         // 既有光照专项固定使用合成模式；原色专项保留实际启动默认值。
-        if (regression && !smoke && !parser.isSet("preview-smoke")) {
+        if (regression && !smoke && !parser.isSet("preview-smoke") &&
+            !parser.isSet("outline-smoke")) {
             window.findChild<QComboBox*>("view_mode")->setCurrentIndex(0);
         }
         if (parser.isSet("scene-smoke")) {
@@ -375,6 +378,9 @@ int main(int argc, char** argv) {
         }
         if (parser.isSet("preview-smoke")) {
             start_preview_smoke(window, parser.value("preview-smoke"));
+        }
+        if (parser.isSet("outline-smoke")) {
+            start_outline_smoke(window, parser.value("outline-smoke"), timing_only);
         }
         int ticks = 0;
         bool resized = false;

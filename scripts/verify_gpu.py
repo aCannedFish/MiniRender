@@ -142,13 +142,19 @@ def main() -> int:
         action="store_true",
         help="Verify base color preview and occlusion",
     )
+    checks.add_argument(
+        "--outline-check",
+        action="store_true",
+        help="Verify preview contours and creases",
+    )
     args = parser.parse_args()
     if args.timing_only and args.sync_validation:
         parser.error(
             "Timing measurements and synchronization validation must run separately"
         )
     scene_check = (
-        args.preview_check
+        args.outline_check
+        or args.preview_check
         or args.theme_check
         or args.lightfield_check
         or args.subsurface_check
@@ -183,6 +189,7 @@ def main() -> int:
     mode = "GPU"
     option = "--smoke"
     for selected, candidate in [
+        (args.outline_check, "Outline"),
         (args.preview_check, "Preview"),
         (args.theme_check, "Theme"),
         (args.lightfield_check, "Lightfield"),

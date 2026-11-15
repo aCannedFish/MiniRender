@@ -60,14 +60,16 @@ struct alignas(16) FrameUniform {
     glm::vec4 ao_settings; // enabled, radius/m, bias/m, strength
     glm::vec4 ao_filter;   // samples, depth sigma/m, normal exponent, use filtered
     std::array<glm::vec4, minirender::ssao_kernel_size> ao_kernel;
-    glm::vec4 ibl; // BRDF ready, maps ready, strength, rotation/radians
+    glm::vec4 ibl;           // BRDF ready, maps ready, strength, rotation/radians
+    glm::vec4 preview_edges; // effective strength, physical pixels per logical pixel, reserved
 };
 static_assert(offsetof(FrameUniform, lights) == 96);
 static_assert(offsetof(FrameUniform, shadow_view_projection) == 384);
 static_assert(offsetof(FrameUniform, view) == 928);
 static_assert(offsetof(FrameUniform, ao_kernel) == 1152);
 static_assert(offsetof(FrameUniform, ibl) == 2176);
-static_assert(sizeof(FrameUniform) == 2192);
+static_assert(offsetof(FrameUniform, preview_edges) == 2192);
+static_assert(sizeof(FrameUniform) == 2208);
 
 } // namespace
 
@@ -466,6 +468,8 @@ void SceneRenderer::update_uniforms() {
     frame.counts.y = window_->environment_background() ? 1 : 0;
     frame.display = {window_->exposure(), static_cast<float>(window_->view_mode()),
                      window_->fxaa_enabled() ? 1.0F : 0.0F, 0};
+    frame.preview_edges = {window_->preview_outline() ? window_->preview_outline_strength() : 0.0F,
+                           static_cast<float>(window_->devicePixelRatio()), 0, 0};
     frame.shadow_view_projection = shadow_matrices_;
     frame.shadow_settings = {window_->shadows_enabled() ? 1.0F : 0.0F, 1.0F / ShadowMap::resolution,
                              0, 0};
