@@ -1,3 +1,5 @@
+// 按需生成的 Loop 层级与邻接关系。
+
 #pragma once
 
 #include <minirender/geometry/halfedge.hpp>

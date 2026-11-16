@@ -1,3 +1,6 @@
+// 场景三角形的 SAH BVH 构建、最近命中与遮挡查询。
+// 公开接口与参数约定见 include/minirender/render/bvh.hpp。
+
 #include <minirender/render/bvh.hpp>
 
 #include <algorithm>
@@ -307,7 +310,8 @@ SurfaceHit SceneBvh::surface_hit(const Ray& ray, const PrimitiveHit& hit) const 
     }
     glm::dvec3 shading(0);
     glm::dvec2 uv(0);
-    glm::dvec3 position(0), absolute_position(0);
+    glm::dvec3 position(0);
+    glm::dvec3 absolute_position(0);
     for (std::size_t corner = 0; corner < 3; ++corner) {
         const auto&  data   = triangle.corners[corner];
         const double weight = hit.hit.barycentric[static_cast<int>(corner)];

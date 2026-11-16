@@ -1,3 +1,6 @@
+// 屏幕空间遮蔽、双边滤波和环境漫反射合成的 Vulkan pass。
+// 本模块接口见 ssao_pass.hpp。
+
 #include "ssao_pass.hpp"
 
 #include <array>

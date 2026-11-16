@@ -1,3 +1,6 @@
+// 自适应细分使用的参考曲面采样与终端过渡。
+// 本模块接口见 adaptive_surface.hpp。
+
 #include "adaptive_surface.hpp"
 #include "height_field.hpp"
 

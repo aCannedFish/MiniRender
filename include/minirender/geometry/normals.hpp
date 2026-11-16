@@ -1,3 +1,5 @@
+// 跨面角计算平滑法线，供细分、位移和网格处理复用。
+
 #pragma once
 
 #include <minirender/scene/scene.hpp>

@@ -1,3 +1,6 @@
+// 布料定义、碰撞环境与模拟状态的场景序列化。
+// 本模块接口见 cloth_simulation_io.hpp。
+
 #include "cloth_simulation_io.hpp"
 
 #include <limits>

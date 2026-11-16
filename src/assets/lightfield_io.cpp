@@ -1,3 +1,6 @@
+// 光场容器的标定、RGB32f 视图数据及有界读取缓存。
+// 公开接口与参数约定见 include/minirender/assets/lightfield_io.hpp。
+
 #include "staged_file.hpp"
 #include <minirender/assets/lightfield_io.hpp>
 

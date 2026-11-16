@@ -1,3 +1,5 @@
+// 对三角网格线框顶点应用实例与相机变换。
+
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "scene_frame.glsl"

@@ -1,3 +1,6 @@
+// 从几何和面角 UV 构造织物方向所需的切向基。
+// 公开接口与参数约定见 include/minirender/geometry/uv_tangents.hpp。
+
 #include <minirender/geometry/uv_tangents.hpp>
 
 #include <algorithm>
@@ -24,7 +27,8 @@ std::optional<UvTangents> uv_tangents(const std::array<glm::vec3, 3>& positions,
     // 只需方向，先约去 UV 尺度；求逆的符号仍参与两个方向。
     auto         u  = (t.y * a - s.y * b) / determinant;
     auto         v  = (-t.x * a + s.x * b) / determinant;
-    const double lu = glm::length(u), lv = glm::length(v);
+    const double lu = glm::length(u);
+    const double lv = glm::length(v);
     if (!std::isfinite(lu) || !std::isfinite(lv) || lu == 0 || lv == 0) {
         return std::nullopt;
     }

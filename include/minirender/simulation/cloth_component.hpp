@@ -1,3 +1,5 @@
+// 布料场景组件、运行姿态与冻结网格之间的转换。
+
 #pragma once
 
 #include <minirender/simulation/cloth.hpp>

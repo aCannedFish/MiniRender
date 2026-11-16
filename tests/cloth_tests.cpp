@@ -1,3 +1,6 @@
+// 回归测试：Cloth grid preserves area mass and unique spring connectivity；Cloth spring force has
+// analytic stiffness damping and zero length recovery。
+
 #include "simulation/cloth_collision.hpp"
 #include <minirender/simulation/cloth.hpp>
 
@@ -240,7 +243,8 @@ TEST_CASE("Cloth swept plane collision preserves sliding and applies Coulomb fri
           "[cloth][collision]") {
     auto environment = vacuum();
     environment.planes.push_back({{}, {0, 1, 0}, 0});
-    glm::dvec3 position(0, 1, 0), velocity(2, -10, 0);
+    glm::dvec3 position(0, 1, 0);
+    glm::dvec3 velocity(2, -10, 0);
     auto       contacts = detail::move_cloth_particle(position, velocity, .2, .01, environment, {});
     REQUIRE(position.x == Approx(.4));
     REQUIRE(position.y >= .01);
@@ -260,7 +264,8 @@ TEST_CASE("Cloth swept sphere catches traversals with both endpoints outside",
           "[cloth][collision]") {
     auto environment = vacuum();
     environment.spheres.push_back({{}, .5, 0});
-    glm::dvec3 position(-2, 0, 0), velocity(40, 0, 0);
+    glm::dvec3 position(-2, 0, 0);
+    glm::dvec3 velocity(40, 0, 0);
     const auto contacts = detail::move_cloth_particle(position, velocity, .1, .01, environment, {});
     REQUIRE(contacts.count == 1);
     REQUIRE(position.x <= -.51);
@@ -294,7 +299,8 @@ TEST_CASE("Cloth collision events handle corners and reject failed projection",
           "[cloth][collision]") {
     auto environment   = vacuum();
     environment.planes = {{{}, {1, 0, 0}, 0}, {{}, {0, 1, 0}, 0}};
-    glm::dvec3 position(1, 1, 0), velocity(-10, -20, 3);
+    glm::dvec3 position(1, 1, 0);
+    glm::dvec3 velocity(-10, -20, 3);
     const auto contacts = detail::move_cloth_particle(position, velocity, .1, .01, environment, {});
     REQUIRE(contacts.count == 2);
     REQUIRE_FALSE(contacts.limited);

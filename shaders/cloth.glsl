@@ -1,3 +1,5 @@
+// 微圆柱经纬织物的 GPU 散射求值，与 CPU 材质数据约定对应。
+
 #ifndef MINIRENDER_CLOTH
 #define MINIRENDER_CLOTH
 #include "scene_instance.glsl"

@@ -1,3 +1,5 @@
+// 布料模拟参数控件、状态刷新与用户操作回调。
+
 #pragma once
 
 #include "cloth_controller.hpp"
@@ -28,7 +30,8 @@ class ClothPanel final : public QWidget {
     ClothController&                                   controller_;
     std::shared_ptr<const minirender::ClothDefinition> source_;
     minirender::ClothDefinition                        draft_;
-    bool                                               refreshing_ = false, geometry_dirty_ = false;
+    bool                                               refreshing_     = false;
+    bool                                               geometry_dirty_ = false;
     QComboBox *     target_ = nullptr, *demo_ = nullptr, *pins_ = nullptr;
     QSpinBox *      columns_ = nullptr, *rows_ = nullptr, *substeps_ = nullptr;
     QDoubleSpinBox *width_ = nullptr, *height_ = nullptr, *density_ = nullptr;

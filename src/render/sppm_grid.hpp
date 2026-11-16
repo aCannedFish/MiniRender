@@ -1,3 +1,5 @@
+// SPPM 可见点的空间哈希网格与邻域查询。
+
 #pragma once
 
 #include <array>
@@ -50,13 +52,15 @@ class SppmGrid final {
 
     struct Entry {
         Cell        cell;
-        std::size_t point, next;
+        std::size_t point;
+        std::size_t next;
     };
 
     static constexpr std::size_t none = std::numeric_limits<std::size_t>::max();
     std::optional<Cell> cell(glm::dvec3 point) const;
     std::size_t hash(const Cell& cell) const;
-    glm::dvec3                 minimum_{0}, maximum_{0};
+    glm::dvec3                 minimum_{0};
+    glm::dvec3                 maximum_{0};
     double                     cell_size_ = 1;
     std::vector<SppmGridPoint> points_;
     std::vector<std::size_t>   heads_;

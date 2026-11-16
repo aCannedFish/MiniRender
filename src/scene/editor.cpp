@@ -1,3 +1,6 @@
+// 场景编辑事务、历史撤销重做与相机导航。
+// 公开接口与参数约定见 include/minirender/scene/editor.hpp。
+
 #include <minirender/scene/editor.hpp>
 #include <minirender/simulation/cloth_component.hpp>
 

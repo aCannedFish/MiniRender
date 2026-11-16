@@ -1,3 +1,5 @@
+// 距离场渲染附件的屏幕显示转换。
+
 #version 450
 layout(binding = 0) uniform sampler2D image;
 

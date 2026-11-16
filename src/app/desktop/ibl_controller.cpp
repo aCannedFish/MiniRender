@@ -1,3 +1,6 @@
+// 环境预处理任务的异步执行、取消与结果缓存。
+// 本模块接口见 ibl_controller.hpp。
+
 #include "ibl_controller.hpp"
 
 #include <QTimer>

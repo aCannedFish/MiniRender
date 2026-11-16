@@ -1,3 +1,5 @@
+// 布料材质参数与 CPU/GPU 布局一致的数据打包。
+
 #pragma once
 
 #include <minirender/scene/scene.hpp>

@@ -1,3 +1,5 @@
+// 点云数据校验与三角网格表面采样。
+
 #pragma once
 
 #include <minirender/scene/scene.hpp>

@@ -1,3 +1,5 @@
+// 点云预览数据的准备、归一化与抽样。
+
 #pragma once
 
 #include <minirender/geometry/point_cloud.hpp>

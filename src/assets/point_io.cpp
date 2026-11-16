@@ -1,3 +1,6 @@
+// PLY 点云的文本及二进制编码读写。
+// 公开接口与参数约定见 include/minirender/assets/point_io.hpp。
+
 #include "staged_file.hpp"
 #include <minirender/assets/point_io.hpp>
 

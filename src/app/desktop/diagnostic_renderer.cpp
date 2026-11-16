@@ -1,3 +1,6 @@
+// 基础纹理、深度和读回的 Vulkan 诊断渲染。
+// 本模块接口见 diagnostic_renderer.hpp。
+
 #include "diagnostic_renderer.hpp"
 #include "gpu_shader.hpp"
 

@@ -1,3 +1,5 @@
+// 点云参数控件、状态刷新与用户操作回调。
+
 #pragma once
 
 #include "geometry_controller.hpp"

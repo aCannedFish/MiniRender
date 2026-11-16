@@ -1,3 +1,6 @@
+// 表面与介质路径积分，连接散射采样、光源采样和 MIS。
+// 公开接口与参数约定见 include/minirender/render/path_tracer.hpp。
+
 #include <minirender/geometry/uv_tangents.hpp>
 #include <minirender/render/path_tracer.hpp>
 
@@ -76,7 +79,8 @@ double power_heuristic(double sampled_pdf, double other_pdf) {
     if (scale == 0) {
         return 0;
     }
-    const double a = sampled_pdf / scale, b = other_pdf / scale;
+    const double a = sampled_pdf / scale;
+    const double b = other_pdf / scale;
     return a * a / (a * a + b * b);
 }
 
@@ -151,9 +155,11 @@ glm::dvec3 PathTracer::trace(Ray ray, Sampler& sampler, RayInterval primary_inte
     if (statistics) {
         ++statistics->paths;
     }
-    glm::dvec3 result(0), beta(1);
+    glm::dvec3 result(0);
+    glm::dvec3 beta(1);
     glm::dvec3 previous_reference(0);
-    double     previous_pdf = 0, eta_scale = 1;
+    double     previous_pdf   = 0;
+    double     eta_scale      = 1;
     bool       previous_delta = true;
     for (std::uint32_t depth = 0;; ++depth) {
         cancellation_.check();

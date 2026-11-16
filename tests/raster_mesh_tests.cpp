@@ -1,3 +1,6 @@
+// 回归测试：Raster preparation preserves face attributes line indices and local bounds；Raster
+// preparation cancels without modifying source or prior data。
+
 #include <minirender/render/raster_mesh.hpp>
 
 #include <catch2/catch_test_macros.hpp>

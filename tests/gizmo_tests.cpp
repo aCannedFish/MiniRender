@@ -1,3 +1,6 @@
+// 回归测试：Gizmo projection size and hits use the camera and logical pixels；Gizmo translation
+// constrains world axes and provides screen-plane movement。
+
 #include <minirender/scene/gizmo.hpp>
 
 #include <catch2/catch_approx.hpp>
@@ -73,8 +76,8 @@ TEST_CASE("Gizmo translation constrains world axes and provides screen-plane mov
     const auto   moved       = drag->update(start + glm::dvec2(80, 30));
     const double pixel_scale = 10 * std::tan(std::numbers::pi / 6) / 600;
     REQUIRE(moved.translation.x == Approx(80 * pixel_scale).margin(2e-6));
-    REQUIRE(moved.translation.y == 0);
-    REQUIRE(moved.translation.z == 0);
+    REQUIRE(moved.translation.y == 0.0F);
+    REQUIRE(moved.translation.z == 0.0F);
     REQUIRE(moved.rotation_degrees == original.rotation_degrees);
     REQUIRE(moved.scale == original.scale);
     const auto restored = drag->update(start);
@@ -84,7 +87,7 @@ TEST_CASE("Gizmo translation constrains world axes and provides screen-plane mov
     const auto shifted = free->update(layout.center + glm::dvec2(80, -30));
     REQUIRE(shifted.translation.x == Approx(80 * pixel_scale).margin(2e-6));
     REQUIRE(shifted.translation.y == Approx(30 * pixel_scale).margin(2e-6));
-    REQUIRE(shifted.translation.z == 0);
+    REQUIRE(shifted.translation.z == 0.0F);
 }
 
 TEST_CASE("All three translation handles remain world-aligned on a rotated scaled object",
@@ -164,7 +167,7 @@ TEST_CASE("Gizmo rotation reconstructs a gimbal pose and handles edge-on rings",
     REQUIRE(edge_drag.has_value());
     const auto edge_result = edge_drag->update(edge_start + glm::dvec2(0, 20));
     REQUIRE(std::isfinite(edge_result.rotation_degrees.x));
-    REQUIRE(std::abs(edge_result.rotation_degrees.x) > 1);
+    REQUIRE(std::abs(edge_result.rotation_degrees.x) > 1.0F);
     REQUIRE(edge_result.rotation_degrees.y == Approx(0).margin(1e-5));
     REQUIRE(edge_result.rotation_degrees.z == Approx(0).margin(1e-5));
 }
@@ -181,7 +184,7 @@ TEST_CASE("Gizmo rotation holds its last valid transform at a parallel constrain
     const auto angle = glm::radians(20.0);
     const auto moved = drag->update(projected(
         view, {std::cos(angle) * layout.world_radius, 0, -std::sin(angle) * layout.world_radius}));
-    REQUIRE(std::abs(moved.rotation_degrees.y) > 10);
+    REQUIRE(std::abs(moved.rotation_degrees.y) > 10.0F);
     // 此处射线的世界 Y 分量为零，与 Y=0 约束平面平行。
     const auto horizon_y = (1 - 1 / std::tan(std::numbers::pi / 6)) * view.size.y / 2;
     const auto held      = drag->update({view.size.x / 2, horizon_y});

@@ -1,3 +1,5 @@
+// 布料粒子与平面、球体的连续碰撞及接触修正。
+
 #pragma once
 
 #include <minirender/simulation/cloth.hpp>

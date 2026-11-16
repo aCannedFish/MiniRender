@@ -1,3 +1,6 @@
+// 隐藏窗口回归：sppm 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 sppm_smoke.hpp。
+
 #include "sppm_smoke.hpp"
 #include "builtin_scenes.hpp"
 #include "geometry_smoke.hpp"
@@ -106,7 +109,8 @@ void verify_display(Workbench& window, const QString& directory, const QString& 
                                      double(actual.height()) / double(image->height()));
     const int    width    = int(std::floor(double(image->width()) * scale));
     const int    height   = int(std::floor(double(image->height()) * scale));
-    const int    left = (actual.width() - width) / 2, top = (actual.height() - height) / 2;
+    const int    left     = (actual.width() - width) / 2;
+    const int    top      = (actual.height() - height) / 2;
     for (std::size_t y = 0; y < image->height(); ++y) {
         for (std::size_t x = 0; x < image->width(); ++x) {
             const auto pixel =
@@ -190,13 +194,16 @@ enum class Stage {
 
 // 每个步骤通过事件循环等待真实任务，参考计算和截图单独排除出响应测量。
 struct State {
-    Stage                                stage = Stage::import;
-    int                                  ticks = 0, frame = 0, settle = 0;
+    Stage                                stage  = Stage::import;
+    int                                  ticks  = 0;
+    int                                  frame  = 0;
+    int                                  settle = 0;
     RenderSettings                       render{24, 24, 64, 101};
     IntegratorSettings                   integrator{};
     std::shared_ptr<const SceneSnapshot> snapshot;
     std::shared_ptr<const Image>         paused_image;
-    std::uint64_t                        job = 0, samples = 0;
+    std::uint64_t                        job     = 0;
+    std::uint64_t                        samples = 0;
     QElapsedTimer                        cancellation;
     UiResponseProbe*                     probe = nullptr;
 };

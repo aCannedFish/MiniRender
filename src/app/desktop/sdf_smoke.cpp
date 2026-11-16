@@ -1,3 +1,6 @@
+// 隐藏窗口回归：sdf 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 sdf_smoke.hpp。
+
 #include "sdf_smoke.hpp"
 #include "geometry_smoke.hpp"
 #include "sdf_editor_smoke.hpp"
@@ -22,8 +25,9 @@ void require(bool value, const char* message) {
 
 // 从二次方程直接求距离、法线及观察深度，不调用距离场的 CPU 追踪器。
 void analytic_sphere(VulkanViewport& viewport, bool normals) {
-    const auto  image = viewport.grab_hdr();
-    std::size_t hits = 0, misses = 0;
+    const auto  image  = viewport.grab_hdr();
+    std::size_t hits   = 0;
+    std::size_t misses = 0;
     for (std::size_t y = 2; y < image.height(); y += 5) {
         for (std::size_t x = 2; x < image.width(); x += 5) {
             const auto ray =
@@ -63,7 +67,8 @@ void compare_cpu(VulkanViewport& viewport, const QString& directory, const QStri
         document, {actual.width(), actual.height(), viewport.sdf_view(), viewport.sdf_shadows()});
     require(reference.limited == 0, "CPU reference exhausted its step budget");
     require(reference.hits > 1000, "SDF reference has too few surface samples");
-    std::size_t count = 0, matched = 0;
+    std::size_t count     = 0;
+    std::size_t matched   = 0;
     float       maximum   = 0;
     const float tolerance = viewport.sdf_view() == minirender::SdfView::steps   ? .02F
                             : viewport.sdf_view() == minirender::SdfView::depth ? .00005F

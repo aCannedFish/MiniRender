@@ -1,3 +1,6 @@
+// 布料场景组件、运行姿态与冻结网格之间的转换。
+// 公开接口与参数约定见 include/minirender/simulation/cloth_component.hpp。
+
 #include <minirender/simulation/cloth_component.hpp>
 
 #include <glm/gtc/matrix_inverse.hpp>

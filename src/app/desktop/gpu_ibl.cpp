@@ -1,3 +1,6 @@
+// 环境预处理图像的 GPU 上传、缓存和描述符输入。
+// 本模块接口见 gpu_ibl.hpp。
+
 #include "gpu_ibl.hpp"
 
 #include <glm/vec4.hpp>

@@ -1,3 +1,5 @@
+// 依据深度、切平面距离和法线差生成原色预览的细轮廓与折角线。
+
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "scene_frame.glsl"

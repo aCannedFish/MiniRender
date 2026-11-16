@@ -1,3 +1,6 @@
+// 回归测试：Raster decoding respects sRGB, 16-bit linear data and HDR；Texture filters preserve
+// orientation, repeat addressing and linear mip averages。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/core/texture.hpp>
 

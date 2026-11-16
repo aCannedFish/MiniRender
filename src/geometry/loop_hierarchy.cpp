@@ -1,3 +1,6 @@
+// 按需生成的 Loop 层级与邻接关系。
+// 本模块接口见 loop_hierarchy.hpp。
+
 #include "loop_hierarchy.hpp"
 #include "loop_rules.hpp"
 

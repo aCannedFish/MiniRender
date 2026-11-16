@@ -1,3 +1,6 @@
+// 可复用的全屏 Vulkan 渲染附件、描述符与命令录制。
+// 本模块接口见 screen_pass.hpp。
+
 #include "screen_pass.hpp"
 #include "gpu_buffer.hpp"
 #include "gpu_shader.hpp"

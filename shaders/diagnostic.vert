@@ -1,3 +1,5 @@
+// 基础 Vulkan 诊断场景的顶点变换与纹理坐标传递。
+
 #version 450
 
 layout(location = 0) out vec2 texcoord;

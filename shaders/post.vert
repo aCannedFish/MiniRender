@@ -1,3 +1,5 @@
+// 后处理全屏顶点与纹理坐标输出。
+
 #version 450
 layout(location = 0) out vec2 uv;
 

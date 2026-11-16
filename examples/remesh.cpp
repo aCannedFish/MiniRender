@@ -1,3 +1,5 @@
+// 可运行示例：各向同性重网格的分裂、折叠、翻边、平滑和表面投影。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/loop.hpp>
 #include <minirender/geometry/remesh.hpp>

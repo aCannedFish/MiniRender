@@ -1,3 +1,6 @@
+// 点云预览数据的准备、归一化与抽样。
+// 公开接口与参数约定见 include/minirender/render/point_preview.hpp。
+
 #include <minirender/geometry/halfedge.hpp>
 #include <minirender/render/point_preview.hpp>
 

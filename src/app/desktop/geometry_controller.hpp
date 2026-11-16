@@ -1,3 +1,5 @@
+// 后台几何和文件任务的取消、进度及结果发布。
+
 #pragma once
 
 #include <minirender/assets/scene_io.hpp>

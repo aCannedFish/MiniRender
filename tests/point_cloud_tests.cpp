@@ -1,3 +1,6 @@
+// 回归测试：PLY round trips positions normals and Unicode paths in all encodings；PLY layout
+// follows declared properties elements and scalar types。
+
 #include "geometry/point_cloud_utils.hpp"
 #include "geometry/point_index.hpp"
 #include "geometry/symmetric_eigen.hpp"

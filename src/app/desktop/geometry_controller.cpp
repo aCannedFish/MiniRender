@@ -1,3 +1,6 @@
+// 后台几何和文件任务的取消、进度及结果发布。
+// 本模块接口见 geometry_controller.hpp。
+
 #include "geometry_controller.hpp"
 
 #include <QtConcurrent/QtConcurrentRun>

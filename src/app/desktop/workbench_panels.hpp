@@ -1,3 +1,5 @@
+// 物体与场景面板的页面路由、独立停靠和布局恢复。
+
 #pragma once
 
 #include <QObject>

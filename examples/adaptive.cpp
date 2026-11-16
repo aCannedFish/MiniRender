@@ -1,3 +1,5 @@
+// 可运行示例：由几何或投影误差控制的自适应细分与层级平衡。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/adaptive.hpp>
 #include <minirender/geometry/loop.hpp>

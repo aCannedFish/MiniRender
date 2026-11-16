@@ -1,3 +1,5 @@
+// 可运行示例：光场标定、瞳孔阵列与重聚焦接口。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/lightfield_capture.hpp>
 

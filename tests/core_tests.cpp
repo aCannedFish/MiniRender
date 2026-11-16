@@ -1,3 +1,6 @@
+// 回归测试：sRGB transfer preserves known values and round trips；Image rejects invalid extents and
+// stores unclipped linear values。
+
 #include <minirender/core/image.hpp>
 
 #include <catch2/catch_approx.hpp>

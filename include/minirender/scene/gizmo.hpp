@@ -1,3 +1,5 @@
+// 物体移动和旋转操纵器的布局、命中测试与变换计算。
+
 #pragma once
 
 #include <minirender/scene/scene.hpp>
@@ -22,8 +24,10 @@ struct GizmoView {
 
 // 线段同时用于显示与命中，world_a/b 为对应世界位置。depth 用于交叉处的前后选择。
 struct GizmoSegment {
-    glm::dvec2  a{0}, b{0};
-    glm::dvec3  world_a{0}, world_b{0};
+    glm::dvec2  a{0};
+    glm::dvec2  b{0};
+    glm::dvec3  world_a{0};
+    glm::dvec3  world_b{0};
     GizmoHandle handle = GizmoHandle::none;
     double      depth  = 0;
 };
@@ -62,9 +66,15 @@ class GizmoDrag {
     Transform   current_;
     GizmoMode   mode_   = GizmoMode::select;
     GizmoHandle handle_ = GizmoHandle::none;
-    glm::dvec3  pivot_{0}, axis_{0}, plane_normal_{0}, initial_point_{0}, radial_{0};
-    glm::dvec2  pointer_{0}, tangent_{0};
-    double      last_angle_ = 0, total_angle_ = 0;
+    glm::dvec3  pivot_{0};
+    glm::dvec3  axis_{0};
+    glm::dvec3  plane_normal_{0};
+    glm::dvec3  initial_point_{0};
+    glm::dvec3  radial_{0};
+    glm::dvec2  pointer_{0};
+    glm::dvec2  tangent_{0};
+    double      last_angle_     = 0;
+    double      total_angle_    = 0;
     bool        plane_rotation_ = false;
 };
 

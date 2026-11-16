@@ -1,3 +1,5 @@
+// 可运行示例：点云数据校验与三角网格表面采样。
+
 #include <minirender/assets/point_io.hpp>
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/ball_pivot.hpp>

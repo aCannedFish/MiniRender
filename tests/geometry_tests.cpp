@@ -1,3 +1,6 @@
+// 回归测试：Halfedge topology covers closed open and disconnected surfaces；Halfedge topology
+// rejects invalid data and nonmanifold fans。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/loop.hpp>
 #include <minirender/render/path_tracer.hpp>
@@ -276,7 +279,7 @@ TEST_CASE("Loop uses cubic boundary masks and preserves child winding", "[geomet
         const auto a = result.mesh->positions[face.corners[0].position];
         const auto b = result.mesh->positions[face.corners[1].position];
         const auto c = result.mesh->positions[face.corners[2].position];
-        REQUIRE(glm::cross(b - a, c - a).z > 0);
+        REQUIRE(glm::cross(b - a, c - a).z > 0.0F);
         for (const auto& corner : face.corners) {
             close(corner.normal, {0, 0, 1});
         }
@@ -350,7 +353,7 @@ TEST_CASE("Loop retains closed topology and affine invariance across levels", "[
     }
     for (const auto& face : result.mesh->triangles) {
         for (const auto& corner : face.corners) {
-            REQUIRE(glm::dot(corner.normal, result.mesh->positions[corner.position]) > 0);
+            REQUIRE(glm::dot(corner.normal, result.mesh->positions[corner.position]) > 0.0F);
             REQUIRE(glm::length(corner.normal) == Approx(1).margin(1e-6));
         }
     }
@@ -375,8 +378,8 @@ TEST_CASE("Loop preserves face-varying UV seams on shared geometric edges", "[ge
     for (std::size_t face = 0; face < result.mesh->triangles.size(); ++face) {
         for (const auto& corner : result.mesh->triangles[face].corners) {
             (face < 16 ? first_positions : second_positions).insert(corner.position);
-            REQUIRE(corner.uv.x >= (face < 16 ? 0 : 10));
-            REQUIRE(corner.uv.x <= (face < 16 ? 2 : 12));
+            REQUIRE(corner.uv.x >= (face < 16 ? 0.0F : 10.0F));
+            REQUIRE(corner.uv.x <= (face < 16 ? 2.0F : 12.0F));
             close(corner.normal, {0, 0, 1});
         }
     }

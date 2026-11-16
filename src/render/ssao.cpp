@@ -1,3 +1,6 @@
+// SSAO 参数校验与可复现半球采样核。
+// 公开接口与参数约定见 include/minirender/render/ssao.hpp。
+
 #include <minirender/core/sampling.hpp>
 #include <minirender/render/ssao.hpp>
 

@@ -1,3 +1,6 @@
+// 离线渲染参数控件、状态刷新与用户操作回调。
+// 本模块接口见 offline_panel.hpp。
+
 #include "offline_panel.hpp"
 #include "vulkan_viewport.hpp"
 

@@ -1,3 +1,6 @@
+// 实时颜色、法线、深度和线框附件及浮点图像读回。
+// 本模块接口见 hdr_targets.hpp。
+
 #include "hdr_targets.hpp"
 
 #include <array>

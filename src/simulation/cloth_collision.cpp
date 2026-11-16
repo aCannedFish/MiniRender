@@ -1,3 +1,6 @@
+// 布料粒子与平面、球体的连续碰撞及接触修正。
+// 本模块接口见 cloth_collision.hpp。
+
 #include "cloth_collision.hpp"
 
 #include <algorithm>

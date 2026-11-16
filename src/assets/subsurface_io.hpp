@@ -1,3 +1,5 @@
+// JSON 中次表面材质参数的转换。
+
 #pragma once
 
 #include <minirender/scene/subsurface.hpp>

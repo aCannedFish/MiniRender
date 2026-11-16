@@ -1,3 +1,6 @@
+// JSON 中有界介质区域和光学参数的转换。
+// 本模块接口见 medium_io.hpp。
+
 #include "medium_io.hpp"
 
 #include <stdexcept>

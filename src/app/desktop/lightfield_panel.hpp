@@ -1,3 +1,5 @@
+// 光场参数控件、状态刷新与用户操作回调。
+
 #pragma once
 #include "lightfield_controller.hpp"
 #include <QWidget>
@@ -40,7 +42,8 @@ class LightFieldPanel final : public QWidget {
     QPushButton *   start_, *pause_, *cancel_, *open_, *save_, *exr_, *png_, *demo_;
     QLabel *        status_, *info_, *notice_;
     QProgressBar*   progress_;
-    std::uint64_t   revision_ = 0;
-    bool            syncing_ = false, asset_busy_ = false;
+    std::uint64_t   revision_   = 0;
+    bool            syncing_    = false;
+    bool            asset_busy_ = false;
     QString         error_;
 };

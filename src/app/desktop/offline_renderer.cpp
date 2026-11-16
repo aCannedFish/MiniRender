@@ -1,3 +1,6 @@
+// CPU 离线图像的 Vulkan 上传和视口显示。
+// 本模块接口见 offline_renderer.hpp。
+
 #include "offline_renderer.hpp"
 #include "gpu_shader.hpp"
 #include "vulkan_viewport.hpp"

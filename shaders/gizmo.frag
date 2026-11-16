@@ -1,3 +1,5 @@
+// 操纵器轴、平面和旋转环的覆盖与高亮颜色输出。
+
 #version 450
 
 layout(location = 0) in vec4 vertex_color;

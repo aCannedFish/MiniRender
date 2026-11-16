@@ -1,3 +1,6 @@
+// 球旋转重建中的球心、接触与几何判定。
+// 本模块接口见 ball_geometry.hpp。
+
 #include "ball_geometry.hpp"
 
 #include <algorithm>

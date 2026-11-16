@@ -1,3 +1,5 @@
+// 回归测试：SPPM indirect density matches a closed room geometric series。
+
 #include <minirender/render/sppm.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -50,7 +52,8 @@ SceneDocument uniform_room() {
 TEST_CASE("SPPM indirect density matches a closed room geometric series", "[sppm][energy]") {
     const auto snapshot = make_snapshot(uniform_room());
     for (const std::uint32_t depth : {2U, 3U}) {
-        double      mean = 0, m2 = 0;
+        double      mean  = 0;
+        double      m2    = 0;
         std::size_t count = 0;
         for (const std::uint64_t seed : {3ULL, 7ULL, 11ULL, 17ULL, 23ULL}) {
             IntegratorSettings settings;

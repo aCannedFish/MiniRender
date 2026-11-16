@@ -1,3 +1,5 @@
+// 内置场景的菜单信息、资源位置和推荐渲染参数。
+
 #pragma once
 
 #include <QString>

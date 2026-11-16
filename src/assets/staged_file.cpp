@@ -1,3 +1,6 @@
+// 先写临时文件再发布目标文件的事务式文件写入。
+// 本模块接口见 staged_file.hpp。
+
 #include "staged_file.hpp"
 
 #include <locale>

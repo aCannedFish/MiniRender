@@ -1,3 +1,5 @@
+// 多半径 Ball Pivoting 重建与前沿拓扑管理。
+
 #pragma once
 
 #include <minirender/geometry/halfedge.hpp>

@@ -1,3 +1,5 @@
+// 随机渐进光子映射的相机路径、光子合并和逐像素统计。
+
 #pragma once
 
 #include <minirender/render/path_tracer.hpp>
@@ -37,11 +39,16 @@ struct SppmStatistics {
     std::uint64_t photon_hits            = 0;
     std::uint64_t gathered_contributions = 0;
     // 非零合并贡献中，光源侧含 delta、两侧都含 delta 的数量；后者验证 SDS 场景。
-    std::uint64_t   specular_light_contributions = 0, sds_contributions = 0;
-    std::uint64_t   camera_paths             = 0;
-    std::uint64_t   camera_scattering_events = 0, photon_scattering_events = 0, shadow_rays = 0;
+    std::uint64_t   specular_light_contributions = 0;
+    std::uint64_t   sds_contributions            = 0;
+    std::uint64_t   camera_paths                 = 0;
+    std::uint64_t   camera_scattering_events     = 0;
+    std::uint64_t   photon_scattering_events     = 0;
+    std::uint64_t   shadow_rays                  = 0;
     TraceStatistics geometry;
-    double          minimum_radius = 0, maximum_radius = 0, mean_radius = 0;
+    double          minimum_radius  = 0;
+    double          maximum_radius  = 0;
+    double          mean_radius     = 0;
     std::uint64_t   estimated_bytes = 0;
     std::uint32_t   workers         = 0;
 };

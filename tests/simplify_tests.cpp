@@ -1,3 +1,6 @@
+// 回归测试：Mesh surface queries recover analytic face edge and vertex projections；Mesh surface
+// tree matches planar analytic distances and brute force triangles。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/loop.hpp>
 #include <minirender/geometry/simplify.hpp>

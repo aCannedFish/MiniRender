@@ -1,3 +1,5 @@
+// SSAO 参数校验与可复现半球采样核。
+
 #pragma once
 
 #include <array>

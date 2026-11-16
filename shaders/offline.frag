@@ -1,3 +1,5 @@
+// CPU 离线图像的视口采样、曝光和显示编码。
+
 #version 450
 layout(binding = 0) uniform sampler2D linear_image;
 

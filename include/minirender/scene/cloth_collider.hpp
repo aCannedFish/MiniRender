@@ -1,3 +1,5 @@
+// 场景中的布料碰撞体类型、启用状态和摩擦参数。
+
 #pragma once
 
 #include <glm/vec3.hpp>

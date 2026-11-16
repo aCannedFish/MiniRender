@@ -1,3 +1,5 @@
+// 次表面材质的实时表面近似与 GPU 参数打包。
+
 #pragma once
 
 #include <minirender/scene/scene.hpp>

@@ -1,3 +1,6 @@
+// 隐藏窗口回归：scene 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 scene_smoke.hpp。
+
 #include "scene_smoke.hpp"
 #include "ibl_controller.hpp"
 #include "workbench.hpp"

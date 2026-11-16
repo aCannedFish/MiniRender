@@ -1,3 +1,6 @@
+// 回归测试：Dipole parameters presets and material domain are explicit；Dipole Fresnel boundary
+// moments match independent hemispherical quadrature。
+
 #include <minirender/core/sampling.hpp>
 #include <minirender/render/bsdf.hpp>
 #include <minirender/render/dipole.hpp>
@@ -42,7 +45,8 @@ TEST_CASE("Dipole Fresnel boundary moments match independent hemispherical quadr
     constexpr int count = 100000;
     for (const double eta : {1., 1.1, 1.5, 2., 3.}) {
         const DipoleProfile profile({}, eta);
-        double              external = 0, internal = 0;
+        double              external         = 0;
+        double              internal         = 0;
         const double        critical_squared = 1 - 1 / (eta * eta);
         for (int i = 0; i < count; ++i) {
             const double u = (i + .5) / count;
@@ -65,13 +69,15 @@ TEST_CASE("Dipole profile is the normal derivative of the diffusion fluence", "[
         (1 + profile.internal_reflectance()) / (1 - profile.internal_reflectance());
     for (const double r : {0., .01, .3, 2.}) {
         for (int c = 0; c < 3; ++c) {
-            const double total     = parameters.absorption[c] + parameters.reduced_scattering[c];
-            const double diffusion = 1 / (3 * total);
-            const double zr = 1 / total, zv = zr + 4 * boundary * diffusion;
+            const double total      = parameters.absorption[c] + parameters.reduced_scattering[c];
+            const double diffusion  = 1 / (3 * total);
+            const double zr         = 1 / total;
+            const double zv         = zr + 4 * boundary * diffusion;
             const double extinction = std::sqrt(3 * parameters.absorption[c] * total);
             const double albedo     = parameters.reduced_scattering[c] / total;
             const auto   fluence    = [&](double z) {
-                const double dr = std::hypot(r, z - zr), dv = std::hypot(r, z + zv);
+                const double dr = std::hypot(r, z - zr);
+                const double dv = std::hypot(r, z + zv);
                 return albedo / (4 * std::numbers::pi * diffusion) *
                        (std::exp(-extinction * dr) / dr - std::exp(-extinction * dv) / dv);
             };

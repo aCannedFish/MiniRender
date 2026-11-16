@@ -1,3 +1,5 @@
+// 高度纹理采样、范围估计与位移误差辅助计算。
+
 #pragma once
 
 #include <minirender/geometry/displacement.hpp>

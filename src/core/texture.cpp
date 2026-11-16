@@ -1,3 +1,6 @@
+// 线性 RGB mip 生成、Repeat 寻址及最近邻、双线性、三线性过滤。
+// 公开接口与参数约定见 include/minirender/core/texture.hpp。
+
 #include <minirender/core/texture.hpp>
 
 #include <algorithm>

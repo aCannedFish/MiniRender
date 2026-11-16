@@ -1,3 +1,5 @@
+// 模拟粒子到带法线、UV 网格的转换。
+
 #include <minirender/simulation/cloth.hpp>
 
 #include <cmath>

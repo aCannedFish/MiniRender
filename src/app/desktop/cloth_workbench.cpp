@@ -1,3 +1,5 @@
+// 布料工具、碰撞体、编辑历史与离线快照的协调。
+
 #include "builtin_scenes.hpp"
 #include "cloth_controller.hpp"
 #include "cloth_panel.hpp"

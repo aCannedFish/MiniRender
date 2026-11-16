@@ -1,3 +1,6 @@
+// 次表面散射参数与表面位置采样。
+// 公开接口与参数约定见 include/minirender/render/subsurface.hpp。
+
 #include <minirender/geometry/halfedge.hpp>
 #include <minirender/render/bsdf.hpp>
 #include <minirender/render/subsurface.hpp>

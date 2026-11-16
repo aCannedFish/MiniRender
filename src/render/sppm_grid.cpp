@@ -1,3 +1,6 @@
+// SPPM 可见点的空间哈希网格与邻域查询。
+// 本模块接口见 sppm_grid.hpp。
+
 #include "sppm_grid.hpp"
 
 #include <algorithm>

@@ -1,3 +1,6 @@
+// 工作台颜色、尺寸、图标及导航和停靠标题的统一样式。
+// 本模块接口见 editor_theme.hpp。
+
 #include "editor_theme.hpp"
 
 #include <QApplication>

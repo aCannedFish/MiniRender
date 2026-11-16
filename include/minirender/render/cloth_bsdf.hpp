@@ -1,3 +1,5 @@
+// 布料散射模型的方向求值、混合采样与概率密度。
+
 #pragma once
 
 #include <minirender/scene/cloth_material.hpp>

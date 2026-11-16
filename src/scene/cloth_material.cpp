@@ -1,3 +1,6 @@
+// 微圆柱经纬织物参数、切向曲线与预置。
+// 公开接口与参数约定见 include/minirender/scene/cloth_material.hpp。
+
 #include <minirender/scene/cloth_material.hpp>
 
 #include <algorithm>

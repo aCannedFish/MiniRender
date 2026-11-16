@@ -1,3 +1,6 @@
+// 距离场 JSON 文档读写与格式校验。
+// 公开接口与参数约定见 include/minirender/assets/sdf_io.hpp。
+
 #include "staged_file.hpp"
 #include <minirender/assets/sdf_io.hpp>
 

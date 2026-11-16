@@ -1,3 +1,6 @@
+// 高度纹理采样、范围估计与位移误差辅助计算。
+// 本模块接口见 height_field.hpp。
+
 #include "height_field.hpp"
 
 #include <algorithm>
@@ -15,7 +18,8 @@ double height_value(const Image& image, glm::dvec2 uv) {
     const double x          = coordinate.x * static_cast<double>(image.width()) - 0.5;
     const double y          = (1 - coordinate.y) * static_cast<double>(image.height()) - 0.5;
     const auto   ix = static_cast<int>(std::floor(x)), iy = static_cast<int>(std::floor(y));
-    const double tx = x - std::floor(x), ty = y - std::floor(y);
+    const double tx    = x - std::floor(x);
+    const double ty    = y - std::floor(y);
     const auto   texel = [&](int px, int py) -> double {
         const auto width  = static_cast<int>(image.width()),
                    height = static_cast<int>(image.height());
@@ -24,7 +28,8 @@ double height_value(const Image& image, glm::dvec2 uv) {
                 static_cast<std::size_t>((py % height + height) % height))
             .r;
     };
-    const double a = texel(ix, iy), b = texel(ix, iy + 1);
+    const double a      = texel(ix, iy);
+    const double b      = texel(ix, iy + 1);
     const double top    = a + tx * (texel(ix + 1, iy) - a);
     const double bottom = b + tx * (texel(ix + 1, iy + 1) - b);
     return top + ty * (bottom - top);
@@ -58,7 +63,8 @@ std::array<glm::dvec2, 2> edge_uv(const MeshData& mesh, const HalfedgeMesh& topo
 // 将两侧 u/v 的全部换段参数合并后，每个区间只需端点和一个可能的内部极值。
 void add_knots(double start, double end, std::vector<double>& knots, std::size_t budget,
                const CancellationToken& cancellation) {
-    const double low = std::min(start, end), high = std::max(start, end);
+    const double low  = std::min(start, end);
+    const double high = std::max(start, end);
     if (low == high) {
         return;
     }
@@ -157,7 +163,8 @@ HeightFieldSamples inspect_height_field(const MeshData& input, const HalfedgeMes
                     if (interval % 1024 == 0) {
                         report(DisplacementStage::seams, edge, topology.edges().size());
                     }
-                    const double a = knots[interval], b = knots[interval + 1];
+                    const double a  = knots[interval];
+                    const double b  = knots[interval + 1];
                     const double q0 = difference(a), q1 = difference(b),
                                  qm      = difference((a + b) / 2);
                     double       maximum = std::max({std::abs(q0), std::abs(q1), std::abs(qm)});

@@ -1,3 +1,6 @@
+// 回归测试：Volume presets include complete geometry media and actual scattering；Beam ceiling
+// aperture preserves both open and blocked light paths。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/path_tracer.hpp>
 

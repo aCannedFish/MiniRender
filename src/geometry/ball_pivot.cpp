@@ -1,3 +1,6 @@
+// 多半径 Ball Pivoting 重建与前沿拓扑管理。
+// 公开接口与参数约定见 include/minirender/geometry/ball_pivot.hpp。
+
 #include "ball_geometry.hpp"
 #include "point_cloud_utils.hpp"
 #include "point_index.hpp"

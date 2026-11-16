@@ -1,3 +1,5 @@
+// 将相机视线映射到环境纹理，生成背景颜色。
+
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "scene_frame.glsl"

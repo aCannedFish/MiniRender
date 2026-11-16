@@ -1,3 +1,5 @@
+// 全屏渲染 pass 的程序化三角形顶点生成。
+
 #version 450
 
 // 全屏三角形。AO 各阶段按 gl_FragCoord 读取附件，无需插值 UV。

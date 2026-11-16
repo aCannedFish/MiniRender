@@ -1,3 +1,5 @@
+// CPU 与 GPU 共用的帧 uniform 布局及原色模式判定。
+
 #ifndef MINIRENDER_SCENE_FRAME
 #define MINIRENDER_SCENE_FRAME
 

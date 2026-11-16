@@ -1,3 +1,6 @@
+// 隐藏窗口回归：cloth playback 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 cloth_playback_smoke.hpp。
+
 #include "cloth_playback_smoke.hpp"
 #include "cloth_controller.hpp"
 #include "cloth_playback_deep_smoke.hpp"
@@ -43,8 +46,11 @@ const minirender::SceneObject& target(Workbench& window) {
 }
 
 struct State {
-    int           stage = 0, frame = 0, ticks = 0, paused_ticks = 0;
-    std::uint64_t paused_frame = 0;
+    int                                               stage        = 0;
+    int                                               frame        = 0;
+    int                                               ticks        = 0;
+    int                                               paused_ticks = 0;
+    std::uint64_t                                     paused_frame = 0;
     std::shared_ptr<const minirender::ClothComponent> initial;
     std::shared_ptr<const minirender::ClothComponent> expected;
     SceneUploadStatistics                             uploads;

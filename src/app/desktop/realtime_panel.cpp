@@ -1,3 +1,6 @@
+// 实时效果参数控件、状态刷新与用户操作回调。
+// 本模块接口见 realtime_panel.hpp。
+
 #include "realtime_panel.hpp"
 #include "vulkan_viewport.hpp"
 

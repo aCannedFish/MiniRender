@@ -1,3 +1,5 @@
+// 距离场全屏覆盖顶点生成。
+
 #version 450
 layout(location = 0) out vec2 uv;
 

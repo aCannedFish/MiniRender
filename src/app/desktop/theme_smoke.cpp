@@ -1,3 +1,6 @@
+// 隐藏窗口回归：theme 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 theme_smoke.hpp。
+
 #include "theme_smoke.hpp"
 #include "geometry_smoke.hpp"
 #include "workbench.hpp"
@@ -81,7 +84,8 @@ void check_stepper(QDoubleSpinBox* spin) {
 }
 
 struct State {
-    int tick = 0, stage = 0;
+    int tick  = 0;
+    int stage = 0;
 };
 } // namespace
 

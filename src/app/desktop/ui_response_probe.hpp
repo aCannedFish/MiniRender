@@ -1,3 +1,5 @@
+// 后台事件投递与 GUI 排队延迟测量。
+
 #pragma once
 
 #include <QCoreApplication>

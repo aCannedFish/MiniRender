@@ -1,3 +1,6 @@
+// CPU 渲染任务的线程调度、暂停取消、进度与不可变预览发布。
+// 公开接口与参数约定见 include/minirender/render/render_session.hpp。
+
 #include <minirender/render/render_session.hpp>
 
 #include <algorithm>
@@ -47,7 +50,8 @@ class Film {
             }
         }
         std::lock_guard lock(mutex_);
-        std::uint64_t   added = 0, finished = 0;
+        std::uint64_t   added    = 0;
+        std::uint64_t   finished = 0;
         for (std::size_t row = 0; row < height; ++row) {
             for (std::size_t column = 0; column < width; ++column) {
                 const auto local = row * width + column;
@@ -195,27 +199,36 @@ void SessionSettings::validate() const {
 
 // control 只保护状态和暂停协议；Film 自行保护像素。两种锁不同时持有，避免锁顺序反转。
 struct RenderSession::Impl {
+    // 保护生命周期状态、任务代号及暂停计数；不与 Film 的像素锁同时持有。
     mutable std::mutex              control;
     mutable std::condition_variable changed;
-    RenderState                     state = RenderState::idle;
-    std::uint64_t                   job = 0, total = 0;
-    std::uint32_t                   workers = 0, live = 0, parked = 0;
-    bool                            pause_requested = false;
-    std::atomic<bool>               pause_fast{false};
-    std::string                     error;
-    Clock::time_point               started{}, finished{};
-    CancellationSource              cancellation;
-    std::thread                     controller;
-    std::shared_ptr<Film>           film;
-    std::shared_ptr<const Image>    result;
-    std::shared_ptr<Film>           retired_film;
-    std::shared_ptr<const Image>    retired_result;
-    PathStatistics                  statistics;
-    IntegratorKind                  kind = IntegratorKind::path_tracing;
-    CancellationSource              iteration_cancellation;
-    SppmStatistics                  sppm;
-    SppmProgress                    sppm_work;
+    RenderState                     state   = RenderState::idle;
+    std::uint64_t                   job     = 0;
+    std::uint64_t                   total   = 0;
+    std::uint32_t                   workers = 0;
+    // 尚未退出的工作线程数。
+    std::uint32_t live = 0;
+    // 已进入暂停等待的工作线程数，等于 live 时才发布 paused。
+    std::uint32_t parked          = 0;
+    bool          pause_requested = false;
+    // 供 worker 的常规采样路径快速检查暂停请求。
+    std::atomic<bool>            pause_fast{false};
+    std::string                  error;
+    Clock::time_point            started{}, finished{};
+    CancellationSource           cancellation;
+    std::thread                  controller;
+    std::shared_ptr<Film>        film;
+    std::shared_ptr<const Image> result;
+    std::shared_ptr<Film>        retired_film;
+    std::shared_ptr<const Image> retired_result;
+    PathStatistics               statistics;
+    IntegratorKind               kind = IntegratorKind::path_tracing;
+    // SPPM 当前迭代的取消标记，用于暂停时回滚未完成迭代。
+    CancellationSource iteration_cancellation;
+    SppmStatistics     sppm;
+    SppmProgress       sppm_work;
 
+    // worker 在安全边界检查取消，并参与全部线程停稳的暂停协议。
     bool checkpoint(const CancellationToken& token) {
         if (token.requested()) {
             return false;
@@ -239,6 +252,7 @@ struct RenderSession::Impl {
         return !token.requested();
     }
 
+    // 线程退出时更新存活计数，并重新判断暂停是否已经完成。
     void worker_finished() {
         std::lock_guard lock(control);
         --live;
@@ -248,6 +262,7 @@ struct RenderSession::Impl {
         changed.notify_all();
     }
 
+    // 记录第一个后台失败并通知其他线程结束。
     void fail(const std::string& message) {
         std::lock_guard lock(control);
         if (error.empty()) {
@@ -261,6 +276,7 @@ struct RenderSession::Impl {
         changed.notify_all();
     }
 
+    // 发布终态与完成时间，唤醒等待任务终止的调用者。
     void complete(RenderState terminal) {
         std::lock_guard lock(control);
         state    = terminal == RenderState::completed && cancellation.token().requested()

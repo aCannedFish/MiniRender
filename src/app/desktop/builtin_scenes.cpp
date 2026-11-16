@@ -1,3 +1,6 @@
+// 内置场景的菜单信息、资源位置和推荐渲染参数。
+// 本模块接口见 builtin_scenes.hpp。
+
 #include "builtin_scenes.hpp"
 
 #include <QCoreApplication>

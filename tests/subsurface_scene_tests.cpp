@@ -1,3 +1,5 @@
+// 回归测试：Subsurface presets include millimeter optics and actual surface transport。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/path_tracer.hpp>
 

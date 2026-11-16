@@ -1,3 +1,6 @@
+// 线性图像到屏幕显示的转换、FXAA 和预览轮廓。
+// 本模块接口见 post_process.hpp。
+
 #include "post_process.hpp"
 #include "gpu_shader.hpp"
 

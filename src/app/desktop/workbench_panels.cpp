@@ -1,3 +1,6 @@
+// 物体与场景面板的页面路由、独立停靠和布局恢复。
+// 本模块接口见 workbench_panels.hpp。
+
 #include "workbench_panels.hpp"
 #include "editor_theme.hpp"
 

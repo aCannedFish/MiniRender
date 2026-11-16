@@ -1,3 +1,6 @@
+// 射线区间、包围盒与三角形求交的数值约定。
+// 公开接口与参数约定见 include/minirender/render/intersection.hpp。
+
 #include <minirender/render/intersection.hpp>
 
 #include <algorithm>
@@ -133,10 +136,11 @@ std::optional<TriangleHit> RayQuery::intersect(const std::array<glm::vec3, 3>& v
         const double error = operations * (std::numeric_limits<double>::epsilon() * 0.5);
         return error / (1 - error);
     };
-    const double x       = std::max({std::abs(p[0].x), std::abs(p[1].x), std::abs(p[2].x)});
-    const double y       = std::max({std::abs(p[0].y), std::abs(p[1].y), std::abs(p[2].y)});
-    const double z       = std::max({std::abs(p[0].z), std::abs(p[1].z), std::abs(p[2].z)});
-    const double error_x = gamma(5) * (x + z), error_y = gamma(5) * (y + z);
+    const double x          = std::max({std::abs(p[0].x), std::abs(p[1].x), std::abs(p[2].x)});
+    const double y          = std::max({std::abs(p[0].y), std::abs(p[1].y), std::abs(p[2].y)});
+    const double z          = std::max({std::abs(p[0].z), std::abs(p[1].z), std::abs(p[2].z)});
+    const double error_x    = gamma(5) * (x + z);
+    const double error_y    = gamma(5) * (y + z);
     const double error_edge = 2 * (gamma(2) * x * y + error_y * x + error_x * y);
     const double edge       = std::max({std::abs(a), std::abs(b), std::abs(c)});
     const double error_distance =

@@ -1,3 +1,5 @@
+// 生成网格的 OBJ 输出及取消检查。
+
 #pragma once
 
 #include <minirender/assets/scene_io.hpp>

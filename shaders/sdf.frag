@@ -1,3 +1,5 @@
+// Vulkan 距离场步进、CSG 求值、法线、阴影与诊断输出。
+
 #version 450
 layout(location = 0) in vec2 uv;
 layout(location = 0) out vec4 color;

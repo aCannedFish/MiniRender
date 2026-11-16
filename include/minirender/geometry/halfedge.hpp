@@ -1,3 +1,5 @@
+// 只读半边拓扑、边界环、连通分量与流形校验。
+
 #pragma once
 
 #include <minirender/core/cancellation.hpp>

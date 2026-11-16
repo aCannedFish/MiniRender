@@ -1,3 +1,6 @@
+// 移动轴与旋转环的 GPU 显示及交互高亮。
+// 本模块接口见 gizmo_renderer.hpp。
+
 #include "gizmo_renderer.hpp"
 #include "gpu_shader.hpp"
 #include "vulkan_viewport.hpp"

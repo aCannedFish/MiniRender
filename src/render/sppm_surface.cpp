@@ -1,3 +1,6 @@
+// SPPM 表面路径处理及光子合并使用的几何与通量数据。
+// 本模块接口见 sppm_surface.hpp。
+
 #include "sppm_surface.hpp"
 
 #include <minirender/geometry/uv_tangents.hpp>
@@ -80,10 +83,11 @@ std::optional<BsdfSample> SppmSurface::sample(double component, glm::dvec2 u,
     if (!value) {
         return {};
     }
-    const auto   local = value->direction;
-    const auto   world = glm::normalize(frame_.to_world(local));
-    const auto   ng    = glm::dvec3(hit.geometric_normal);
-    const double a = glm::dot(ng, wo_world), b = glm::dot(ng, world);
+    const auto   local        = value->direction;
+    const auto   world        = glm::normalize(frame_.to_world(local));
+    const auto   ng           = glm::dvec3(hit.geometric_normal);
+    const double a            = glm::dot(ng, wo_world);
+    const double b            = glm::dot(ng, world);
     const bool   transmission = value->event == ScatteringEvent::specular_transmission;
     if (transmission ? a * b >= 0 : a * b <= 0) {
         return {};

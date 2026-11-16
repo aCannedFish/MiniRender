@@ -1,3 +1,6 @@
+// 物体移动和旋转操纵器的布局、命中测试与变换计算。
+// 公开接口与参数约定见 include/minirender/scene/gizmo.hpp。
+
 #include <minirender/scene/gizmo.hpp>
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -44,7 +47,8 @@ std::optional<glm::dvec3> plane_point(const Ray& ray, glm::dvec3 point, glm::dve
 // 保存的欧拉角可以跨分支变化，实际旋转矩阵保持连续。
 glm::vec3 euler_zyx(const glm::dmat4& rotation) {
     const auto y = std::asin(std::clamp(-rotation[0][2], -1.0, 1.0));
-    double     x = 0, z = 0;
+    double     x = 0;
+    double     z = 0;
     if (std::abs(std::cos(y)) > 1e-8) {
         x = std::atan2(rotation[1][2], rotation[2][2]);
         z = std::atan2(rotation[0][1], rotation[0][0]);

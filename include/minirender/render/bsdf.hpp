@@ -1,3 +1,5 @@
+// 基础表面材质的求值、方向采样与概率密度计算。
+
 #pragma once
 
 #include <minirender/core/sampling.hpp>

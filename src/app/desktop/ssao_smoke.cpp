@@ -1,3 +1,6 @@
+// 隐藏窗口回归：ssao 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 ssao_smoke.hpp。
+
 #include "ssao_smoke.hpp"
 #include "workbench.hpp"
 #include <minirender/assets/scene_io.hpp>
@@ -135,8 +138,10 @@ void check_composite(const minirender::Image& baseline, const minirender::Image&
     require(static_cast<int>(hdr.width()) == ao.width() &&
                 static_cast<int>(hdr.height()) == ao.height(),
             "AO and HDR dimensions differ");
-    std::size_t geometry = 0, darkened = 0, background = 0;
-    float       error = 0;
+    std::size_t geometry   = 0;
+    std::size_t darkened   = 0;
+    std::size_t background = 0;
+    float       error      = 0;
     for (int y = 0; y < ao.height(); ++y) {
         for (int x = 0; x < ao.width(); ++x) {
             const auto original =
@@ -165,7 +170,11 @@ void check_composite(const minirender::Image& baseline, const minirender::Image&
 }
 
 struct State {
-    int                              step = 0, ticks = 0, generation = 0, drag = 0, frame = 0;
+    int                              step       = 0;
+    int                              ticks      = 0;
+    int                              generation = 0;
+    int                              drag       = 0;
+    int                              frame      = 0;
     minirender::Camera               camera;
     QSize                            previous_extent, stable_size;
     int                              stable_frames = 0;
@@ -256,7 +265,8 @@ void start_ssao_smoke(Workbench& window, const QString& directory) {
                 const auto hdr = viewport->grab_hdr();
                 check_composite(*state->baseline, hdr, state->raw);
                 hdr.write_exr(path(directory + "/raw-composite.exr"));
-                const glm::vec3 near{0.62F, 0.002F, 0.2F}, far{1.8F, 0.002F, 0.7F};
+                const glm::vec3 near{0.62F, 0.002F, 0.2F};
+                const glm::vec3 far{1.8F, 0.002F, 0.7F};
                 const double    near_ao =
                     average(state->raw, project(*viewport, near, state->raw.size()));
                 const double far_ao =
@@ -333,7 +343,8 @@ void start_ssao_smoke(Workbench& window, const QString& directory) {
                     require(moved.size() == viewport->swapChainImageSize() &&
                                 moved.size() == state->raw.size(),
                             "AO resize dimensions are stale");
-                    std::size_t changed = 0, contact = 0;
+                    std::size_t changed = 0;
+                    std::size_t contact = 0;
                     for (int y = 0; y < moved.height(); ++y) {
                         for (int x = 0; x < moved.width(); ++x) {
                             const int current = moved.pixelColor(x, y).red();

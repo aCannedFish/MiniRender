@@ -1,3 +1,5 @@
+// 回归测试：Packaged light field charts refocus at the two calibrated depths。
+
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
 #include <minirender/assets/scene_io.hpp>

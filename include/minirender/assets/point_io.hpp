@@ -1,3 +1,5 @@
+// PLY 点云的文本及二进制编码读写。
+
 #pragma once
 
 #include <minirender/geometry/point_cloud.hpp>

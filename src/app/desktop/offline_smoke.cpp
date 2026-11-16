@@ -1,3 +1,6 @@
+// 隐藏窗口回归：offline 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 offline_smoke.hpp。
+
 #include "offline_smoke.hpp"
 #include "offline_panel.hpp"
 #include "workbench.hpp"
@@ -48,8 +51,10 @@ void verify_display(Workbench& window, const QString& directory) {
                                           static_cast<double>(image.height()) / source_height);
     const auto   width         = static_cast<int>(std::floor(source_width * scale));
     const auto   height        = static_cast<int>(std::floor(source_height * scale));
-    const int    left = (image.width() - width) / 2, top = (image.height() - height) / 2;
-    int          probes = 0, nonblack = 0;
+    const int    left          = (image.width() - width) / 2;
+    const int    top           = (image.height() - height) / 2;
+    int          probes        = 0;
+    int          nonblack      = 0;
     for (std::size_t y = 0; y < linear->height(); ++y) {
         for (std::size_t x = 0; x < linear->width(); ++x) {
             const auto pixel = image.pixelColor(
@@ -75,10 +80,15 @@ void verify_display(Workbench& window, const QString& directory) {
 }
 
 struct State {
-    int                   step = 0, ticks = 0, paused_ticks = 0, cycles = 0;
-    std::uint64_t         samples = 0, job = 0;
+    int                   step         = 0;
+    int                   ticks        = 0;
+    int                   paused_ticks = 0;
+    int                   cycles       = 0;
+    std::uint64_t         samples      = 0;
+    std::uint64_t         job          = 0;
     qint64                previous = 0, maximum_gap = 0;
-    int                   heartbeats = 0, generations = 0;
+    int                   heartbeats  = 0;
+    int                   generations = 0;
     QElapsedTimer         clock;
     SceneUploadStatistics uploads;
 };

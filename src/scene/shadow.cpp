@@ -1,3 +1,6 @@
+// 方向光阴影视投影矩阵及场景边界适配。
+// 公开接口与参数约定见 include/minirender/scene/shadow.hpp。
+
 #include <minirender/scene/shadow.hpp>
 
 #include <glm/gtc/matrix_transform.hpp>

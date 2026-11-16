@@ -1,3 +1,5 @@
+// 回归测试：subsurface fixture。
+
 #pragma once
 
 #include <minirender/render/path_tracer.hpp>

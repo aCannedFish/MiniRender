@@ -1,3 +1,6 @@
+// 回归测试：Light field pupils and refocus shifts match independent ray plane geometry；Light field
+// files stream views preserve pixels and bound their cache。
+
 #include <minirender/assets/lightfield_io.hpp>
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/lightfield_capture.hpp>
@@ -196,10 +199,11 @@ TEST_CASE("Light field refocus restores independent near and far sinusoidal plan
         }
         const auto       file = writer.finish(0);
         LightFieldReader reader(file);
-        const auto       focused        = refocus_lightfield(reader, {depth, 2});
-        const auto       defocused      = refocus_lightfield(reader, {4, 2});
-        const auto       pinhole        = refocus_lightfield(reader, {depth, 0});
-        double           focused_energy = 0, defocused_energy = 0;
+        const auto       focused          = refocus_lightfield(reader, {depth, 2});
+        const auto       defocused        = refocus_lightfield(reader, {4, 2});
+        const auto       pinhole          = refocus_lightfield(reader, {depth, 0});
+        double           focused_energy   = 0;
+        double           defocused_energy = 0;
         for (std::size_t y = 4; y < 12; ++y) {
             for (std::size_t x = 4; x < 28; ++x) {
                 REQUIRE(std::abs(focused.image.at(x, y).x - pattern(double(x), double(y))) < 1e-6);

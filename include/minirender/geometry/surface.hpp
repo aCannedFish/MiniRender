@@ -1,3 +1,5 @@
+// 原三角曲面的最近点、属性投影及双向采样距离。
+
 #pragma once
 
 #include <minirender/geometry/halfedge.hpp>
@@ -24,7 +26,8 @@ class MeshSurface {
 
   private:
     struct Node {
-        glm::dvec3 low{0}, high{0};
+        glm::dvec3 low{0};
+        glm::dvec3 high{0};
         MeshIndex  first = 0, count = 0, right = 0;
     };
 

@@ -1,3 +1,5 @@
+// 光场固定瞳孔射线与参考焦面的几何关系。
+
 #include <minirender/render/lightfield.hpp>
 
 #include <cmath>

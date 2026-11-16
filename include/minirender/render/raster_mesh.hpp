@@ -1,3 +1,5 @@
+// 面角顶点和线框数据的准备与不可变网格缓存。
+
 #pragma once
 
 #include <minirender/scene/scene.hpp>

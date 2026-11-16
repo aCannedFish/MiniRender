@@ -1,3 +1,6 @@
+// 回归测试：Built-in offline scenes load complete editable geometry and lighting；Built-in sphere
+// is closed with outward geometry and radial normals。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/halfedge.hpp>
 #include <minirender/render/path_tracer.hpp>
@@ -16,7 +19,7 @@ TEST_CASE("Built-in offline scenes load complete editable geometry and lighting"
         scene.validate();
         const auto snapshot = make_snapshot(scene);
         REQUIRE(snapshot->instances.size() >= 8);
-        REQUIRE(scene.camera.aperture_radius == 0);
+        REQUIRE(scene.camera.aperture_radius == 0.0F);
         REQUIRE(scene.directional_lights.empty());
         bool emitter = false;
         for (const auto& material : scene.materials) {
@@ -53,7 +56,7 @@ TEST_CASE("Built-in sphere is closed with outward geometry and radial normals", 
         const auto a = mesh.positions[triangle.corners[0].position];
         const auto b = mesh.positions[triangle.corners[1].position];
         const auto c = mesh.positions[triangle.corners[2].position];
-        REQUIRE(glm::dot(glm::cross(b - a, c - a), a + b + c) > 0);
+        REQUIRE(glm::dot(glm::cross(b - a, c - a), a + b + c) > 0.0F);
         for (const auto& corner : triangle.corners) {
             REQUIRE(glm::dot(corner.normal, mesh.positions[corner.position]) > 0.999F);
         }

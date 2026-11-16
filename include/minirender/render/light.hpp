@@ -1,3 +1,5 @@
+// 场景发光三角形、方向光和环境光的统一采样。
+
 #pragma once
 
 #include <minirender/core/sampling.hpp>

@@ -1,3 +1,6 @@
+// JSON 场景加载、资产解析与场景保存。
+// 公开接口与参数约定见 include/minirender/assets/scene_io.hpp。
+
 #include "asset_writer.hpp"
 #include "cloth_material_io.hpp"
 #include "cloth_simulation_io.hpp"

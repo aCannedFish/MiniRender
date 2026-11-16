@@ -1,3 +1,5 @@
+// 将环境遮蔽应用到环境漫反射附件，并处理原色预览的暗化上限。
+
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "scene_frame.glsl"

@@ -1,3 +1,5 @@
+// 可运行示例：次表面散射参数与表面位置采样。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/render_session.hpp>
 

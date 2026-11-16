@@ -1,3 +1,5 @@
+// 对称三阶矩阵的特征分解，供局部 PCA 使用。
+
 #pragma once
 
 #include <glm/glm.hpp>

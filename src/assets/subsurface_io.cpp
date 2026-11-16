@@ -1,3 +1,6 @@
+// JSON 中次表面材质参数的转换。
+// 本模块接口见 subsurface_io.hpp。
+
 #include "subsurface_io.hpp"
 
 #include <stdexcept>

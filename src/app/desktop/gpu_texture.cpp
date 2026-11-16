@@ -1,3 +1,6 @@
+// 纹理暂存上传、mip 层和采样器的 GPU 资源管理。
+// 本模块接口见 gpu_texture.hpp。
+
 #include "gpu_texture.hpp"
 
 #include <vector>

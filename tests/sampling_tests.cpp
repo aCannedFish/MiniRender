@@ -1,3 +1,6 @@
+// 回归测试：PCG follows its reference sequence and sample streams ignore scheduling；Geometric
+// samplers match analytic moments and bins。
+
 #include <minirender/core/sampling.hpp>
 #include <minirender/render/bsdf.hpp>
 
@@ -81,8 +84,11 @@ TEST_CASE("PCG follows its reference sequence and sample streams ignore scheduli
 TEST_CASE("Geometric samplers match analytic moments and bins", "[sampling]") {
     constexpr std::size_t      count = 100000;
     Sampler                    sampler(914, 21);
-    glm::dvec3                 sphere_sum(0), triangle_sum(0);
-    double                     cosine_sum = 0, disk_radius_sum = 0, triangle_cross_sum = 0;
+    glm::dvec3                 sphere_sum(0);
+    glm::dvec3                 triangle_sum(0);
+    double                     cosine_sum         = 0;
+    double                     disk_radius_sum    = 0;
+    double                     triangle_cross_sum = 0;
     std::array<std::size_t, 4> disk_bins{}, sphere_bins{}, cosine_bins{};
     for (std::size_t index = 0; index < count; ++index) {
         const auto u = sampler.next_2d();

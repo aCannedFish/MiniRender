@@ -1,3 +1,5 @@
+// CPU 命令行入口与场景、图像、渲染子命令分发。
+
 #include "lightfield_cli.hpp"
 #include "render_cli.hpp"
 #include <minirender/assets/scene_io.hpp>

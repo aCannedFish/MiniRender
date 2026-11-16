@@ -1,3 +1,5 @@
+// 微圆柱经纬织物参数、切向曲线与预置。
+
 #pragma once
 
 #include <glm/vec3.hpp>

@@ -1,3 +1,5 @@
+// JSON 场景加载、资产解析与场景保存。
+
 #pragma once
 
 #include <minirender/scene/scene.hpp>

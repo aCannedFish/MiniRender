@@ -1,3 +1,6 @@
+// 隐藏窗口回归：volume 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 volume_smoke.hpp。
+
 #include "volume_smoke.hpp"
 #include "geometry_smoke.hpp"
 #include "offline_panel.hpp"
@@ -94,8 +97,9 @@ void verify_display(Workbench& window, const QString& directory, const QString& 
                                      double(actual.height()) / double(linear->height()));
     const int    width    = int(std::floor(double(linear->width()) * scale));
     const int    height   = int(std::floor(double(linear->height()) * scale));
-    const int    left = (actual.width() - width) / 2, top = (actual.height() - height) / 2;
-    int          probes = 0;
+    const int    left     = (actual.width() - width) / 2;
+    const int    top      = (actual.height() - height) / 2;
+    int          probes   = 0;
     for (std::size_t y = 0; y < linear->height(); ++y) {
         for (std::size_t x = 0; x < linear->width(); ++x) {
             const auto pixel =
@@ -194,14 +198,18 @@ enum class Stage {
 };
 
 struct State {
-    Stage                                stage = Stage::create;
-    int                                  ticks = 0, frame = 0, settle = 0, edits = 0;
+    Stage                                stage  = Stage::create;
+    int                                  ticks  = 0;
+    int                                  frame  = 0;
+    int                                  settle = 0;
+    int                                  edits  = 0;
     std::vector<MediumRegion>            before;
     std::shared_ptr<const SceneSnapshot> snapshot;
     SceneUploadStatistics                uploads;
     RenderSettings                       render{32, 32, 256, 101};
     IntegratorSettings                   integrator{SamplingMode::mis, 6, true, 3};
-    std::uint64_t                        job = 0, samples = 0;
+    std::uint64_t                        job     = 0;
+    std::uint64_t                        samples = 0;
     QElapsedTimer                        cancellation;
     UiResponseProbe*                     probe = nullptr;
 };

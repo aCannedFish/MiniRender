@@ -1,3 +1,6 @@
+// 隐藏窗口回归：texture 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 texture_smoke.hpp。
+
 #include "texture_smoke.hpp"
 #include "ibl_controller.hpp"
 #include "workbench.hpp"

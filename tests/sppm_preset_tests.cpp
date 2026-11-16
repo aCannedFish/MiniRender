@@ -1,3 +1,5 @@
+// 回归测试：Packaged SPPM presets preserve caustic and SDS transport。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/sppm.hpp>
 
@@ -16,7 +18,7 @@ TEST_CASE("Packaged SPPM presets preserve caustic and SDS transport", "[sppm][pr
                                       (std::string(name) + ".json"));
         REQUIRE(scene.objects.size() == 8);
         REQUIRE(scene.media.empty());
-        REQUIRE(scene.camera.aperture_radius == 0);
+        REQUIRE(scene.camera.aperture_radius == 0.0F);
         const auto glass = std::find_if(scene.materials.begin(), scene.materials.end(),
                                         [](const auto& m) { return m.id == "mat_glass_ball"; });
         REQUIRE(glass != scene.materials.end());

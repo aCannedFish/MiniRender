@@ -1,3 +1,6 @@
+// 回归测试：PT and SPPM sessions retain paused state during rapid resume pause toggles；Render
+// sessions agree bitwise with serial kernels across thread and batch counts。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/render_session.hpp>
 

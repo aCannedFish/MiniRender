@@ -1,3 +1,6 @@
+// 三角网格实时渲染、资源缓存、阴影与显示管线连接。
+// 本模块接口见 scene_renderer.hpp。
+
 #include "scene_renderer.hpp"
 #include "gpu_cloth.hpp"
 #include "gpu_shader.hpp"

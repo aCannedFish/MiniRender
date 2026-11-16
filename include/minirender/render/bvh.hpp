@@ -1,3 +1,5 @@
+// 场景三角形的 SAH BVH 构建、最近命中与遮挡查询。
+
 #pragma once
 
 #include <minirender/core/cancellation.hpp>

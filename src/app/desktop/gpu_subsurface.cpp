@@ -1,3 +1,6 @@
+// 次表面材质的实时表面近似与 GPU 参数打包。
+// 本模块接口见 gpu_subsurface.hpp。
+
 #include "gpu_subsurface.hpp"
 
 #include <minirender/render/dipole.hpp>

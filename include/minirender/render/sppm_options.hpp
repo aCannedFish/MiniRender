@@ -1,3 +1,5 @@
+// SPPM 迭代预算、初始半径和渐进更新参数。
+
 #pragma once
 
 #include <cstdint>

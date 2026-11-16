@@ -1,3 +1,6 @@
+// 点云 k-d 树索引与邻域查询。
+// 本模块接口见 point_index.hpp。
+
 #include "point_index.hpp"
 
 #include <algorithm>

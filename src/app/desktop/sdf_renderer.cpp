@@ -1,3 +1,6 @@
+// 距离场图元与 CSG 的 Vulkan 步进显示。
+// 本模块接口见 sdf_renderer.hpp。
+
 #include "sdf_renderer.hpp"
 #include "gpu_shader.hpp"
 
@@ -18,10 +21,17 @@ struct SdfGpuNode {
 };
 
 struct SdfGpuFrame {
-    glm::vec4                  origin{0}, forward{0}, right{0}, up{0};
-    glm::vec4                  bounds_min{0}, bounds_max{0}, settings{0};
+    glm::vec4                  origin{0};
+    glm::vec4                  forward{0};
+    glm::vec4                  right{0};
+    glm::vec4                  up{0};
+    glm::vec4                  bounds_min{0};
+    glm::vec4                  bounds_max{0};
+    glm::vec4                  settings{0};
     glm::ivec4                 counts{0};
-    glm::vec4                  light_direction{0}, light_color{0}, ambient{0};
+    glm::vec4                  light_direction{0};
+    glm::vec4                  light_color{0};
+    glm::vec4                  ambient{0};
     glm::ivec4                 display{0};
     std::array<SdfGpuNode, 64> nodes;
 };

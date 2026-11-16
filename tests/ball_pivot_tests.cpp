@@ -1,3 +1,6 @@
+// 回归测试：Contact balls and pivot angles match analytic geometry；Ball pivoting joins cocircular
+// grid faces into one manifold patch。
+
 #include "geometry/ball_geometry.hpp"
 #include <minirender/geometry/ball_pivot.hpp>
 #include <minirender/geometry/loop.hpp>

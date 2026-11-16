@@ -1,3 +1,6 @@
+// 布料后台固定步模拟、暂停与完整帧发布。
+// 本模块接口见 cloth_controller.hpp。
+
 #include "cloth_controller.hpp"
 
 #include <QtConcurrent/QtConcurrentRun>

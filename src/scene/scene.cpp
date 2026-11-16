@@ -1,3 +1,6 @@
+// 场景、网格、材质、相机与不可变渲染快照的数据约定。
+// 公开接口与参数约定见 include/minirender/scene/scene.hpp。
+
 #include <minirender/core/sampling.hpp>
 #include <minirender/geometry/uv_tangents.hpp>
 #include <minirender/scene/scene.hpp>

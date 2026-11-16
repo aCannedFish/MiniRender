@@ -1,3 +1,5 @@
+// CPU 距离场步进、表面着色与诊断图生成。
+
 #pragma once
 
 #include <minirender/core/image.hpp>

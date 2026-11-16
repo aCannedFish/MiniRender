@@ -1,3 +1,5 @@
+// macOS 隐藏窗口回归的进程活动生命周期。
+
 #include "regression_activity.hpp"
 
 #import <Foundation/Foundation.h>

@@ -1,3 +1,5 @@
+// 生成有界雾、光束和 Cornell 介质示例，并输出参考图与收敛数据。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/render_session.hpp>
 

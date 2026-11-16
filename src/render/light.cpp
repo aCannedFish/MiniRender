@@ -1,3 +1,6 @@
+// 场景发光三角形、方向光和环境光的统一采样。
+// 公开接口与参数约定见 include/minirender/render/light.hpp。
+
 #include <minirender/render/light.hpp>
 
 #include <algorithm>
@@ -121,7 +124,8 @@ glm::dvec3 EnvironmentLight::lookup(glm::dvec2 uv) const {
     const double y     = uv.y * static_cast<double>(image.height()) - 0.5;
     const int    ix    = static_cast<int>(std::floor(x));
     const int    iy    = static_cast<int>(std::floor(y));
-    const double tx = x - std::floor(x), ty = y - std::floor(y);
+    const double tx    = x - std::floor(x);
+    const double ty    = y - std::floor(y);
     const auto   texel = [&](int column, int row) {
         const int  width   = static_cast<int>(image.width()),
                    height  = static_cast<int>(image.height());
@@ -167,7 +171,8 @@ EnvironmentSample EnvironmentLight::sample(glm::dvec2 u) const {
             2 * std::sin((theta0 + theta1) * 0.5) * std::sin((theta1 - theta0) * 0.5);
         const double v =
             std::clamp(u.y, std::numeric_limits<double>::epsilon() * 0.5, std::nextafter(1.0, 0.0));
-        double cosine, sine;
+        double cosine;
+        double sine;
         if (y < grid.height() / 2) {
             const double h = 1 - std::cos(theta0) + v * difference;
             cosine         = 1 - h;

@@ -1,3 +1,6 @@
+// 隐藏窗口回归：adaptive 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 adaptive_smoke.hpp。
+
 #include "adaptive_smoke.hpp"
 #include "geometry_panel.hpp"
 #include "geometry_smoke.hpp"

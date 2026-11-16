@@ -1,3 +1,5 @@
+// 场景、网格、材质、相机与不可变渲染快照的数据约定。
+
 #pragma once
 
 #include <glm/glm.hpp>

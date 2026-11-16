@@ -1,3 +1,6 @@
+// 带拓扑和属性约束的 QEM 边折叠简化。
+// 公开接口与参数约定见 include/minirender/geometry/simplify.hpp。
+
 #include <minirender/geometry/normals.hpp>
 #include <minirender/geometry/simplify.hpp>
 
@@ -111,7 +114,8 @@ struct Face {
 
 struct Candidate {
     MeshIndex     a = 0, b = 0;
-    std::uint64_t version_a = 0, version_b = 0;
+    std::uint64_t version_a = 0;
+    std::uint64_t version_b = 0;
     glm::dvec3    position{0};
     double        cost           = 0;
     double        length_squared = 0;
@@ -141,7 +145,8 @@ class Decimator {
               CancellationToken token, SimplifyProgressCallback progress, SimplifyResult& result)
         : settings_(settings), token_(token), progress_(std::move(progress)), result_(result),
           remaining_(input.triangles.size()) {
-        glm::dvec3 low(input.positions.front()), high(low);
+        glm::dvec3 low(input.positions.front());
+        glm::dvec3 high(low);
         for (std::size_t i = 0; i < input.positions.size(); ++i) {
             if (i % 1024 == 0) {
                 token_.check();
@@ -369,7 +374,8 @@ class Decimator {
             local.size() <= shared_faces) {
             return false;
         }
-        const bool boundary_a = na.size() != fa.size(), boundary_b = nb.size() != fb.size();
+        const bool boundary_a = na.size() != fa.size();
+        const bool boundary_b = nb.size() != fb.size();
         if (shared_faces == 2 && boundary_a && boundary_b) {
             return false;
         }

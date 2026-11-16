@@ -1,3 +1,6 @@
+// 隐藏窗口回归：lightfield 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 lightfield_smoke.hpp。
+
 #include "lightfield_smoke.hpp"
 #include "geometry_smoke.hpp"
 #include "lightfield_panel.hpp"
@@ -162,9 +165,13 @@ enum class Stage {
 };
 
 struct State {
-    Stage                                 stage = Stage::import;
-    int                                   ticks = 0, frame = 0, settle = 0;
-    std::uint64_t                         samples = 0, job = 0, revision = 0;
+    Stage                                 stage    = Stage::import;
+    int                                   ticks    = 0;
+    int                                   frame    = 0;
+    int                                   settle   = 0;
+    std::uint64_t                         samples  = 0;
+    std::uint64_t                         job      = 0;
+    std::uint64_t                         revision = 0;
     LightFieldCaptureSettings             settings;
     std::shared_ptr<const SceneSnapshot>  original;
     SceneUploadStatistics                 uploads;

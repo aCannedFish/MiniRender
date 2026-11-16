@@ -1,3 +1,5 @@
+// 点云预览顶点变换、点大小与法线显示数据传递。
+
 #version 450
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 normal;

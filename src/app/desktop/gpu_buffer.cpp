@@ -1,3 +1,6 @@
+// Vulkan 缓冲区与内存的独占生命周期及主机读写。
+// 本模块接口见 gpu_buffer.hpp。
+
 #include "gpu_buffer.hpp"
 
 #include <cstring>

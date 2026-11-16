@@ -1,3 +1,5 @@
+// 路径积分器中的界面反射与跨位置次表面散射事件。
+
 #include <minirender/render/path_tracer.hpp>
 
 #include <algorithm>

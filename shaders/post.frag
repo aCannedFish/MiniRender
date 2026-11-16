@@ -1,3 +1,5 @@
+// 曝光、色调映射、诊断显示、原色轮廓与 FXAA 的最终屏幕输出。
+
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "scene_frame.glsl"

@@ -1,3 +1,5 @@
+// 共享取消标记与 OperationCancelled 异常，供后台算法定期检查任务状态。
+
 #pragma once
 
 #include <atomic>

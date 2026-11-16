@@ -1,3 +1,6 @@
+// 回归测试：Remeshing splits long edges into a conforming planar triangulation；Remeshing collapses
+// dense input while preserving boundaries and UV。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/loop.hpp>
 #include <minirender/geometry/remesh.hpp>

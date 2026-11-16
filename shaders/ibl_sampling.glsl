@@ -1,3 +1,5 @@
+// 环境图、漫反射卷积、粗糙度预过滤层和 BRDF LUT 的共用采样。
+
 #ifndef MINIRENDER_IBL_SAMPLING
 #define MINIRENDER_IBL_SAMPLING
 layout(binding = 4) uniform sampler2D ibl_diffuse_map;

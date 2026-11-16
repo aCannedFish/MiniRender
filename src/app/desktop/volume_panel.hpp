@@ -1,3 +1,5 @@
+// 体积介质参数控件、状态刷新与用户操作回调。
+
 #pragma once
 
 #include <minirender/scene/medium.hpp>
@@ -45,15 +47,18 @@ class VolumePanel final : public QWidget {
     std::vector<minirender::MediumRegion>   source_;
     std::optional<minirender::MediumRegion> draft_;
     std::string                             selected_;
-    std::uint64_t                           generation_ = 0;
-    bool       initialized_ = false, refreshing_ = false, dirty_ = false, busy_ = false;
-    QComboBox *regions_ = nullptr, *demo_ = nullptr;
-    QLineEdit* name_    = nullptr;
-    QCheckBox* enabled_ = nullptr;
-    std::array<QDoubleSpinBox*, 3> minimum_{}, maximum_{}, absorption_{}, scattering_{};
-    QDoubleSpinBox*                g_          = nullptr;
-    QWidget*                       parameters_ = nullptr;
-    QLabel *                       notice_ = nullptr, *summary_ = nullptr;
-    QPushButton *                  add_ = nullptr, *remove_ = nullptr, *apply_ = nullptr;
-    QPushButton *                  load_ = nullptr, *render_ = nullptr;
+    std::uint64_t                           generation_  = 0;
+    bool                                    initialized_ = false;
+    bool                                    refreshing_  = false;
+    bool                                    dirty_       = false;
+    bool                                    busy_        = false;
+    QComboBox *                             regions_ = nullptr, *demo_ = nullptr;
+    QLineEdit*                              name_    = nullptr;
+    QCheckBox*                              enabled_ = nullptr;
+    std::array<QDoubleSpinBox*, 3>          minimum_{}, maximum_{}, absorption_{}, scattering_{};
+    QDoubleSpinBox*                         g_          = nullptr;
+    QWidget*                                parameters_ = nullptr;
+    QLabel *                                notice_ = nullptr, *summary_ = nullptr;
+    QPushButton *                           add_ = nullptr, *remove_ = nullptr, *apply_ = nullptr;
+    QPushButton *                           load_ = nullptr, *render_ = nullptr;
 };

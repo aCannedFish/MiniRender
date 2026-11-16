@@ -1,3 +1,6 @@
+// 回归测试：Displacement moves real geometry along smooth normals using signed linear
+// red；Displacement sampling agrees with UV orientation repeat and bilinear texel centers。
+
 #include <minirender/geometry/displacement.hpp>
 #include <minirender/geometry/loop.hpp>
 #include <minirender/render/path_tracer.hpp>
@@ -80,7 +83,7 @@ TEST_CASE("Displacement moves real geometry along smooth normals using signed li
         REQUIRE(p.x == source->positions[v].x);
         REQUIRE(p.y == source->positions[v].y);
         REQUIRE(p.z == Approx(0.1));
-        REQUIRE(source->positions[v].z == 0);
+        REQUIRE(source->positions[v].z == 0.0F);
     }
     for (const auto& triangle : result.mesh->triangles) {
         for (const auto& corner : triangle.corners) {
@@ -136,7 +139,7 @@ TEST_CASE("Displacement reports inconsistent heights at shared vertices",
     mesh->triangles[1].corners[0].uv = {0.75F, 0.75F};
     const auto height                = std::make_shared<const Texture>(image);
     REQUIRE_THROWS_WITH(displace_mesh(mesh, height), ContainsSubstring("at vertex"));
-    REQUIRE(mesh->positions[0].z == 0);
+    REQUIRE(mesh->positions[0].z == 0.0F);
 }
 
 TEST_CASE("Displacement checks edge interiors even when all endpoint heights match",
@@ -153,7 +156,7 @@ TEST_CASE("Displacement checks edge interiors even when all endpoint heights mat
     const auto height                = std::make_shared<const Texture>(image);
     for (const auto& face : mesh->triangles) {
         for (const auto& corner : face.corners) {
-            REQUIRE(height->sample(corner.uv, 0, TextureFilter::bilinear).r == 0);
+            REQUIRE(height->sample(corner.uv, 0, TextureFilter::bilinear).r == 0.0F);
         }
     }
     REQUIRE_THROWS_WITH(displace_mesh(mesh, height), ContainsSubstring("at edge"));
@@ -279,7 +282,7 @@ TEST_CASE("Displacement cancellation progress and previous immutable results sur
                           OperationCancelled);
         REQUIRE(reached);
         REQUIRE(previous.mesh->positions[0] == previous_position);
-        REQUIRE(source->positions[0].z == 0);
+        REQUIRE(source->positions[0].z == 0.0F);
     }
 }
 

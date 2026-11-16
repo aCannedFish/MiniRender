@@ -1,3 +1,6 @@
+// 布料材质参数控件、状态刷新与用户操作回调。
+// 本模块接口见 cloth_material_panel.hpp。
+
 #include "cloth_material_panel.hpp"
 
 #include <QComboBox>

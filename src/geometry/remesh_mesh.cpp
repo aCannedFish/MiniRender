@@ -1,3 +1,6 @@
+// 可编辑网格邻接及局部拓扑修改，供重网格算法使用。
+// 本模块接口见 remesh_mesh.hpp。
+
 #include "remesh_mesh.hpp"
 #include <minirender/geometry/normals.hpp>
 

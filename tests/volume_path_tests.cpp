@@ -1,3 +1,6 @@
+// 回归测试：Volume path integrates pure absorption only within the camera clip interval；Vacuum
+// regions preserve the existing path image and random stream。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/path_tracer.hpp>
 #include <minirender/render/render_session.hpp>
@@ -52,7 +55,8 @@ void add_plane(SceneDocument& scene, std::string id, float y, float half_size, M
 
 struct Moments {
     std::size_t count = 0;
-    glm::dvec3  mean{0}, m2{0};
+    glm::dvec3  mean{0};
+    glm::dvec3  m2{0};
 
     void add(glm::dvec3 value) {
         ++count;

@@ -1,3 +1,5 @@
+// 环境光预处理：漫反射卷积、GGX 粗糙度层与 BRDF 积分表。
+
 #pragma once
 
 #include <minirender/core/cancellation.hpp>

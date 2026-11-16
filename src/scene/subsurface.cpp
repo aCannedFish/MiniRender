@@ -1,3 +1,6 @@
+// 次表面散射参数与表面位置采样。
+// 公开接口与参数约定见 include/minirender/scene/subsurface.hpp。
+
 #include <minirender/scene/subsurface.hpp>
 
 #include <cmath>

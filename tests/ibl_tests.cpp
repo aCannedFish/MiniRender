@@ -1,3 +1,6 @@
+// 回归测试：IBL latlong agrees with path lighting across axes seams poles and rotations；IBL
+// constant environments retain linear HDR in every roughness layer。
+
 #include <minirender/render/bsdf.hpp>
 #include <minirender/render/ibl.hpp>
 #include <minirender/render/light.hpp>
@@ -147,7 +150,8 @@ TEST_CASE("IBL diffuse and fully rough maps preserve directional first moments",
     settings.diffuse_samples  = 1024;
     settings.specular_samples = 1024;
     const auto maps           = bake_ibl_environment(source, settings);
-    double     diffuse_error = 0, specular_error = 0;
+    double     diffuse_error  = 0;
+    double     specular_error = 0;
     for (const auto normal : {glm::dvec3(1, 0, 0), glm::dvec3(-1, 0, 0), glm::dvec3(0, 1, 0),
                               glm::dvec3(0, -1, 0), glm::dvec3(0, 0, 1), glm::dvec3(0, 0, -1)}) {
         // ∫ L cos/π 对 L=1+0.5*d 的解析结果为 1+n/3。
@@ -198,8 +202,10 @@ TEST_CASE("IBL roughness spreads a small bright source while retaining spherical
         bake_ibl_environment(std::make_shared<const Texture>(std::move(image)), settings);
     const auto& sharp      = maps->specular.front();
     const auto& rough      = maps->specular.back();
-    float       sharp_peak = 0, rough_peak = 0;
-    std::size_t sharp_lit = 0, rough_lit = 0;
+    float       sharp_peak = 0;
+    float       rough_peak = 0;
+    std::size_t sharp_lit  = 0;
+    std::size_t rough_lit  = 0;
     for (std::size_t y = 0; y < sharp.height(); ++y) {
         for (std::size_t x = 0; x < sharp.width(); ++x) {
             sharp_peak = std::max(sharp_peak, sharp.at(x, y).x);
@@ -210,7 +216,7 @@ TEST_CASE("IBL roughness spreads a small bright source while retaining spherical
     }
     INFO("peaks " << sharp_peak << " / " << rough_peak << " energy " << sphere_integral(sharp)
                   << " / " << sphere_integral(rough));
-    REQUIRE(sharp_peak > 19);
+    REQUIRE(sharp_peak > 19.0F);
     REQUIRE(rough_peak < sharp_peak * 0.1F);
     REQUIRE(rough_lit > sharp_lit * 10);
     std::cout << "IBL bright source peaks: " << sharp_peak << ' ' << rough_peak

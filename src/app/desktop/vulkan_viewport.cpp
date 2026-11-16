@@ -1,3 +1,6 @@
+// Vulkan 窗口生命周期、输入交互、渲染调度与图像读回。
+// 本模块接口见 vulkan_viewport.hpp。
+
 #include "vulkan_viewport.hpp"
 #include "diagnostic_renderer.hpp"
 #include "offline_renderer.hpp"

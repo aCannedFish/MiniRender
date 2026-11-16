@@ -1,3 +1,6 @@
+// 均匀 RGB 介质及射线在有界区域内的吸收、散射处理。
+// 公开接口与参数约定见 include/minirender/render/medium.hpp。
+
 #include <minirender/render/bsdf.hpp>
 #include <minirender/render/medium.hpp>
 
@@ -49,7 +52,8 @@ double optical_depth(double extinction, double distance) {
 // 混合概率在 log 空间求和。长距离/稀薄系数下 PDF 可能下溢，权重比仍有限。
 glm::dvec3 mixture_weight(const HomogeneousMedium& medium, double distance, bool scattered) {
     const auto extinction = medium.extinction();
-    glm::dvec3 log_density(-infinity), log_numerator(-infinity);
+    glm::dvec3 log_density(-infinity);
+    glm::dvec3 log_numerator(-infinity);
     for (int c = 0; c < 3; ++c) {
         const double attenuation = -optical_depth(extinction[c], distance);
         if (!scattered) {
@@ -155,7 +159,8 @@ MediumSegments MediumField::segments(const Ray& ray, RayInterval interval,
         if (!region.enabled) {
             continue;
         }
-        double enter = interval.minimum, leave = interval.maximum;
+        double enter = interval.minimum;
+        double leave = interval.maximum;
         for (int axis = 0; axis < 3; ++axis) {
             if (ray.direction[axis] == 0) {
                 // 平行且落在盒边界的射线按外侧处理，避免相邻盒在共享面上重叠。

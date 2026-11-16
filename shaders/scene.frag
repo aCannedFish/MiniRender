@@ -1,3 +1,5 @@
+// 三角表面的原色、GGX 光照、阴影、织物与 IBL 着色，输出颜色和辅助附件。
+
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "scene_frame.glsl"

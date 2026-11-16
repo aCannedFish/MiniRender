@@ -1,3 +1,6 @@
+// 均匀半无限介质的 dipole 扩散模型及径向分布。
+// 公开接口与参数约定见 include/minirender/render/dipole.hpp。
+
 #include <minirender/render/bsdf.hpp>
 #include <minirender/render/dipole.hpp>
 
@@ -28,7 +31,8 @@ double transmission_moment(double eta) {
         double z          = std::cos(pi * (i + .75) / (count + .5));
         double derivative = 0;
         for (int iteration = 0; iteration < 20; ++iteration) {
-            double previous = 0, value = 1;
+            double previous = 0;
+            double value    = 1;
             for (int order = 1; order <= count; ++order) {
                 const double next = ((2 * order - 1) * z * value - (order - 1) * previous) / order;
                 previous          = value;
@@ -127,7 +131,8 @@ double DipoleProfile::sample_radius(int channel, double u, double maximum_radius
         return 0;
     }
     const double target = u * total;
-    double       low = 0, high = std::min(maximum_radius, parameters.real_depth);
+    double       low    = 0;
+    double       high   = std::min(maximum_radius, parameters.real_depth);
     while (integral(parameters, high) < target && high < maximum_radius) {
         high = std::min(maximum_radius, high * 2);
     }

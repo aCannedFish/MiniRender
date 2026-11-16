@@ -1,3 +1,5 @@
+// 射线区间、包围盒与三角形求交的数值约定。
+
 #pragma once
 
 #include <minirender/scene/scene.hpp>

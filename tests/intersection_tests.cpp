@@ -1,3 +1,6 @@
+// 回归测试：Ray intervals and queries reject invalid distance conventions；Slab queries cover
+// parallel rays, boundary origins and finite segments。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/bvh.hpp>
 
@@ -298,7 +301,7 @@ TEST_CASE("BVH nearest and shadow queries agree with independent brute force", "
             REQUIRE(accelerated->instance_index == reference->instance);
             REQUIRE(accelerated->triangle_index == reference->triangle);
             REQUIRE(glm::length(accelerated->shading_normal) == Approx(1).margin(1e-6));
-            REQUIRE(glm::dot(accelerated->shading_normal, accelerated->geometric_normal) >= 0);
+            REQUIRE(glm::dot(accelerated->shading_normal, accelerated->geometric_normal) >= 0.0F);
         }
     }
     REQUIRE(hits > 300);

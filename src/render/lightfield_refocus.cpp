@@ -1,3 +1,5 @@
+// 从已采集子视图平移叠加重建焦面与覆盖率。
+
 #include <minirender/assets/lightfield_io.hpp>
 
 #include <algorithm>
@@ -54,15 +56,17 @@ LightFieldReconstruction refocus_lightfield(LightFieldReader&         reader,
         for (std::size_t y = 0; y < c.render.height; ++y) {
             cancellation.check();
             for (std::size_t x = 0; x < c.render.width; ++x) {
-                const double sx = double(x) + shift.x, sy = double(y) + shift.y;
+                const double sx = double(x) + shift.x;
+                const double sy = double(y) + shift.y;
                 if (sx < 0 || sy < 0 || sx > double(c.render.width - 1) ||
                     sy > double(c.render.height - 1)) {
                     continue;
                 }
                 const auto   ix = std::size_t(std::floor(sx)), iy = std::size_t(std::floor(sy));
-                const auto   jx = std::min(ix + 1, c.render.width - 1),
-                             jy = std::min(iy + 1, c.render.height - 1);
-                const double tx = sx - double(ix), ty = sy - double(iy);
+                const auto   jx    = std::min(ix + 1, c.render.width - 1),
+                             jy    = std::min(iy + 1, c.render.height - 1);
+                const double tx    = sx - double(ix);
+                const double ty    = sy - double(iy);
                 const auto   color = (1 - ty) * ((1 - tx) * glm::dvec3(image->at(ix, iy)) +
                                                  tx * glm::dvec3(image->at(jx, iy))) +
                                      ty * ((1 - tx) * glm::dvec3(image->at(ix, jy)) +

@@ -1,3 +1,6 @@
+// 布料材质参数与 CPU/GPU 布局一致的数据打包。
+// 本模块接口见 gpu_cloth.hpp。
+
 #include "gpu_cloth.hpp"
 
 #include <cmath>

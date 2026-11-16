@@ -1,3 +1,6 @@
+// 可复现随机流、基础方向映射及离散概率分布。
+// 公开接口与参数约定见 include/minirender/core/sampling.hpp。
+
 #include <minirender/core/sampling.hpp>
 
 #include <algorithm>

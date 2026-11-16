@@ -1,3 +1,5 @@
+// Wavefront OBJ 到共享位置和面角属性网格的解析。
+
 #include <minirender/assets/scene_io.hpp>
 
 #include <tiny_obj_loader.h>

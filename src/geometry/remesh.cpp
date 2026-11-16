@@ -1,3 +1,6 @@
+// 各向同性重网格的分裂、折叠、翻边、平滑和表面投影。
+// 公开接口与参数约定见 include/minirender/geometry/remesh.hpp。
+
 #include "remesh_mesh.hpp"
 
 #include <algorithm>

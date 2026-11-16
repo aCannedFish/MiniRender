@@ -1,3 +1,5 @@
+// 沿指定轴执行深度和法线引导的环境遮蔽双边滤波。
+
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "scene_frame.glsl"

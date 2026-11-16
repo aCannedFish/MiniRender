@@ -1,3 +1,6 @@
+// 回归测试：Finite shadow segments retain precision near their sampled light endpoint；Power
+// heuristic handles limiting probabilities without squaring overflow。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/light.hpp>
 #include <minirender/render/path_tracer.hpp>
@@ -66,7 +69,8 @@ SceneDocument direct_scene(bool glossy) {
 
 struct Moments {
     std::size_t count = 0;
-    double      mean = 0, m2 = 0;
+    double      mean  = 0;
+    double      m2    = 0;
 
     void add(double value) {
         ++count;
@@ -292,7 +296,8 @@ TEST_CASE("MIS preserves means and reduces variance in complementary lighting ca
         const PathTracer bsdf(snapshot, {SamplingMode::bsdf, 1, false, 3});
         const PathTracer light(snapshot, {SamplingMode::light, 1, false, 3});
         const PathTracer mis(snapshot, {SamplingMode::mis, 1, false, 3});
-        double           reference = 0, reference_error = 0;
+        double           reference       = 0;
+        double           reference_error = 0;
         if (glossy) {
             const auto high = estimate(bsdf, 65536, 991);
             reference       = high.mean;
@@ -349,7 +354,7 @@ TEST_CASE("Thin-lens parameters survive scene serialization", "[camera][path][io
     REQUIRE(loaded.camera.focus_distance == scene.camera.focus_distance);
     const auto legacy =
         load_scene(std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/studio.json");
-    REQUIRE(legacy.camera.aperture_radius == 0);
+    REQUIRE(legacy.camera.aperture_radius == 0.0F);
 }
 
 TEST_CASE("Pixel rendering reuses deterministic samples and keeps HDR separate from display",

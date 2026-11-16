@@ -1,3 +1,6 @@
+// 回归测试：Cloth local component preserves affine world motion and pins；Cloth component world
+// transform gives analytic free fall。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/scene/editor.hpp>
 #include <minirender/simulation/cloth_component.hpp>

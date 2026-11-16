@@ -1,3 +1,5 @@
+// 场景资产与对象的唯一标识生成。
+
 #pragma once
 
 #include <algorithm>

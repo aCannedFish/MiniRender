@@ -1,3 +1,6 @@
+// 基础表面材质的求值、方向采样与概率密度计算。
+// 公开接口与参数约定见 include/minirender/render/bsdf.hpp。
+
 #include <minirender/core/sampling.hpp>
 #include <minirender/render/bsdf.hpp>
 

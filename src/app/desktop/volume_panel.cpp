@@ -1,3 +1,6 @@
+// 体积介质参数控件、状态刷新与用户操作回调。
+// 本模块接口见 volume_panel.hpp。
+
 #include "volume_panel.hpp"
 
 #include <QCheckBox>

@@ -1,3 +1,6 @@
+// 质量弹簧布料的状态、固定子步积分、风力与约束。
+// 公开接口与参数约定见 include/minirender/simulation/cloth.hpp。
+
 #include "cloth_collision.hpp"
 #include <minirender/simulation/cloth.hpp>
 
@@ -38,7 +41,8 @@ ClothEnvironment normalized_environment(ClothEnvironment environment) {
 void ClothGrid::validate() const {
     require(columns >= 2 && columns <= 256 && rows >= 2 && rows <= 256,
             "Cloth grid dimensions must be in 2..256");
-    const glm::dvec3 u(span_u), v(span_v);
+    const glm::dvec3 u(span_u);
+    const glm::dvec3 v(span_v);
     require(finite(glm::dvec3(origin)) && finite(u) && finite(v) &&
                 glm::all(glm::lessThanEqual(glm::abs(glm::dvec3(origin)), glm::dvec3(1e6))),
             "Cloth grid coordinates must be finite and within the working range");
@@ -186,7 +190,8 @@ ClothSimulation::ClothSimulation(ClothGrid grid, ClothParameters parameters,
             damping_sums[index] += edge.damping;
         }
     }
-    double k_bound = 0, c_bound = 0;
+    double k_bound = 0;
+    double c_bound = 0;
     for (std::size_t i = 0; i < count; ++i) {
         if (!pinned_[i]) {
             k_bound = std::max(k_bound, 2 * stiffness_sums[i] / masses_[i]);

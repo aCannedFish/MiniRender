@@ -1,3 +1,5 @@
+// 距离场图元、CSG 组合与变换后的距离求值。
+
 #pragma once
 
 #include <minirender/scene/scene.hpp>

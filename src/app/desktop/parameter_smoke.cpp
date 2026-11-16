@@ -1,3 +1,6 @@
+// 隐藏窗口回归：parameter 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 parameter_smoke.hpp。
+
 #include "parameter_smoke.hpp"
 #include "workbench.hpp"
 

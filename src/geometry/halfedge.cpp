@@ -1,3 +1,6 @@
+// 只读半边拓扑、边界环、连通分量与流形校验。
+// 公开接口与参数约定见 include/minirender/geometry/halfedge.hpp。
+
 #include <minirender/geometry/halfedge.hpp>
 
 #include <algorithm>

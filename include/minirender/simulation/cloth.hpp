@@ -1,3 +1,5 @@
+// 质量弹簧布料的状态、固定子步积分、风力与约束。
+
 #pragma once
 
 #include <minirender/scene/scene.hpp>

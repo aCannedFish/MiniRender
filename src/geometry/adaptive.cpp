@@ -1,3 +1,6 @@
+// 由几何或投影误差控制的自适应细分与层级平衡。
+// 公开接口与参数约定见 include/minirender/geometry/adaptive.hpp。
+
 #include "adaptive_surface.hpp"
 #include "height_field.hpp"
 #include <minirender/geometry/normals.hpp>

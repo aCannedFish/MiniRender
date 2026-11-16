@@ -1,3 +1,6 @@
+// 回归测试：Constant environment maps sample uniform solid angle including pole limits；Environment
+// importance PDFs normalize and retain bilinear support。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/light.hpp>
 
@@ -246,12 +249,12 @@ TEST_CASE("Environment asset references round trip and freeze with scene snapsho
     save_scene(scene, file);
     const auto reloaded = load_scene(file);
     REQUIRE(reloaded.environment_map.texture_id == "sky");
-    REQUIRE(reloaded.environment_map.strength == 2);
-    REQUIRE(reloaded.environment_map.rotation_degrees == 90);
+    REQUIRE(reloaded.environment_map.strength == 2.0F);
+    REQUIRE(reloaded.environment_map.rotation_degrees == 90.0F);
     REQUIRE(make_snapshot(reloaded)->environment_texture != nullptr);
     REQUIRE(snapshot->environment_texture == scene.textures[0].data);
     scene.environment_map.strength = 10;
-    REQUIRE(snapshot->environment_strength == 2);
+    REQUIRE(snapshot->environment_strength == 2.0F);
     scene.environment_map.texture_id = "missing";
     REQUIRE_THROWS(make_snapshot(scene));
     scene.environment_map.texture_id = "sky";

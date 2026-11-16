@@ -1,3 +1,6 @@
+// 回归测试：Point preview centers extreme coordinates and preserves source data；Point preview
+// extracts all boundary edges and honors cancellation。
+
 #include <minirender/render/point_preview.hpp>
 
 #include <catch2/catch_test_macros.hpp>

@@ -1,3 +1,6 @@
+// 回归测试：Single sided surfaces agree in BVH occlusion picking and path emission；A discarded
+// back face does not hide a farther visible surface。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/path_tracer.hpp>
 #include <minirender/scene/editor.hpp>

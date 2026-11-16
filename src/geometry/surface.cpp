@@ -1,3 +1,6 @@
+// 原三角曲面的最近点、属性投影及双向采样距离。
+// 公开接口与参数约定见 include/minirender/geometry/surface.hpp。
+
 #include <minirender/geometry/surface.hpp>
 
 #include <algorithm>
@@ -103,9 +106,10 @@ MeshSurface::MeshSurface(std::shared_ptr<const MeshData> mesh, CancellationToken
 MeshIndex MeshSurface::build(MeshIndex begin, MeshIndex end, const CancellationToken& token) {
     token.check();
     Node node;
-    node.low              = glm::dvec3(std::numeric_limits<double>::infinity());
-    node.high             = -node.low;
-    glm::dvec3 center_low = node.low, center_high = node.high;
+    node.low               = glm::dvec3(std::numeric_limits<double>::infinity());
+    node.high              = -node.low;
+    glm::dvec3 center_low  = node.low;
+    glm::dvec3 center_high = node.high;
     for (auto i = begin; i < end; ++i) {
         if (i % 1024 == 0) {
             token.check();
@@ -156,8 +160,9 @@ MeshClosestPoint MeshSurface::closest(glm::dvec3 point, CancellationToken cancel
     cancellation.check();
     // 中位数树的最大深度受 32 位面索引约束，64 个槽足以保存待访问的兄弟节点。
     std::array<std::pair<MeshIndex, double>, 64> stack;
-    std::size_t                                  pending = 1, visited = 0;
-    stack[0] = {0, 0};
+    std::size_t                                  pending = 1;
+    std::size_t                                  visited = 0;
+    stack[0]                                             = {0, 0};
     MeshClosestPoint result;
     while (pending) {
         const auto [index, lower_bound] = stack[--pending];

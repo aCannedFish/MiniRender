@@ -1,3 +1,6 @@
+// 布料散射模型的方向求值、混合采样与概率密度。
+// 公开接口与参数约定见 include/minirender/render/cloth_bsdf.hpp。
+
 #include <minirender/core/sampling.hpp>
 #include <minirender/render/bsdf.hpp>
 #include <minirender/render/cloth_bsdf.hpp>
@@ -104,7 +107,8 @@ ClothBsdf::ClothBsdf(std::shared_ptr<const ClothAppearance> appearance, double i
     }
     const double rotation =
         std::remainder(appearance_->settings().rotation_degrees, 360.0) * radians;
-    const double     c = std::cos(rotation), s = std::sin(rotation);
+    const double     c = std::cos(rotation);
+    const double     s = std::sin(rotation);
     const std::array inputs{axes.u, axes.v};
     for (std::size_t i = 0; i < 2; ++i) {
         auto         axis  = inputs[i];
@@ -143,7 +147,8 @@ glm::dvec3 ClothBsdf::response_normalized(glm::dvec3 wo, glm::dvec3 wi) const {
         normalization += sample.weight * projection;
 
         // 半角余弦由两个单位圆方向的和求得，避免相反方向处的 1+cos 消去。
-        const double csum = in.cosine + out.cosine, ssum = in.sine + out.sine;
+        const double csum             = in.cosine + out.cosine;
+        const double ssum             = in.sine + out.sine;
         const double cosine_d_squared = std::max(.25 * (csum * csum + ssum * ssum), 1e-12);
         const double cosine_phi       = std::cos(.5 * phi_d);
         const double fresnel          = fresnel_dielectric(
@@ -249,7 +254,8 @@ std::optional<glm::dvec3> ClothBsdf::sample(glm::dvec3 wo, double component, glm
     const auto   out        = angles_for(frame, wo);
     const auto&  parameters = settings.threads[thread];
     const double surface    = surface_probability(parameters, ior_, dye_);
-    double       theta, phi;
+    double       theta;
+    double       phi;
     if (lobe < surface) {
         theta = sample_longitudinal(out.theta, parameters.surface_width_degrees * radians, u.x);
         phi   = out.phi - 2 * std::asin(2 * u.y - 1);

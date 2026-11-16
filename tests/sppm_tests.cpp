@@ -1,3 +1,6 @@
+// 回归测试：Area photon emission conserves power and samples the selected hemispheres；Infinite
+// photon emission accounts for projected area and missed photons。
+
 #include "render/sppm_grid.hpp"
 #include "render/sppm_surface.hpp"
 #include <minirender/assets/scene_io.hpp>
@@ -86,10 +89,12 @@ TEST_CASE("Area photon emission conserves power and samples the selected hemisph
         const LightSampler light(snapshot);
         const SceneBvh     bvh(snapshot);
         Sampler            random(101);
-        glm::dvec3         center(0), flux(0);
-        double             cosine = 0;
-        int                back = 0, self_hits = 0;
-        constexpr int      samples = 30000;
+        glm::dvec3         center(0);
+        glm::dvec3         flux(0);
+        double             cosine    = 0;
+        int                back      = 0;
+        int                self_hits = 0;
+        constexpr int      samples   = 30000;
         for (int i = 0; i < samples; ++i) {
             const auto value = emission(light, random);
             center += value.ray.origin;

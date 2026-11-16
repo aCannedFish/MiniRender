@@ -1,3 +1,6 @@
+// 隐藏窗口回归：presets 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 presets_smoke.hpp。
+
 #include "presets_smoke.hpp"
 #include "builtin_scenes.hpp"
 #include "offline_panel.hpp"

@@ -1,3 +1,6 @@
+// 回归测试：Camera rays agree with Vulkan projection and pixel coordinates；Inverse transpose
+// preserves normal tangent orthogonality。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/scene/editor.hpp>
 #include <minirender/scene/shadow.hpp>
@@ -177,11 +180,11 @@ TEST_CASE("Scene editor commits valid transactions and keeps invalid edits out o
     REQUIRE_THROWS(editor.edit([](auto& scene) { scene.objects.front().transform.scale.x = 0; }));
     REQUIRE_FALSE(editor.can_undo());
     editor.edit([](auto& scene) { scene.objects.front().transform.translation.x = 2; });
-    REQUIRE(editor.document().objects.front().transform.translation.x == 2);
+    REQUIRE(editor.document().objects.front().transform.translation.x == 2.0F);
     REQUIRE(editor.undo());
     REQUIRE(editor.document().objects.front().transform.translation == original);
     REQUIRE(editor.redo());
-    REQUIRE(editor.document().objects.front().transform.translation.x == 2);
+    REQUIRE(editor.document().objects.front().transform.translation.x == 2.0F);
     editor.undo();
     editor.edit([](auto& scene) { scene.objects.front().name = "changed"; });
     REQUIRE_FALSE(editor.can_redo());

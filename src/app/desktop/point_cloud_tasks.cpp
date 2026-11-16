@@ -1,3 +1,5 @@
+// 点云导入、法线准备、重建和导出的后台任务。
+
 #include "geometry_controller.hpp"
 
 #include <minirender/assets/point_io.hpp>

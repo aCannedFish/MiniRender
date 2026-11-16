@@ -1,3 +1,6 @@
+// 回归测试：Lazy Loop controls normals and topology match uniform refinement；Lazy Loop evaluates
+// isolated and high level support without a dense mesh。
+
 #include "geometry/loop_hierarchy.hpp"
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/adaptive.hpp>

@@ -1,3 +1,6 @@
+// 点云 PCA 法线估计、邻域尺度及最小生成森林定向。
+// 公开接口与参数约定见 include/minirender/geometry/point_normals.hpp。
+
 #include "point_cloud_utils.hpp"
 #include "point_index.hpp"
 #include "symmetric_eigen.hpp"

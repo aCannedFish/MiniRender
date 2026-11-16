@@ -1,3 +1,6 @@
+// 回归测试：SDF primitive distances agree with analytic geometry；SDF demo cutter removes the
+// spherical cap with clearance。
+
 #include <minirender/assets/sdf_io.hpp>
 #include <minirender/core/sampling.hpp>
 #include <minirender/render/sdf_render.hpp>

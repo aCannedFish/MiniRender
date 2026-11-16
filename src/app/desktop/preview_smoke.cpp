@@ -1,3 +1,6 @@
+// 隐藏窗口回归：preview 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 preview_smoke.hpp。
+
 #include "preview_smoke.hpp"
 #include "geometry_smoke.hpp"
 #include "workbench.hpp"
@@ -136,7 +139,9 @@ void verify_ao(const Image& plain, const Image& shaded) {
 }
 
 struct State {
-    int                          stage = 0, ticks = 0, frame = 0;
+    int                          stage = 0;
+    int                          ticks = 0;
+    int                          frame = 0;
     std::shared_ptr<const Image> plain, shaded, lit, offline;
     SceneUploadStatistics        uploads;
     SceneDocument                cornell;

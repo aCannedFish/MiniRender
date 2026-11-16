@@ -1,3 +1,6 @@
+// 回归测试：Subsurface path transports light across positions with all sampling modes；Subsurface
+// continuous environment MIS matches the full surface integral。
+
 #include "subsurface_fixture.hpp"
 
 #include <minirender/assets/scene_io.hpp>
@@ -20,7 +23,8 @@ namespace {
 
 struct Moments {
     std::size_t count = 0;
-    glm::dvec3  mean{0}, variance_sum{0};
+    glm::dvec3  mean{0};
+    glm::dvec3  variance_sum{0};
 
     void add(glm::dvec3 value) {
         ++count;

@@ -1,3 +1,5 @@
+// 先写临时文件再发布目标文件的事务式文件写入。
+
 #pragma once
 
 #include <filesystem>

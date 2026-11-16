@@ -1,3 +1,5 @@
+// 布料定义、碰撞环境与模拟状态的场景序列化。
+
 #pragma once
 
 #include <minirender/simulation/cloth_component.hpp>

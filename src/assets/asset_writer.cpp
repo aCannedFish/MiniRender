@@ -1,3 +1,6 @@
+// 生成资产的内容标识、复用与安全发布。
+// 本模块接口见 asset_writer.hpp。
+
 #include "asset_writer.hpp"
 #include "obj_writer.hpp"
 

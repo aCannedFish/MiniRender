@@ -1,3 +1,6 @@
+// 隐藏窗口回归：gizmo 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 gizmo_smoke.hpp。
+
 #include "gizmo_smoke.hpp"
 #include "geometry_smoke.hpp"
 #include "ibl_controller.hpp"
@@ -105,16 +108,21 @@ enum class Phase {
 };
 
 struct State {
-    Phase                 phase = Phase::startup;
-    int                   ticks = 0, step = 0, frame = 0;
+    Phase                 phase               = Phase::startup;
+    int                   ticks               = 0;
+    int                   step                = 0;
+    int                   frame               = 0;
     double                maximum_callback_ms = 0;
     minirender::Transform original, moved, rotated, gesture_start;
     minirender::Camera    camera;
-    glm::dvec2            start{0}, delta{0};
-    glm::dvec3            radial{0}, rotation_axis{0};
+    glm::dvec2            start{0};
+    glm::dvec2            delta{0};
+    glm::dvec3            radial{0};
+    glm::dvec3            rotation_axis{0};
     double                radius          = 0;
     Handle                rotation_handle = Handle::none;
-    std::uint64_t         uploads = 0, descriptors = 0;
+    std::uint64_t         uploads         = 0;
+    std::uint64_t         descriptors     = 0;
     QImage                baseline, moved_image, rotated_image;
     QString               source_scene;
 };

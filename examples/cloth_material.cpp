@@ -1,3 +1,5 @@
+// 可运行示例：微圆柱经纬织物参数、切向曲线与预置。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/render_session.hpp>
 #include <minirender/simulation/cloth.hpp>

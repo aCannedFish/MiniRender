@@ -1,3 +1,5 @@
+// OpenEXR 浮点图像读写，保留线性 HDR 像素。
+
 #include <minirender/core/image.hpp>
 
 #include <tinyexr.h>

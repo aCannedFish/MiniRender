@@ -1,3 +1,5 @@
+// 沿顶点方向进行真实高度位移，并检查共享边接缝。
+
 #pragma once
 
 #include <minirender/geometry/halfedge.hpp>
@@ -9,10 +11,14 @@ namespace minirender {
 // p' = p + normal * scale * (height_R - midlevel)。scale 为局部米制长度，允许负值。
 // 高度使用 level 0、双线性、Repeat、OBJ 左下原点 UV，不做 gamma 或 [0,1] 截断。
 struct DisplacementSettings {
-    double      scale                 = 0.1;
-    double      midlevel              = 0.5;
-    double      seam_tolerance        = 1e-6; // 接缝两侧允许的位移距离差，单位为局部米。
+    // 高度相对中值的位移倍率，单位为局部空间米。
+    double scale = 0.1;
+    // 不产生位移时的高度值。
+    double midlevel       = 0.5;
+    double seam_tolerance = 1e-6; // 接缝两侧允许的位移距离差，单位为局部米。
+    // 共享边高度一致性检查允许处理的最大分段数。
     std::size_t maximum_seam_segments = 1000000;
+    // 检查数值范围和预算组合，非法设置在修改网格前抛出异常。
     void validate() const;
 };
 
@@ -20,21 +26,31 @@ enum class DisplacementStage { topology, directions, samples, seams, positions, 
 
 // 各阶段独立计数。seams 以边计数，单条边的长扫描也定期发送当前边编号并检查取消。
 struct DisplacementProgress {
-    DisplacementStage stage     = DisplacementStage::topology;
-    std::size_t       completed = 0;
-    std::size_t       total     = 1;
+    // 当前执行阶段，completed 和 total 在阶段内解释。
+    DisplacementStage stage = DisplacementStage::topology;
+    // 当前阶段已完成的工作项数量。
+    std::size_t completed = 0;
+    // 当前阶段工作项总数。
+    std::size_t total = 1;
 };
 
 using DisplacementProgressCallback = std::function<void(const DisplacementProgress&)>;
 
 struct DisplacementResult {
+    // 成功结果的共享只读网格，调用方可以直接保存或交给渲染器。
     std::shared_ptr<const MeshData> mesh;
-    TopologyStatistics              topology;
-    std::size_t                     sampled_corners         = 0;
-    std::size_t                     seam_edges              = 0;
-    std::size_t                     seam_segments           = 0;
-    double                          maximum_seam_difference = 0;
-    double                          maximum_displacement    = 0;
+    // 输出网格通过拓扑检查后的统计。
+    TopologyStatistics topology;
+    // 实际采样的面角数量。
+    std::size_t sampled_corners = 0;
+    // 检查过的 UV 接缝边数量。
+    std::size_t seam_edges = 0;
+    // 接缝一致性检查处理的高度分段数量。
+    std::size_t seam_segments = 0;
+    // 接缝两侧最大位移距离差，单位为局部米。
+    double maximum_seam_difference = 0;
+    // 输出位置相对输入或参考曲面的最大位移长度。
+    double maximum_displacement = 0;
 };
 
 // 沿面积加权平滑法线移动共享位置，忽略输入的硬法线，随后重新计算输出法线。

@@ -1,3 +1,5 @@
+// 将实例顶点、法线、UV 与切向变换到实时着色所需空间。
+
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "scene_frame.glsl"

@@ -1,3 +1,6 @@
+// 回归测试：SSAO settings reject invalid world distance and sampling ranges；SSAO kernels cover the
+// oriented unit hemisphere without a radius-dependent prefix。
+
 #include <catch2/catch_test_macros.hpp>
 #include <glm/glm.hpp>
 #include <minirender/render/ssao.hpp>
@@ -34,13 +37,14 @@ TEST_CASE("SSAO kernels cover the oriented unit hemisphere without a radius-depe
     REQUIRE(first == make_ssao_kernel());
     REQUIRE(first != make_ssao_kernel(102));
     double mean_cosine = 0;
-    int    nearby = 0, distant = 0;
+    int    nearby      = 0;
+    int    distant     = 0;
     for (const auto& sample : first) {
         const auto length = glm::length(glm::vec3(sample));
         REQUIRE(length >= 0.09999F);
         REQUIRE(length <= 1.00001F);
-        REQUIRE(sample.z > 0);
-        REQUIRE(sample.w == 0);
+        REQUIRE(sample.z > 0.0F);
+        REQUIRE(sample.w == 0.0F);
         mean_cosine += sample.z / length;
         nearby += length < 0.3F;
         distant += length > 0.7F;

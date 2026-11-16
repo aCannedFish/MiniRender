@@ -1,3 +1,6 @@
+// 回归测试：OBJ export round trips shared indices UV seams normals and Unicode paths；OBJ export
+// cancellation and errors retain the original destination。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/displacement.hpp>
 #include <minirender/geometry/loop.hpp>

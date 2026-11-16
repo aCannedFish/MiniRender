@@ -1,3 +1,6 @@
+// 命令行渲染参数解析、任务进度与图像导出。
+// 本模块接口见 render_cli.hpp。
+
 #include "render_cli.hpp"
 
 #include <minirender/assets/scene_io.hpp>

@@ -1,3 +1,5 @@
+// 可运行示例：沿顶点方向进行真实高度位移，并检查共享边接缝。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/displacement.hpp>
 #include <minirender/geometry/loop.hpp>
@@ -51,7 +53,8 @@ void compare_visibility(std::shared_ptr<const SceneSnapshot> before,
     }
     const SceneBvh first(before), second(after);
     const auto     light = -glm::normalize(glm::dvec3(after->directional_lights[0].direction));
-    std::size_t    silhouettes = 0, shadows = 0;
+    std::size_t    silhouettes = 0;
+    std::size_t    shadows     = 0;
     for (std::size_t y = 0; y < 128; ++y) {
         for (std::size_t x = 0; x < 128; ++x) {
             const auto ray = after->camera.generate_ray(

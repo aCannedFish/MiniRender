@@ -1,3 +1,6 @@
+// 均匀 RGB 介质及射线在有界区域内的吸收、散射处理。
+// 公开接口与参数约定见 include/minirender/scene/medium.hpp。
+
 #include <minirender/scene/medium.hpp>
 
 #include <cmath>

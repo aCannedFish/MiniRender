@@ -1,3 +1,6 @@
+// 隐藏窗口回归：ibl 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 ibl_smoke.hpp。
+
 #include "ibl_smoke.hpp"
 #include "ibl_controller.hpp"
 #include "workbench.hpp"
@@ -180,8 +183,9 @@ void verify_ao(Workbench& window, const QString& directory) {
             "IBL AO comparison dimensions changed");
     const auto                 snapshot = minirender::make_snapshot(window.document());
     const minirender::SceneBvh bvh(snapshot);
-    double                     unchanged = 0, composition = 0;
-    int                        darkened = 0;
+    double                     unchanged   = 0;
+    double                     composition = 0;
+    int                        darkened    = 0;
     for (int gy = 0; gy < 24; ++gy) {
         for (int gx = 0; gx < 32; ++gx) {
             const auto x =
@@ -249,10 +253,14 @@ void verify_panel(Workbench& window) {
 }
 
 struct State {
-    int                   step = 0, ticks = 0, hold = 0;
+    int                   step          = 0;
+    int                   ticks         = 0;
+    int                   hold          = 0;
     int                   maximum_ticks = 1500;
     std::string           source_a;
-    std::uint64_t         environment_jobs = 0, hits = 0, gpu_updates = 0;
+    std::uint64_t         environment_jobs = 0;
+    std::uint64_t         hits             = 0;
+    std::uint64_t         gpu_updates      = 0;
     SceneUploadStatistics uploads;
     qint64                last = 0, max_gap = 0;
     bool                  monitor        = false;

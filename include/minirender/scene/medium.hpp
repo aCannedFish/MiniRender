@@ -1,3 +1,5 @@
+// 均匀 RGB 介质及射线在有界区域内的吸收、散射处理。
+
 #pragma once
 
 #include <glm/vec3.hpp>

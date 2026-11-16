@@ -1,3 +1,5 @@
+// 次表面散射参数与表面位置采样。
+
 #pragma once
 
 #include <minirender/render/bvh.hpp>

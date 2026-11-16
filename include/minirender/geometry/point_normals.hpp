@@ -1,3 +1,5 @@
+// 点云 PCA 法线估计、邻域尺度及最小生成森林定向。
+
 #pragma once
 
 #include <minirender/geometry/point_cloud.hpp>

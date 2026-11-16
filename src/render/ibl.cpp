@@ -1,3 +1,6 @@
+// 环境光预处理：漫反射卷积、GGX 粗糙度层与 BRDF 积分表。
+// 公开接口与参数约定见 include/minirender/render/ibl.hpp。
+
 #include <minirender/render/bsdf.hpp>
 #include <minirender/render/ibl.hpp>
 
@@ -78,7 +81,8 @@ glm::dvec3 direction_at(std::size_t x, std::size_t y, const Image& image) {
 
 glm::dvec3 bilinear(const Image& image, double x, double y, bool repeat_x, bool nonnegative) {
     const auto   ix = static_cast<int>(std::floor(x)), iy = static_cast<int>(std::floor(y));
-    const double tx = x - std::floor(x), ty = y - std::floor(y);
+    const double tx    = x - std::floor(x);
+    const double ty    = y - std::floor(y);
     const auto   texel = [&](int column, int row) {
         const auto width  = static_cast<int>(image.width()),
                    height = static_cast<int>(image.height());

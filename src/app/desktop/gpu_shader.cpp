@@ -1,3 +1,6 @@
+// SPIR-V 资源加载、着色器模块与 Vulkan 错误处理。
+// 本模块接口见 gpu_shader.hpp。
+
 #include "gpu_shader.hpp"
 #include "gpu_buffer.hpp"
 

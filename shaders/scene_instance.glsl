@@ -1,3 +1,5 @@
+// 实例 SSBO 数据布局及当前绘制实例索引。
+
 #ifndef MINIRENDER_SCENE_INSTANCE
 #define MINIRENDER_SCENE_INSTANCE
 

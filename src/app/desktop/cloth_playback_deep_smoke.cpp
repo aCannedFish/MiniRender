@@ -1,3 +1,6 @@
+// 隐藏窗口回归：cloth playback deep 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 cloth_playback_deep_smoke.hpp。
+
 #include "cloth_playback_deep_smoke.hpp"
 #include "cloth_controller.hpp"
 #include "geometry_smoke.hpp"
@@ -75,7 +78,8 @@ void mouse(VulkanViewport& viewport, QEvent::Type type, glm::dvec2 point, Qt::Mo
 // 根据实际屏幕布局选取手柄，拖动通过真实鼠标事件进入 Workbench 的事务流程。
 struct Gesture {
     Transform  original;
-    glm::dvec2 start{0}, end{0};
+    glm::dvec2 start{0};
+    glm::dvec2 end{0};
 };
 
 Gesture begin_gesture(Workbench& window, GizmoMode mode) {
@@ -217,9 +221,10 @@ enum class Stage {
 };
 
 struct State {
-    Stage                                 stage = Stage::setup;
-    int                                   ticks = 0, gpu_frame = 0;
-    std::uint64_t                         frame = 0;
+    Stage                                 stage     = Stage::setup;
+    int                                   ticks     = 0;
+    int                                   gpu_frame = 0;
+    std::uint64_t                         frame     = 0;
     Gesture                               gesture;
     std::shared_ptr<const ClothComponent> expected, preserved;
     std::shared_ptr<const SceneSnapshot>  snapshot;

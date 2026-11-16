@@ -1,3 +1,6 @@
+// 回归测试：Subsurface probes include both boundaries and isolate the selected instance；Concave
+// subsurface PDFs use each projection axis intersection count。
+
 #include "subsurface_fixture.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -138,9 +141,10 @@ TEST_CASE("Concave subsurface PDFs use each projection axis intersection count",
     bool                    differing = false;
     int                     accepted  = 0;
     for (int i = 0; i < 3000; ++i) {
-        const double axis = random.next_1d(), channel = random.next_1d();
-        const auto   disk   = random.next_2d();
-        const auto   sample = sampler.sample(from, axis, channel, disk, random.next_1d());
+        const double axis    = random.next_1d();
+        const double channel = random.next_1d();
+        const auto   disk    = random.next_2d();
+        const auto   sample  = sampler.sample(from, axis, channel, disk, random.next_1d());
         if (!sample) {
             continue;
         }
@@ -161,13 +165,15 @@ TEST_CASE("Subsurface surface estimator matches independent world area quadratur
     const auto              coarse   = area_integral(*snapshot, from, sampler.profile(0), 64);
     const auto              expected = area_integral(*snapshot, from, sampler.profile(0), 128);
     REQUIRE(glm::length(coarse - expected) < .0002);
-    glm::dvec3    sum(0), squares(0);
+    glm::dvec3    sum(0);
+    glm::dvec3    squares(0);
     constexpr int count = 50000;
     for (int i = 0; i < count; ++i) {
-        auto         random = Sampler::for_sample(177, 0, std::uint64_t(i));
-        const double axis = random.next_1d(), channel = random.next_1d();
-        const auto   disk   = random.next_2d();
-        const auto   sample = sampler.sample(from, axis, channel, disk, random.next_1d());
+        auto         random  = Sampler::for_sample(177, 0, std::uint64_t(i));
+        const double axis    = random.next_1d();
+        const double channel = random.next_1d();
+        const auto   disk    = random.next_2d();
+        const auto   sample  = sampler.sample(from, axis, channel, disk, random.next_1d());
         const auto   value =
             sample ? sample->weight * spatial_function(sample->surface.position) : glm::dvec3(0);
         sum += value;

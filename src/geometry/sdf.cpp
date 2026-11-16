@@ -1,3 +1,6 @@
+// 距离场图元、CSG 组合与变换后的距离求值。
+// 公开接口与参数约定见 include/minirender/geometry/sdf.hpp。
+
 #include <minirender/geometry/sdf.hpp>
 
 #include <glm/gtc/matrix_transform.hpp>

@@ -1,3 +1,6 @@
+// 隐藏窗口回归：point cloud 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 point_cloud_smoke.hpp。
+
 #include "point_cloud_smoke.hpp"
 #include "geometry_smoke.hpp"
 #include "point_cloud_editor_smoke.hpp"

@@ -1,3 +1,5 @@
+// 通过逆投影从屏幕像素和深度重建相机空间位置。
+
 #ifndef MINIRENDER_SCREEN_POSITION
 #define MINIRENDER_SCREEN_POSITION
 

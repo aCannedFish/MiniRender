@@ -1,3 +1,6 @@
+// 隐藏窗口回归：subsurface 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 subsurface_smoke.hpp。
+
 #include "subsurface_smoke.hpp"
 #include "geometry_smoke.hpp"
 #include "offline_panel.hpp"
@@ -107,7 +110,8 @@ void verify_display(Workbench& window, const QString& directory, const QString& 
                                      double(actual.height()) / double(source->height()));
     const int    width    = int(std::floor(double(source->width()) * scale)),
                  height   = int(std::floor(double(source->height()) * scale));
-    const int    left = (actual.width() - width) / 2, top = (actual.height() - height) / 2;
+    const int    left     = (actual.width() - width) / 2;
+    const int    top      = (actual.height() - height) / 2;
     for (std::size_t y = 0; y < source->height(); ++y) {
         for (std::size_t x = 0; x < source->width(); ++x) {
             const auto pixel =
@@ -200,15 +204,19 @@ enum class Stage {
 };
 
 struct State {
-    Stage                                stage = Stage::import;
-    int                                  ticks = 0, frame = 0, settle = 0, edits = 0;
+    Stage                                stage  = Stage::import;
+    int                                  ticks  = 0;
+    int                                  frame  = 0;
+    int                                  settle = 0;
+    int                                  edits  = 0;
     SubsurfaceParameters                 precise;
     std::shared_ptr<const SceneSnapshot> snapshot;
     RenderSettings                       render{24, 24, 1024, 101};
     IntegratorSettings                   integrator{SamplingMode::mis, 6, true, 3};
     std::optional<Image>                 realtime;
     SceneUploadStatistics                uploads;
-    std::uint64_t                        job = 0, samples = 0;
+    std::uint64_t                        job     = 0;
+    std::uint64_t                        samples = 0;
     QElapsedTimer                        cancellation;
     UiResponseProbe*                     probe = nullptr;
 };

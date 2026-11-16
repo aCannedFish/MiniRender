@@ -1,3 +1,5 @@
+// 桌面应用入口、命令行选项、Vulkan 初始化及回归模式调度。
+
 #include "adaptive_smoke.hpp"
 #include "cloth_playback_smoke.hpp"
 #include "cloth_smoke.hpp"

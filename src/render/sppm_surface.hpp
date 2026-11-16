@@ -1,3 +1,5 @@
+// SPPM 表面路径处理及光子合并使用的几何与通量数据。
+
 #pragma once
 
 #include <minirender/render/path_tracer.hpp>

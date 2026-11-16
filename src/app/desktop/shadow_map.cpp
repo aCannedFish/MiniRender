@@ -1,3 +1,6 @@
+// 方向光阴影图数组的分配、布局与逐层渲染。
+// 本模块接口见 shadow_map.hpp。
+
 #include "shadow_map.hpp"
 #include "gpu_buffer.hpp"
 

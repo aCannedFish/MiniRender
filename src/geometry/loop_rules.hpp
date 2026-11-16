@@ -1,3 +1,5 @@
+// Loop 顶点权重与边界规则的共用计算。
+
 #pragma once
 
 #include <cmath>

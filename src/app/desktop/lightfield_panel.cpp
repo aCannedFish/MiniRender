@@ -1,3 +1,6 @@
+// 光场参数控件、状态刷新与用户操作回调。
+// 本模块接口见 lightfield_panel.hpp。
+
 #include "lightfield_panel.hpp"
 #include <QCheckBox>
 #include <QComboBox>
@@ -416,7 +419,8 @@ void LightFieldPanel::sync() {
         const QSignalBlocker blocker(exposure_);
         exposure_->setValue(viewport_.exposure());
     }
-    std::uint64_t done = 0, total = 0;
+    std::uint64_t done  = 0;
+    std::uint64_t total = 0;
     if (controller_.acquiring() && job != Job::adopt) {
         done  = p.recorded_samples;
         total = p.total_samples;

@@ -1,3 +1,5 @@
+// 可运行示例：带拓扑和属性约束的 QEM 边折叠简化。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/loop.hpp>
 #include <minirender/geometry/simplify.hpp>

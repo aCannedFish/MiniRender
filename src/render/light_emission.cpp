@@ -1,3 +1,5 @@
+// 光子路径的光源选择与发射位置、方向采样。
+
 #include <minirender/render/light.hpp>
 #include <minirender/render/path_tracer.hpp>
 
@@ -55,7 +57,8 @@ std::optional<PhotonEmission> LightSampler::sample_emission(double light_u, glm:
                               1 / light.area,
                               local.z / (hemispheres * pi)};
     }
-    glm::dvec3 outward, radiance;
+    glm::dvec3 outward;
+    glm::dvec3 radiance;
     double     direction_pdf;
     if (choice.kind == LightKind::directional) {
         const auto& light = directional_[choice.index];

@@ -1,3 +1,6 @@
+// 点云数据校验与三角网格表面采样。
+// 公开接口与参数约定见 include/minirender/geometry/point_cloud.hpp。
+
 #include "point_cloud_utils.hpp"
 #include <minirender/core/sampling.hpp>
 #include <minirender/geometry/point_cloud.hpp>

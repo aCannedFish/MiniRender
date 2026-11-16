@@ -1,3 +1,6 @@
+// 生成网格的 OBJ 输出及取消检查。
+// 本模块接口见 obj_writer.hpp。
+
 #include "obj_writer.hpp"
 #include "staged_file.hpp"
 

@@ -1,3 +1,6 @@
+// 对称三阶矩阵的特征分解，供局部 PCA 使用。
+// 本模块接口见 symmetric_eigen.hpp。
+
 #include "symmetric_eigen.hpp"
 
 #include <algorithm>

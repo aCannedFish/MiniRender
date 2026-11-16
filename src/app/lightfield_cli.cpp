@@ -1,3 +1,6 @@
+// 命令行光场采集、文件重开与重聚焦。
+// 本模块接口见 lightfield_cli.hpp。
+
 #include "lightfield_cli.hpp"
 
 #include <minirender/assets/scene_io.hpp>
@@ -51,7 +54,8 @@ int run_lightfield_cli(int argc, char** argv, bool capture) {
     double                                exposure = 0;
     std::uint64_t                         cache    = 128ULL * 1024 * 1024;
     std::shared_ptr<const LightFieldFile> file;
-    bool                                  reference_set = false, radius_set = false;
+    bool                                  reference_set = false;
+    bool                                  radius_set    = false;
     if (!capture) {
         file                    = LightFieldFile::open(path(argv[0]));
         refocus.focus_distance  = file->calibration().reference_focus;

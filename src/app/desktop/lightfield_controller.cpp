@@ -1,3 +1,6 @@
+// 光场采集和重建任务、文件操作及预览来源协调。
+// 本模块接口见 lightfield_controller.hpp。
+
 #include "lightfield_controller.hpp"
 #include <QThreadPool>
 #include <QTimer>

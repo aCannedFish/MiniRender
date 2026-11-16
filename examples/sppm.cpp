@@ -1,3 +1,5 @@
+// 可运行示例：随机渐进光子映射的相机路径、光子合并和逐像素统计。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/render_session.hpp>
 

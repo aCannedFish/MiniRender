@@ -1,3 +1,6 @@
+// 隐藏窗口回归：cloth 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 cloth_smoke.hpp。
+
 #include "cloth_smoke.hpp"
 #include "cloth_material_editor_smoke.hpp"
 #include "geometry_smoke.hpp"
@@ -53,7 +56,8 @@ void verify(VulkanViewport& viewport, const QString& directory, const QString& l
     const auto                 image = viewport.grab_hdr();
     const auto                 scene = viewport.scene();
     const minirender::SceneBvh bvh(scene);
-    std::size_t                samples = 0, matched = 0;
+    std::size_t                samples = 0;
+    std::size_t                matched = 0;
     double                     maximum = 0;
     for (int gy = 0; gy < 70; ++gy) {
         for (int gx = 0; gx < 90; ++gx) {
@@ -117,11 +121,12 @@ void verify(VulkanViewport& viewport, const QString& directory, const QString& l
 }
 
 struct State {
-    minirender::SceneDocument scene   = fixture();
-    int                       stage   = 0;
-    int                       frame   = 0;
-    int                       ticks   = 0;
-    std::uint64_t             uploads = 0, descriptors = 0;
+    minirender::SceneDocument scene       = fixture();
+    int                       stage       = 0;
+    int                       frame       = 0;
+    int                       ticks       = 0;
+    std::uint64_t             uploads     = 0;
+    std::uint64_t             descriptors = 0;
 };
 
 } // namespace

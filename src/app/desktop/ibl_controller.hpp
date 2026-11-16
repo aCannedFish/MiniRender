@@ -1,3 +1,5 @@
+// 环境预处理任务的异步执行、取消与结果缓存。
+
 #pragma once
 
 #include "vulkan_viewport.hpp"
@@ -60,8 +62,10 @@ class IblController final : public QObject {
     QFutureWatcher<Result>*                           watcher_ = nullptr;
     minirender::CancellationSource                    cancellation_;
     std::vector<CacheEntry>                           cache_;
-    std::uint64_t                                     generation_ = 0, clock_ = 0;
+    std::uint64_t                                     generation_        = 0;
+    std::uint64_t                                     clock_             = 0;
     std::uint64_t                                     active_generation_ = 0;
     IblTaskStatus                                     status_;
-    bool                                              initialized_ = false, cancelled_ = false;
+    bool                                              initialized_ = false;
+    bool                                              cancelled_   = false;
 };

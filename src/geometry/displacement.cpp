@@ -1,3 +1,6 @@
+// 沿顶点方向进行真实高度位移，并检查共享边接缝。
+// 公开接口与参数约定见 include/minirender/geometry/displacement.hpp。
+
 #include "height_field.hpp"
 #include <minirender/geometry/displacement.hpp>
 #include <minirender/geometry/normals.hpp>

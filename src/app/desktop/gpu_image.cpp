@@ -1,3 +1,6 @@
+// Vulkan 图像、显存和视图的独占生命周期。
+// 本模块接口见 gpu_image.hpp。
+
 #include "gpu_image.hpp"
 #include "gpu_buffer.hpp"
 

@@ -1,3 +1,6 @@
+// 回归测试：Cloth appearance compiles length weighted tangent curves and presets；Cloth flat thread
+// has a closed form normal response and untinted surface lobe。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/core/sampling.hpp>
 #include <minirender/geometry/uv_tangents.hpp>
@@ -87,7 +90,8 @@ TEST_CASE("Cloth appearance compiles length weighted tangent curves and presets"
     settings.threads[0].curve   = {{-20, -20, 40, 40}, {1, 0, 3}};
     const ClothAppearance appearance(settings);
     REQUIRE(appearance.samples().size() == 8);
-    double mean = 0, weight = 0;
+    double mean   = 0;
+    double weight = 0;
     for (const auto& sample : appearance.samples()) {
         REQUIRE(sample.cosine * sample.cosine + sample.sine * sample.sine == Approx(1));
         weight += sample.weight;
@@ -198,7 +202,8 @@ TEST_CASE("Cloth BSDF sampling agrees with independent hemispherical integration
     REQUIRE(glm::length(reference - refined) < .001);
     for (std::uint64_t seed = 1; seed <= 3; ++seed) {
         Sampler       sampler(seed);
-        glm::dvec3    sum(0), sum2(0);
+        glm::dvec3    sum(0);
+        glm::dvec3    sum2(0);
         constexpr int count = 50000;
         for (int i = 0; i < count; ++i) {
             glm::dvec3   contribution(0);
@@ -249,8 +254,9 @@ TEST_CASE("Cloth thread importance sampling reduces satin variance", "[cloth-bsd
     const auto      wo       = glm::normalize(glm::dvec3(.15, .4, 1));
     const auto      estimate = [&](bool importance) {
         Sampler       sampler(2026);
-        double        sum = 0, squared = 0;
-        constexpr int count = 60000;
+        double        sum     = 0;
+        double        squared = 0;
+        constexpr int count   = 60000;
         for (int i = 0; i < count; ++i) {
             const double component    = sampler.next_1d();
             const auto   u            = sampler.next_2d();

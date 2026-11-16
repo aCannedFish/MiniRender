@@ -1,3 +1,6 @@
+// 跨面角计算平滑法线，供细分、位移和网格处理复用。
+// 公开接口与参数约定见 include/minirender/geometry/normals.hpp。
+
 #include <minirender/geometry/normals.hpp>
 
 #include <cmath>

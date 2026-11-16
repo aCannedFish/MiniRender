@@ -1,3 +1,6 @@
+// 隐藏窗口回归：cloth material editor 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 cloth_material_editor_smoke.hpp。
+
 #include "cloth_material_editor_smoke.hpp"
 #include "cloth_smoke.hpp"
 #include "geometry_smoke.hpp"
@@ -97,9 +100,13 @@ void verify_layout(Workbench& window, const QString& directory, const QString& l
 }
 
 struct State {
-    int                                                stage = 0, frame = 0, ticks = 0, edits = 0;
-    UiResponseProbe*                                   probe  = nullptr;
-    std::uint64_t                                      meshes = 0, descriptors = 0;
+    int                                                stage       = 0;
+    int                                                frame       = 0;
+    int                                                ticks       = 0;
+    int                                                edits       = 0;
+    UiResponseProbe*                                   probe       = nullptr;
+    std::uint64_t                                      meshes      = 0;
+    std::uint64_t                                      descriptors = 0;
     std::shared_ptr<const minirender::ClothAppearance> before_curve, before_preset;
     std::shared_ptr<const minirender::SceneSnapshot>   frozen_snapshot;
     minirender::Image                                  reference{12, 12};

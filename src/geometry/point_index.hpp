@@ -1,3 +1,5 @@
+// 点云 k-d 树索引与邻域查询。
+
 #pragma once
 
 #include <minirender/geometry/point_cloud.hpp>

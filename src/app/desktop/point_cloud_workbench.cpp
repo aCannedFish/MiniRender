@@ -1,3 +1,5 @@
+// 点云工具与场景编辑、历史和资产目标的协调。
+
 #include "geometry_controller.hpp"
 #include "point_cloud_panel.hpp"
 #include "scene_id.hpp"

@@ -1,3 +1,5 @@
+// 点云数据处理共用的校验和辅助操作。
+
 #pragma once
 
 #include <minirender/geometry/point_cloud.hpp>

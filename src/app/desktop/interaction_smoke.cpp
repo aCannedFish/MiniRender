@@ -1,3 +1,6 @@
+// 隐藏窗口回归：interaction 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 interaction_smoke.hpp。
+
 #include "interaction_smoke.hpp"
 #include "workbench.hpp"
 

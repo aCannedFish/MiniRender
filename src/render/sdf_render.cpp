@@ -1,3 +1,6 @@
+// CPU 距离场步进、表面着色与诊断图生成。
+// 公开接口与参数约定见 include/minirender/render/sdf_render.hpp。
+
 #include <minirender/render/sdf_render.hpp>
 
 #include <glm/gtc/constants.hpp>

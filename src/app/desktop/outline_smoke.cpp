@@ -1,3 +1,6 @@
+// 隐藏窗口回归：outline 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 outline_smoke.hpp。
+
 #include "outline_smoke.hpp"
 #include "geometry_smoke.hpp"
 #include "ui_response_probe.hpp"
@@ -98,7 +101,9 @@ void verify_edges(Workbench& window, const QImage& off, const QImage& on, bool e
             if (!center) {
                 continue;
             }
-            bool boundary = false, crease = false, flat = true;
+            bool boundary = false;
+            bool crease   = false;
+            bool flat     = true;
             for (const auto& direction : directions) {
                 const auto other = hit(x + direction.x() * radius, y + direction.y() * radius);
                 if (!other || other->instance_index != center->instance_index) {
@@ -165,7 +170,10 @@ void drag(VulkanViewport& viewport, QEvent::Type type, QPointF p, Qt::MouseButto
 }
 
 struct State {
-    int                          stage = 0, ticks = 0, frame = 0, motion = 0;
+    int                          stage  = 0;
+    int                          ticks  = 0;
+    int                          frame  = 0;
+    int                          motion = 0;
     QImage                       off, on, light;
     std::shared_ptr<const Image> hdr;
     SceneDocument                scene;

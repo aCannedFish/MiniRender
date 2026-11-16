@@ -1,3 +1,5 @@
+// 球旋转重建中的球心、接触与几何判定。
+
 #pragma once
 
 #include <glm/glm.hpp>

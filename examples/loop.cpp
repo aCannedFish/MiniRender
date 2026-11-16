@@ -1,3 +1,5 @@
+// 可运行示例：均匀 Loop 细分、共享边顶点与面角属性插值。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/loop.hpp>
 #include <minirender/render/path_tracer.hpp>

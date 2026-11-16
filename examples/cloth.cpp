@@ -1,3 +1,5 @@
+// 可运行示例：质量弹簧布料的状态、固定子步积分、风力与约束。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/path_tracer.hpp>
 #include <minirender/simulation/cloth.hpp>
@@ -10,7 +12,7 @@ using namespace minirender;
 
 namespace {
 
-// 使用已有场景资源显示模拟几何；A6.2 再接入专门的微圆柱布料材质。
+// 使用纹理化漫反射材质观察模拟几何；专用布料外观示例见 cloth_material.cpp。
 SceneDocument scene_for(const FrozenCloth& cloth, bool sphere) {
     const auto source = std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes";
     auto       scene  = load_scene(source / "studio.json");

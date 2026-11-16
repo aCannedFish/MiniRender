@@ -1,3 +1,5 @@
+// 从屏幕深度重建位置，沿旋转半球样本估计局部遮蔽。
+
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "scene_frame.glsl"

@@ -1,3 +1,6 @@
+// 光场逐视图后台采集、内存预算、进度和取消。
+// 公开接口与参数约定见 include/minirender/render/lightfield_capture.hpp。
+
 #include "../assets/lightfield_internal.hpp"
 #include <minirender/render/lightfield_capture.hpp>
 
@@ -71,8 +74,9 @@ struct LightFieldCaptureSession::Impl {
     std::atomic<std::uint64_t>            recorded{0};
     bool                                  pause_requested   = false;
     bool                                  controller_parked = false;
-    std::uint32_t                         live = 0, parked = 0;
-    std::uint64_t                         view_base = 0;
+    std::uint32_t                         live              = 0;
+    std::uint32_t                         parked            = 0;
+    std::uint64_t                         view_base         = 0;
     Clock::time_point                     started{}, finished{};
 
     void checkpoint(const CancellationToken& token, bool worker) {

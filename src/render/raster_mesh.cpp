@@ -1,3 +1,6 @@
+// 面角顶点和线框数据的准备与不可变网格缓存。
+// 公开接口与参数约定见 include/minirender/render/raster_mesh.hpp。
+
 #include <minirender/geometry/uv_tangents.hpp>
 #include <minirender/render/raster_mesh.hpp>
 

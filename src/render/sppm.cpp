@@ -1,3 +1,6 @@
+// 随机渐进光子映射的相机路径、光子合并和逐像素统计。
+// 公开接口与参数约定见 include/minirender/render/sppm.hpp。
+
 #include "sppm_grid.hpp"
 #include "sppm_surface.hpp"
 #include <minirender/render/sppm.hpp>
@@ -36,7 +39,8 @@ void check(glm::dvec3 value) {
 
 struct CameraPoint {
     std::optional<SppmSurface> surface;
-    glm::dvec3                 beta{0}, direct{0};
+    glm::dvec3                 beta{0};
+    glm::dvec3                 direct{0};
     std::uint32_t              depth           = 0;
     bool                       specular_prefix = false;
 };
@@ -241,9 +245,11 @@ struct SppmIntegrator::Impl {
         const double cosine = glm::dot(ray.direction, forward);
         RayInterval  interval{scene->camera.near_plane / cosine, scene->camera.far_plane / cosine};
         CameraPoint  result;
-        glm::dvec3   beta(1), previous(0);
-        double       previous_pdf = 0, eta_scale = 1;
-        bool         delta = true;
+        glm::dvec3   beta(1);
+        glm::dvec3   previous(0);
+        double       previous_pdf = 0;
+        double       eta_scale    = 1;
+        bool         delta        = true;
         for (std::uint32_t depth = 0;; ++depth) {
             token.check();
             const auto hit             = bvh->intersect(ray, interval, &stats.geometry, token);

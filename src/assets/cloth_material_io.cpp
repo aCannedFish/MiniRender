@@ -1,3 +1,6 @@
+// JSON 中织物经纬参数和切向曲线的转换。
+// 本模块接口见 cloth_material_io.hpp。
+
 #include "cloth_material_io.hpp"
 
 #include <stdexcept>

@@ -1,3 +1,5 @@
+// 将实例网格变换到指定方向光的阴影裁剪空间。
+
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "scene_frame.glsl"

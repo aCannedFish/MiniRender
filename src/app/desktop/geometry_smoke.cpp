@@ -1,3 +1,6 @@
+// 隐藏窗口回归：geometry 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 geometry_smoke.hpp。
+
 #include "geometry_smoke.hpp"
 #include "geometry_panel.hpp"
 #include "ibl_controller.hpp"
@@ -140,8 +143,10 @@ QImage verify_gpu(Workbench& window, const QString& directory, const QString& la
     control<QComboBox>(window, "view_mode")->setCurrentIndex(2);
     const auto depth = viewport->grab();
     require(normals.size() == depth.size(), "Geometry debug capture dimensions changed");
-    int              checked = 0, matched = 0, target = 0;
-    const double     aspect = static_cast<double>(normals.width()) / normals.height();
+    int              checked = 0;
+    int              matched = 0;
+    int              target  = 0;
+    const double     aspect  = static_cast<double>(normals.width()) / normals.height();
     const glm::dmat4 view(snapshot->camera.view_matrix());
     for (int gy = 0; gy < 64; ++gy) {
         for (int gx = 0; gx < 80; ++gx) {
@@ -219,7 +224,10 @@ void verify_shadows(Workbench& window, const QString& directory) {
     const double aspect    = static_cast<double>(on.width()) / on.height();
     const auto   matrix    = snapshot->camera.projection_matrix(static_cast<float>(aspect)) *
                              snapshot->camera.view_matrix();
-    int          blocked = 0, blocked_matches = 0, lit = 0, lit_matches = 0;
+    int          blocked   = 0;
+    int          blocked_matches = 0;
+    int          lit             = 0;
+    int          lit_matches     = 0;
     for (int gz = -40; gz <= 40; ++gz) {
         for (int gx = -40; gx <= 40; ++gx) {
             const glm::vec3 point{static_cast<float>(gx) * 0.06F, 0,
@@ -267,7 +275,8 @@ void verify_shadows(Workbench& window, const QString& directory) {
     require(blocked >= 3 && lit >= 100 && blocked_matches * 100 >= blocked * 90 &&
                 lit_matches * 100 >= lit * 98,
             "Generated geometry GPU shadows disagree with CPU rays");
-    int surface_lit = 0, surface_matches = 0;
+    int surface_lit     = 0;
+    int surface_matches = 0;
     for (int gy = 0; gy < 80; ++gy) {
         for (int gx = 0; gx < 100; ++gx) {
             const int  x   = static_cast<int>((gx + 0.43) * on.width() / 100);
@@ -384,15 +393,20 @@ enum class Stage {
 };
 
 struct State {
-    Stage         stage = Stage::startup;
-    int           ticks = 0, maximum_ticks = 4000, frame = 0;
-    std::uint64_t uploads = 0;
-    bool          monitor = false, numeric_progress = false, cancel_sent = false, renderable = true;
-    bool          active    = false;
-    bool          offscreen = false;
-    qint64        last = 0, maximum_gap = 0, cancel_at = 0;
-    qint64        maximum_event_latency = 0;
-    std::size_t   probe_samples         = 0;
+    Stage                                       stage            = Stage::startup;
+    int                                         ticks            = 0;
+    int                                         maximum_ticks    = 4000;
+    int                                         frame            = 0;
+    std::uint64_t                               uploads          = 0;
+    bool                                        monitor          = false;
+    bool                                        numeric_progress = false;
+    bool                                        cancel_sent      = false;
+    bool                                        renderable       = true;
+    bool                                        active           = false;
+    bool                                        offscreen        = false;
+    qint64                                      last = 0, maximum_gap = 0, cancel_at = 0;
+    qint64                                      maximum_event_latency = 0;
+    std::size_t                                 probe_samples         = 0;
     std::atomic<std::uint64_t>                  probe_epoch{0};
     QObject*                                    probe_receiver   = nullptr;
     int                                         probe_event_type = 0;
@@ -403,8 +417,9 @@ struct State {
     minirender::RemeshSettings                       remesh_settings;
     std::shared_ptr<const minirender::SceneSnapshot> snapshot;
     QImage                baseline, after, qem_before, qem_after, remesh_before, remesh_after;
-    std::size_t           original_meshes = 0, original_objects = 0;
-    float                 saved_x = 0;
+    std::size_t           original_meshes  = 0;
+    std::size_t           original_objects = 0;
+    float                 saved_x          = 0;
     std::filesystem::path input_file;
     std::string           original_input;
 };

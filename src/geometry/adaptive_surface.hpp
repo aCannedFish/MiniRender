@@ -1,3 +1,5 @@
+// 自适应细分使用的参考曲面采样与终端过渡。
+
 #pragma once
 
 #include "loop_hierarchy.hpp"

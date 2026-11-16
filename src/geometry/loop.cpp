@@ -1,3 +1,6 @@
+// 均匀 Loop 细分、共享边顶点与面角属性插值。
+// 公开接口与参数约定见 include/minirender/geometry/loop.hpp。
+
 #include "loop_rules.hpp"
 #include <minirender/geometry/loop.hpp>
 #include <minirender/geometry/normals.hpp>

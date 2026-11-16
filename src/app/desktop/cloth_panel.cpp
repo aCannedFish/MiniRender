@@ -1,3 +1,6 @@
+// 布料模拟参数控件、状态刷新与用户操作回调。
+// 本模块接口见 cloth_panel.hpp。
+
 #include "cloth_panel.hpp"
 
 #include <QComboBox>

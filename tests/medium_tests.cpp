@@ -1,3 +1,6 @@
+// 回归测试：HG uses outgoing directions and matches analytic angular moments；HG inverse CDF
+// preserves forward mean under arbitrary frames。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/medium.hpp>
 
@@ -80,7 +83,9 @@ TEST_CASE("HG inverse CDF preserves forward mean under arbitrary frames", "[medi
     constexpr int count = 131072;
     for (const double g : {-.97, -.8, -1e-10, 0.0, 1e-10, .8, .97}) {
         glm::dvec3 sum(0);
-        double     second = 0, length_error = 0, pdf_error = 0;
+        double     second       = 0;
+        double     length_error = 0;
+        double     pdf_error    = 0;
         for (int i = 0; i < count; ++i) {
             const glm::dvec2 u{(i + .5) / count, std::fmod(i * .6180339887498949, 1)};
             const auto       value  = sample_henyey_greenstein(wo, g, u);
@@ -124,7 +129,8 @@ TEST_CASE("RGB free flight preserves mixed distance and escape probability", "[m
     Sampler                 random(719);
     int                     escaped = 0;
     std::array<int, 4>      bins{};
-    glm::dvec3              escape_weight(0), scatter_weight(0);
+    glm::dvec3              escape_weight(0);
+    glm::dvec3              scatter_weight(0);
     double                  largest_weight = 0;
     for (int i = 0; i < count; ++i) {
         const double channel  = random.next_1d();

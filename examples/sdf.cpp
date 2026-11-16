@@ -1,3 +1,5 @@
+// 可运行示例：距离场图元、CSG 组合与变换后的距离求值。
+
 #include <minirender/assets/sdf_io.hpp>
 #include <minirender/render/sdf_render.hpp>
 

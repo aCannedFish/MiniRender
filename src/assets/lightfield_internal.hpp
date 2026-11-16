@@ -1,3 +1,5 @@
+// 光场文件与临时存储之间的内部所有权接口。
+
 #pragma once
 
 #include <minirender/assets/lightfield_io.hpp>

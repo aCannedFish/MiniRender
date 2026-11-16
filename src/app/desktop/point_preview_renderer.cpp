@@ -1,3 +1,6 @@
+// 点云、法线与边界的独立 Vulkan 预览。
+// 本模块接口见 point_preview_renderer.hpp。
+
 #include "point_preview_renderer.hpp"
 #include "gpu_shader.hpp"
 #include "vulkan_viewport.hpp"
