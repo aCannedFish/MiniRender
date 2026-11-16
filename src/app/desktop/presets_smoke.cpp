@@ -1,3 +1,6 @@
+// 隐藏窗口回归：presets 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 presets_smoke.hpp。
+
 #include "presets_smoke.hpp"
 #include "builtin_scenes.hpp"
 #include "offline_panel.hpp"
@@ -30,16 +33,16 @@ void require(bool condition, const char* message) {
 }
 
 struct State {
-    std::size_t preset = 0;
-    int stage = 0;
-    int ticks = 0;
-    QByteArray original;
-    minirender::SceneDocument original_scene;
+    std::size_t                                      preset = 0;
+    int                                              stage  = 0;
+    int                                              ticks  = 0;
+    QByteArray                                       original;
+    minirender::SceneDocument                        original_scene;
     std::shared_ptr<const minirender::SceneSnapshot> snapshot;
 };
 
 const minirender::SceneObject& object(const minirender::SceneDocument& scene,
-                                      const std::string& id) {
+                                      const std::string&               id) {
     const auto found = std::find_if(scene.objects.begin(), scene.objects.end(),
                                     [&](const auto& value) { return value.id == id; });
     require(found != scene.objects.end(), "Preset object is missing");
@@ -66,8 +69,8 @@ void verify_import(const minirender::SceneDocument& actual,
 }
 
 minirender::IntegratorSettings test_integrator(const BuiltinScene& preset) {
-    auto result = preset.integrator;
-    result.maximum_depth = 8;
+    auto result                       = preset.integrator;
+    result.maximum_depth              = 8;
     result.sppm.photons_per_iteration = 2000;
     return result;
 }
@@ -79,7 +82,7 @@ void verify_render(Workbench& window, const QString& directory, const BuiltinSce
     require(panel->session().progress().state == minirender::RenderState::completed,
             "Preset render did not complete");
     const auto integrator = test_integrator(preset);
-    const auto expected = [&] {
+    const auto expected   = [&] {
         if (integrator.kind == minirender::IntegratorKind::path_tracing) {
             return minirender::PathTracer(snapshot, integrator).render({24, 24, 16, 101});
         }
@@ -112,7 +115,7 @@ void verify_render(Workbench& window, const QString& directory, const BuiltinSce
 void start_presets_smoke(Workbench& window, const QString& directory) {
     require(QDir().mkpath(directory), "Cannot create preset test directory");
     const auto state = std::make_shared<State>();
-    auto* timer = new QTimer(&window);
+    auto*      timer = new QTimer(&window);
     timer->setInterval(80);
     QObject::connect(timer, &QTimer::timeout, &window, [state, timer, &window, directory] {
         try {
@@ -126,10 +129,10 @@ void start_presets_smoke(Workbench& window, const QString& directory) {
             if (state->stage == 0) {
                 QFile file(builtin_scene_directory() + "/" + preset.filename);
                 require(file.open(QIODevice::ReadOnly), "Cannot read source preset");
-                state->original = file.readAll();
+                state->original       = file.readAll();
                 state->original_scene = minirender::load_scene(std::filesystem::path(
                     (builtin_scene_directory() + "/" + preset.filename).toStdU16String()));
-                auto* action = window.findChild<QAction*>("builtin_" + preset.id);
+                auto* action          = window.findChild<QAction*>("builtin_" + preset.id);
                 require(action && window.findChild<QToolButton*>("builtin_scenes")->isEnabled(),
                         "Quick import action missing");
                 action->trigger();
@@ -166,8 +169,8 @@ void start_presets_smoke(Workbench& window, const QString& directory) {
                                     return material.kind == minirender::MaterialKind::subsurface;
                                 });
                 const double displacement = subsurface ? .0007 : .07;
-                auto* x = window.findChild<QDoubleSpinBox*>("translation.x");
-                const auto before = x->value();
+                auto*        x            = window.findChild<QDoubleSpinBox*>("translation.x");
+                const auto   before       = x->value();
                 x->setValue(before + displacement);
                 require(x->value() != before, "Imported object cannot be edited");
                 window.findChild<QAction*>("undo")->trigger();
@@ -190,7 +193,7 @@ void start_presets_smoke(Workbench& window, const QString& directory) {
                                      });
                     if (material != state->original_scene.materials.end() &&
                         glm::length(material->emission) > 0) {
-                        emitter_id = source.id;
+                        emitter_id          = source.id;
                         emitter_material_id = source.material_id;
                         break;
                     }
@@ -199,16 +202,16 @@ void start_presets_smoke(Workbench& window, const QString& directory) {
                 if (!emitter_id.empty()) {
                     window.select_object(emitter_id);
                     auto* emission = window.findChild<QDoubleSpinBox*>("emission.x");
-                    new_light = emission->value() + 1;
+                    new_light      = emission->value() + 1;
                     emission->setValue(new_light);
                 } else {
                     require(!window.document().directional_lights.empty(),
                             "Preset lighting fixture has no editable light");
                     auto* intensity = window.findChild<QDoubleSpinBox*>("light_intensity");
-                    new_light = intensity->value() + 1;
+                    new_light       = intensity->value() + 1;
                     intensity->setValue(new_light);
                 }
-                auto* camera_x = window.findChild<QDoubleSpinBox*>("camera_position.x");
+                auto*        camera_x     = window.findChild<QDoubleSpinBox*>("camera_position.x");
                 const double new_camera_x = camera_x->value() + (subsurface ? .0005 : .05);
                 camera_x->setValue(new_camera_x);
                 const auto saved = directory + "/编辑 " + preset.id + ".json";
@@ -222,7 +225,7 @@ void start_presets_smoke(Workbench& window, const QString& directory) {
                                 1e-5,
                         "Preset edits did not survive scene IO");
                 const auto& materials = window.document().materials;
-                const auto edited_material =
+                const auto  edited_material =
                     std::find_if(materials.begin(), materials.end(),
                                  [&](const auto& m) { return m.id == edited_material_id; });
                 require(edited_material != materials.end(), "Imported material is missing");

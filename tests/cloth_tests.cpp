@@ -1,3 +1,6 @@
+// 回归测试：Cloth grid preserves area mass and unique spring connectivity；Cloth spring force has
+// analytic stiffness damping and zero length recovery。
+
 #include "simulation/cloth_collision.hpp"
 #include <minirender/simulation/cloth.hpp>
 
@@ -17,29 +20,32 @@ namespace {
 
 ClothEnvironment vacuum() {
     ClothEnvironment result;
-    result.gravity = glm::dvec3(0);
+    result.gravity     = glm::dvec3(0);
     result.air_density = 0;
     return result;
 }
+
 ClothParameters free_particles() {
     ClothParameters result;
     result.structural_stiffness = 0;
-    result.shear_stiffness = 0;
-    result.bending_stiffness = 0;
-    result.velocity_damping = 0;
+    result.shear_stiffness      = 0;
+    result.bending_stiffness    = 0;
+    result.velocity_damping     = 0;
     result.spring_damping_ratio = 0;
-    result.substeps = 1;
+    result.substeps             = 1;
     return result;
 }
+
 ClothGrid square() {
     ClothGrid result;
     result.columns = 2;
-    result.rows = 2;
-    result.origin = {0, 1, 0};
-    result.span_u = {1, 0, 0};
-    result.span_v = {0, 0, -1};
+    result.rows    = 2;
+    result.origin  = {0, 1, 0};
+    result.span_u  = {1, 0, 0};
+    result.span_v  = {0, 0, -1};
     return result;
 }
+
 void same(const ClothState& a, const ClothState& b) {
     REQUIRE(a.frame == b.frame);
     REQUIRE(a.positions == b.positions);
@@ -48,14 +54,14 @@ void same(const ClothState& a, const ClothState& b) {
 
 // 2×2 网格仅启用剪切弹簧，两个对角线独立；其中一条作无阻尼解析振子。
 ClothSimulation oscillator(std::uint32_t substeps, double damping = 0) {
-    auto parameters = free_particles();
-    parameters.surface_density = 1;
-    parameters.shear_stiffness = 12;
+    auto parameters                 = free_particles();
+    parameters.surface_density      = 1;
+    parameters.shear_stiffness      = 12;
     parameters.spring_damping_ratio = damping;
-    parameters.substeps = substeps;
+    parameters.substeps             = substeps;
     ClothSimulation simulation(square(), parameters, vacuum());
-    auto state = simulation.state();
-    const auto direction = glm::normalize(state.positions[3] - state.positions[0]);
+    auto            state     = simulation.state();
+    const auto      direction = glm::normalize(state.positions[3] - state.positions[0]);
     state.positions[0] -= .05 * direction;
     state.positions[3] += .05 * direction;
     simulation.set_state(std::move(state));
@@ -67,16 +73,16 @@ ClothSimulation oscillator(std::uint32_t substeps, double damping = 0) {
 TEST_CASE("Cloth grid preserves area mass and unique spring connectivity", "[cloth]") {
     ClothGrid grid;
     grid.columns = 5;
-    grid.rows = 4;
-    grid.origin = {2, 3, 4};
-    grid.span_u = {2, 0, 0};
-    grid.span_v = {0, 0, -3};
+    grid.rows    = 4;
+    grid.origin  = {2, 3, 4};
+    grid.span_u  = {2, 0, 0};
+    grid.span_v  = {0, 0, -3};
     ClothSimulation simulation(grid, {}, vacuum());
     REQUIRE(simulation.state().positions.size() == 20);
     REQUIRE(simulation.triangles().size() == 24);
     REQUIRE(std::accumulate(simulation.masses().begin(), simulation.masses().end(), 0.0) ==
             Approx(.9));
-    std::array<std::size_t, 3> counts{};
+    std::array<std::size_t, 3>                        counts{};
     std::set<std::pair<std::uint32_t, std::uint32_t>> edges;
     for (const auto& spring : simulation.springs()) {
         ++counts[std::size_t(spring.kind)];
@@ -111,16 +117,16 @@ TEST_CASE("Cloth spring force has analytic stiffness damping and zero length rec
 
 TEST_CASE("Cloth free fall follows semi implicit Euler and converges with fixed substeps",
           "[cloth]") {
-    auto parameters = free_particles();
-    auto environment = vacuum();
-    environment.gravity = {0, -9.81, 0};
+    auto parameters       = free_particles();
+    auto environment      = vacuum();
+    environment.gravity   = {0, -9.81, 0};
     double previous_error = 1;
     for (const auto substeps : {4U, 8U, 16U}) {
         parameters.substeps = substeps;
         ClothSimulation simulation(square(), parameters, environment);
-        const auto initial = simulation.state();
+        const auto      initial = simulation.state();
         simulation.advance(60);
-        const double h = parameters.frame_seconds / substeps;
+        const double h            = parameters.frame_seconds / substeps;
         const double displacement = -.5 * 9.81 * (1 + h);
         for (std::size_t i = 0; i < initial.positions.size(); ++i) {
             REQUIRE(simulation.state().positions[i].y ==
@@ -137,8 +143,8 @@ TEST_CASE("Cloth free fall follows semi implicit Euler and converges with fixed 
 TEST_CASE("Cloth diagonal oscillator matches closed form and bounds energy", "[cloth]") {
     double previous_error = 1;
     for (const auto substeps : {8U, 16U, 32U}) {
-        auto simulation = oscillator(substeps);
-        const double omega = std::sqrt(24 / simulation.masses()[0]);
+        auto         simulation = oscillator(substeps);
+        const double omega      = std::sqrt(24 / simulation.masses()[0]);
         simulation.advance(30);
         const double extension =
             glm::length(simulation.state().positions[3] - simulation.state().positions[0]) -
@@ -148,7 +154,7 @@ TEST_CASE("Cloth diagonal oscillator matches closed form and bounds energy", "[c
         REQUIRE(error < previous_error * .6);
         previous_error = error;
     }
-    auto simulation = oscillator(8);
+    auto         simulation     = oscillator(8);
     const double initial_energy = simulation.statistics().elastic_energy;
     for (int frame = 0; frame < 180; ++frame) {
         simulation.advance();
@@ -166,16 +172,16 @@ TEST_CASE("Cloth diagonal oscillator matches closed form and bounds energy", "[c
 TEST_CASE("Cloth fixed frames reproduce exact states and preserve anchors", "[cloth]") {
     ClothGrid grid;
     grid.columns = 9;
-    grid.rows = 9;
-    grid.origin = {-1, 2, 0};
-    grid.span_v = {0, -1.4F, 0};
-    grid.pinned = {0, 8};
+    grid.rows    = 9;
+    grid.origin  = {-1, 2, 0};
+    grid.span_v  = {0, -1.4F, 0};
+    grid.pinned  = {0, 8};
     ClothEnvironment environment;
     environment.wind_velocity = {0, 0, 2};
     ClothSimulation batch(grid, {}, environment);
     ClothSimulation individual(grid, {}, environment);
-    const auto initial = batch.state();
-    const auto report = batch.advance(40);
+    const auto      initial = batch.state();
+    const auto      report  = batch.advance(40);
     for (int frame = 0; frame < 40; ++frame) {
         individual.advance();
     }
@@ -197,16 +203,16 @@ TEST_CASE("Cloth fixed frames reproduce exact states and preserve anchors", "[cl
 }
 
 TEST_CASE("Cloth pressure respects area winding and relative wind velocity", "[cloth]") {
-    auto grid = square();
-    grid.span_u = {2, 0, 0};
-    grid.span_v = {0, 0, -2};
-    auto environment = vacuum();
-    environment.air_density = 2;
+    auto grid                    = square();
+    grid.span_u                  = {2, 0, 0};
+    grid.span_v                  = {0, 0, -2};
+    auto environment             = vacuum();
+    environment.air_density      = 2;
     environment.drag_coefficient = 1;
-    environment.wind_velocity = {0, 3, 0};
+    environment.wind_velocity    = {0, 3, 0};
     ClothSimulation simulation(grid, free_particles(), environment);
-    const auto forces = simulation.forces();
-    glm::dvec3 total(0);
+    const auto      forces = simulation.forces();
+    glm::dvec3      total(0);
     for (std::size_t i = 0; i < forces.size(); ++i) {
         REQUIRE(glm::length(forces[i] / simulation.masses()[i] - glm::dvec3(0, 60, 0)) < 1e-12);
         total += forces[i];
@@ -237,16 +243,17 @@ TEST_CASE("Cloth swept plane collision preserves sliding and applies Coulomb fri
           "[cloth][collision]") {
     auto environment = vacuum();
     environment.planes.push_back({{}, {0, 1, 0}, 0});
-    glm::dvec3 position(0, 1, 0), velocity(2, -10, 0);
-    auto contacts = detail::move_cloth_particle(position, velocity, .2, .01, environment, {});
+    glm::dvec3 position(0, 1, 0);
+    glm::dvec3 velocity(2, -10, 0);
+    auto       contacts = detail::move_cloth_particle(position, velocity, .2, .01, environment, {});
     REQUIRE(position.x == Approx(.4));
     REQUIRE(position.y >= .01);
     REQUIRE(velocity == glm::dvec3(2, 0, 0));
     REQUIRE(contacts.count == 1);
     REQUIRE_FALSE(contacts.limited);
     environment.planes[0].friction = .1;
-    position = {0, 1, 0};
-    velocity = {2, -10, 0};
+    position                       = {0, 1, 0};
+    velocity                       = {2, -10, 0};
     detail::move_cloth_particle(position, velocity, .2, .01, environment, {});
     REQUIRE(velocity.x == Approx(1));
     REQUIRE(position.x == Approx(.299));
@@ -257,7 +264,8 @@ TEST_CASE("Cloth swept sphere catches traversals with both endpoints outside",
           "[cloth][collision]") {
     auto environment = vacuum();
     environment.spheres.push_back({{}, .5, 0});
-    glm::dvec3 position(-2, 0, 0), velocity(40, 0, 0);
+    glm::dvec3 position(-2, 0, 0);
+    glm::dvec3 velocity(40, 0, 0);
     const auto contacts = detail::move_cloth_particle(position, velocity, .1, .01, environment, {});
     REQUIRE(contacts.count == 1);
     REQUIRE(position.x <= -.51);
@@ -271,14 +279,14 @@ TEST_CASE("Cloth swept sphere catches traversals with both endpoints outside",
     velocity = {};
     detail::move_cloth_particle(position, velocity, .1, .01, environment, {});
     REQUIRE(position.y >= .51);
-    auto grid = square();
-    grid.origin = {-2, 1, 0};
-    auto parameters = free_particles();
-    parameters.frame_seconds = .1;
-    parameters.thickness = .01;
+    auto grid                     = square();
+    grid.origin                   = {-2, 1, 0};
+    auto parameters               = free_particles();
+    parameters.frame_seconds      = .1;
+    parameters.thickness          = .01;
     environment.spheres[0].center = {0, 1, 0};
     ClothSimulation simulation(grid, parameters, environment);
-    auto state = simulation.state();
+    auto            state = simulation.state();
     std::fill(state.velocities.begin(), state.velocities.end(), glm::dvec3(40, 0, 0));
     simulation.set_state(state);
     simulation.advance();
@@ -289,9 +297,10 @@ TEST_CASE("Cloth swept sphere catches traversals with both endpoints outside",
 
 TEST_CASE("Cloth collision events handle corners and reject failed projection",
           "[cloth][collision]") {
-    auto environment = vacuum();
+    auto environment   = vacuum();
     environment.planes = {{{}, {1, 0, 0}, 0}, {{}, {0, 1, 0}, 0}};
-    glm::dvec3 position(1, 1, 0), velocity(-10, -20, 3);
+    glm::dvec3 position(1, 1, 0);
+    glm::dvec3 velocity(-10, -20, 3);
     const auto contacts = detail::move_cloth_particle(position, velocity, .1, .01, environment, {});
     REQUIRE(contacts.count == 2);
     REQUIRE_FALSE(contacts.limited);
@@ -303,16 +312,16 @@ TEST_CASE("Cloth collision events handle corners and reject failed projection",
     REQUIRE_THROWS_AS(detail::move_cloth_particle(position, velocity, .1, .01, environment, {}),
                       std::runtime_error);
     ClothSimulation simulation(square(), free_particles(), environment);
-    const auto before = simulation.state();
+    const auto      before = simulation.state();
     REQUIRE_THROWS_AS(simulation.advance(), std::runtime_error);
     same(before, simulation.state());
 }
 
 TEST_CASE("Cloth cancellation and callback errors leave the previous state intact", "[cloth]") {
-    auto simulation = ClothSimulation();
-    const auto before = simulation.state();
+    auto               simulation = ClothSimulation();
+    const auto         before     = simulation.state();
     CancellationSource source;
-    std::size_t completed = 0;
+    std::size_t        completed = 0;
     REQUIRE_THROWS_AS(simulation.advance(100, source.token(),
                                          [&](std::size_t value, std::size_t total) {
                                              REQUIRE(total == 6400);
@@ -340,14 +349,14 @@ TEST_CASE("Cloth cancellation and callback errors leave the previous state intac
 }
 
 TEST_CASE("Cloth freeze keeps local details UV topology and immutable geometry", "[cloth]") {
-    auto grid = square();
-    grid.origin = {1e6F, -1e6F, 1e6F};
+    auto grid    = square();
+    grid.origin  = {1e6F, -1e6F, 1e6F};
     grid.columns = 4;
-    grid.rows = 5;
-    grid.span_u = {.01F, 0, 0};
-    grid.span_v = {0, 0, -.02F};
+    grid.rows    = 5;
+    grid.span_u  = {.01F, 0, 0};
+    grid.span_v  = {0, 0, -.02F};
     ClothSimulation simulation(grid, free_particles(), vacuum());
-    const auto frozen = simulation.freeze();
+    const auto      frozen = simulation.freeze();
     frozen.mesh->validate();
     REQUIRE(glm::dvec3(frozen.transform.translation) == grid.origin);
     REQUIRE(frozen.mesh->positions.size() == 20);
@@ -366,9 +375,9 @@ TEST_CASE("Cloth freeze keeps local details UV topology and immutable geometry",
                     Approx(double(corner.position / grid.columns) / (grid.rows - 1)));
         }
     }
-    const auto positions = frozen.mesh->positions;
-    auto environment = vacuum();
-    environment.gravity.y = -1;
+    const auto positions   = frozen.mesh->positions;
+    auto       environment = vacuum();
+    environment.gravity.y  = -1;
     simulation.set_environment(environment);
     simulation.advance();
     REQUIRE(frozen.mesh->positions == positions);
@@ -379,12 +388,12 @@ TEST_CASE("Cloth freeze resolves cancelling crease normals and rejects degenerat
           "[cloth]") {
     ClothGrid grid;
     grid.columns = 3;
-    grid.rows = 3;
-    grid.origin = {};
-    grid.span_u = {2, 0, 0};
-    grid.span_v = {0, 0, -2};
+    grid.rows    = 3;
+    grid.origin  = {};
+    grid.span_u  = {2, 0, 0};
+    grid.span_v  = {0, 0, -2};
     ClothSimulation simulation(grid, free_particles(), vacuum());
-    auto state = simulation.state();
+    auto            state = simulation.state();
     for (std::size_t i = 6; i < 9; ++i) {
         state.positions[i] = state.positions[i - 6];
     }
@@ -403,25 +412,25 @@ TEST_CASE("Cloth freeze resolves cancelling crease normals and rejects degenerat
 
 TEST_CASE("Cloth validation rejects unstable steps invalid data and obstructed anchors",
           "[cloth]") {
-    auto grid = square();
+    auto grid   = square();
     grid.pinned = {0, 0};
     REQUIRE_THROWS_AS(ClothSimulation(grid), std::invalid_argument);
-    grid = square();
+    grid        = square();
     grid.span_v = grid.span_u;
     REQUIRE_THROWS_AS(ClothSimulation(grid), std::invalid_argument);
-    auto parameters = ClothParameters();
+    auto parameters     = ClothParameters();
     parameters.substeps = 1;
     REQUIRE_THROWS_AS(ClothSimulation({}, parameters), std::invalid_argument);
     parameters.surface_density = -1;
     REQUIRE_THROWS_AS(ClothSimulation({}, parameters), std::invalid_argument);
-    grid = square();
-    grid.pinned = {0};
-    auto simulation = ClothSimulation(grid, {}, vacuum());
-    const auto before = simulation.state();
-    auto state = before;
+    grid                  = square();
+    grid.pinned           = {0};
+    auto       simulation = ClothSimulation(grid, {}, vacuum());
+    const auto before     = simulation.state();
+    auto       state      = before;
     state.positions[0].x += .1;
     REQUIRE_THROWS_AS(simulation.set_state(state), std::invalid_argument);
-    state = before;
+    state                 = before;
     state.velocities[1].z = std::numeric_limits<double>::infinity();
     REQUIRE_THROWS_AS(simulation.set_state(state), std::invalid_argument);
     same(before, simulation.state());
@@ -443,7 +452,7 @@ TEST_CASE("Cloth drapes over a sphere while staying outside collision solids",
     environment.planes.push_back({});
     environment.spheres.push_back({});
     ClothSimulation simulation({}, {}, environment);
-    const auto report = simulation.advance(90);
+    const auto      report = simulation.advance(90);
     REQUIRE(report.contacts > 100);
     REQUIRE(report.contact_limits == 0);
     const auto& state = simulation.state();

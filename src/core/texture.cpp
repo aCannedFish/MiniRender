@@ -1,3 +1,6 @@
+// 线性 RGB mip 生成、Repeat 寻址及最近邻、双线性、三线性过滤。
+// 公开接口与参数约定见 include/minirender/core/texture.hpp。
+
 #include <minirender/core/texture.hpp>
 
 #include <algorithm>
@@ -25,12 +28,12 @@ Image downsample(const Image& source, const CancellationToken& cancellation) {
     for (std::size_t y = 0; y < target.height(); ++y) {
         cancellation.check();
         for (std::size_t x = 0; x < target.width(); ++x) {
-            const double left = double(x) * double(source.width()) / double(target.width());
-            const double right = double(x + 1) * double(source.width()) / double(target.width());
-            const double top = double(y) * double(source.height()) / double(target.height());
+            const double left   = double(x) * double(source.width()) / double(target.width());
+            const double right  = double(x + 1) * double(source.width()) / double(target.width());
+            const double top    = double(y) * double(source.height()) / double(target.height());
             const double bottom = double(y + 1) * double(source.height()) / double(target.height());
-            glm::dvec3 sum(0);
-            double weight_sum = 0;
+            glm::dvec3   sum(0);
+            double       weight_sum = 0;
             for (std::size_t sy = static_cast<std::size_t>(top);
                  sy < static_cast<std::size_t>(std::ceil(bottom)); ++sy) {
                 for (std::size_t sx = static_cast<std::size_t>(left);
@@ -74,20 +77,21 @@ Texture::Texture(Image image, CancellationToken cancellation) {
 const Image& Texture::level(std::size_t index) const {
     return levels_.at(index);
 }
+
 std::size_t Texture::level_count() const noexcept {
     return levels_.size();
 }
 
 glm::vec3 Texture::bilinear(glm::vec2 uv, std::size_t level_index) const {
-    const auto& image = levels_.at(level_index);
-    const auto coordinate = image_uv(uv);
-    const float x = coordinate.x * static_cast<float>(image.width()) - 0.5F;
-    const float y = coordinate.y * static_cast<float>(image.height()) - 0.5F;
-    const int ix = static_cast<int>(std::floor(x));
-    const int iy = static_cast<int>(std::floor(y));
-    const float tx = x - std::floor(x);
-    const float ty = y - std::floor(y);
-    const auto texel = [&](int px, int py) {
+    const auto& image      = levels_.at(level_index);
+    const auto  coordinate = image_uv(uv);
+    const float x          = coordinate.x * static_cast<float>(image.width()) - 0.5F;
+    const float y          = coordinate.y * static_cast<float>(image.height()) - 0.5F;
+    const int   ix         = static_cast<int>(std::floor(x));
+    const int   iy         = static_cast<int>(std::floor(y));
+    const float tx         = x - std::floor(x);
+    const float ty         = y - std::floor(y);
+    const auto  texel      = [&](int px, int py) {
         return image.at(static_cast<std::size_t>(wrap(px, static_cast<int>(image.width()))),
                         static_cast<std::size_t>(wrap(py, static_cast<int>(image.height()))));
     };
@@ -100,9 +104,9 @@ glm::vec3 Texture::sample(glm::vec2 uv, float lod, TextureFilter filter) const {
         throw std::invalid_argument("Texture LOD must be finite");
     }
     if (filter == TextureFilter::nearest) {
-        const auto coordinate = image_uv(uv);
-        const auto& image = levels_.front();
-        const int x =
+        const auto  coordinate = image_uv(uv);
+        const auto& image      = levels_.front();
+        const int   x =
             static_cast<int>(std::floor(coordinate.x * static_cast<float>(image.width())));
         const int y =
             static_cast<int>(std::floor(coordinate.y * static_cast<float>(image.height())));
@@ -116,8 +120,8 @@ glm::vec3 Texture::sample(glm::vec2 uv, float lod, TextureFilter filter) const {
         throw std::invalid_argument("Unknown texture filter");
     }
     const float clamped = std::clamp(lod, 0.0F, static_cast<float>(levels_.size() - 1));
-    const auto lower = static_cast<std::size_t>(std::floor(clamped));
-    const auto upper = std::min(lower + 1, levels_.size() - 1);
+    const auto  lower   = static_cast<std::size_t>(std::floor(clamped));
+    const auto  upper   = std::min(lower + 1, levels_.size() - 1);
     return glm::mix(bilinear(uv, lower), bilinear(uv, upper), clamped - static_cast<float>(lower));
 }
 
@@ -132,6 +136,7 @@ std::string texture_filter_name(TextureFilter filter) {
     }
     throw std::invalid_argument("Unknown texture filter");
 }
+
 TextureFilter parse_texture_filter(const std::string& name) {
     if (name == "nearest") {
         return TextureFilter::nearest;

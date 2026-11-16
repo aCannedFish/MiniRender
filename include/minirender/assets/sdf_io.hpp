@@ -1,3 +1,5 @@
+// 距离场 JSON 文档读写与格式校验。
+
 #pragma once
 
 #include <minirender/geometry/sdf.hpp>

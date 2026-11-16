@@ -1,3 +1,6 @@
+// 隐藏窗口回归：scene 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 scene_smoke.hpp。
+
 #include "scene_smoke.hpp"
 #include "ibl_controller.hpp"
 #include "workbench.hpp"
@@ -36,7 +39,7 @@ int changed_pixels(const QImage& a, const QImage& b) {
     int changed = 0;
     for (int y = 0; y < a.height(); ++y) {
         for (int x = 0; x < a.width(); ++x) {
-            const auto first = a.pixelColor(x, y);
+            const auto first  = a.pixelColor(x, y);
             const auto second = b.pixelColor(x, y);
             changed += std::abs(first.red() - second.red()) +
                            std::abs(first.green() - second.green()) +
@@ -55,18 +58,18 @@ void verify_second_light_shadows(Workbench& window, const QImage& on, const QIma
         return;
     }
     const auto& camera = window.viewport()->camera();
-    const auto matrix =
+    const auto  matrix =
         camera.projection_matrix(static_cast<float>(on.width()) / static_cast<float>(on.height())) *
         camera.view_matrix();
-    const auto to_light = -glm::normalize(scene.directional_lights[1].direction);
-    int blocked = 0;
-    int blocked_matches = 0;
-    int lit = 0;
-    int lit_matches = 0;
+    const auto to_light        = -glm::normalize(scene.directional_lights[1].direction);
+    int        blocked         = 0;
+    int        blocked_matches = 0;
+    int        lit             = 0;
+    int        lit_matches     = 0;
     for (int iz = -25; iz <= 25; ++iz) {
         for (int ix = -25; ix <= 25; ++ix) {
             const glm::vec3 point{static_cast<float>(ix) * 0.1F, 0, static_cast<float>(iz) * 0.1F};
-            const auto clip = matrix * glm::vec4(point, 1);
+            const auto      clip = matrix * glm::vec4(point, 1);
             if (clip.w <= 0) {
                 continue;
             }
@@ -86,7 +89,7 @@ void verify_second_light_shadows(Workbench& window, const QImage& on, const QIma
                     .has_value();
             };
             const bool expected = occluded(glm::vec3(0));
-            bool stable = true;
+            bool       stable   = true;
             for (auto offset : {glm::vec3(0.03F, 0, 0), glm::vec3(-0.03F, 0, 0),
                                 glm::vec3(0, 0, 0.03F), glm::vec3(0, 0, -0.03F)}) {
                 stable = stable && occluded(offset) == expected;
@@ -94,8 +97,8 @@ void verify_second_light_shadows(Workbench& window, const QImage& on, const QIma
             if (!stable) {
                 continue;
             }
-            const int x = static_cast<int>(uv.x * static_cast<float>(on.width()));
-            const int y = static_cast<int>(uv.y * static_cast<float>(on.height()));
+            const int  x = static_cast<int>(uv.x * static_cast<float>(on.width()));
+            const int  y = static_cast<int>(uv.y * static_cast<float>(on.height()));
             const auto a = on.pixelColor(x, y);
             const auto b = off.pixelColor(x, y);
             const bool darker =
@@ -118,17 +121,17 @@ void verify_second_light_shadows(Workbench& window, const QImage& on, const QIma
 
 // 将可见地面点投影到像素，直接核对法线编码或相机空间线性深度的显示值。
 void verify_surface_view(Workbench& window, const QImage& image, bool normal_view) {
-    const auto& scene = *window.viewport()->scene();
-    const auto& camera = window.viewport()->camera();
-    const float aspect = static_cast<float>(image.width()) / static_cast<float>(image.height());
-    const auto view = camera.view_matrix();
-    const auto projection = camera.projection_matrix(aspect) * view;
-    int checked = 0;
-    int matched = 0;
+    const auto& scene      = *window.viewport()->scene();
+    const auto& camera     = window.viewport()->camera();
+    const float aspect     = static_cast<float>(image.width()) / static_cast<float>(image.height());
+    const auto  view       = camera.view_matrix();
+    const auto  projection = camera.projection_matrix(aspect) * view;
+    int         checked    = 0;
+    int         matched    = 0;
     for (int z = -5; z <= 5; ++z) {
         for (int x = -5; x <= 5; ++x) {
             const glm::vec3 point{static_cast<float>(x) * 0.5F, 0, static_cast<float>(z) * 0.5F};
-            const auto clip = projection * glm::vec4(point, 1);
+            const auto      clip = projection * glm::vec4(point, 1);
             if (clip.w <= 0) {
                 continue;
             }
@@ -142,7 +145,7 @@ void verify_surface_view(Workbench& window, const QImage& image, bool normal_vie
             const auto actual =
                 image.pixelColor(static_cast<int>(uv.x * static_cast<float>(image.width())),
                                  static_cast<int>(uv.y * static_cast<float>(image.height())));
-            const float depth = -(view * glm::vec4(point, 1)).z;
+            const float     depth = -(view * glm::vec4(point, 1)).z;
             const glm::vec3 expected =
                 normal_view ? glm::vec3(0.5F, 1.0F, 0.5F) : glm::vec3(1.0F / (1.0F + depth));
             bool equal = true;
@@ -152,7 +155,7 @@ void verify_surface_view(Workbench& window, const QImage& image, bool normal_vie
                 const int channel = component == 0
                                         ? actual.red()
                                         : (component == 1 ? actual.green() : actual.blue());
-                equal = equal && std::abs(value - channel) <= 2;
+                equal             = equal && std::abs(value - channel) <= 2;
             }
             ++checked;
             matched += equal;
@@ -165,19 +168,19 @@ void verify_surface_view(Workbench& window, const QImage& image, bool normal_vie
 }
 
 struct SmokeState {
-    int stage = 0;
-    int ticks = 0;
-    float original_x = 0;
-    float camera_distance = 0;
-    QImage baseline;
-    QImage edited;
-    QImage shadowed;
-    QImage unfiltered;
+    int                              stage           = 0;
+    int                              ticks           = 0;
+    float                            original_x      = 0;
+    float                            camera_distance = 0;
+    QImage                           baseline;
+    QImage                           edited;
+    QImage                           shadowed;
+    QImage                           unfiltered;
     std::optional<minirender::Image> linear;
-    QPoint hdr_sample;
-    QSize before_resize;
-    int before_resize_generation = 0;
-    minirender::Camera before_navigation;
+    QPoint                           hdr_sample;
+    QSize                            before_resize;
+    int                              before_resize_generation = 0;
+    minirender::Camera               before_navigation;
 };
 
 } // namespace
@@ -185,7 +188,7 @@ struct SmokeState {
 void start_scene_smoke(Workbench& window, const QString& directory) {
     require(QDir().mkpath(directory), "Cannot create scene smoke output");
     const auto state = std::make_shared<SmokeState>();
-    auto* timer = new QTimer(&window);
+    auto*      timer = new QTimer(&window);
     timer->setInterval(150);
     QObject::connect(timer, &QTimer::timeout, &window, [state, timer, &window, directory] {
         try {
@@ -217,8 +220,8 @@ void start_scene_smoke(Workbench& window, const QString& directory) {
                 break;
             case 1: {
                 state->baseline = capture("baseline");
-                int blue = 0;
-                int gold = 0;
+                int blue        = 0;
+                int gold        = 0;
                 for (int y = 0; y < state->baseline.height(); ++y) {
                     for (int x = 0; x < state->baseline.width(); ++x) {
                         const auto color = state->baseline.pixelColor(x, y);
@@ -230,7 +233,7 @@ void start_scene_smoke(Workbench& window, const QString& directory) {
                 }
                 qInfo() << "Scene pixels: blue" << blue << "gold" << gold;
                 require(blue > 100 && gold > 100, "Expected scene material colors are missing");
-                auto* x = window.findChild<QDoubleSpinBox*>("translation.x");
+                auto* x           = window.findChild<QDoubleSpinBox*>("translation.x");
                 state->original_x = static_cast<float>(x->value());
                 x->setValue(state->original_x - 0.7);
                 QMetaObject::invokeMethod(x, "editingFinished", Qt::DirectConnection);
@@ -268,8 +271,8 @@ void start_scene_smoke(Workbench& window, const QString& directory) {
                 state->camera_distance =
                     glm::length(viewport->camera().position - viewport->camera().target);
                 const QPointF center(viewport->width() * 0.5, viewport->height() * 0.5);
-                QWheelEvent event(center, center, {}, {0, 120}, Qt::NoButton, Qt::NoModifier,
-                                  Qt::NoScrollPhase, false);
+                QWheelEvent   event(center, center, {}, {0, 120}, Qt::NoButton, Qt::NoModifier,
+                                    Qt::NoScrollPhase, false);
                 QCoreApplication::sendEvent(viewport, &event);
                 require(glm::length(viewport->camera().position - viewport->camera().target) <
                             state->camera_distance,
@@ -287,7 +290,7 @@ void start_scene_smoke(Workbench& window, const QString& directory) {
                 window.findChild<QAction*>("delete")->trigger();
                 require(window.document().objects.size() == count, "Delete action failed");
                 const auto position = viewport->camera().position;
-                QKeyEvent key(QEvent::KeyPress, Qt::Key_W, Qt::NoModifier);
+                QKeyEvent  key(QEvent::KeyPress, Qt::Key_W, Qt::NoModifier);
                 QCoreApplication::sendEvent(viewport, &key);
                 require(glm::length(position - viewport->camera().position) > 0.01F,
                         "Free camera key movement failed");
@@ -322,7 +325,7 @@ void start_scene_smoke(Workbench& window, const QString& directory) {
             }
             case 10: {
                 capture("final");
-                auto scene = window.document();
+                auto scene        = window.document();
                 scene.environment = glm::vec3(0);
                 for (auto& light : scene.directional_lights) {
                     light.intensity = 0;
@@ -340,10 +343,10 @@ void start_scene_smoke(Workbench& window, const QString& directory) {
                 break;
             }
             case 11: {
-                state->linear = viewport->grab_hdr();
-                const auto& linear = *state->linear;
-                bool found = false;
-                const auto expected = glm::vec3(8.0F, 2.0F, 0.5F);
+                state->linear        = viewport->grab_hdr();
+                const auto& linear   = *state->linear;
+                bool        found    = false;
+                const auto  expected = glm::vec3(8.0F, 2.0F, 0.5F);
                 for (std::size_t y = 13; y + 13 < linear.height() && !found; ++y) {
                     for (std::size_t x = 13; x + 13 < linear.width() && !found; ++x) {
                         bool interior = glm::length(linear.at(x, y) - expected) < 1e-4F;
@@ -358,7 +361,7 @@ void start_scene_smoke(Workbench& window, const QString& directory) {
                         }
                         if (interior) {
                             state->hdr_sample = QPoint(static_cast<int>(x), static_cast<int>(y));
-                            found = true;
+                            found             = true;
                         }
                     }
                 }
@@ -367,12 +370,12 @@ void start_scene_smoke(Workbench& window, const QString& directory) {
                     std::filesystem::path((directory + "/radiance.exr").toStdU16String());
                 linear.write_exr(path);
                 const auto decoded = minirender::Image::read_exr(path);
-                const auto sample = state->hdr_sample;
-                const auto x = static_cast<std::size_t>(sample.x());
-                const auto y = static_cast<std::size_t>(sample.y());
+                const auto sample  = state->hdr_sample;
+                const auto x       = static_cast<std::size_t>(sample.x());
+                const auto y       = static_cast<std::size_t>(sample.y());
                 require(decoded.at(x, y) == linear.at(x, y),
                         "EXR output did not preserve float radiance");
-                state->unfiltered = capture("hdr-tonemapped");
+                state->unfiltered    = capture("hdr-tonemapped");
                 const auto displayed = state->unfiltered.pixelColor(sample);
                 for (int component = 0; component < 3; ++component) {
                     const int expected_byte = minirender::encode_unorm8(minirender::linear_to_srgb(
@@ -387,8 +390,8 @@ void start_scene_smoke(Workbench& window, const QString& directory) {
                 break;
             }
             case 12: {
-                const auto linear = viewport->grab_hdr();
-                float max_difference = 0;
+                const auto linear         = viewport->grab_hdr();
+                float      max_difference = 0;
                 for (std::size_t y = 0; y < linear.height(); ++y) {
                     for (std::size_t x = 0; x < linear.width(); ++x) {
                         max_difference = std::max(
@@ -408,11 +411,11 @@ void start_scene_smoke(Workbench& window, const QString& directory) {
                 break;
             }
             case 13: {
-                const auto filtered = capture("fxaa-on");
-                const int difference = changed_pixels(state->unfiltered, filtered);
+                const auto filtered   = capture("fxaa-on");
+                const int  difference = changed_pixels(state->unfiltered, filtered);
                 require(difference > 50, "FXAA did not modify high-contrast edges");
                 const auto before = state->unfiltered.pixelColor(state->hdr_sample);
-                const auto after = filtered.pixelColor(state->hdr_sample);
+                const auto after  = filtered.pixelColor(state->hdr_sample);
                 require(std::abs(before.red() - after.red()) +
                                 std::abs(before.green() - after.green()) +
                                 std::abs(before.blue() - after.blue()) <=
@@ -426,7 +429,7 @@ void start_scene_smoke(Workbench& window, const QString& directory) {
                 const auto depth = capture("depth");
                 require(changed_pixels(state->unfiltered, depth) > 1000, "Depth view is missing");
                 verify_surface_view(window, depth, false);
-                state->before_resize = viewport->swapChainImageSize();
+                state->before_resize            = viewport->swapChainImageSize();
                 state->before_resize_generation = viewport->resource_generations();
                 window.resize(window.width() - 80, window.height() - 60);
                 break;

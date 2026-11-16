@@ -1,3 +1,5 @@
+// 均匀半无限介质的 dipole 扩散模型及径向分布。
+
 #pragma once
 
 #include <minirender/scene/subsurface.hpp>
@@ -22,12 +24,18 @@ class DipoleProfile final {
 
   private:
     struct Channel {
-        double albedo, real_depth, virtual_depth, extinction;
+        double albedo;
+        double real_depth;
+        double virtual_depth;
+        double extinction;
     };
+
     double integral(const Channel& channel, double radius) const;
-    Channel channels_[3];
+    Channel    channels_[3];
     glm::dvec3 reflectance_;
-    double ior_, external_transmission_, internal_reflectance_;
+    double     ior_;
+    double     external_transmission_;
+    double     internal_reflectance_;
 };
 
 } // namespace minirender

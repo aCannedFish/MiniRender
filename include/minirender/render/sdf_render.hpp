@@ -1,3 +1,5 @@
+// CPU 距离场步进、表面着色与诊断图生成。
+
 #pragma once
 
 #include <minirender/core/image.hpp>
@@ -10,18 +12,18 @@ namespace minirender {
 enum class SdfView { surface, normals, depth, steps };
 
 struct SdfRenderOptions {
-    std::size_t width = 128;
-    std::size_t height = 128;
-    SdfView view = SdfView::surface;
-    bool shadows = true;
+    std::size_t width   = 128;
+    std::size_t height  = 128;
+    SdfView     view    = SdfView::surface;
+    bool        shadows = true;
 };
 
 // 图像使用线性 RGB。统计分别记录主射线命中、步数耗尽和未定义梯度。
 struct SdfRenderResult {
-    Image image;
-    std::size_t hits = 0;
-    std::size_t limited = 0;
-    std::size_t steps = 0;
+    Image       image;
+    std::size_t hits             = 0;
+    std::size_t limited          = 0;
+    std::size_t steps            = 0;
     std::size_t normal_fallbacks = 0;
 };
 

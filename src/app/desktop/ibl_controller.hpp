@@ -1,3 +1,5 @@
+// 环境预处理任务的异步执行、取消与结果缓存。
+
 #pragma once
 
 #include "vulkan_viewport.hpp"
@@ -6,14 +8,15 @@
 #include <mutex>
 
 enum class IblTaskState { idle, preparing, ready, cancelling, cancelled, failed };
+
 struct IblTaskStatus {
-    IblTaskState state = IblTaskState::idle;
+    IblTaskState            state = IblTaskState::idle;
     minirender::IblProgress progress{minirender::IblStage::source};
-    QString error;
-    std::uint64_t jobs_started = 0;
-    std::uint64_t environment_started = 0;
-    std::uint64_t cache_hits = 0;
-    bool waiting_for_previous = false;
+    QString                 error;
+    std::uint64_t           jobs_started         = 0;
+    std::uint64_t           environment_started  = 0;
+    std::uint64_t           cache_hits           = 0;
+    bool                    waiting_for_previous = false;
 };
 
 // GUI 线程拥有任务生命周期与小型 LRU；worker 只访问固定输入和自己的进度对象。
@@ -28,36 +31,41 @@ class IblController final : public QObject {
 
   private:
     struct Progress {
-        std::mutex mutex;
+        std::mutex              mutex;
         minirender::IblProgress value{minirender::IblStage::source};
     };
+
     struct Result {
-        std::shared_ptr<const minirender::Texture> source;
+        std::shared_ptr<const minirender::Texture>        source;
         std::shared_ptr<const minirender::IblEnvironment> maps;
-        std::shared_ptr<const minirender::Image> lut;
-        QString error;
-        bool cancelled = false;
+        std::shared_ptr<const minirender::Image>          lut;
+        QString                                           error;
+        bool                                              cancelled = false;
     };
+
     struct CacheEntry {
-        std::weak_ptr<const minirender::Texture> source;
+        std::weak_ptr<const minirender::Texture>          source;
         std::shared_ptr<const minirender::IblEnvironment> maps;
-        std::uint64_t used;
+        std::uint64_t                                     used;
     };
+
     void poll();
     void launch();
     void cache(const Result& result);
     std::shared_ptr<const minirender::IblEnvironment>
     cached(const std::shared_ptr<const minirender::Texture>& source);
-    VulkanViewport& viewport_;
-    std::shared_ptr<const minirender::Texture> source_;
+    VulkanViewport&                                   viewport_;
+    std::shared_ptr<const minirender::Texture>        source_;
     std::shared_ptr<const minirender::IblEnvironment> maps_;
-    std::shared_ptr<const minirender::Image> lut_;
-    std::shared_ptr<Progress> progress_;
-    QFutureWatcher<Result>* watcher_ = nullptr;
-    minirender::CancellationSource cancellation_;
-    std::vector<CacheEntry> cache_;
-    std::uint64_t generation_ = 0, clock_ = 0;
-    std::uint64_t active_generation_ = 0;
-    IblTaskStatus status_;
-    bool initialized_ = false, cancelled_ = false;
+    std::shared_ptr<const minirender::Image>          lut_;
+    std::shared_ptr<Progress>                         progress_;
+    QFutureWatcher<Result>*                           watcher_ = nullptr;
+    minirender::CancellationSource                    cancellation_;
+    std::vector<CacheEntry>                           cache_;
+    std::uint64_t                                     generation_        = 0;
+    std::uint64_t                                     clock_             = 0;
+    std::uint64_t                                     active_generation_ = 0;
+    IblTaskStatus                                     status_;
+    bool                                              initialized_ = false;
+    bool                                              cancelled_   = false;
 };

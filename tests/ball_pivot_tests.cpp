@@ -1,3 +1,6 @@
+// 回归测试：Contact balls and pivot angles match analytic geometry；Ball pivoting joins cocircular
+// grid faces into one manifold patch。
+
 #include "geometry/ball_geometry.hpp"
 #include <minirender/geometry/ball_pivot.hpp>
 #include <minirender/geometry/loop.hpp>
@@ -19,9 +22,9 @@ namespace {
 std::shared_ptr<PointCloud> sphere(std::size_t count, glm::vec3 translation = {}) {
     auto cloud = std::make_shared<PointCloud>();
     for (std::size_t i = 0; i < count; ++i) {
-        const double z = 1 - 2 * (static_cast<double>(i) + .5) / static_cast<double>(count);
-        const double angle = static_cast<double>(i) * std::numbers::pi * (3 - std::sqrt(5.0));
-        const double radius = std::sqrt(1 - z * z);
+        const double    z      = 1 - 2 * (static_cast<double>(i) + .5) / static_cast<double>(count);
+        const double    angle  = static_cast<double>(i) * std::numbers::pi * (3 - std::sqrt(5.0));
+        const double    radius = std::sqrt(1 - z * z);
         const glm::vec3 p{radius * std::cos(angle), radius * std::sin(angle), z};
         cloud->positions.push_back(p + translation);
         cloud->normals.push_back(p);
@@ -43,6 +46,7 @@ std::shared_ptr<PointCloud> plane_grid(int side, bool hole = false) {
     }
     return result;
 }
+
 void verify_reconstruction(const PointCloud& input, const BallPivotResult& result) {
     REQUIRE(result.mesh);
     REQUIRE(result.source_indices.size() == result.mesh->positions.size());
@@ -62,7 +66,7 @@ TEST_CASE("Contact balls and pivot angles match analytic geometry", "[points][bp
     const glm::dvec3 a{0, 0, 0};
     const glm::dvec3 b{1, 0, 0};
     const glm::dvec3 c{0, 1, 0};
-    const auto balls = detail::contact_balls(a, b, c, 1);
+    const auto       balls = detail::contact_balls(a, b, c, 1);
     REQUIRE(balls);
     REQUIRE(glm::length(balls->circumcenter - glm::dvec3(.5, .5, 0)) < 1e-14);
     REQUIRE(glm::length(balls->outward - glm::dvec3(.5, .5, std::sqrt(.5))) < 1e-14);
@@ -82,7 +86,7 @@ TEST_CASE("Contact balls and pivot angles match analytic geometry", "[points][bp
 }
 
 TEST_CASE("Ball pivoting joins cocircular grid faces into one manifold patch", "[points][bpa]") {
-    const auto cloud = plane_grid(8);
+    const auto cloud  = plane_grid(8);
     const auto result = reconstruct_ball_pivot(cloud, {.radii = {.08}});
     verify_reconstruction(*cloud, result);
     REQUIRE(result.mesh->triangles.size() == 128);
@@ -100,7 +104,7 @@ TEST_CASE("Ball pivoting joins cocircular grid faces into one manifold patch", "
 }
 
 TEST_CASE("Ball pivoting reconstructs closed spheres with outward normals", "[points][bpa]") {
-    const auto cloud = sphere(700);
+    const auto cloud  = sphere(700);
     const auto result = reconstruct_ball_pivot(cloud, {.radii = {.16}});
     verify_reconstruction(*cloud, result);
     INFO("faces=" << result.topology.faces << " boundaries=" << result.topology.boundary_edges
@@ -142,7 +146,7 @@ TEST_CASE("Ball pivoting reconstructs closed spheres with outward normals", "[po
 }
 
 TEST_CASE("Ball pivoting retains unsupported holes instead of bridging them", "[points][bpa]") {
-    const auto cloud = plane_grid(20, true);
+    const auto cloud  = plane_grid(20, true);
     const auto result = reconstruct_ball_pivot(cloud, {.radii = {.08}});
     verify_reconstruction(*cloud, result);
     REQUIRE(result.topology.boundary_loops == 2);
@@ -162,8 +166,8 @@ TEST_CASE("Ball pivoting closes a torus through front joins", "[points][bpa]") {
     auto cloud = std::make_shared<PointCloud>();
     for (int u = 0; u < 40; ++u) {
         for (int v = 0; v < 20; ++v) {
-            const double theta = 2 * std::numbers::pi * u / 40;
-            const double phi = 2 * std::numbers::pi * v / 20;
+            const double theta  = 2 * std::numbers::pi * u / 40;
+            const double phi    = 2 * std::numbers::pi * v / 20;
             const double radius = 1 + .35 * std::cos(phi);
             cloud->positions.emplace_back(radius * std::cos(theta), radius * std::sin(theta),
                                           .35 * std::sin(phi));
@@ -231,7 +235,7 @@ TEST_CASE("Multiple ball radii reactivate the front across uneven sample density
 }
 
 TEST_CASE("Ball pivoting reports unused duplicates and disconnected components", "[points][bpa]") {
-    auto cloud = sphere(150);
+    auto       cloud = sphere(150);
     const auto other = sphere(150, {5, 0, 0});
     cloud->positions.insert(cloud->positions.end(), other->positions.begin(),
                             other->positions.end());
@@ -253,7 +257,7 @@ TEST_CASE("Ball pivoting reports unused duplicates and disconnected components",
 
 TEST_CASE("Ball pivot budgets and each-stage cancellation preserve the point input",
           "[points][bpa]") {
-    const auto cloud = plane_grid(8);
+    const auto cloud    = plane_grid(8);
     const auto original = *cloud;
     REQUIRE_THROWS_AS(reconstruct_ball_pivot(cloud, {.radii = {.1, .05}}), std::invalid_argument);
     REQUIRE_THROWS_AS(reconstruct_ball_pivot(cloud, {.radii = {}}), std::invalid_argument);
@@ -271,7 +275,7 @@ TEST_CASE("Ball pivot budgets and each-stage cancellation preserve the point inp
           BallPivotStage::reactivation, BallPivotStage::seeds, BallPivotStage::pivoting,
           BallPivotStage::output, BallPivotStage::complete}) {
         CancellationSource cancellation;
-        bool reached = false;
+        bool               reached = false;
         REQUIRE_THROWS_AS(reconstruct_ball_pivot(cloud, {.radii = {.08, .16}}, cancellation.token(),
                                                  [&](auto p) {
                                                      REQUIRE(p.completed <= p.total);
@@ -291,7 +295,7 @@ TEST_CASE("Estimated point normals reconstruct assets accepted by the geometry p
           "[points][bpa]") {
     auto cloud = sphere(160);
     cloud->normals.clear();
-    const auto prepared = prepare_point_normals(cloud, {.neighbors = 12});
+    const auto prepared       = prepare_point_normals(cloud, {.neighbors = 12});
     const auto reconstruction = reconstruct_ball_pivot(prepared.cloud, {.radii = {.35}});
     REQUIRE(reconstruction.mesh);
     REQUIRE(reconstruction.topology.boundary_edges == 0);

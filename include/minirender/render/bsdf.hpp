@@ -1,3 +1,5 @@
+// 基础表面材质的求值、方向采样与概率密度计算。
+
 #pragma once
 
 #include <minirender/core/sampling.hpp>
@@ -33,12 +35,12 @@ enum class TransportMode { radiance, importance };
 // 连续事件的 probability 是 sr^-1，离散事件是无量纲概率质量。
 // weight 是已经除以采样概率的吞吐乘子。eta 为 eta_t/eta_i，反射时为 1。
 struct BsdfSample {
-    glm::dvec3 direction{0};
-    glm::dvec3 weight{0};
-    double probability = 0;
-    SampleMeasure measure = SampleMeasure::solid_angle;
-    ScatteringEvent event = ScatteringEvent::diffuse_reflection;
-    double eta = 1;
+    glm::dvec3      direction{0};
+    glm::dvec3      weight{0};
+    double          probability = 0;
+    SampleMeasure   measure     = SampleMeasure::solid_angle;
+    ScatteringEvent event       = ScatteringEvent::diffuse_reflection;
+    double          eta         = 1;
 };
 
 // 非吸收介质的精确 Fresnel。cosine 为入射侧与法线的非负夹角余弦。
@@ -63,11 +65,11 @@ class Bsdf {
   private:
     glm::dvec3 evaluate_normalized(glm::dvec3 wo, glm::dvec3 wi) const;
     double pdf_normalized(glm::dvec3 wo, glm::dvec3 wi) const;
-    MaterialKind kind_;
-    glm::dvec3 color_;
-    double alpha_;
-    double eta_i_;
-    double eta_t_;
+    MaterialKind             kind_;
+    glm::dvec3               color_;
+    double                   alpha_;
+    double                   eta_i_;
+    double                   eta_t_;
     std::optional<ClothBsdf> cloth_;
 };
 

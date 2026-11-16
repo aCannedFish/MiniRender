@@ -1,3 +1,5 @@
+// 射线区间、包围盒与三角形求交的数值约定。
+
 #pragma once
 
 #include <minirender/scene/scene.hpp>
@@ -29,7 +31,7 @@ struct Bounds3 {
 
 // barycentric 的三个分量依次对应输入三角形的三个顶点，和为一。
 struct TriangleHit {
-    double distance = 0;
+    double     distance = 0;
     glm::dvec3 barycentric{0};
 };
 
@@ -44,18 +46,18 @@ class RayQuery {
     // 采用 Woop/Benthin/Wald 2013 的置换与剪切形式，算术统一使用 double。
     // 排除数值误差范围内无法与零区分的起点命中。
     std::optional<TriangleHit> intersect(const std::array<glm::vec3, 3>& vertices,
-                                         RayInterval interval) const;
+                                         RayInterval                     interval) const;
 
   private:
     glm::dvec3 origin_;
     glm::dvec3 direction_;
     glm::dvec3 inverse_;
-    int x_ = 0;
-    int y_ = 1;
-    int z_ = 2;
-    double shear_x_ = 0;
-    double shear_y_ = 0;
-    double scale_z_ = 1;
+    int        x_       = 0;
+    int        y_       = 1;
+    int        z_       = 2;
+    double     shear_x_ = 0;
+    double     shear_y_ = 0;
+    double     scale_z_ = 1;
 };
 
 } // namespace minirender

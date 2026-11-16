@@ -1,3 +1,6 @@
+// 隐藏窗口回归：gizmo 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 gizmo_smoke.hpp。
+
 #include "gizmo_smoke.hpp"
 #include "geometry_smoke.hpp"
 #include "ibl_controller.hpp"
@@ -24,7 +27,7 @@
 
 namespace {
 
-using Mode = minirender::GizmoMode;
+using Mode   = minirender::GizmoMode;
 using Handle = minirender::GizmoHandle;
 
 void require(bool condition, const char* message) {
@@ -32,11 +35,13 @@ void require(bool condition, const char* message) {
         throw std::runtime_error(message);
     }
 }
+
 template <class T> T* control(Workbench& window, const char* name) {
     auto* value = window.findChild<T*>(name);
     require(value != nullptr, "Gizmo regression control is missing");
     return value;
 }
+
 minirender::Transform transform(const Workbench& window) {
     for (const auto& object : window.document().objects) {
         if (object.id == "blue_cube") {
@@ -45,10 +50,12 @@ minirender::Transform transform(const Workbench& window) {
     }
     throw std::runtime_error("Gizmo fixture requires blue_cube");
 }
+
 bool equal(const minirender::Transform& a, const minirender::Transform& b) {
     return a.translation == b.translation && a.rotation_degrees == b.rotation_degrees &&
            a.scale == b.scale;
 }
+
 bool close(const glm::mat4& actual, const glm::dmat4& expected) {
     for (int column = 0; column < 4; ++column) {
         if (glm::length(glm::dvec4(actual[column]) - expected[column]) > 3e-5) {
@@ -57,14 +64,17 @@ bool close(const glm::mat4& actual, const glm::dmat4& expected) {
     }
     return true;
 }
+
 glm::dvec3 axis(Handle handle) {
     return handle == Handle::x   ? glm::dvec3(1, 0, 0)
            : handle == Handle::y ? glm::dvec3(0, 1, 0)
                                  : glm::dvec3(0, 0, 1);
 }
+
 minirender::GizmoView view(VulkanViewport& viewport) {
     return {viewport.camera(), {viewport.width(), viewport.height()}};
 }
+
 glm::dvec2 project(VulkanViewport& viewport, glm::dvec3 position) {
     const auto result = view(viewport).project(position);
     require(result.has_value(), "Gizmo test point is outside the camera depth range");
@@ -98,24 +108,29 @@ enum class Phase {
 };
 
 struct State {
-    Phase phase = Phase::startup;
-    int ticks = 0, step = 0, frame = 0;
-    double maximum_callback_ms = 0;
+    Phase                 phase               = Phase::startup;
+    int                   ticks               = 0;
+    int                   step                = 0;
+    int                   frame               = 0;
+    double                maximum_callback_ms = 0;
     minirender::Transform original, moved, rotated, gesture_start;
-    minirender::Camera camera;
-    glm::dvec2 start{0}, delta{0};
-    glm::dvec3 radial{0}, rotation_axis{0};
-    double radius = 0;
-    Handle rotation_handle = Handle::none;
-    std::uint64_t uploads = 0, descriptors = 0;
-    QImage baseline, moved_image, rotated_image;
-    QString source_scene;
+    minirender::Camera    camera;
+    glm::dvec2            start{0};
+    glm::dvec2            delta{0};
+    glm::dvec3            radial{0};
+    glm::dvec3            rotation_axis{0};
+    double                radius          = 0;
+    Handle                rotation_handle = Handle::none;
+    std::uint64_t         uploads         = 0;
+    std::uint64_t         descriptors     = 0;
+    QImage                baseline, moved_image, rotated_image;
+    QString               source_scene;
 };
 
 void mouse(State& state, VulkanViewport& viewport, QEvent::Type type, glm::dvec2 point,
            Qt::MouseButton button, Qt::MouseButtons buttons) {
     const QPointF local(point.x, point.y);
-    QMouseEvent event(type, local, viewport.mapToGlobal(local), button, buttons, Qt::NoModifier);
+    QMouseEvent   event(type, local, viewport.mapToGlobal(local), button, buttons, Qt::NoModifier);
     QElapsedTimer clock;
     clock.start();
     QCoreApplication::sendEvent(&viewport, &event);
@@ -126,14 +141,14 @@ void mouse(State& state, VulkanViewport& viewport, QEvent::Type type, glm::dvec2
 void begin_axis(State& state, VulkanViewport& viewport) {
     viewport.set_gizmo_mode(Mode::translate);
     const auto& layout = viewport.gizmo_layout();
-    bool found = false;
+    bool        found  = false;
     for (const auto& segment : layout.segments) {
         const auto point = segment.a * 0.35 + segment.b * 0.65;
         if (segment.handle == Handle::x && glm::length(segment.b - segment.a) > 20 &&
             layout.hit(point).handle == Handle::x) {
             state.start = point;
             state.delta = glm::normalize(segment.b - segment.a) * 45.0;
-            found = true;
+            found       = true;
             break;
         }
     }
@@ -143,19 +158,19 @@ void begin_axis(State& state, VulkanViewport& viewport) {
 }
 
 void verify_overlay(VulkanViewport& viewport, const QString& path, Handle handle) {
-    const auto image = viewport.grab();
-    const auto& layout = viewport.gizmo_layout();
+    const auto               image    = viewport.grab();
+    const auto&              layout   = viewport.gizmo_layout();
     const std::array<int, 3> expected = handle == Handle::x   ? std::array{245, 61, 51}
                                         : handle == Handle::y ? std::array{77, 224, 97}
                                                               : std::array{71, 140, 255};
-    bool matched = false;
+    bool                     matched  = false;
     for (const auto& segment : layout.segments) {
         if (segment.handle != handle) {
             continue;
         }
         const auto point = segment.a * 0.4 + segment.b * 0.6;
-        const int x = static_cast<int>(point.x * image.width() / viewport.width());
-        const int y = static_cast<int>(point.y * image.height() / viewport.height());
+        const int  x     = static_cast<int>(point.x * image.width() / viewport.width());
+        const int  y     = static_cast<int>(point.y * image.height() / viewport.height());
         for (int dy = -4; dy <= 4; ++dy) {
             for (int dx = -4; dx <= 4; ++dx) {
                 if (x + dx < 0 || y + dy < 0 || x + dx >= image.width() ||
@@ -163,9 +178,9 @@ void verify_overlay(VulkanViewport& viewport, const QString& path, Handle handle
                     continue;
                 }
                 const auto c = image.pixelColor(x + dx, y + dy);
-                matched = matched || (std::abs(c.red() - expected[0]) < 16 &&
-                                      std::abs(c.green() - expected[1]) < 16 &&
-                                      std::abs(c.blue() - expected[2]) < 16);
+                matched      = matched || (std::abs(c.red() - expected[0]) < 16 &&
+                                           std::abs(c.green() - expected[1]) < 16 &&
+                                           std::abs(c.blue() - expected[2]) < 16);
             }
         }
     }
@@ -180,9 +195,9 @@ void verify_overlay(VulkanViewport& viewport, const QString& path, Handle handle
 // 使用分帧事件序列，避免把一次连续拖拽压缩到同一轮事件循环。
 void begin_rotation(State& state, VulkanViewport& viewport, const minirender::Transform& original) {
     viewport.set_gizmo_mode(Mode::rotate);
-    const auto& layout = viewport.gizmo_layout();
-    const auto forward = glm::normalize(glm::dvec3(viewport.camera().target) -
-                                        glm::dvec3(viewport.camera().position));
+    const auto& layout    = viewport.gizmo_layout();
+    const auto  forward   = glm::normalize(glm::dvec3(viewport.camera().target) -
+                                           glm::dvec3(viewport.camera().position));
     state.rotation_handle = Handle::x;
     for (const auto candidate : {Handle::y, Handle::z}) {
         if (std::abs(glm::dot(axis(candidate), forward)) >
@@ -191,20 +206,20 @@ void begin_rotation(State& state, VulkanViewport& viewport, const minirender::Tr
         }
     }
     state.rotation_axis = axis(state.rotation_handle);
-    state.radius = layout.world_radius;
+    state.radius        = layout.world_radius;
     const auto basis =
         state.rotation_handle == Handle::x ? glm::dvec3(0, 1, 0) : glm::dvec3(1, 0, 0);
     const auto other = glm::cross(state.rotation_axis, basis);
-    bool found = false;
+    bool       found = false;
     for (int i = 1; i < 96; ++i) {
-        const auto angle = i * 2 * std::numbers::pi / 96;
+        const auto angle  = i * 2 * std::numbers::pi / 96;
         const auto radial = basis * std::cos(angle) + other * std::sin(angle);
         const auto point =
             project(viewport, glm::dvec3(original.translation) + state.radius * radial);
         if (layout.hit(point).handle == state.rotation_handle) {
             state.radial = radial;
-            state.start = point;
-            found = true;
+            state.start  = point;
+            found        = true;
             break;
         }
     }
@@ -217,7 +232,7 @@ void begin_rotation(State& state, VulkanViewport& viewport, const minirender::Tr
 
 void start_gizmo_smoke(Workbench& window, const QString& directory, bool measure_responsiveness) {
     require(QDir().mkpath(directory), "Cannot create gizmo output directory");
-    const auto state = std::make_shared<State>();
+    const auto state    = std::make_shared<State>();
     state->source_scene = directory + "/initial.json";
     window.save_scene_file(state->source_scene);
     // 普通启动使用异步场景导入，先检查该路径的默认选择，再测试显式选中物体。
@@ -244,7 +259,7 @@ void start_gizmo_smoke(Workbench& window, const QString& directory, bool measure
                             << static_cast<int>(phase);
                     state->phase = phase;
                     state->frame = viewport.rendered_frames();
-                    state->step = 0;
+                    state->step  = 0;
                 };
                 const auto rendered = [&] {
                     return viewport.rendered_frames() > state->frame + 2 &&
@@ -277,16 +292,16 @@ void start_gizmo_smoke(Workbench& window, const QString& directory, bool measure
                             "Async scene import lost the default manipulation target");
                     verify_overlay(viewport, directory + "/default-selection.png", Handle::x);
                     window.select_object("blue_cube");
-                    state->original = transform(window);
-                    state->camera = window.document().camera;
-                    state->baseline = gpu("initial");
+                    state->original       = transform(window);
+                    state->camera         = window.document().camera;
+                    state->baseline       = gpu("initial");
                     const auto hdr_before = viewport.grab_hdr();
                     control<QAction>(window, "gizmo_translate")->setChecked(true);
                     require(viewport.gizmo_mode() == Mode::translate,
                             "Checked translation tool did not update the viewport mode");
                     verify_overlay(viewport, directory + "/translate-overlay.png", Handle::x);
                     const auto hdr_after = viewport.grab_hdr();
-                    double maximum = 0;
+                    double     maximum   = 0;
                     for (std::size_t y = 0; y < hdr_before.height(); ++y) {
                         for (std::size_t x = 0; x < hdr_before.width(); ++x) {
                             maximum =
@@ -296,7 +311,7 @@ void start_gizmo_smoke(Workbench& window, const QString& directory, bool measure
                     }
                     require(maximum == 0, "Editor gizmo changed the linear HDR image");
                     capture_workbench_ui(window, directory + "/translate-ui.png");
-                    state->uploads = viewport.upload_statistics().mesh_uploads;
+                    state->uploads     = viewport.upload_statistics().mesh_uploads;
                     state->descriptors = viewport.upload_statistics().descriptor_rebuilds;
                     begin_axis(*state, viewport);
                     advance(Phase::move);
@@ -418,7 +433,7 @@ void start_gizmo_smoke(Workbench& window, const QString& directory, bool measure
                 case Phase::rotate: {
                     ++state->step;
                     const double angle = state->step * std::numbers::pi / (3 * 8);
-                    const auto radial =
+                    const auto   radial =
                         glm::dvec3(glm::rotate(glm::dmat4(1), angle, state->rotation_axis) *
                                    glm::dvec4(state->radial, 0));
                     const auto pointer = project(viewport, glm::dvec3(state->original.translation) +
@@ -431,7 +446,7 @@ void start_gizmo_smoke(Workbench& window, const QString& directory, bool measure
                     }
                     mouse(*state, viewport, QEvent::MouseButtonRelease, pointer, Qt::LeftButton,
                           Qt::NoButton);
-                    state->rotated = transform(window);
+                    state->rotated   = transform(window);
                     const auto pivot = glm::dvec3(state->original.translation);
                     const auto expected =
                         glm::translate(glm::dmat4(1), pivot) *

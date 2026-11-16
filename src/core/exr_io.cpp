@@ -1,3 +1,5 @@
+// OpenEXR 浮点图像读写，保留线性 HDR 像素。
+
 #include <minirender/core/image.hpp>
 
 #include <tinyexr.h>
@@ -50,33 +52,33 @@ void Image::write_exr(const std::filesystem::path& path) const {
             planes[static_cast<std::size_t>(2 - component)][i] = value;
         }
     }
-    std::array<unsigned char*, 3> pointers{};
-    std::array<EXRChannelInfo, 3> channels{};
-    std::array<int, 3> types{TINYEXR_PIXELTYPE_FLOAT, TINYEXR_PIXELTYPE_FLOAT,
-                             TINYEXR_PIXELTYPE_FLOAT};
+    std::array<unsigned char*, 3>    pointers{};
+    std::array<EXRChannelInfo, 3>    channels{};
+    std::array<int, 3>               types{TINYEXR_PIXELTYPE_FLOAT, TINYEXR_PIXELTYPE_FLOAT,
+                                           TINYEXR_PIXELTYPE_FLOAT};
     const std::array<const char*, 3> names{"B", "G", "R"};
     for (std::size_t i = 0; i < planes.size(); ++i) {
-        pointers[i] = reinterpret_cast<unsigned char*>(planes[i].data());
-        channels[i].name[0] = names[i][0]; // channels 已零初始化，名字均为单字符。
+        pointers[i]            = reinterpret_cast<unsigned char*>(planes[i].data());
+        channels[i].name[0]    = names[i][0]; // channels 已零初始化，名字均为单字符。
         channels[i].pixel_type = TINYEXR_PIXELTYPE_FLOAT;
         channels[i].x_sampling = channels[i].y_sampling = 1;
     }
     EXRHeader header;
     InitEXRHeader(&header);
-    header.num_channels = 3;
-    header.channels = channels.data();
-    header.pixel_types = types.data();
+    header.num_channels          = 3;
+    header.channels              = channels.data();
+    header.pixel_types           = types.data();
     header.requested_pixel_types = types.data();
-    header.compression_type = TINYEXR_COMPRESSIONTYPE_ZIP;
+    header.compression_type      = TINYEXR_COMPRESSIONTYPE_ZIP;
     EXRImage image;
     InitEXRImage(&image);
-    image.num_channels = 3;
-    image.width = static_cast<int>(width_);
-    image.height = static_cast<int>(height_);
-    image.images = pointers.data();
-    unsigned char* buffer = nullptr;
-    const char* error = nullptr;
-    const std::size_t bytes = SaveEXRImageToMemory(&image, &header, &buffer, &error);
+    image.num_channels       = 3;
+    image.width              = static_cast<int>(width_);
+    image.height             = static_cast<int>(height_);
+    image.images             = pointers.data();
+    unsigned char*    buffer = nullptr;
+    const char*       error  = nullptr;
+    const std::size_t bytes  = SaveEXRImageToMemory(&image, &header, &buffer, &error);
     const std::unique_ptr<unsigned char, FreeMemory> data(buffer);
     if (bytes == 0) {
         codec_error(error);
@@ -93,11 +95,11 @@ Image Image::read_exr(const std::filesystem::path& path) {
         throw std::runtime_error("Cannot open EXR image");
     }
     const std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(stream)), {});
-    float* rgba = nullptr;
-    int width = 0;
-    int height = 0;
-    const char* error = nullptr;
-    const int result =
+    float*                           rgba   = nullptr;
+    int                              width  = 0;
+    int                              height = 0;
+    const char*                      error  = nullptr;
+    const int                        result =
         LoadEXRFromMemory(&rgba, &width, &height, bytes.data(), bytes.size(), &error);
     const std::unique_ptr<float, FreeMemory> data(rgba);
     if (result != TINYEXR_SUCCESS) {

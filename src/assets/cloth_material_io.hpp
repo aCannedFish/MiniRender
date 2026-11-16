@@ -1,3 +1,5 @@
+// JSON 中织物经纬参数和切向曲线的转换。
+
 #pragma once
 
 #include <minirender/scene/cloth_material.hpp>

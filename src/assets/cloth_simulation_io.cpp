@@ -1,3 +1,6 @@
+// 布料定义、碰撞环境与模拟状态的场景序列化。
+// 本模块接口见 cloth_simulation_io.hpp。
+
 #include "cloth_simulation_io.hpp"
 
 #include <limits>
@@ -13,9 +16,11 @@ glm::dvec3 vector(const Json& value) {
     }
     return {value.at(0).get<double>(), value.at(1).get<double>(), value.at(2).get<double>()};
 }
+
 Json array(glm::dvec3 value) {
     return Json::array({value.x, value.y, value.z});
 }
+
 std::uint64_t integer(const Json& value) {
     if (value.is_number_unsigned()) {
         return value.get<std::uint64_t>();
@@ -25,6 +30,7 @@ std::uint64_t integer(const Json& value) {
     }
     throw std::invalid_argument("Cloth count must be a nonnegative integer");
 }
+
 std::uint32_t count(const Json& value, std::uint32_t low, std::uint32_t high) {
     const auto result = integer(value);
     if (result < low || result > high) {
@@ -34,39 +40,39 @@ std::uint32_t count(const Json& value, std::uint32_t low, std::uint32_t high) {
 }
 } // namespace
 
-std::shared_ptr<const ClothComponent> read_cloth_component(const Json& value,
+std::shared_ptr<const ClothComponent> read_cloth_component(const Json&                     value,
                                                            std::shared_ptr<const MeshData> mesh) {
     ClothDefinition definition;
-    const auto& grid = value.at("grid");
+    const auto&     grid    = value.at("grid");
     definition.grid.columns = count(grid.at("columns"), 2, 256);
-    definition.grid.rows = count(grid.at("rows"), 2, 256);
-    definition.grid.origin = vector(grid.at("origin"));
-    definition.grid.span_u = vector(grid.at("span_u"));
-    definition.grid.span_v = vector(grid.at("span_v"));
-    const auto size = definition.grid.columns * definition.grid.rows;
+    definition.grid.rows    = count(grid.at("rows"), 2, 256);
+    definition.grid.origin  = vector(grid.at("origin"));
+    definition.grid.span_u  = vector(grid.at("span_u"));
+    definition.grid.span_v  = vector(grid.at("span_v"));
+    const auto size         = definition.grid.columns * definition.grid.rows;
     if (!grid.at("pinned").is_array() || grid.at("pinned").size() > size) {
         throw std::invalid_argument("Invalid cloth fixed point list");
     }
     for (const auto& index : grid.at("pinned")) {
         definition.grid.pinned.push_back(count(index, 0, size - 1));
     }
-    const auto& parameters = value.at("parameters");
-    auto& p = definition.parameters;
-    p.surface_density = parameters.at("surface_density").get<double>();
-    p.structural_stiffness = parameters.at("structural_stiffness").get<double>();
-    p.shear_stiffness = parameters.at("shear_stiffness").get<double>();
-    p.bending_stiffness = parameters.at("bending_stiffness").get<double>();
-    p.spring_damping_ratio = parameters.at("spring_damping_ratio").get<double>();
-    p.velocity_damping = parameters.at("velocity_damping").get<double>();
-    p.thickness = parameters.at("thickness").get<double>();
-    p.frame_seconds = parameters.at("frame_seconds").get<double>();
-    p.substeps = count(parameters.at("substeps"), 1, 4096);
+    const auto& parameters  = value.at("parameters");
+    auto&       p           = definition.parameters;
+    p.surface_density       = parameters.at("surface_density").get<double>();
+    p.structural_stiffness  = parameters.at("structural_stiffness").get<double>();
+    p.shear_stiffness       = parameters.at("shear_stiffness").get<double>();
+    p.bending_stiffness     = parameters.at("bending_stiffness").get<double>();
+    p.spring_damping_ratio  = parameters.at("spring_damping_ratio").get<double>();
+    p.velocity_damping      = parameters.at("velocity_damping").get<double>();
+    p.thickness             = parameters.at("thickness").get<double>();
+    p.frame_seconds         = parameters.at("frame_seconds").get<double>();
+    p.substeps              = count(parameters.at("substeps"), 1, 4096);
     const auto& environment = value.at("environment");
-    auto& e = definition.environment;
-    e.gravity = vector(environment.at("gravity"));
-    e.wind_velocity = vector(environment.at("wind_velocity"));
-    e.air_density = environment.at("air_density").get<double>();
-    e.drag_coefficient = environment.at("drag_coefficient").get<double>();
+    auto&       e           = definition.environment;
+    e.gravity               = vector(environment.at("gravity"));
+    e.wind_velocity         = vector(environment.at("wind_velocity"));
+    e.air_density           = environment.at("air_density").get<double>();
+    e.drag_coefficient      = environment.at("drag_coefficient").get<double>();
     if (!environment.at("planes").is_array() || environment.at("planes").size() > 32 ||
         !environment.at("spheres").is_array() || environment.at("spheres").size() > 32) {
         throw std::invalid_argument("Too many cloth collision objects");
@@ -80,8 +86,8 @@ std::shared_ptr<const ClothComponent> read_cloth_component(const Json& value,
                              sphere.at("friction").get<double>()});
     }
     definition.use_scene_colliders = value.at("use_scene_colliders").get<bool>();
-    const auto& positions = value.at("positions");
-    const auto& velocities = value.at("velocities");
+    const auto& positions          = value.at("positions");
+    const auto& velocities         = value.at("velocities");
     if (!positions.is_array() || !velocities.is_array() || positions.size() != size ||
         velocities.size() != size) {
         throw std::invalid_argument("Cloth saved state dimensions differ from its grid");
@@ -101,9 +107,9 @@ std::shared_ptr<const ClothComponent> read_cloth_component(const Json& value,
 
 Json write_cloth_component(const ClothComponent& component) {
     const auto& definition = *component.definition();
-    const auto& g = definition.grid;
-    const auto& p = definition.parameters;
-    const auto& e = definition.environment;
+    const auto& g          = definition.grid;
+    const auto& p          = definition.parameters;
+    const auto& e          = definition.environment;
     Json environment{{"gravity", array(e.gravity)},  {"wind_velocity", array(e.wind_velocity)},
                      {"air_density", e.air_density}, {"drag_coefficient", e.drag_coefficient},
                      {"planes", Json::array()},      {"spheres", Json::array()}};
@@ -150,7 +156,7 @@ Json write_cloth_component(const ClothComponent& component) {
 
 ClothCollider read_cloth_collider(const Json& value) {
     ClothCollider result;
-    const auto kind = value.at("kind").get<std::string>();
+    const auto    kind = value.at("kind").get<std::string>();
     if (kind == "sphere") {
         result.kind = ClothColliderKind::sphere;
     } else if (kind == "plane") {
@@ -158,14 +164,15 @@ ClothCollider read_cloth_collider(const Json& value) {
     } else {
         throw std::invalid_argument("Unknown cloth collider kind");
     }
-    result.point = vector(value.at("point"));
-    result.normal = vector(value.at("normal"));
-    result.radius = value.at("radius").get<double>();
+    result.point    = vector(value.at("point"));
+    result.normal   = vector(value.at("normal"));
+    result.radius   = value.at("radius").get<double>();
     result.friction = value.at("friction").get<double>();
-    result.enabled = value.at("enabled").get<bool>();
+    result.enabled  = value.at("enabled").get<bool>();
     result.validate();
     return result;
 }
+
 Json write_cloth_collider(const ClothCollider& collider) {
     return {{"kind", collider.kind == ClothColliderKind::sphere ? "sphere" : "plane"},
             {"point", array(collider.point)},

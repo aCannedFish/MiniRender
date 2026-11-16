@@ -1,3 +1,5 @@
+// JSON 中有界介质区域和光学参数的转换。
+
 #pragma once
 
 #include <minirender/scene/medium.hpp>

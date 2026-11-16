@@ -1,3 +1,6 @@
+// 对称三阶矩阵的特征分解，供局部 PCA 使用。
+// 本模块接口见 symmetric_eigen.hpp。
+
 #include "symmetric_eigen.hpp"
 
 #include <algorithm>
@@ -45,13 +48,13 @@ SymmetricEigen symmetric_eigen(glm::dmat3 matrix) {
             break;
         }
         const double tau = (matrix[q][q] - matrix[p][p]) / (2 * cross);
-        const double t = std::copysign(1.0, tau) / (std::abs(tau) + std::hypot(1.0, tau));
-        const double c = 1 / std::sqrt(1 + t * t);
-        const double s = t * c;
-        const auto vp = vectors[p];
-        const auto vq = vectors[q];
-        vectors[p] = c * vp - s * vq;
-        vectors[q] = s * vp + c * vq;
+        const double t   = std::copysign(1.0, tau) / (std::abs(tau) + std::hypot(1.0, tau));
+        const double c   = 1 / std::sqrt(1 + t * t);
+        const double s   = t * c;
+        const auto   vp  = vectors[p];
+        const auto   vq  = vectors[q];
+        vectors[p]       = c * vp - s * vq;
+        vectors[q]       = s * vp + c * vq;
         matrix[p][p] -= t * cross;
         matrix[q][q] += t * cross;
         matrix[p][q] = matrix[q][p] = 0;

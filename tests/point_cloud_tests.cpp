@@ -1,3 +1,6 @@
+// 回归测试：PLY round trips positions normals and Unicode paths in all encodings；PLY layout
+// follows declared properties elements and scalar types。
+
 #include "geometry/point_cloud_utils.hpp"
 #include "geometry/point_index.hpp"
 #include "geometry/symmetric_eigen.hpp"
@@ -28,10 +31,12 @@ class TemporaryDirectory final {
                 std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
         std::filesystem::create_directories(path);
     }
+
     ~TemporaryDirectory() {
         std::error_code error;
         std::filesystem::remove_all(path, error);
     }
+
     std::filesystem::path path;
 };
 
@@ -47,6 +52,7 @@ class CommaLocale final {
     CommaLocale() : original_(std::locale()) {
         std::locale::global(std::locale(original_, new Punctuation));
     }
+
     ~CommaLocale() {
         std::locale::global(original_);
     }
@@ -54,20 +60,23 @@ class CommaLocale final {
   private:
     std::locale original_;
 };
+
 void text_file(const std::filesystem::path& path, const std::string& text) {
     std::ofstream stream(path, std::ios::binary);
     stream << text;
 }
+
 std::string bytes(const std::filesystem::path& path) {
     std::ifstream stream(path, std::ios::binary);
     return {std::istreambuf_iterator<char>(stream), {}};
 }
+
 std::shared_ptr<PointCloud> sphere(std::size_t count, glm::vec3 translation = {}) {
     auto cloud = std::make_shared<PointCloud>();
     for (std::size_t i = 0; i < count; ++i) {
-        const double z = 1 - 2 * (static_cast<double>(i) + .5) / static_cast<double>(count);
-        const double angle = static_cast<double>(i) * std::numbers::pi * (3 - std::sqrt(5.0));
-        const double radius = std::sqrt(1 - z * z);
+        const double    z      = 1 - 2 * (static_cast<double>(i) + .5) / static_cast<double>(count);
+        const double    angle  = static_cast<double>(i) * std::numbers::pi * (3 - std::sqrt(5.0));
+        const double    radius = std::sqrt(1 - z * z);
         const glm::vec3 point{radius * std::cos(angle), radius * std::sin(angle), z};
         cloud->positions.push_back(point + translation);
         cloud->normals.push_back(point);
@@ -78,11 +87,11 @@ std::shared_ptr<PointCloud> sphere(std::size_t count, glm::vec3 translation = {}
 } // namespace
 
 TEST_CASE("PLY round trips positions normals and Unicode paths in all encodings", "[points][io]") {
-    CommaLocale locale;
+    CommaLocale        locale;
     TemporaryDirectory directory;
-    const auto file = directory.path / std::filesystem::path(u8"点云 空格.ply");
-    auto input = *sphere(31);
-    input.positions[0] = {.125F, -2.75F, 12345.25F};
+    const auto         file  = directory.path / std::filesystem::path(u8"点云 空格.ply");
+    auto               input = *sphere(31);
+    input.positions[0]       = {.125F, -2.75F, 12345.25F};
     for (const auto format : {PlyFormat::ascii, PlyFormat::little_endian, PlyFormat::big_endian}) {
         std::size_t completed = 0;
         save_point_cloud(input, file, format, {}, [&](auto done, auto total) {
@@ -97,7 +106,7 @@ TEST_CASE("PLY round trips positions normals and Unicode paths in all encodings"
     input.normals.clear();
     save_point_cloud(input, file);
     REQUIRE(load_point_cloud(file).normals.empty());
-    const auto original = bytes(file);
+    const auto         original = bytes(file);
     CancellationSource source;
     REQUIRE_THROWS_AS(save_point_cloud(input, file, PlyFormat::ascii, source.token(),
                                        [&](auto done, auto total) {
@@ -114,7 +123,7 @@ TEST_CASE("PLY round trips positions normals and Unicode paths in all encodings"
 
 TEST_CASE("PLY layout follows declared properties elements and scalar types", "[points][io]") {
     TemporaryDirectory directory;
-    const auto file = directory.path / "layout.ply";
+    const auto         file = directory.path / "layout.ply";
     text_file(file,
               "ply\r\nformat ascii 1.0\r\ncomment input layout\r\nobj_info extra\r\n"
               "element face 1\r\nproperty list uchar int vertex_indices\r\n"
@@ -124,7 +133,7 @@ TEST_CASE("PLY layout follows declared properties elements and scalar types", "[
               "3 0 1 2\r\n255 3.5 -2 +1.25 2 0.1 0.9\r\n0 7 4 -0.0 0\r\n"
               "128 -1e-2 -32768 5.75 1 0.3\r\n-128 4294967295\r\n");
     std::size_t completed = 0;
-    const auto cloud = load_point_cloud(file, {}, {}, [&](auto done, auto total) {
+    const auto  cloud     = load_point_cloud(file, {}, {}, [&](auto done, auto total) {
         REQUIRE(total == 5);
         completed = done;
     });
@@ -150,9 +159,9 @@ TEST_CASE("PLY layout follows declared properties elements and scalar types", "[
 
 TEST_CASE("PLY rejects incomplete invalid and over-budget records", "[points][io]") {
     TemporaryDirectory directory;
-    const auto file = directory.path / "invalid.ply";
-    const std::string header = "ply\nformat ascii 1.0\nelement vertex 1\nproperty float x\n"
-                               "property float y\nproperty float z\n";
+    const auto         file   = directory.path / "invalid.ply";
+    const std::string  header = "ply\nformat ascii 1.0\nelement vertex 1\nproperty float x\n"
+                                "property float y\nproperty float z\n";
     for (const auto& suffix :
          {"end_header\n1 2", "end_header\n1 nan 3", "end_header\n1 2 1e99",
           "property float nx\nend_header\n1 2 3 1", "property float x\nend_header\n1 2 3 4",
@@ -193,8 +202,8 @@ TEST_CASE("Point queries match independent exhaustive distance ordering", "[poin
             }
         }
         const auto neighbors = index.radius(point, .75, 200);
-        const auto count = std::count_if(expected.begin(), expected.end(),
-                                         [](const auto& p) { return p.first <= .75 * .75; });
+        const auto count     = std::count_if(expected.begin(), expected.end(),
+                                             [](const auto& p) { return p.first <= .75 * .75; });
         REQUIRE(neighbors.size() == static_cast<std::size_t>(count));
         for (std::size_t i = 0; i < neighbors.size(); ++i) {
             REQUIRE(neighbors[i].index == expected[i].second);
@@ -205,7 +214,7 @@ TEST_CASE("Point queries match independent exhaustive distance ordering", "[poin
     REQUIRE_THROWS_AS(index.radius({}, 2, 1), std::length_error);
     REQUIRE(index.nearest({}, 1, detail::no_point, .01).empty());
     REQUIRE(index.nearest({}, 0).empty());
-    CancellationSource cancellation;
+    CancellationSource       cancellation;
     const detail::PointIndex cancellable(cloud->positions, cancellation.token());
     cancellation.request();
     REQUIRE_THROWS_AS(cancellable.nearest({}, 1), OperationCancelled);
@@ -223,7 +232,7 @@ TEST_CASE("Symmetric eigen decomposition satisfies residual and orthogonality",
             }
         }
         const auto matrix = glm::transpose(basis) * basis;
-        const auto eigen = detail::symmetric_eigen(matrix);
+        const auto eigen  = detail::symmetric_eigen(matrix);
         REQUIRE(eigen.values.x <= eigen.values.y);
         REQUIRE(eigen.values.y <= eigen.values.z);
         for (int i = 0; i < 3; ++i) {
@@ -238,7 +247,7 @@ TEST_CASE("Symmetric eigen decomposition satisfies residual and orthogonality",
 }
 
 TEST_CASE("Point PCA normals agree with planar and spherical geometry", "[points][normals]") {
-    auto plane = std::make_shared<PointCloud>();
+    auto       plane  = std::make_shared<PointCloud>();
     const auto normal = glm::normalize(glm::dvec3(-.3, -.2, 1));
     for (int y = 0; y < 9; ++y) {
         for (int x = 0; x < 9; ++x) {
@@ -256,7 +265,7 @@ TEST_CASE("Point PCA normals agree with planar and spherical geometry", "[points
     for (const auto n : planar.cloud->normals) {
         REQUIRE(glm::dot(glm::dvec3(n), normal) > .99999);
     }
-    const auto cloud = sphere(700);
+    const auto cloud     = sphere(700);
     const auto spherical = prepare_point_normals(cloud);
     REQUIRE(spherical.orientation_components == 1);
     for (std::size_t i = 0; i < cloud->positions.size(); ++i) {
@@ -267,7 +276,7 @@ TEST_CASE("Point PCA normals agree with planar and spherical geometry", "[points
 }
 
 TEST_CASE("Point normal forests preserve components and explicit flip", "[points][normals]") {
-    auto first = sphere(150);
+    auto       first  = sphere(150);
     const auto second = sphere(150, {5, 0, 0});
     first->positions.insert(first->positions.end(), second->positions.begin(),
                             second->positions.end());
@@ -276,11 +285,11 @@ TEST_CASE("Point normal forests preserve components and explicit flip", "[points
         first->normals[i] *= i % 3 ? -2.0F : 3.0F;
     }
     PointNormalSettings settings;
-    settings.estimate = false;
+    settings.estimate         = false;
     settings.maximum_distance = .8;
-    const auto result = prepare_point_normals(first, settings);
+    const auto result         = prepare_point_normals(first, settings);
     REQUIRE(result.orientation_components == 2);
-    settings.flip = true;
+    settings.flip      = true;
     const auto flipped = prepare_point_normals(first, settings);
     for (std::size_t i = 0; i < first->normals.size(); ++i) {
         const auto center = i < 150 ? glm::vec3(0) : glm::vec3(5, 0, 0);
@@ -291,21 +300,21 @@ TEST_CASE("Point normal forests preserve components and explicit flip", "[points
 }
 
 TEST_CASE("Point normal failures and each-stage cancellation preserve input", "[points][normals]") {
-    const auto cloud = sphere(30);
+    const auto cloud    = sphere(30);
     const auto original = *cloud;
     REQUIRE_THROWS_AS(prepare_point_normals(cloud, {.neighbors = 2}), std::invalid_argument);
     REQUIRE_THROWS_AS(prepare_point_normals(cloud, {.maximum_neighbor_links = 1}),
                       std::length_error);
     REQUIRE_THROWS_AS(prepare_point_normals(cloud, {.maximum_distance = .001}),
                       std::invalid_argument);
-    auto line = std::make_shared<PointCloud>();
+    auto line       = std::make_shared<PointCloud>();
     line->positions = {{0, 0, 0}, {1, 0, 0}, {2, 0, 0}};
     REQUIRE_THROWS_AS(prepare_point_normals(line), std::invalid_argument);
     for (const auto stage : {PointNormalStage::validation, PointNormalStage::duplicates,
                              PointNormalStage::index, PointNormalStage::estimation,
                              PointNormalStage::orientation, PointNormalStage::complete}) {
         CancellationSource cancellation;
-        bool reached = false;
+        bool               reached = false;
         REQUIRE_THROWS_AS(prepare_point_normals(cloud, {}, cancellation.token(),
                                                 [&](auto p) {
                                                     REQUIRE(p.completed <= p.total);
@@ -332,7 +341,7 @@ TEST_CASE("Surface point sampling follows triangle areas and reproducible baryce
         }
         mesh.triangles.push_back(triangle);
     }
-    const auto points = sample_mesh_surface(mesh, 10000, 7);
+    const auto  points = sample_mesh_surface(mesh, 10000, 7);
     std::size_t larger = 0;
     for (std::size_t i = 0; i < points.positions.size(); ++i) {
         const auto p = points.positions[i];

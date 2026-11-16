@@ -1,8 +1,8 @@
-#include "workbench.hpp"
+// Qt 工作台的视口、面板、编辑事务及后台资产任务协调。
+// 本模块接口见 workbench.hpp。
+
 #include "builtin_scenes.hpp"
-#include "cloth_collider_panel.hpp"
 #include "cloth_controller.hpp"
-#include "cloth_material_panel.hpp"
 #include "cloth_panel.hpp"
 #include "editor_theme.hpp"
 #include "environment_panel.hpp"
@@ -11,35 +11,21 @@
 #include "offline_panel.hpp"
 #include "point_cloud_panel.hpp"
 #include "realtime_panel.hpp"
-#include "scene_id.hpp"
 #include "sdf_panel.hpp"
-#include "subsurface_material_panel.hpp"
 #include "volume_panel.hpp"
-
-#include <minirender/assets/scene_io.hpp>
-
+#include "workbench_internal.hpp"
 #include <QAction>
 #include <QActionGroup>
 #include <QCheckBox>
 #include <QComboBox>
-#include <QCoreApplication>
-#include <QDir>
 #include <QDockWidget>
-#include <QDoubleSpinBox>
 #include <QFileDialog>
-#include <QFileInfo>
-#include <QFormLayout>
-#include <QFutureWatcher>
-#include <QHBoxLayout>
 #include <QLabel>
-#include <QLineEdit>
-#include <QLocale>
 #include <QMenu>
 #include <QMessageBox>
 #include <QProgressBar>
 #include <QScreen>
 #include <QScrollArea>
-#include <QSignalBlocker>
 #include <QSizePolicy>
 #include <QStatusBar>
 #include <QStringList>
@@ -50,161 +36,11 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 #include <QVulkanInstance>
-#include <QtConcurrent/QtConcurrentRun>
-
 #include <algorithm>
 #include <array>
+#include <minirender/assets/scene_io.hpp>
 
-namespace {
-
-using minirender::desktop::unique_id;
-
-// 工作线程不访问 UI 或 Vulkan。结果和异常均在 watcher 的 UI 线程回调处理。
-template <typename T> struct TaskResult {
-    T value{};
-    std::string error;
-};
-
-// 文件解析和完整网格校验一起完成，GUI 事务复用校验缓存。
-struct LoadedMesh {
-    std::shared_ptr<const minirender::MeshData> data;
-    std::shared_ptr<const minirender::RasterMeshData> raster;
-    minirender::MeshValidationCache validated;
-};
-struct LoadedScene {
-    minirender::SceneDocument document;
-    minirender::MeshValidationCache validated;
-    std::vector<std::pair<std::shared_ptr<const minirender::MeshData>,
-                          std::shared_ptr<const minirender::RasterMeshData>>>
-        raster;
-};
-
-template <typename Work, typename Done> void run_background(QObject* owner, Work work, Done done) {
-    using Result = TaskResult<decltype(work())>;
-    auto* watcher = new QFutureWatcher<Result>(owner);
-    QObject::connect(watcher, &QFutureWatcher<Result>::finished, owner, [watcher, done] {
-        const auto result = watcher->result();
-        watcher->deleteLater();
-        done(result);
-    });
-    watcher->setFuture(QtConcurrent::run([work] {
-        Result result;
-        try {
-            result.value = work();
-        } catch (const std::exception& error) {
-            result.error = error.what();
-        }
-        return result;
-    }));
-}
-
-std::filesystem::path native_path(const QString& path) {
-    const auto bytes = path.toUtf8();
-    return std::filesystem::path(std::u8string(bytes.begin(), bytes.end()));
-}
-
-// 去掉固定小数尾部的零，为三轴输入保留可读空间。精度与解析仍由 QDoubleSpinBox 管理。
-class CompactScalar final : public QDoubleSpinBox {
-  public:
-    using QDoubleSpinBox::QDoubleSpinBox;
-
-  protected:
-    QString textFromValue(double value) const override {
-        auto format = locale();
-        format.setNumberOptions(format.numberOptions() | QLocale::OmitGroupSeparator);
-        auto text = format.toString(value, 'f', decimals());
-        if (decimals() > 0) {
-            while (text.endsWith('0')) {
-                text.chop(1);
-            }
-            if (text.endsWith(format.decimalPoint())) {
-                text.chop(format.decimalPoint().size());
-            }
-        }
-        return text;
-    }
-};
-
-QDoubleSpinBox* spin(QWidget* parent, const QString& name, double minimum, double maximum,
-                     double step) {
-    auto* value = new CompactScalar(parent);
-    value->setObjectName(name);
-    value->setRange(minimum, maximum);
-    value->setDecimals(4);
-    value->setSingleStep(step);
-    value->setKeyboardTracking(false);
-    value->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    return value;
-}
-
-QScrollArea* scroll_panel(QWidget* panel) {
-    auto* area = new QScrollArea;
-    area->setWidgetResizable(true);
-    area->setFrameShape(QFrame::NoFrame);
-    area->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    panel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    area->setWidget(panel);
-    return area;
-}
-
-void configure_form(QFormLayout* form) {
-    form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
-    form->setRowWrapPolicy(QFormLayout::WrapLongRows);
-    form->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-    form->setFormAlignment(Qt::AlignTop | Qt::AlignLeft);
-    form->setHorizontalSpacing(10);
-    form->setVerticalSpacing(6);
-    form->setContentsMargins(12, 8, 12, 12);
-}
-
-} // namespace
-
-// 三分量控件在数值改变时发布事务。键盘输入在 Enter/失焦时提交，箭头立即生效。
-class VectorField final : public QWidget {
-  public:
-    VectorField(QWidget* parent, const QString& prefix, double minimum = -10000,
-                double maximum = 10000)
-        : QWidget(parent) {
-        auto* layout = new QHBoxLayout(this);
-        layout->setContentsMargins(0, 0, 0, 0);
-        layout->setSpacing(4);
-        // QFormLayout 根据整行宽度换行，避免分量采用 Ignored 策略时被压入标签旁。
-        setMinimumWidth(3 * 88 + 2 * layout->spacing());
-        const std::array<QString, 3> axes{"x", "y", "z"};
-        for (std::size_t index = 0; index < values_.size(); ++index) {
-            values_[index] = spin(this, prefix + "." + axes[index], minimum, maximum, 0.1);
-            const bool color = prefix == "base_color" || prefix == "emission";
-            const std::array<QString, 3> channels{"r", "g", "b"};
-            values_[index]->setPrefix((color ? channels[index] : axes[index]) + " ");
-            if (color) {
-                values_[index]->setToolTip("线性 RGB");
-            }
-            values_[index]->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-            values_[index]->setMinimumWidth(88);
-            values_[index]->setProperty("axis", axes[index]);
-            layout->addWidget(values_[index], 1);
-            connect(values_[index], &QDoubleSpinBox::valueChanged, this, [this] {
-                if (on_changed) {
-                    on_changed();
-                }
-            });
-        }
-    }
-    glm::vec3 value() const {
-        return {static_cast<float>(values_[0]->value()), static_cast<float>(values_[1]->value()),
-                static_cast<float>(values_[2]->value())};
-    }
-    void set_value(glm::vec3 value) {
-        for (int index = 0; index < 3; ++index) {
-            const QSignalBlocker blocker(values_[static_cast<std::size_t>(index)]);
-            values_[static_cast<std::size_t>(index)]->setValue(value[index]);
-        }
-    }
-    std::function<void()> on_changed;
-
-  private:
-    std::array<QDoubleSpinBox*, 3> values_;
-};
+using namespace workbench_detail;
 
 Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(diagnostic) {
     setWindowTitle("MiniRender");
@@ -213,12 +49,13 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     auto* container = QWidget::createWindowContainer(viewport_, this);
     container->setFocusPolicy(Qt::StrongFocus);
     container->setMinimumSize(280, 240);
-    auto* viewport_frame = new QWidget(this);
+    auto* viewport_frame  = new QWidget(this);
     auto* viewport_layout = new QVBoxLayout(viewport_frame);
     viewport_layout->setContentsMargins(0, 0, 0, 0);
     viewport_layout->setSpacing(0);
     viewport_layout->addWidget(container, 1);
     setCentralWidget(viewport_frame);
+    // 先建立文件与资产操作入口，回调把耗时工作交给后台控制器。
     auto* toolbar = addToolBar("项目");
     toolbar->setObjectName("project_toolbar");
     toolbar->setMovable(false);
@@ -346,6 +183,7 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
         }
     });
 
+    // 场景树驱动当前选择与可见状态，编辑器事务统一维护撤销历史。
     tree_ = new QTreeWidget;
     tree_->setObjectName("scene_tree");
     tree_->setHeaderLabel("物体");
@@ -371,7 +209,7 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
         if (refreshing_) {
             return;
         }
-        const auto id = item->data(0, Qt::UserRole).toString().toStdString();
+        const auto id      = item->data(0, Qt::UserRole).toString().toStdString();
         const bool visible = item->checkState(0) == Qt::Checked;
         perform_edit([&](minirender::SceneDocument& scene) {
             for (auto& object : scene.objects) {
@@ -382,10 +220,11 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
         });
     });
 
+    // 注册对象与全局工具页，各工具通过回调访问场景。
     build_object_panel();
     build_light_panel();
     build_camera_panel();
-    panels_ = new WorkbenchPanels(*this);
+    panels_          = new WorkbenchPanels(*this);
     auto* right_tabs = panels_;
     right_tabs->addTab(scroll_panel(object_panel_), "物体");
     right_tabs->addTab(scroll_panel(light_panel_), "灯光");
@@ -402,11 +241,11 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     right_tabs->addTab(scroll_panel(offline_), "离线");
     auto* realtime = new RealtimePanel(*viewport_, this);
     right_tabs->addTab(scroll_panel(realtime), "实时");
-    ibl_ = new IblController(*viewport_, this);
+    ibl_         = new IblController(*viewport_, this);
     environment_ = new EnvironmentPanel(*viewport_, *ibl_, this);
     right_tabs->addTab(scroll_panel(environment_), "环境");
     geometry_tasks_ = new GeometryController(this);
-    geometry_ = new GeometryPanel(*geometry_tasks_, this);
+    geometry_       = new GeometryPanel(*geometry_tasks_, this);
     right_tabs->addTab(scroll_panel(geometry_), "几何");
     points_ = new PointCloudPanel(*geometry_tasks_, this);
     right_tabs->addTab(scroll_panel(points_), "点云");
@@ -414,10 +253,10 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     sdf_ = new SdfPanel(*viewport_, this);
     right_tabs->addTab(scroll_panel(sdf_), "距离场");
     cloth_controller_ = new ClothController(this);
-    cloth_panel_ = new ClothPanel(*cloth_controller_, this);
+    cloth_panel_      = new ClothPanel(*cloth_controller_, this);
     right_tabs->addTab(scroll_panel(cloth_panel_), "布料");
     cloth_controller_->on_frame = [this](const auto& frame) { return accept_cloth_frame(frame); };
-    cloth_panel_->on_demo = [this](int kind) {
+    cloth_panel_->on_demo       = [this](int kind) {
         try {
             create_cloth_demo(kind);
         } catch (const std::exception& error) {
@@ -431,16 +270,16 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     cloth_panel_->on_apply = [this](auto definition, bool reset) {
         apply_cloth_definition(std::move(definition), reset);
     };
-    cloth_panel_->on_freeze = [this] { freeze_cloth(); };
+    cloth_panel_->on_freeze  = [this] { freeze_cloth(); };
     cloth_panel_->on_preview = [this] { show_cloth_preview(); };
-    volume_ = new VolumePanel(this);
+    volume_                  = new VolumePanel(this);
     right_tabs->addTab(scroll_panel(volume_), "介质");
     volume_->on_changed = [this](std::vector<minirender::MediumRegion> regions) {
         editor_.edit([&](auto& scene) { scene.media = std::move(regions); });
         ++document_revision_;
         refresh();
     };
-    volume_->on_demo = [this](const QString& id) { import_builtin_scene(id); };
+    volume_->on_demo   = [this](const QString& id) { import_builtin_scene(id); };
     volume_->on_render = [this, right_tabs] {
         right_tabs->setCurrentIndex(3);
         if (minirender::render_terminal(offline_->session().progress().state) &&
@@ -452,19 +291,19 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
         return !minirender::render_terminal(offline_->session().progress().state) ||
                offline_->exporting();
     };
-    lightfield_ = new LightFieldController(*viewport_, this);
+    lightfield_                      = new LightFieldController(*viewport_, this);
     lightfield_->other_render_active = [this] {
         return !minirender::render_terminal(offline_->session().progress().state) ||
                offline_->exporting();
     };
-    lightfield_panel_ = new LightFieldPanel(*lightfield_, *viewport_, this);
+    lightfield_panel_             = new LightFieldPanel(*lightfield_, *viewport_, this);
     lightfield_panel_->integrator = [this] {
         auto s = offline_->integrator_settings();
         s.kind = minirender::IntegratorKind::path_tracing;
         return s;
     };
     lightfield_panel_->snapshot = [this] { return offline_snapshot(); };
-    lightfield_panel_->on_demo = [this] { import_builtin_scene("lightfield"); };
+    lightfield_panel_->on_demo  = [this] { import_builtin_scene("lightfield"); };
     right_tabs->addTab(scroll_panel(lightfield_panel_), "光场");
     geometry_->on_apply = [this] {
         try {
@@ -497,7 +336,7 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     };
     environment_->on_edited = [this](glm::vec3 constant, minirender::EnvironmentMap map) {
         perform_edit([&](auto& document) {
-            document.environment = constant;
+            document.environment     = constant;
             document.environment_map = map;
         });
     };
@@ -512,10 +351,12 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
             }
         }
     };
+    // 显示来源变化时同步控件启用状态，避免修改当前不可用的显示参数。
     viewport_->on_display_changed = [this, realtime](bool offline) {
         findChild<QComboBox*>("view_mode")->setEnabled(!offline);
-        if (auto* quick = findChild<QComboBox*>("viewport_view_mode"))
+        if (auto* quick = findChild<QComboBox*>("viewport_view_mode")) {
             quick->setEnabled(!offline);
+        }
         findChild<QCheckBox*>("fxaa_enabled")->setEnabled(!offline);
         findChild<QCheckBox*>("shadows_enabled")->setEnabled(!offline);
         realtime->setEnabled(!offline);
@@ -523,8 +364,9 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     scene_dock->setObjectName("scene_dock");
     scene_dock->setMinimumWidth(160);
     editor::decorate_dock(scene_dock);
+    // 把页面分配到独立停靠面板，再连接相机与布局恢复操作。
     panels_->build(scene_dock);
-    auto* inspector = panels_->objectDock();
+    auto* inspector              = panels_->objectDock();
     viewport_->on_camera_changed = [this](const minirender::Camera& camera) {
         editor_.update_navigation(camera);
         ++document_revision_;
@@ -585,23 +427,23 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     toolbar->insertSeparator(screenshot);
     toolbar->insertSeparator(restore);
     viewport_->on_object_picked = [this](const std::string& id) { select_object(id); };
-    auto* manipulation = new QToolBar("物体操纵", viewport_frame);
+    auto* manipulation          = new QToolBar("物体操纵", viewport_frame);
     viewport_layout->insertWidget(0, manipulation);
     manipulation->setIconSize(QSize(16, 16));
     // 图标工具为视图选择保留空间，窄窗口也能直接切换原色与光照。
     manipulation->setToolButtonStyle(Qt::ToolButtonIconOnly);
     manipulation->setObjectName("gizmo_toolbar");
     manipulation->setMovable(false);
-    auto* tool_group = new QActionGroup(manipulation);
-    const std::array<QString, 3> tool_names{"选择", "移动", "旋转"};
+    auto*                             tool_group = new QActionGroup(manipulation);
+    const std::array<QString, 3>      tool_names{"选择", "移动", "旋转"};
     const std::array<editor::Icon, 3> tool_icons{editor::Icon::select, editor::Icon::move,
                                                  editor::Icon::rotate};
-    const std::array<QString, 3> shortcuts{"V", "T", "R"};
-    const std::array<QString, 3> tool_ids{"gizmo_select", "gizmo_translate", "gizmo_rotate"};
+    const std::array<QString, 3>      shortcuts{"V", "T", "R"};
+    const std::array<QString, 3>      tool_ids{"gizmo_select", "gizmo_translate", "gizmo_rotate"};
     const std::array<minirender::GizmoMode, 3> tool_modes{minirender::GizmoMode::select,
                                                           minirender::GizmoMode::translate,
                                                           minirender::GizmoMode::rotate};
-    std::array<QAction*, 3> tools{};
+    std::array<QAction*, 3>                    tools{};
     for (std::size_t index = 0; index < tools.size(); ++index) {
         tools[index] = manipulation->addAction(tool_names[index]);
         tools[index]->setObjectName(tool_ids[index]);
@@ -640,11 +482,11 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
             tools[index]->setChecked(tool_modes[index] == mode);
         }
     };
-    viewport_->on_transform_begin = [this] { return begin_transform(); };
+    viewport_->on_transform_begin   = [this] { return begin_transform(); };
     viewport_->on_transform_preview = [this](const auto& transform) {
         return preview_transform(transform);
     };
-    viewport_->on_transform_end = [this](bool commit) { finish_transform(commit); };
+    viewport_->on_transform_end     = [this](bool commit) { finish_transform(commit); };
     viewport_->on_interaction_error = [this](const auto& error) {
         statusBar()->showMessage(QString::fromStdString(error), 5000);
     };
@@ -664,14 +506,15 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     statusBar()->addPermanentWidget(task_progress_);
     task_label_->hide();
     task_progress_->hide();
+    // 按固定频率汇总后台进度和视口状态，避免每个采样事件更新 GUI。
     auto* status_timer = new QTimer(this);
     status_timer->setInterval(100);
     connect(status_timer, &QTimer::timeout, this, [this] {
         const bool waiting = viewport_->preview_wait_ms() >= 150;
-        const bool busy = asset_loading_ || waiting;
+        const bool busy    = asset_loading_ || waiting;
         task_label_->setVisible(busy);
         task_progress_->setVisible(busy);
-        const auto geometry_status = geometry_tasks_->status();
+        const auto geometry_status  = geometry_tasks_->status();
         const bool geometry_running = geometry_tasks_->busy();
         const auto task_text = geometry_running && !geometry_status.progress.stage.empty()
                                    ? QString::fromUtf8(geometry_status.progress.stage.c_str())
@@ -754,290 +597,6 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     }
 }
 
-void Workbench::build_object_panel() {
-    object_panel_ = new QWidget;
-    auto* layout = new QFormLayout(object_panel_);
-    configure_form(layout);
-    object_name_ = new QLineEdit;
-    object_name_->setObjectName("object_name");
-    translation_ = new VectorField(object_panel_, "translation");
-    rotation_ = new VectorField(object_panel_, "rotation", -360, 360);
-    scale_ = new VectorField(object_panel_, "scale", -100, 100);
-    base_color_ = new VectorField(object_panel_, "base_color", 0, 1);
-    emission_ = new VectorField(object_panel_, "emission", 0, 1000000);
-    material_kind_ = new QComboBox;
-    material_kind_->setObjectName("material_kind");
-    material_kind_->addItems({"漫反射", "金属", "镜面（预览近似）", "玻璃（预览近似）",
-                              "布料（微圆柱）", "次表面散射（SSS）"});
-    texture_selector_ = new QComboBox;
-    texture_selector_->setObjectName("base_texture");
-    texture_filter_ = new QComboBox;
-    texture_filter_->setObjectName("texture_filter");
-    texture_filter_->addItems({"最近邻", "双线性", "三线性 mipmap"});
-    double_sided_ = new QCheckBox("双面渲染");
-    double_sided_->setObjectName("material_double_sided");
-    double_sided_->setToolTip("关闭时只显示几何正面；镜像缩放保留原外侧。");
-    roughness_ = spin(object_panel_, "roughness", 0, 1, 0.05);
-    ior_ = spin(object_panel_, "ior", 0.1, 5, 0.05);
-    layout->addRow("名称", object_name_);
-    layout->addRow(editor::section("变换", object_panel_));
-    layout->addRow("位置 / m", translation_);
-    layout->addRow("旋转 / °", rotation_);
-    layout->addRow("缩放", scale_);
-    cloth_collider_ = new ClothColliderPanel(object_panel_);
-    layout->addRow(cloth_collider_);
-    cloth_collider_->on_changed = [this](const minirender::ClothCollider& collider) {
-        edit_object_property(
-            [&](minirender::SceneObject& object) { object.cloth_collider = collider; });
-    };
-    layout->addRow(editor::section("表面材质", object_panel_));
-    layout->addRow("材质", material_kind_);
-    material_notice_ = new QLabel(object_panel_);
-    material_notice_->setObjectName("material_notice");
-    material_notice_->setWordWrap(true);
-    material_notice_->setProperty("role", "muted");
-    layout->addRow(material_notice_);
-    layout->addRow(double_sided_);
-    layout->addRow("底色", base_color_);
-    layout->addRow("底色纹理", texture_selector_);
-    layout->addRow("纹理过滤", texture_filter_);
-    layout->addRow("自发光", emission_);
-    layout->addRow("粗糙度", roughness_);
-    layout->addRow("折射率", ior_);
-    auto* hint = new QLabel("同一材质的参数会同时影响引用它的物体。");
-    hint->setWordWrap(true);
-    hint->setProperty("role", "muted");
-    layout->addRow(hint);
-    cloth_material_ = new ClothMaterialPanel(object_panel_);
-    layout->addRow(cloth_material_);
-    cloth_material_->on_changed =
-        [this](std::shared_ptr<const minirender::ClothAppearance> appearance,
-               std::optional<double> ior) {
-            edit_material_property([&](minirender::Material& material) {
-                material.cloth = appearance;
-                if (ior) {
-                    material.ior = static_cast<float>(*ior);
-                    material.base_color = glm::vec3(1);
-                }
-            });
-        };
-    subsurface_material_ = new SubsurfaceMaterialPanel(object_panel_);
-    layout->addRow(subsurface_material_);
-    subsurface_material_->on_changed = [this](auto parameters, std::optional<double> ior) {
-        edit_material_property([&](minirender::Material& material) {
-            material.subsurface = parameters;
-            if (ior) {
-                material.ior = static_cast<float>(*ior);
-            }
-        });
-    };
-    subsurface_material_->render_active = [this] {
-        return offline_ && (!minirender::render_terminal(offline_->session().progress().state) ||
-                            offline_->exporting());
-    };
-    subsurface_material_->on_render = [this](bool start) {
-        if (start && minirender::render_terminal(offline_->session().progress().state) &&
-            !offline_->exporting()) {
-            offline_->set_integrator_kind(minirender::IntegratorKind::path_tracing);
-            offline_->start();
-        }
-        panels_->setCurrentIndex(3);
-    };
-    translation_->on_changed = [this] {
-        edit_object_property([&](minirender::SceneObject& object) {
-            object.transform.translation = translation_->value();
-        });
-    };
-    rotation_->on_changed = [this] {
-        edit_object_property([&](minirender::SceneObject& object) {
-            object.transform.rotation_degrees = rotation_->value();
-        });
-    };
-    scale_->on_changed = [this] {
-        edit_object_property(
-            [&](minirender::SceneObject& object) { object.transform.scale = scale_->value(); });
-    };
-    base_color_->on_changed = [this] {
-        edit_material_property(
-            [&](minirender::Material& material) { material.base_color = base_color_->value(); });
-    };
-    emission_->on_changed = [this] {
-        edit_material_property(
-            [&](minirender::Material& material) { material.emission = emission_->value(); });
-    };
-    connect(object_name_, &QLineEdit::editingFinished, this, [this] {
-        if (!object_name_->isModified()) {
-            return;
-        }
-        object_name_->setModified(false);
-        edit_object_property([&](minirender::SceneObject& object) {
-            object.name = object_name_->text().toStdString();
-        });
-    });
-    connect(roughness_, &QDoubleSpinBox::valueChanged, this, [this] {
-        edit_material_property([&](minirender::Material& material) {
-            material.roughness = static_cast<float>(roughness_->value());
-        });
-    });
-    connect(ior_, &QDoubleSpinBox::valueChanged, this, [this] {
-        edit_material_property([&](minirender::Material& material) {
-            material.ior = static_cast<float>(ior_->value());
-        });
-    });
-    connect(material_kind_, &QComboBox::currentIndexChanged, this, [this] {
-        if (refreshing_) {
-            return;
-        }
-        const auto kind = static_cast<minirender::MaterialKind>(material_kind_->currentIndex());
-        if (kind == minirender::MaterialKind::subsurface) {
-            for (const auto& object : editor_.document().objects) {
-                if (object.id != selected_id_) {
-                    continue;
-                }
-                for (const auto& material : editor_.document().materials) {
-                    if (material.id == object.material_id && !material.base_color_texture.empty()) {
-                        refresh_properties();
-                        material_notice_->setText("请先移除底色纹理，再使用均匀 SSS 材质。");
-                        material_notice_->show();
-                        return;
-                    }
-                }
-            }
-        }
-        edit_material_property([&](minirender::Material& material) {
-            material.kind = kind;
-            if (material.kind == minirender::MaterialKind::cloth) {
-                material.ior = std::clamp(material.ior, 1.0F, 3.0F);
-                if (!material.cloth) {
-                    const auto preset = minirender::make_cloth_preset("linen");
-                    material.cloth = preset.appearance;
-                    material.ior = static_cast<float>(preset.ior);
-                    material.base_color = glm::vec3(1);
-                }
-            }
-            if (kind == minirender::MaterialKind::subsurface) {
-                material.ior = std::clamp(material.ior, 1.0F, 3.0F);
-                if (!material.subsurface) {
-                    const auto preset = minirender::make_subsurface_preset("marble");
-                    material.subsurface = preset.parameters;
-                    material.ior = static_cast<float>(preset.ior);
-                }
-            }
-        });
-    });
-    connect(texture_selector_, &QComboBox::currentIndexChanged, this, [this] {
-        edit_material_property([&](minirender::Material& material) {
-            material.base_color_texture = texture_selector_->currentData().toString().toStdString();
-        });
-    });
-    connect(texture_filter_, &QComboBox::currentIndexChanged, this, [this] {
-        edit_material_property([&](minirender::Material& material) {
-            material.texture_filter =
-                static_cast<minirender::TextureFilter>(texture_filter_->currentIndex());
-        });
-    });
-    connect(double_sided_, &QCheckBox::toggled, this, [this](bool checked) {
-        edit_material_property(
-            [&](minirender::Material& material) { material.double_sided = checked; });
-    });
-    object_panel_->setEnabled(false);
-}
-
-void Workbench::build_light_panel() {
-    light_panel_ = new QWidget;
-    auto* layout = new QFormLayout(light_panel_);
-    configure_form(layout);
-    light_selector_ = new QComboBox;
-    light_direction_ = new VectorField(light_panel_, "light_direction", -100, 100);
-    light_color_ = new VectorField(light_panel_, "light_color", 0, 100);
-    light_intensity_ = spin(light_panel_, "light_intensity", 0, 1000, 0.1);
-    layout->addRow("方向光", light_selector_);
-    layout->addRow("传播方向", light_direction_);
-    layout->addRow("颜色", light_color_);
-    layout->addRow("强度", light_intensity_);
-    connect(light_selector_, &QComboBox::currentIndexChanged, this, [this] {
-        if (!refreshing_) {
-            refresh_properties();
-        }
-    });
-    const auto update = [this] {
-        if (refreshing_ || light_selector_->currentIndex() < 0) {
-            return;
-        }
-        perform_edit([&](minirender::SceneDocument& scene) {
-            auto& light = scene.directional_lights.at(
-                static_cast<std::size_t>(light_selector_->currentIndex()));
-            light.direction = light_direction_->value();
-            light.color = light_color_->value();
-            light.intensity = static_cast<float>(light_intensity_->value());
-        });
-    };
-    light_direction_->on_changed = light_color_->on_changed = update;
-    connect(light_intensity_, &QDoubleSpinBox::valueChanged, this, update);
-}
-
-void Workbench::build_camera_panel() {
-    camera_panel_ = new QWidget;
-    auto* layout = new QFormLayout(camera_panel_);
-    configure_form(layout);
-    camera_position_ = new VectorField(camera_panel_, "camera_position");
-    camera_target_ = new VectorField(camera_panel_, "camera_target");
-    fov_ = spin(camera_panel_, "fov", 5, 150, 1);
-    exposure_ = spin(camera_panel_, "exposure", -10, 10, 0.25);
-    aperture_ = spin(camera_panel_, "aperture_radius", 0, 10, 0.005);
-    focus_ = spin(camera_panel_, "focus_distance", 0.0001, 100000, 0.1);
-    auto* mode = new QComboBox;
-    mode->setObjectName("view_mode");
-    mode->addItems({"光照合成", "法线", "线性深度", "线框", "原始 AO", "滤波 AO", "原色预览"});
-    mode->setItemData(VulkanViewport::base_color_preview_mode,
-                      "均匀亮度显示材质和纹理，保留深度与接触遮蔽；不依赖场景光源。",
-                      Qt::ToolTipRole);
-    layout->addRow(editor::section("相机", camera_panel_));
-    layout->addRow("位置", camera_position_);
-    layout->addRow("目标", camera_target_);
-    layout->addRow("垂直 FOV / °", fov_);
-    layout->addRow("光圈半径 / m", aperture_);
-    layout->addRow("对焦距离 / m", focus_);
-    layout->addRow(editor::section("视口显示", camera_panel_));
-    layout->addRow("曝光 / EV", exposure_);
-    layout->addRow("显示", mode);
-    auto* fxaa = new QCheckBox("启用 FXAA");
-    fxaa->setObjectName("fxaa_enabled");
-    fxaa->setChecked(true);
-    layout->addRow(fxaa);
-    connect(fxaa, &QCheckBox::toggled, this,
-            [this](bool enabled) { viewport_->set_fxaa_enabled(enabled); });
-    auto* shadows = new QCheckBox("启用方向光阴影");
-    shadows->setObjectName("shadows_enabled");
-    shadows->setChecked(true);
-    layout->addRow(shadows);
-    connect(shadows, &QCheckBox::toggled, this,
-            [this](bool enabled) { viewport_->set_shadows_enabled(enabled); });
-    const auto update = [this] {
-        if (refreshing_) {
-            return;
-        }
-        perform_edit([&](minirender::SceneDocument& scene) {
-            scene.camera.position = camera_position_->value();
-            scene.camera.target = camera_target_->value();
-            scene.camera.vertical_fov_degrees = static_cast<float>(fov_->value());
-            scene.camera.aperture_radius = static_cast<float>(aperture_->value());
-            scene.camera.focus_distance = static_cast<float>(focus_->value());
-        });
-    };
-    camera_position_->on_changed = camera_target_->on_changed = update;
-    connect(fov_, &QDoubleSpinBox::valueChanged, this, update);
-    connect(aperture_, &QDoubleSpinBox::valueChanged, this, update);
-    connect(focus_, &QDoubleSpinBox::valueChanged, this, update);
-    connect(exposure_, &QDoubleSpinBox::valueChanged, this,
-            [this](double value) { viewport_->set_exposure(static_cast<float>(value)); });
-    connect(mode, &QComboBox::currentIndexChanged, this, [this](int index) {
-        viewport_->set_view_mode(index);
-        exposure_->setEnabled(index != VulkanViewport::base_color_preview_mode);
-    });
-    mode->setCurrentIndex(VulkanViewport::base_color_preview_mode);
-}
-
 void Workbench::refresh() {
     if (!editor_.transforming()) {
         viewport_->finish_gizmo_drag(false);
@@ -1088,93 +647,12 @@ void Workbench::refresh() {
     volume_->set_document(editor_.document().media, document_generation_);
 }
 
-void Workbench::refresh_properties() {
-    refreshing_ = true;
-    const auto& document = editor_.document();
-    geometry_->set_context(document, selected_id_);
-    const auto object = std::find_if(
-        document.objects.begin(), document.objects.end(),
-        [&](const minirender::SceneObject& value) { return value.id == selected_id_; });
-    texture_selector_->clear();
-    texture_selector_->addItem("无", QString());
-    for (const auto& texture : document.textures) {
-        texture_selector_->addItem(QString::fromStdString(texture.id),
-                                   QString::fromStdString(texture.id));
-    }
-    object_panel_->setEnabled(object != document.objects.end());
-    cloth_collider_->set_collider(object != document.objects.end() ? object->cloth_collider
-                                                                   : std::nullopt);
-    if (object == document.objects.end()) {
-        cloth_material_->set_material(nullptr, document_generation_);
-        subsurface_material_->set_material(nullptr, document_generation_);
-    }
-    material_notice_->clear();
-    material_notice_->hide();
-    viewport_->set_gizmo_target(
-        object != document.objects.end() && object->visible ? object->id : "",
-        object != document.objects.end() && object->visible ? std::optional(object->transform)
-                                                            : std::nullopt);
-    if (object != document.objects.end()) {
-        object_name_->setText(QString::fromStdString(object->name));
-        translation_->set_value(object->transform.translation);
-        rotation_->set_value(object->transform.rotation_degrees);
-        scale_->set_value(object->transform.scale);
-        for (const auto& material : document.materials) {
-            if (material.id == object->material_id) {
-                base_color_->set_value(material.base_color);
-                emission_->set_value(material.emission);
-                material_kind_->setCurrentIndex(static_cast<int>(material.kind));
-                const bool cloth = material.kind == minirender::MaterialKind::cloth;
-                const bool subsurface = material.kind == minirender::MaterialKind::subsurface;
-                roughness_->setEnabled(!cloth && !subsurface);
-                base_color_->setEnabled(!subsurface);
-                texture_selector_->setEnabled(!subsurface);
-                texture_filter_->setEnabled(!subsurface);
-                ior_->setRange(cloth || subsurface ? 1 : .1, cloth || subsurface ? 3 : 5);
-                cloth_material_->set_material(&material, document_generation_);
-                subsurface_material_->set_material(&material, document_generation_);
-                roughness_->setValue(material.roughness);
-                ior_->setValue(material.ior);
-                double_sided_->setChecked(material.double_sided);
-                texture_selector_->setCurrentIndex(texture_selector_->findData(
-                    QString::fromStdString(material.base_color_texture)));
-                texture_filter_->setCurrentIndex(static_cast<int>(material.texture_filter));
-            }
-        }
-    }
-    const int index = light_selector_->currentIndex();
-    light_direction_->setEnabled(index >= 0);
-    light_color_->setEnabled(index >= 0);
-    light_intensity_->setEnabled(index >= 0);
-    if (index >= 0) {
-        const auto& light = document.directional_lights.at(static_cast<std::size_t>(index));
-        light_direction_->set_value(light.direction);
-        light_color_->set_value(light.color);
-        light_intensity_->setValue(light.intensity);
-    }
-    refreshing_ = false;
-    update_point_selection();
-}
-
-void Workbench::refresh_camera() {
-    camera_position_->set_value(editor_.document().camera.position);
-    camera_target_->set_value(editor_.document().camera.target);
-    const QSignalBlocker blocker(fov_);
-    fov_->setValue(editor_.document().camera.vertical_fov_degrees);
-    const QSignalBlocker aperture_blocker(aperture_);
-    const QSignalBlocker focus_blocker(focus_);
-    const QSignalBlocker exposure_blocker(exposure_);
-    aperture_->setValue(editor_.document().camera.aperture_radius);
-    focus_->setValue(editor_.document().camera.focus_distance);
-    exposure_->setValue(viewport_->exposure());
-}
-
 OfflinePanel* Workbench::offline_panel() const noexcept {
     return offline_;
 }
 
 void Workbench::perform_edit(const std::function<void(minirender::SceneDocument&)>& operation,
-                             const minirender::MeshValidationCache* validated) {
+                             const minirender::MeshValidationCache*                 validated) {
     try {
         if (validated) {
             editor_.edit_prevalidated(operation, *validated);
@@ -1227,13 +705,13 @@ void Workbench::duplicate_object() {
     perform_edit([&](minirender::SceneDocument& scene) {
         if (const auto* original = selected(scene)) {
             auto copy = *original;
-            copy.id = unique_id(scene.objects, "object_");
+            copy.id   = unique_id(scene.objects, "object_");
             if (copy.cloth) {
                 const auto asset =
                     std::find_if(scene.meshes.begin(), scene.meshes.end(),
                                  [&](const auto& value) { return value.id == copy.mesh_id; });
-                auto mesh = *asset;
-                mesh.id = unique_id(scene.meshes, "cloth_mesh_");
+                auto mesh    = *asset;
+                mesh.id      = unique_id(scene.meshes, "cloth_mesh_");
                 copy.mesh_id = mesh.id;
                 scene.meshes.push_back(std::move(mesh));
             }
@@ -1288,7 +766,7 @@ void Workbench::begin_asset_task(const QString& message) {
 }
 
 void Workbench::finish_asset_task() {
-    asset_loading_ = false;
+    asset_loading_   = false;
     texture_loading_ = false;
     open_action_->setEnabled(true);
     builtin_button_->setEnabled(true);
@@ -1307,370 +785,15 @@ bool Workbench::asset_loading() const noexcept {
     return asset_loading_;
 }
 
-void Workbench::import_object_file(const QString& path) {
-    begin_asset_task("正在读取并校验网格…");
-    const auto source = native_path(path);
-    const auto generation = document_generation_;
-    run_background(
-        this,
-        [source] {
-            LoadedMesh result;
-            result.data =
-                std::make_shared<const minirender::MeshData>(minirender::load_obj(source));
-            result.validated.validate(result.data);
-            result.raster = minirender::prepare_raster_mesh(*result.data);
-            return result;
-        },
-        [this, source, path, generation](const auto& result) {
-            finish_asset_task();
-            if (generation != document_generation_) {
-                return;
-            }
-            if (!result.error.empty()) {
-                report_error(std::runtime_error(result.error));
-                return;
-            }
-            viewport_->supply_raster_mesh(result.value.data, result.value.raster);
-            perform_edit(
-                [&](minirender::SceneDocument& scene) {
-                    if (scene.materials.empty()) {
-                        scene.materials.push_back({"default", "默认材质"});
-                    }
-                    const auto mesh_id = unique_id(scene.meshes, "mesh_");
-                    const auto object_id = unique_id(scene.objects, "object_");
-                    scene.meshes.push_back({mesh_id, source, result.value.data});
-                    scene.objects.push_back({object_id,
-                                             QFileInfo(path).baseName().toStdString(),
-                                             mesh_id,
-                                             scene.materials.front().id,
-                                             {},
-                                             true});
-                    selected_id_ = object_id;
-                },
-                &result.value.validated);
-        });
-}
-
-void Workbench::open_scene_file(const QString& path, std::function<void()> after_load) {
-    begin_asset_task("正在读取场景与资产…");
-    const auto source = native_path(path);
-    const auto generation = ++document_generation_;
-    run_background(
-        this,
-        [source] {
-            LoadedScene result;
-            result.document = minirender::load_scene(source);
-            result.document.validate(&result.validated);
-            for (const auto& mesh : result.document.meshes) {
-                const bool visible = std::any_of(
-                    result.document.objects.begin(), result.document.objects.end(),
-                    [&](const auto& item) { return item.visible && item.mesh_id == mesh.id; });
-                if (visible) {
-                    result.raster.emplace_back(mesh.data,
-                                               minirender::prepare_raster_mesh(*mesh.data));
-                }
-            }
-            return result;
-        },
-        [this, path, generation, after_load = std::move(after_load)](const auto& result) {
-            finish_asset_task();
-            if (generation != document_generation_) {
-                return;
-            }
-            if (!result.error.empty()) {
-                report_error(std::runtime_error(result.error));
-                return;
-            }
-            try {
-                for (const auto& [mesh, raster] : result.value.raster) {
-                    viewport_->supply_raster_mesh(mesh, raster);
-                }
-                install_scene(result.value.document, path, &result.value.validated);
-                if (after_load) {
-                    after_load();
-                }
-            } catch (const std::exception& error) {
-                report_error(error);
-            }
-        });
-}
-
-void Workbench::import_builtin_scene(const QString& id) {
-    const auto& scenes = builtin_scenes();
-    const auto found =
-        std::find_if(scenes.begin(), scenes.end(), [&](const auto& item) { return item.id == id; });
-    if (found == scenes.end()) {
-        throw std::invalid_argument("Unknown built-in scene");
-    }
-    const auto preset = *found;
-    open_scene_file(builtin_scene_directory() + "/" + preset.filename, [this, preset] {
-        scene_path_.clear();
-        findChild<QDoubleSpinBox*>("exposure")->setValue(0);
-        lightfield_->cancel();
-        offline_->prepare_import(preset.render, preset.integrator);
-        select_object(preset.selected_object);
-        findChild<QComboBox*>("view_mode")
-            ->setCurrentIndex(VulkanViewport::base_color_preview_mode);
-        if (!editor_.document().media.empty()) {
-            panels_->setCurrentIndex(10);
-        }
-        for (const auto& material : editor_.document().materials) {
-            if (material.kind == minirender::MaterialKind::subsurface) {
-                panels_->setCurrentIndex(0);
-                break;
-            }
-        }
-        if (preset.id == "lightfield") {
-            minirender::LightFieldCaptureSettings settings;
-            settings.render = preset.render;
-            settings.reference_focus = 4;
-            settings.aperture_radius = .2;
-            lightfield_panel_->set_capture_settings(settings);
-            panels_->setCurrentIndex(11);
-        }
-        setWindowTitle("MiniRender — " + preset.name + "（示例副本）");
-        statusBar()->showMessage(
-            preset.name + " 已覆盖导入，当前为原色预览；可编辑后开始离线渲染。", 12000);
-    });
-}
-
-void Workbench::load_scene_file(const QString& path) {
-    install_scene(minirender::load_scene(native_path(path)), path);
-}
-
-void Workbench::install_scene(minirender::SceneDocument document, const QString& path,
-                              const minirender::MeshValidationCache* validated) {
-    if (document.directional_lights.size() > 8) {
-        throw std::runtime_error("实时视口目前最多支持 8 个方向光。");
-    }
-    ++document_generation_;
-    ++document_revision_;
-    if (cloth_controller_) {
-        cloth_controller_->pause();
-    }
-    cloth_target_.clear();
-    geometry_tasks_->cancel();
-    viewport_->set_point_preview_data({});
-    points_->clear_source();
-    if (validated) {
-        editor_.replace_prevalidated(std::move(document), *validated);
-    } else {
-        editor_.replace(std::move(document));
-    }
-    scene_path_ = path;
-#ifdef Q_OS_MACOS
-    // 包内示例作为模板打开，首次保存选择用户路径，保持已签名资源不变。
-    const auto resources =
-        QDir(QCoreApplication::applicationDirPath() + "/../Resources").canonicalPath();
-    if (!resources.isEmpty() && QFileInfo(path).canonicalFilePath().startsWith(resources + '/')) {
-        scene_path_.clear();
-    }
-#endif
-    selected_id_.clear();
-    diagnostic_ = false;
-    refresh();
-    setWindowTitle("MiniRender — " + QFileInfo(path).fileName() +
-                   (scene_path_.isEmpty() ? "（示例副本）" : ""));
-}
-
-void Workbench::save_scene_file(const QString& path) {
-    minirender::save_scene(editor_.document(), native_path(path));
-    scene_path_ = path;
-    setWindowTitle("MiniRender — " + QFileInfo(path).fileName());
-}
-
 GeometryController* Workbench::geometry_controller() const noexcept {
     return geometry_tasks_;
 }
+
 GeometryPanel* Workbench::geometry_panel() const noexcept {
     return geometry_;
 }
 
 // 每个结束分支都释放资产互斥状态，失败信息由几何面板和短时状态栏消息显示。
-bool Workbench::finish_geometry_task(const GeometryTaskResult& result) {
-    finish_asset_task();
-    geometry_notice_.restart();
-    return result.error.empty() && !result.cancelled;
-}
-
-void Workbench::apply_geometry() {
-    const auto& document = editor_.document();
-    const auto object = std::find_if(document.objects.begin(), document.objects.end(),
-                                     [&](const auto& item) { return item.id == selected_id_; });
-    if (object == document.objects.end()) {
-        throw std::invalid_argument("Select an object before generating geometry");
-    }
-    if (object->cloth) {
-        throw std::invalid_argument("请先冻结布料，再进行网格处理。");
-    }
-    const auto mesh = std::find_if(document.meshes.begin(), document.meshes.end(),
-                                   [&](const auto& item) { return item.id == object->mesh_id; });
-    if (mesh == document.meshes.end()) {
-        throw std::invalid_argument("Selected mesh is missing");
-    }
-    const auto params = geometry_->parameters();
-    GeometryTaskInput input;
-    input.mesh = mesh->data;
-    input.loop = params.loop;
-    input.height_settings = params.displacement;
-    input.simplify = params.simplify;
-    input.remesh = params.remesh;
-    input.adaptive = params.adaptive;
-    if (input.adaptive && input.adaptive->metric == minirender::AdaptiveMetric::screen_pixels) {
-        const auto extent = viewport_->swapChainImageSize();
-        if (extent.isEmpty()) {
-            throw std::runtime_error("Wait for the viewport before using pixel error");
-        }
-        const auto& camera = viewport_->camera();
-        input.adaptive->projection = minirender::AdaptiveProjection{
-            glm::dmat4(camera.projection_matrix(static_cast<float>(extent.width()) /
-                                                static_cast<float>(extent.height()))) *
-                glm::dmat4(camera.view_matrix()) * glm::dmat4(object->transform.matrix()),
-            {static_cast<double>(extent.width()), static_cast<double>(extent.height())}};
-    }
-    input.target_name = object->name;
-    if (params.displacement && params.displacement->scale != 0) {
-        const auto height = std::find_if(
-            document.textures.begin(), document.textures.end(), [&](const auto& texture) {
-                return texture.id == params.height_id &&
-                       texture.encoding == minirender::ColorEncoding::linear;
-            });
-        if (height == document.textures.end()) {
-            throw std::invalid_argument("Select a linear height texture before displacement");
-        }
-        input.height = height->data;
-    }
-    const auto generation = document_generation_;
-    const auto target = object->id;
-    const auto expected_mesh_id = mesh->id;
-    const auto source = mesh->data;
-    begin_asset_task("正在生成网格…");
-    try {
-        geometry_tasks_->build_mesh(std::move(input), [this, generation, target, expected_mesh_id,
-                                                       source](const auto& result) {
-            if (!finish_geometry_task(result)) {
-                return true;
-            }
-            const auto& current = editor_.document();
-            const auto current_object =
-                std::find_if(current.objects.begin(), current.objects.end(),
-                             [&](const auto& item) { return item.id == target; });
-            const auto current_mesh =
-                std::find_if(current.meshes.begin(), current.meshes.end(),
-                             [&](const auto& item) { return item.id == expected_mesh_id; });
-            if (generation != document_generation_ || current_object == current.objects.end() ||
-                current_object->mesh_id != expected_mesh_id ||
-                current_mesh == current.meshes.end() || current_mesh->data != source) {
-                return false;
-            }
-            if (result.mesh != source) {
-                editor_.edit_prevalidated(
-                    [&](auto& scene) {
-                        const auto id = unique_id(scene.meshes, "geometry_");
-                        scene.meshes.push_back({id, {}, result.mesh});
-                        for (auto& item : scene.objects) {
-                            if (item.id == target) {
-                                item.mesh_id = id;
-                            }
-                        }
-                    },
-                    result.validated_meshes);
-                ++document_revision_;
-                viewport_->supply_raster_mesh(result.mesh, result.raster);
-                refresh();
-            }
-            if (selected_id_ == target) {
-                geometry_->show_result(result);
-            }
-            return true;
-        });
-    } catch (...) {
-        finish_asset_task();
-        throw;
-    }
-}
-
-void Workbench::import_height_file(const QString& path) {
-    const auto generation = document_generation_;
-    begin_asset_task("正在读取线性高度图…");
-    try {
-        geometry_tasks_->import_height(native_path(path), [this, generation](const auto& result) {
-            if (!finish_geometry_task(result)) {
-                return true;
-            }
-            if (generation != document_generation_) {
-                return false;
-            }
-            std::string id;
-            editor_.edit([&](auto& scene) {
-                id = unique_id(scene.textures, "height_");
-                scene.textures.push_back(
-                    {id, result.saved_path, minirender::ColorEncoding::linear, result.height});
-            });
-            ++document_revision_;
-            refresh();
-            geometry_->select_height(id);
-            return true;
-        });
-    } catch (...) {
-        finish_asset_task();
-        throw;
-    }
-}
-
-void Workbench::export_geometry_file(const QString& path) {
-    const auto& document = editor_.document();
-    const auto object = std::find_if(document.objects.begin(), document.objects.end(),
-                                     [&](const auto& item) { return item.id == selected_id_; });
-    if (object == document.objects.end()) {
-        throw std::invalid_argument("Select an object before exporting geometry");
-    }
-    const auto mesh = std::find_if(document.meshes.begin(), document.meshes.end(),
-                                   [&](const auto& item) { return item.id == object->mesh_id; });
-    if (mesh == document.meshes.end()) {
-        throw std::invalid_argument("Selected mesh is missing");
-    }
-    begin_asset_task("正在导出 OBJ…");
-    try {
-        geometry_tasks_->export_obj(document, mesh->data, native_path(path),
-                                    [this](const auto& result) {
-                                        finish_geometry_task(result);
-                                        return true;
-                                    });
-    } catch (...) {
-        finish_asset_task();
-        throw;
-    }
-}
-
-void Workbench::save_scene_async(const QString& path) {
-    const auto generation = document_generation_;
-    const auto revision = document_revision_;
-    begin_asset_task("正在保存场景快照…");
-    try {
-        geometry_tasks_->save_scene(editor_.document(), native_path(path),
-                                    [this, generation, revision, path](const auto& result) {
-                                        if (!finish_geometry_task(result)) {
-                                            return true;
-                                        }
-                                        if (generation == document_generation_) {
-                                            scene_path_ = path;
-                                            const bool changed = revision != document_revision_;
-                                            setWindowTitle("MiniRender — " +
-                                                           QFileInfo(path).fileName() +
-                                                           (changed ? " *" : ""));
-                                            if (changed) {
-                                                geometry_notice_extra_ = " | 当前还有未保存修改";
-                                            }
-                                        }
-                                        return true;
-                                    });
-    } catch (...) {
-        finish_asset_task();
-        throw;
-    }
-}
-
 void Workbench::select_object(const std::string& id) {
     viewport_->finish_gizmo_drag(false);
     selected_id_ = id;
@@ -1692,15 +815,18 @@ void Workbench::report_error(const std::exception& error) {
 LightFieldController* Workbench::lightfield_controller() const noexcept {
     return lightfield_;
 }
+
 LightFieldPanel* Workbench::lightfield_panel() const noexcept {
     return lightfield_panel_;
 }
+
 void Workbench::mark_snapshot_changed() {
     offline_->scene_changed();
     if (lightfield_) {
         lightfield_->scene_changed();
     }
 }
+
 void Workbench::export_display_hdr(const QString& path) {
     if (viewport_->offline_visible()) {
         if (viewport_->offline_source() == OfflineImageSource::lightfield) {
@@ -1712,6 +838,7 @@ void Workbench::export_display_hdr(const QString& path) {
         viewport_->grab_hdr().write_exr(native_path(path));
     }
 }
+
 Workbench::~Workbench() {
     // 先断开面板导航回调，随后 QMainWindow 可以销毁停靠布局和子窗口。
     delete panels_;
@@ -1725,14 +852,14 @@ Workbench::~Workbench() {
     }
     // 原生子窗口晚于派生类成员销毁；先结束手势，断开持有编辑器引用的回调。
     viewport_->finish_gizmo_drag(false);
-    viewport_->on_transform_begin = {};
-    viewport_->on_transform_preview = {};
-    viewport_->on_transform_end = {};
-    viewport_->on_gizmo_mode_changed = {};
-    viewport_->on_interaction_error = {};
+    viewport_->on_transform_begin       = {};
+    viewport_->on_transform_preview     = {};
+    viewport_->on_transform_end         = {};
+    viewport_->on_gizmo_mode_changed    = {};
+    viewport_->on_interaction_error     = {};
     viewport_->on_point_preview_changed = {};
-    viewport_->on_sdf_visible_changed = {};
-    viewport_->on_sdf_display_changed = {};
+    viewport_->on_sdf_visible_changed   = {};
+    viewport_->on_sdf_display_changed   = {};
 }
 
 SdfPanel* Workbench::sdf_panel() const noexcept {
@@ -1807,105 +934,11 @@ void Workbench::finish_transform(bool commit) {
     }
     sync_cloth_context();
 }
+
 VulkanViewport* Workbench::viewport() const noexcept {
     return viewport_;
 }
+
 const minirender::SceneDocument& Workbench::document() const noexcept {
     return editor_.document();
-}
-
-void Workbench::import_texture() {
-    const auto path = QFileDialog::getOpenFileName(this, "导入底色纹理", {},
-                                                   "Images (*.png *.jpg *.jpeg *.hdr *.exr)");
-    if (path.isEmpty()) {
-        return;
-    }
-    const auto suffix = QFileInfo(path).suffix().toLower();
-    const auto encoding = suffix == "hdr" || suffix == "exr" ? minirender::ColorEncoding::linear
-                                                             : minirender::ColorEncoding::srgb;
-    import_texture_file(path, encoding);
-}
-
-void Workbench::import_texture_file(const QString& path, minirender::ColorEncoding encoding) {
-    begin_asset_task("正在读取纹理并生成 mipmap…");
-    std::string material_id;
-    for (const auto& object : editor_.document().objects) {
-        if (object.id == selected_id_) {
-            material_id = object.material_id;
-        }
-    }
-    const auto generation = document_generation_;
-    const auto source = native_path(path);
-    texture_loading_ = true;
-    run_background(
-        this,
-        [source, encoding] {
-            return std::make_shared<const minirender::Texture>(
-                minirender::Image::read(source, encoding));
-        },
-        [this, generation, source, encoding, material_id](const auto& result) {
-            finish_asset_task();
-            if (generation != document_generation_) {
-                return;
-            }
-            if (!result.error.empty()) {
-                report_error(std::runtime_error(result.error));
-                return;
-            }
-            bool subsurface_target = false;
-            perform_edit([&](minirender::SceneDocument& scene) {
-                const auto id = unique_id(scene.textures, "texture_");
-                scene.textures.push_back({id, source, encoding, result.value});
-                for (auto& material : scene.materials) {
-                    if (material.id == material_id) {
-                        if (material.kind == minirender::MaterialKind::subsurface) {
-                            subsurface_target = true;
-                        } else {
-                            material.base_color_texture = id;
-                        }
-                    }
-                }
-            });
-            if (subsurface_target) {
-                material_notice_->setText("纹理已导入资源；均匀 SSS 材质不使用底色纹理。");
-                material_notice_->show();
-            }
-        });
-}
-
-bool Workbench::texture_loading() const noexcept {
-    return texture_loading_;
-}
-
-IblController* Workbench::ibl_controller() const noexcept {
-    return ibl_;
-}
-void Workbench::import_environment_file(const QString& path) {
-    begin_asset_task("正在读取环境图…");
-    const auto source = native_path(path);
-    const auto suffix = QFileInfo(path).suffix().toLower();
-    const auto encoding = suffix == "hdr" || suffix == "exr" ? minirender::ColorEncoding::linear
-                                                             : minirender::ColorEncoding::srgb;
-    const auto generation = document_generation_;
-    run_background(
-        this,
-        [source, encoding] {
-            return std::make_shared<const minirender::Texture>(
-                minirender::Image::read(source, encoding));
-        },
-        [this, source, encoding, generation](const auto& result) {
-            finish_asset_task();
-            if (generation != document_generation_) {
-                return;
-            }
-            if (!result.error.empty()) {
-                report_error(std::runtime_error(result.error));
-                return;
-            }
-            perform_edit([&](auto& scene) {
-                const auto id = unique_id(scene.textures, "environment_");
-                scene.textures.push_back({id, source, encoding, result.value});
-                scene.environment_map.texture_id = id;
-            });
-        });
 }

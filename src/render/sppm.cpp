@@ -1,3 +1,6 @@
+// 随机渐进光子映射的相机路径、光子合并和逐像素统计。
+// 公开接口与参数约定见 include/minirender/render/sppm.hpp。
+
 #include "sppm_grid.hpp"
 #include "sppm_surface.hpp"
 #include <minirender/render/sppm.hpp>
@@ -15,28 +18,35 @@ namespace {
 using detail::SppmGrid;
 using detail::SppmGridPoint;
 using detail::SppmSurface;
+
 double maximum(glm::dvec3 value) {
     return std::max({value.x, value.y, value.z});
 }
+
 double luminance(glm::dvec3 value) {
     return glm::dot(value, glm::dvec3(.2126, .7152, .0722));
 }
+
 bool finite(glm::dvec3 value) {
     return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
 }
+
 void check(glm::dvec3 value) {
     if (!finite(value) || glm::any(glm::lessThan(value, glm::dvec3(0)))) {
         throw std::runtime_error("SPPM contribution is nonfinite or negative");
     }
 }
+
 struct CameraPoint {
     std::optional<SppmSurface> surface;
-    glm::dvec3 beta{0}, direct{0};
-    std::uint32_t depth = 0;
-    bool specular_prefix = false;
+    glm::dvec3                 beta{0};
+    glm::dvec3                 direct{0};
+    std::uint32_t              depth           = 0;
+    bool                       specular_prefix = false;
 };
+
 struct PhotonAccum {
-    glm::dvec3 phi{0};
+    glm::dvec3    phi{0};
     std::uint64_t count = 0;
 };
 
@@ -45,10 +55,10 @@ template <class Function, class Progress>
 void parallel(std::size_t count, std::uint32_t workers, CancellationToken token, Function function,
               Progress progress) {
     std::atomic<std::uint64_t> completed{0};
-    std::atomic<bool> failed{false};
-    std::exception_ptr error;
-    std::mutex error_mutex;
-    const auto work = [&](std::uint32_t worker) {
+    std::atomic<bool>          failed{false};
+    std::exception_ptr         error;
+    std::mutex                 error_mutex;
+    const auto                 work = [&](std::uint32_t worker) {
         try {
             for (std::size_t i = worker; i < count; i += workers) {
                 if (failed.load(std::memory_order_relaxed)) {
@@ -70,7 +80,7 @@ void parallel(std::size_t count, std::uint32_t workers, CancellationToken token,
         }
     };
     std::vector<std::thread> threads;
-    const auto join = [&] {
+    const auto               join = [&] {
         for (auto& thread : threads) {
             if (thread.joinable()) {
                 thread.join();
@@ -104,6 +114,7 @@ void SppmOptions::validate() const {
         throw std::invalid_argument("Invalid SPPM photons, radius, alpha or memory budget");
     }
 }
+
 std::string_view sppm_phase_name(SppmPhase phase) {
     switch (phase) {
     case SppmPhase::camera:
@@ -117,6 +128,7 @@ std::string_view sppm_phase_name(SppmPhase phase) {
     }
     throw std::invalid_argument("Unknown SPPM phase");
 }
+
 SppmPixel update_sppm_pixel(SppmPixel previous, std::uint64_t photons, glm::dvec3 phi,
                             glm::dvec3 direct, double alpha) {
     if (!std::isfinite(previous.radius) || previous.radius <= 0 ||
@@ -130,10 +142,10 @@ SppmPixel update_sppm_pixel(SppmPixel previous, std::uint64_t photons, glm::dvec
     check(previous.direct_sum);
     previous.direct_sum += direct;
     if (photons > 0) {
-        const double n = previous.effective_photons + alpha * double(photons);
+        const double n     = previous.effective_photons + alpha * double(photons);
         const double ratio = n / (previous.effective_photons + double(photons));
         previous.radius *= std::sqrt(ratio);
-        previous.tau = (previous.tau + phi) * ratio;
+        previous.tau               = (previous.tau + phi) * ratio;
         previous.effective_photons = n;
     }
     check(previous.tau);
@@ -143,12 +155,12 @@ SppmPixel update_sppm_pixel(SppmPixel previous, std::uint64_t photons, glm::dvec
 
 struct SppmIntegrator::Impl {
     std::shared_ptr<const SceneSnapshot> scene;
-    RenderSettings film;
-    IntegratorSettings settings;
-    std::unique_ptr<SceneBvh> bvh;
-    std::unique_ptr<LightSampler> lights;
-    std::vector<SppmPixel> pixels;
-    SppmStatistics statistics;
+    RenderSettings                       film;
+    IntegratorSettings                   settings;
+    std::unique_ptr<SceneBvh>            bvh;
+    std::unique_ptr<LightSampler>        lights;
+    std::vector<SppmPixel>               pixels;
+    SppmStatistics                       statistics;
 
     Impl(std::shared_ptr<const SceneSnapshot> input, RenderSettings render,
          IntegratorSettings options, std::uint32_t threads, CancellationToken token)
@@ -178,7 +190,7 @@ struct SppmIntegrator::Impl {
         const auto hardware = std::max(1U, std::thread::hardware_concurrency());
         statistics.workers =
             threads == 0 ? std::min(32U, hardware > 1 ? hardware - 1 : 1) : threads;
-        const auto count = film.width * film.height;
+        const auto count   = film.width * film.height;
         statistics.workers = std::uint32_t(std::min(std::size_t(statistics.workers), count));
         statistics.estimated_bytes =
             std::uint64_t(count) *
@@ -189,7 +201,7 @@ struct SppmIntegrator::Impl {
             throw std::length_error(
                 "SPPM memory budget exceeded; reduce resolution/workers or increase the budget");
         }
-        bvh = std::make_unique<SceneBvh>(scene, token);
+        bvh    = std::make_unique<SceneBvh>(scene, token);
         lights = std::make_unique<LightSampler>(scene, token);
         pixels.resize(count);
         for (auto& pixel : pixels) {
@@ -201,44 +213,46 @@ struct SppmIntegrator::Impl {
 
     glm::dvec3 visibility(const SurfaceHit& hit, const LightSample& light, TraceStatistics& trace,
                           CancellationToken token) const {
-        auto ray = spawn_ray(hit, light.direction);
+        auto   ray   = spawn_ray(hit, light.direction);
         double limit = std::numeric_limits<double>::infinity();
         if (std::isfinite(light.distance)) {
             SurfaceHit endpoint;
-            endpoint.position = light.position;
+            endpoint.position         = light.position;
             endpoint.geometric_normal = glm::vec3(light.normal);
-            endpoint.position_error = light.position_error;
-            const auto delta = offset_origin(endpoint, -light.direction) - ray.origin;
-            limit = glm::length(delta);
+            endpoint.position_error   = light.position_error;
+            const auto delta          = offset_origin(endpoint, -light.direction) - ray.origin;
+            limit                     = glm::length(delta);
             if (limit == 0) {
                 return glm::dvec3(0);
             }
             ray.direction = delta / limit;
-            limit = std::nextafter(limit, 0.0);
+            limit         = std::nextafter(limit, 0.0);
         }
         return bvh->occluded(ray, {0, limit}, &trace, token) ? glm::dvec3(0) : light.radiance;
     }
 
     CameraPoint camera(std::size_t pixel, std::uint64_t iteration, SppmStatistics& stats,
                        CancellationToken token) const {
-        auto sampler = Sampler::for_sample(film.seed, pixel, iteration);
-        const auto sample = sampler.next_2d();
-        const auto lens = sampler.next_2d();
+        auto             sampler = Sampler::for_sample(film.seed, pixel, iteration);
+        const auto       sample  = sampler.next_2d();
+        const auto       lens    = sampler.next_2d();
         const glm::dvec2 uv{(double(pixel % film.width) + sample.x) / double(film.width),
                             (double(pixel / film.width) + sample.y) / double(film.height)};
-        auto ray =
+        auto             ray =
             scene->camera.generate_lens_ray(uv, double(film.width) / double(film.height), lens);
         const auto forward =
             glm::normalize(glm::dvec3(scene->camera.target) - glm::dvec3(scene->camera.position));
         const double cosine = glm::dot(ray.direction, forward);
-        RayInterval interval{scene->camera.near_plane / cosine, scene->camera.far_plane / cosine};
-        CameraPoint result;
-        glm::dvec3 beta(1), previous(0);
-        double previous_pdf = 0, eta_scale = 1;
-        bool delta = true;
+        RayInterval  interval{scene->camera.near_plane / cosine, scene->camera.far_plane / cosine};
+        CameraPoint  result;
+        glm::dvec3   beta(1);
+        glm::dvec3   previous(0);
+        double       previous_pdf = 0;
+        double       eta_scale    = 1;
+        bool         delta        = true;
         for (std::uint32_t depth = 0;; ++depth) {
             token.check();
-            const auto hit = bvh->intersect(ray, interval, &stats.geometry, token);
+            const auto hit             = bvh->intersect(ray, interval, &stats.geometry, token);
             const auto emission_weight = [&](double pdf) {
                 return depth == 0 || delta ? 1.0 : power_heuristic(previous_pdf, pdf);
             };
@@ -254,12 +268,12 @@ struct SppmIntegrator::Impl {
                 break;
             }
             SppmSurface surface(*scene, *hit, -ray.direction);
-            const bool stop =
+            const bool  stop =
                 !surface.delta() && (!surface.glossy() || depth + 1 == settings.maximum_depth);
-            const double light_u = sampler.next_1d();
-            const auto light_surface = sampler.next_2d();
-            const double component = sampler.next_1d();
-            const auto direction = sampler.next_2d();
+            const double light_u       = sampler.next_1d();
+            const auto   light_surface = sampler.next_2d();
+            const double component     = sampler.next_1d();
+            const auto   direction     = sampler.next_2d();
             if (!surface.delta()) {
                 const auto light = lights->sample(hit->position, light_u, light_surface);
                 if (light) {
@@ -278,8 +292,8 @@ struct SppmIntegrator::Impl {
             }
             if (stop) {
                 result.surface = std::move(surface);
-                result.beta = beta;
-                result.depth = depth;
+                result.beta    = beta;
+                result.depth   = depth;
                 break;
             }
             const auto bsdf = surface.sample(component, direction, TransportMode::radiance);
@@ -289,13 +303,13 @@ struct SppmIntegrator::Impl {
             beta *= bsdf->weight;
             ++stats.camera_scattering_events;
             check(beta);
-            previous = hit->position;
-            previous_pdf = bsdf->probability;
-            delta = bsdf->measure == SampleMeasure::discrete;
+            previous               = hit->position;
+            previous_pdf           = bsdf->probability;
+            delta                  = bsdf->measure == SampleMeasure::discrete;
             result.specular_prefix = result.specular_prefix || delta;
             eta_scale *= bsdf->eta * bsdf->eta;
-            ray = spawn_ray(*hit, bsdf->direction);
-            interval = {0, std::numeric_limits<double>::infinity()};
+            ray             = spawn_ray(*hit, bsdf->direction);
+            interval        = {0, std::numeric_limits<double>::infinity()};
             const double rr = sampler.next_1d();
             if (settings.russian_roulette && depth + 1 >= settings.roulette_depth) {
                 const double survival = std::clamp(maximum(beta * eta_scale), .05, .95);
@@ -313,15 +327,15 @@ struct SppmIntegrator::Impl {
                 const std::vector<CameraPoint>& points, std::vector<PhotonAccum>& accum,
                 SppmStatistics& stats, CancellationToken token) const {
         auto sampler = Sampler::for_sample(film.seed ^ 0x5350504d50484f54ULL, index, iteration);
-        const double choice = sampler.next_1d();
-        const auto position = sampler.next_2d();
-        const auto direction = sampler.next_2d();
-        const auto emission = lights->sample_emission(choice, position, direction);
+        const double choice    = sampler.next_1d();
+        const auto   position  = sampler.next_2d();
+        const auto   direction = sampler.next_2d();
+        const auto   emission  = lights->sample_emission(choice, position, direction);
         if (!emission || maximum(emission->flux) == 0) {
             return;
         }
-        auto beta = emission->flux;
-        auto ray = emission->ray;
+        auto beta            = emission->flux;
+        auto ray             = emission->ray;
         bool specular_prefix = false;
         for (std::uint32_t depth = 0; depth < settings.maximum_depth; ++depth) {
             token.check();
@@ -357,8 +371,8 @@ struct SppmIntegrator::Impl {
                 break;
             }
             const SppmSurface surface(*scene, *hit, -ray.direction);
-            const double component = sampler.next_1d();
-            const auto direction_u = sampler.next_2d();
+            const double      component   = sampler.next_1d();
+            const auto        direction_u = sampler.next_2d();
             const auto bsdf = surface.sample(component, direction_u, TransportMode::importance);
             if (!bsdf || maximum(bsdf->weight) == 0) {
                 break;
@@ -379,7 +393,7 @@ struct SppmIntegrator::Impl {
                 next /= survival;
             }
             beta = next;
-            ray = spawn_ray(*hit, bsdf->direction);
+            ray  = spawn_ray(*hit, bsdf->direction);
         }
     }
 };
@@ -388,10 +402,13 @@ SppmIntegrator::SppmIntegrator(std::shared_ptr<const SceneSnapshot> scene, Rende
                                IntegratorSettings settings, std::uint32_t threads,
                                CancellationToken cancellation)
     : impl_(std::make_unique<Impl>(std::move(scene), render, settings, threads, cancellation)) {}
+
 SppmIntegrator::~SppmIntegrator() = default;
+
 const SppmStatistics& SppmIntegrator::statistics() const noexcept {
     return impl_->statistics;
 }
+
 std::span<const SppmPixel> SppmIntegrator::pixels() const noexcept {
     return impl_->pixels;
 }
@@ -408,9 +425,9 @@ void SppmIntegrator::advance(CancellationToken token, SppmCallback callback) {
             callback({phase, completed, total});
         }
     };
-    const auto count = self.pixels.size();
-    const auto workers = self.statistics.workers;
-    std::vector<CameraPoint> points(count);
+    const auto                  count   = self.pixels.size();
+    const auto                  workers = self.statistics.workers;
+    std::vector<CameraPoint>    points(count);
     std::vector<SppmStatistics> local(workers);
     report(SppmPhase::camera, 0, count);
     parallel(
@@ -447,8 +464,8 @@ void SppmIntegrator::advance(CancellationToken token, SppmCallback callback) {
             },
             [&](auto n, auto total) { report(SppmPhase::photons, n, total); });
     }
-    auto pixels = self.pixels;
-    auto stats = self.statistics;
+    auto pixels          = self.pixels;
+    auto stats           = self.statistics;
     stats.minimum_radius = std::numeric_limits<double>::infinity();
     stats.maximum_radius = stats.mean_radius = 0;
     for (std::size_t i = 0; i < count; ++i) {
@@ -482,12 +499,13 @@ void SppmIntegrator::advance(CancellationToken token, SppmCallback callback) {
     }
     report(SppmPhase::update, count, count);
     token.check();
-    self.pixels = std::move(pixels);
+    self.pixels     = std::move(pixels);
     self.statistics = stats;
 }
+
 Image SppmIntegrator::image(CancellationToken token) const {
     const auto& self = *impl_;
-    Image image(self.film.width, self.film.height);
+    Image       image(self.film.width, self.film.height);
     if (self.statistics.iterations == 0) {
         return image;
     }

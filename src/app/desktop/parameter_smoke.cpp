@@ -1,3 +1,6 @@
+// 隐藏窗口回归：parameter 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 parameter_smoke.hpp。
+
 #include "parameter_smoke.hpp"
 #include "workbench.hpp"
 
@@ -16,18 +19,18 @@
 namespace {
 
 struct State {
-    int step = 0;
-    int ticks = 0;
-    int previous_frame = 0;
-    bool waiting = false;
-    QElapsedTimer elapsed;
-    double maximum_callback_ms = 0;
-    qint64 maximum_frame_ms = 0;
+    int                   step           = 0;
+    int                   ticks          = 0;
+    int                   previous_frame = 0;
+    bool                  waiting        = false;
+    QElapsedTimer         elapsed;
+    double                maximum_callback_ms = 0;
+    qint64                maximum_frame_ms    = 0;
     SceneUploadStatistics initial;
-    int import_stage = 0;
-    int import_frame = 0;
-    int import_objects = 0;
-    bool import_heartbeat = false;
+    int                   import_stage     = 0;
+    int                   import_frame     = 0;
+    int                   import_objects   = 0;
+    bool                  import_heartbeat = false;
 };
 
 } // namespace
@@ -37,7 +40,7 @@ void start_parameter_smoke(Workbench& window, const QString& directory) {
         throw std::runtime_error("Cannot create parameter test directory");
     }
     const auto state = std::make_shared<State>();
-    auto* timer = new QTimer(&window);
+    auto*      timer = new QTimer(&window);
     timer->setInterval(20);
     QObject::connect(timer, &QTimer::timeout, &window, [state, timer, &window, directory] {
         try {
@@ -75,7 +78,7 @@ void start_parameter_smoke(Workbench& window, const QString& directory) {
                     const auto source =
                         window.document().asset_directory / window.document().meshes.back().source;
                     state->import_objects = static_cast<int>(window.document().objects.size());
-                    state->import_frame = viewport->rendered_frames();
+                    state->import_frame   = viewport->rendered_frames();
                     window.import_object_file(QString::fromStdU16String(source.u16string()));
                     auto* progress = window.findChild<QProgressBar*>("task_progress");
                     if (!window.asset_loading() || !progress->isVisible() ||
@@ -123,7 +126,7 @@ void start_parameter_smoke(Workbench& window, const QString& directory) {
             }
             state->previous_frame = viewport->rendered_frames();
             if (state->step == 0) {
-                state->initial = viewport->upload_statistics();
+                state->initial      = viewport->upload_statistics();
                 const auto revision = viewport->scene_revision();
                 // 没有数值变化的失焦提交不得发布新快照或增加撤销项。
                 QMetaObject::invokeMethod(window.findChild<QDoubleSpinBox*>("roughness"),
@@ -151,7 +154,7 @@ void start_parameter_smoke(Workbench& window, const QString& directory) {
                 spin->setValue(spin->value() + 0.1);
                 QMetaObject::invokeMethod(spin, "editingFinished", Qt::DirectConnection);
             }
-            const double callback_ms = static_cast<double>(state->elapsed.nsecsElapsed()) / 1e6;
+            const double callback_ms   = static_cast<double>(state->elapsed.nsecsElapsed()) / 1e6;
             state->maximum_callback_ms = std::max(state->maximum_callback_ms, callback_ms);
             qInfo() << "Parameter" << step << "callback ms" << callback_ms;
             state->waiting = true;

@@ -1,3 +1,6 @@
+// 隐藏窗口回归：subsurface 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 subsurface_smoke.hpp。
+
 #include "subsurface_smoke.hpp"
 #include "geometry_smoke.hpp"
 #include "offline_panel.hpp"
@@ -30,16 +33,19 @@
 
 namespace {
 using namespace minirender;
+
 void require(bool condition, const char* message) {
     if (!condition) {
         throw std::runtime_error(message);
     }
 }
+
 template <class T> T* control(Workbench& window, const char* name) {
     auto* result = window.findChild<T*>(name);
     require(result, "SSS regression control is missing");
     return result;
 }
+
 void click(Workbench& window, const char* name) {
     auto* button = control<QPushButton>(window, name);
     if (!button->isEnabled()) {
@@ -47,24 +53,28 @@ void click(Workbench& window, const char* name) {
     }
     button->click();
 }
+
 void action(Workbench& window, const char* name) {
     auto* value = control<QAction>(window, name);
     require(value->isEnabled(), "SSS history/import action is disabled");
     value->trigger();
 }
+
 void set(Workbench& window, const char* name, double value) {
     control<QDoubleSpinBox>(window, name)->setValue(value);
 }
+
 const Material& material(Workbench& window) {
-    const auto& scene = window.document();
-    const auto object = std::find_if(scene.objects.begin(), scene.objects.end(),
-                                     [](const auto& o) { return o.id == "block"; });
+    const auto& scene  = window.document();
+    const auto  object = std::find_if(scene.objects.begin(), scene.objects.end(),
+                                      [](const auto& o) { return o.id == "block"; });
     require(object != scene.objects.end(), "SSS block is missing");
     const auto result = std::find_if(scene.materials.begin(), scene.materials.end(),
                                      [&](const auto& m) { return m.id == object->material_id; });
     require(result != scene.materials.end(), "SSS material is missing");
     return *result;
 }
+
 std::filesystem::path native(const QString& path) {
     return std::filesystem::path(path.toStdU16String());
 }
@@ -73,7 +83,7 @@ std::filesystem::path native(const QString& path) {
 void verify_result(Workbench& window, const std::shared_ptr<const SceneSnapshot>& snapshot,
                    RenderSettings render, IntegratorSettings integrator) {
     const auto expected = PathTracer(snapshot, integrator).render(render);
-    const auto actual = window.offline_panel()->session().result();
+    const auto actual   = window.offline_panel()->session().result();
     require(actual && actual->width() == render.width && actual->height() == render.height,
             "SSS result dimensions differ");
     double maximum = 0;
@@ -89,17 +99,19 @@ void verify_result(Workbench& window, const std::shared_ptr<const SceneSnapshot>
     qInfo() << "Subsurface serial RGB maximum" << maximum << "events"
             << p.statistics.subsurface_events;
 }
+
 void verify_display(Workbench& window, const QString& directory, const QString& label) {
     const auto actual = window.viewport()->grab();
     const auto source = window.offline_panel()->session().result();
     require(source && !actual.isNull() && window.viewport()->offline_visible(),
             "SSS display is missing");
-    const auto expected = display_image(*source, window.viewport()->exposure());
-    const double scale = std::min(double(actual.width()) / double(source->width()),
-                                  double(actual.height()) / double(source->height()));
-    const int width = int(std::floor(double(source->width()) * scale)),
-              height = int(std::floor(double(source->height()) * scale));
-    const int left = (actual.width() - width) / 2, top = (actual.height() - height) / 2;
+    const auto   expected = display_image(*source, window.viewport()->exposure());
+    const double scale    = std::min(double(actual.width()) / double(source->width()),
+                                     double(actual.height()) / double(source->height()));
+    const int    width    = int(std::floor(double(source->width()) * scale)),
+                 height   = int(std::floor(double(source->height()) * scale));
+    const int    left     = (actual.width() - width) / 2;
+    const int    top      = (actual.height() - height) / 2;
     for (std::size_t y = 0; y < source->height(); ++y) {
         for (std::size_t x = 0; x < source->width(); ++x) {
             const auto pixel =
@@ -116,10 +128,11 @@ void verify_display(Workbench& window, const QString& directory, const QString& 
     require(actual.save(directory + '/' + label + ".png"), "Cannot save SSS display");
     qInfo() << "Subsurface GPU display" << label << source->width() * source->height();
 }
+
 void verify_layout(Workbench& window, const QString& directory) {
     auto* tabs = window.panels();
     tabs->setCurrentIndex(0);
-    auto* area = qobject_cast<QScrollArea*>(tabs->currentWidget());
+    auto* area  = qobject_cast<QScrollArea*>(tabs->currentWidget());
     auto* panel = control<QWidget>(window, "subsurface_material_panel");
     require(area, "SSS page is not scrollable");
     for (const auto size : {QSize(1200, 800), QSize(960, 700)}) {
@@ -189,41 +202,46 @@ enum class Stage {
     cancelled,
     exit_running
 };
+
 struct State {
-    Stage stage = Stage::import;
-    int ticks = 0, frame = 0, settle = 0, edits = 0;
-    SubsurfaceParameters precise;
+    Stage                                stage  = Stage::import;
+    int                                  ticks  = 0;
+    int                                  frame  = 0;
+    int                                  settle = 0;
+    int                                  edits  = 0;
+    SubsurfaceParameters                 precise;
     std::shared_ptr<const SceneSnapshot> snapshot;
-    RenderSettings render{24, 24, 1024, 101};
-    IntegratorSettings integrator{SamplingMode::mis, 6, true, 3};
-    std::optional<Image> realtime;
-    SceneUploadStatistics uploads;
-    std::uint64_t job = 0, samples = 0;
-    QElapsedTimer cancellation;
-    UiResponseProbe* probe = nullptr;
+    RenderSettings                       render{24, 24, 1024, 101};
+    IntegratorSettings                   integrator{SamplingMode::mis, 6, true, 3};
+    std::optional<Image>                 realtime;
+    SceneUploadStatistics                uploads;
+    std::uint64_t                        job     = 0;
+    std::uint64_t                        samples = 0;
+    QElapsedTimer                        cancellation;
+    UiResponseProbe*                     probe = nullptr;
 };
 } // namespace
 
 void start_subsurface_smoke(Workbench& window, const QString& directory, bool enforce_response) {
     require(QDir().mkpath(directory), "Cannot create SSS regression directory");
-    auto state = std::make_shared<State>();
+    auto state   = std::make_shared<State>();
     state->probe = new UiResponseProbe(&window, "Subsurface");
-    auto* timer = new QTimer(&window);
+    auto* timer  = new QTimer(&window);
     timer->setInterval(50);
     QObject::connect(
         timer, &QTimer::timeout, &window, [state, timer, &window, directory, enforce_response] {
             try {
-                auto* viewport = window.viewport();
-                auto* offline = window.offline_panel();
-                const auto p = offline->session().progress();
+                auto*      viewport = window.viewport();
+                auto*      offline  = window.offline_panel();
+                const auto p        = offline->session().progress();
                 require(++state->ticks < 5000 && viewport->failure().isEmpty(),
                         "SSS smoke timed out");
                 if (!viewport->can_render() || viewport->rendered_frames() <= state->frame + 2) {
                     return;
                 }
                 const auto next = [&] {
-                    state->stage = static_cast<Stage>(int(state->stage) + 1);
-                    state->frame = viewport->rendered_frames();
+                    state->stage  = static_cast<Stage>(int(state->stage) + 1);
+                    state->frame  = viewport->rendered_frames();
                     state->settle = 0;
                     qInfo() << "Subsurface stage" << int(state->stage);
                 };
@@ -248,12 +266,12 @@ void start_subsurface_smoke(Workbench& window, const QString& directory, bool en
                     require(material(window).kind == MaterialKind::subsurface &&
                                 !control<QDoubleSpinBox>(window, "roughness")->isEnabled(),
                             "SSS controls or material selection are missing");
-                    auto scene = window.document();
-                    auto precise = *material(window).subsurface;
-                    precise.absorption.x = .12345678901234567;
+                    auto scene                   = window.document();
+                    auto precise                 = *material(window).subsurface;
+                    precise.absorption.x         = .12345678901234567;
                     precise.reduced_scattering.y = 612.3456789012345;
-                    precise.density = .7123456789012345;
-                    state->precise = precise;
+                    precise.density              = .7123456789012345;
+                    state->precise               = precise;
                     for (auto& m : scene.materials) {
                         if (m.kind == MaterialKind::subsurface) {
                             m.subsurface = std::make_shared<const SubsurfaceParameters>(precise);
@@ -460,7 +478,7 @@ void start_subsurface_smoke(Workbench& window, const QString& directory, bool en
                         verify_result(window, state->snapshot, state->render, state->integrator);
                         verify_display(window, directory, "old-snapshot");
                     });
-                    state->render = {16, 16, 64, 101};
+                    state->render   = {16, 16, 64, 101};
                     state->snapshot = make_snapshot(window.document());
                     offline->set_settings(state->render, state->integrator, {.threads = 2});
                     click(window, "subsurface_render");
@@ -477,7 +495,7 @@ void start_subsurface_smoke(Workbench& window, const QString& directory, bool en
                         verify_result(window, state->snapshot, state->render, state->integrator);
                         verify_display(window, directory, "new-snapshot");
                     });
-                    state->job = p.job_id;
+                    state->job     = p.job_id;
                     state->samples = p.recorded_samples;
                     set(window, "offline_exposure", 2);
                     next();

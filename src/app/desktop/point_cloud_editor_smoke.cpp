@@ -1,3 +1,6 @@
+// 隐藏窗口回归：point cloud editor 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 point_cloud_editor_smoke.hpp。
+
 #include "point_cloud_editor_smoke.hpp"
 #include "geometry_smoke.hpp"
 #include "offline_panel.hpp"
@@ -36,44 +39,51 @@ void require(bool value, const char* message) {
         throw std::runtime_error(message);
     }
 }
+
 template <class T> T* control(Workbench& window, const char* name) {
     auto* value = window.findChild<T*>(name);
     require(value, "Point editor control is missing");
     return value;
 }
+
 std::filesystem::path native(const QString& path) {
     return std::filesystem::path(path.toStdU16String());
 }
+
 std::string bytes(const std::filesystem::path& path) {
     std::ifstream stream(path, std::ios::binary);
     return {std::istreambuf_iterator<char>(stream), {}};
 }
+
 const minirender::SceneObject& object_for(const minirender::SceneDocument& scene,
-                                          const std::string& id) {
+                                          const std::string&               id) {
     const auto found = std::find_if(scene.objects.begin(), scene.objects.end(),
                                     [&](const auto& o) { return o.id == id; });
     require(found != scene.objects.end(), "Point editor scene object is missing");
     return *found;
 }
+
 std::shared_ptr<const minirender::MeshData> mesh_for(const minirender::SceneDocument& scene,
-                                                     const std::string& id) {
+                                                     const std::string&               id) {
     const auto& object = object_for(scene, id);
-    const auto found = std::find_if(scene.meshes.begin(), scene.meshes.end(),
-                                    [&](const auto& mesh) { return mesh.id == object.mesh_id; });
+    const auto  found  = std::find_if(scene.meshes.begin(), scene.meshes.end(),
+                                      [&](const auto& mesh) { return mesh.id == object.mesh_id; });
     require(found != scene.meshes.end(), "Point editor scene mesh is missing");
     return found->data;
 }
+
 minirender::PointCloud sphere() {
     minirender::PointCloud result;
-    constexpr std::size_t count = 1200;
+    constexpr std::size_t  count = 1200;
     for (std::size_t i = 0; i < count; ++i) {
-        const double z = 1 - 2 * (static_cast<double>(i) + .5) / count;
+        const double z     = 1 - 2 * (static_cast<double>(i) + .5) / count;
         const double angle = static_cast<double>(i) * std::numbers::pi * (3 - std::sqrt(5.0));
-        const double r = std::sqrt(1 - z * z);
+        const double r     = std::sqrt(1 - z * z);
         result.positions.emplace_back(.1 * r * std::cos(angle), .1 * r * std::sin(angle), .1 * z);
     }
     return result;
 }
+
 void mouse(VulkanViewport& viewport, QEvent::Type type, QPointF p, Qt::MouseButton button,
            Qt::MouseButtons buttons) {
     QMouseEvent event(type, p, viewport.mapToGlobal(p), button, buttons, Qt::NoModifier);
@@ -82,10 +92,10 @@ void mouse(VulkanViewport& viewport, QEvent::Type type, QPointF p, Qt::MouseButt
 
 // 真实按下/移动/释放重复驱动相机，核对工具导航与主场景编辑的隔离。
 void drag_points(Workbench& window) {
-    auto* viewport = window.viewport();
-    const auto scene = window.document().camera;
+    auto*      viewport = window.viewport();
+    const auto scene    = window.document().camera;
     for (int i = 0; i < 6; ++i) {
-        const auto before = viewport->camera();
+        const auto    before = viewport->camera();
         const QPointF origin(viewport->width() * .5, viewport->height() * .5);
         mouse(*viewport, QEvent::MouseButtonPress, origin, Qt::LeftButton, Qt::LeftButton);
         mouse(*viewport, QEvent::MouseMove, origin + QPointF(22, 8), Qt::NoButton, Qt::LeftButton);
@@ -101,6 +111,7 @@ void drag_points(Workbench& window) {
                 window.document().camera.target == scene.target,
             "Point camera gestures changed the scene camera");
 }
+
 void equal_mesh(const minirender::MeshData& a, const minirender::MeshData& b) {
     require(a.positions == b.positions && a.triangles.size() == b.triangles.size(),
             "Point mesh differs from fixed core input");
@@ -111,7 +122,8 @@ void equal_mesh(const minirender::MeshData& a, const minirender::MeshData& b) {
         }
     }
 }
-void verify_offline(Workbench& window,
+
+void verify_offline(Workbench&                                              window,
                     const std::shared_ptr<const minirender::SceneSnapshot>& snapshot) {
     require(window.offline_panel()->session().progress().state ==
                 minirender::RenderState::completed,
@@ -133,7 +145,7 @@ void verify_offline(Workbench& window,
 void verify_layout(Workbench& window, const QString& directory) {
     auto* tabs = window.panels();
     tabs->setCurrentIndex(7);
-    auto* area = qobject_cast<QScrollArea*>(tabs->currentWidget());
+    auto* area  = qobject_cast<QScrollArea*>(tabs->currentWidget());
     auto* panel = window.point_cloud_panel();
     require(area, "Point panel is not inside a scroll area");
     for (const auto size : {QSize(1200, 800), QSize(960, 700)}) {
@@ -148,7 +160,7 @@ void verify_layout(Workbench& window, const QString& directory) {
         auto* form = qobject_cast<QFormLayout*>(panel->layout());
         require(form, "Point panel form layout is missing");
         std::vector<QWidget*> fields;
-        QWidget* bottom = nullptr;
+        QWidget*              bottom = nullptr;
         for (int i = 0; i < form->count(); ++i) {
             auto* field = form->itemAt(i)->widget();
             if (!field || !field->isVisibleTo(panel) || field->height() == 0) {
@@ -209,54 +221,55 @@ enum class Stage {
     cancel_wait,
     shutdown
 };
+
 struct State {
-    Stage stage = Stage::setup;
-    int ticks = 0;
-    int frame = 0;
-    std::size_t original_objects = 0;
-    std::size_t original_materials = 0;
-    std::uint64_t point_uploads = 0;
-    minirender::PointCloud fixture;
-    PointReconstructionInput input;
-    minirender::Transform file_transform;
-    minirender::Transform sampled_transform;
-    std::shared_ptr<const minirender::PointCloud> raw;
-    std::shared_ptr<const minirender::PointCloud> large;
-    std::shared_ptr<const PointNormalCache> cache;
-    std::shared_ptr<const minirender::MeshData> original;
-    std::shared_ptr<const minirender::MeshData> file_mesh;
-    std::shared_ptr<const minirender::MeshData> sampled_mesh;
+    Stage                                            stage              = Stage::setup;
+    int                                              ticks              = 0;
+    int                                              frame              = 0;
+    std::size_t                                      original_objects   = 0;
+    std::size_t                                      original_materials = 0;
+    std::uint64_t                                    point_uploads      = 0;
+    minirender::PointCloud                           fixture;
+    PointReconstructionInput                         input;
+    minirender::Transform                            file_transform;
+    minirender::Transform                            sampled_transform;
+    std::shared_ptr<const minirender::PointCloud>    raw;
+    std::shared_ptr<const minirender::PointCloud>    large;
+    std::shared_ptr<const PointNormalCache>          cache;
+    std::shared_ptr<const minirender::MeshData>      original;
+    std::shared_ptr<const minirender::MeshData>      file_mesh;
+    std::shared_ptr<const minirender::MeshData>      sampled_mesh;
     std::shared_ptr<const minirender::SceneSnapshot> snapshot;
     std::shared_ptr<const minirender::SceneSnapshot> saved_snapshot;
-    std::string file_object;
-    std::string original_input;
-    QString input_path;
-    QElapsedTimer cancellation;
+    std::string                                      file_object;
+    std::string                                      original_input;
+    QString                                          input_path;
+    QElapsedTimer                                    cancellation;
 };
 } // namespace
 
 void start_point_cloud_editor_smoke(Workbench& window, const QString& directory,
                                     bool measure_responsiveness) {
     const auto state = std::make_shared<State>();
-    auto* probe = new UiResponseProbe(&window, "Points");
-    auto* timer = new QTimer(&window);
+    auto*      probe = new UiResponseProbe(&window, "Points");
+    auto*      timer = new QTimer(&window);
     timer->setInterval(60);
     QObject::connect(
         timer, &QTimer::timeout, &window,
         [state, timer, probe, &window, directory, measure_responsiveness] {
             try {
-                auto* viewport = window.viewport();
-                auto* tasks = window.geometry_controller();
-                auto* panel = window.point_cloud_panel();
-                const auto status = tasks->status();
+                auto*      viewport = window.viewport();
+                auto*      tasks    = window.geometry_controller();
+                auto*      panel    = window.point_cloud_panel();
+                const auto status   = tasks->status();
                 require(++state->ticks < 6000 && viewport->failure().isEmpty(),
                         "Point editor timed out or Vulkan failed");
                 if (!viewport->can_render() || viewport->rendered_frames() < 5) {
                     return;
                 }
-                const bool ready = !tasks->busy() && !window.asset_loading() &&
-                                   viewport->rendered_frames() > state->frame + 2 &&
-                                   viewport->preview_wait_ms() == 0;
+                const bool ready   = !tasks->busy() && !window.asset_loading() &&
+                                     viewport->rendered_frames() > state->frame + 2 &&
+                                     viewport->preview_wait_ms() == 0;
                 const auto advance = [&](Stage stage) {
                     qInfo() << "Point editor stage" << static_cast<int>(state->stage) << "->"
                             << static_cast<int>(stage);
@@ -280,7 +293,7 @@ void start_point_cloud_editor_smoke(Workbench& window, const QString& directory,
                 switch (state->stage) {
                 case Stage::setup:
                     probe->verify([&] {
-                        state->fixture = sphere();
+                        state->fixture    = sphere();
                         state->input_path = directory + "/点云 原输入.ply";
                         minirender::save_point_cloud(state->fixture, native(state->input_path));
                         state->original_input = bytes(native(state->input_path));
@@ -288,9 +301,9 @@ void start_point_cloud_editor_smoke(Workbench& window, const QString& directory,
                                                native(directory + "/start.json"));
                         state->snapshot = minirender::make_snapshot(window.document());
                     });
-                    state->original_objects = window.document().objects.size();
+                    state->original_objects   = window.document().objects.size();
                     state->original_materials = window.document().materials.size();
-                    state->original = mesh_for(window.document(), "blue_cube");
+                    state->original           = mesh_for(window.document(), "blue_cube");
                     require(mesh_for(window.document(), "metal_cube") == state->original,
                             "Point fixture lost shared mesh input");
                     window.panels()->setCurrentIndex(7);
@@ -405,7 +418,7 @@ void start_point_cloud_editor_smoke(Workbench& window, const QString& directory,
                     require(status.state == GeometryTaskState::ready,
                             "Imported point reconstruction failed");
                     state->file_object = panel->target_id();
-                    state->file_mesh = mesh_for(window.document(), state->file_object);
+                    state->file_mesh   = mesh_for(window.document(), state->file_object);
                     require(window.document().objects.size() == state->original_objects + 1 &&
                                 window.document().materials.size() == state->original_materials + 1,
                             "Imported point reconstruction did not create one independent "
@@ -419,9 +432,9 @@ void start_point_cloud_editor_smoke(Workbench& window, const QString& directory,
                     require(window.offline_panel()->stale(),
                             "Point mesh did not stale the old offline snapshot");
                     probe->verify([&] {
-                        auto settings = state->input.balls;
-                        const auto spacing = state->cache->value.spacing_p90;
-                        settings.radii = {2 * spacing, 3 * spacing, 4 * spacing};
+                        auto       settings = state->input.balls;
+                        const auto spacing  = state->cache->value.spacing_p90;
+                        settings.radii      = {2 * spacing, 3 * spacing, 4 * spacing};
                         const auto expected =
                             minirender::reconstruct_ball_pivot(state->cache->value.cloud, settings);
                         equal_mesh(*state->file_mesh, *expected.mesh);

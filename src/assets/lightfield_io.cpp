@@ -1,3 +1,6 @@
+// 光场容器的标定、RGB32f 视图数据及有界读取缓存。
+// 公开接口与参数约定见 include/minirender/assets/lightfield_io.hpp。
+
 #include "staged_file.hpp"
 #include <minirender/assets/lightfield_io.hpp>
 
@@ -16,8 +19,8 @@ namespace minirender {
 namespace {
 using Json = nlohmann::json;
 constexpr std::array<char, 8> magic{'M', 'R', 'L', 'F', '\r', '\n', '\0', '\0'};
-constexpr std::uint64_t header_bytes = 40;
-constexpr std::uint64_t maximum_metadata = 1024 * 1024;
+constexpr std::uint64_t       header_bytes     = 40;
+constexpr std::uint64_t       maximum_metadata = 1024 * 1024;
 static_assert(sizeof(float) == 4 && std::numeric_limits<float>::is_iec559);
 
 void put(std::ostream& stream, std::uint64_t value, std::size_t bytes) {
@@ -27,6 +30,7 @@ void put(std::ostream& stream, std::uint64_t value, std::size_t bytes) {
     }
     stream.write(encoded.data(), static_cast<std::streamsize>(bytes));
 }
+
 std::uint64_t get(std::istream& stream, std::size_t bytes) {
     std::array<unsigned char, 8> encoded{};
     stream.read(reinterpret_cast<char*>(encoded.data()), static_cast<std::streamsize>(bytes));
@@ -36,6 +40,7 @@ std::uint64_t get(std::istream& stream, std::size_t bytes) {
     }
     return result;
 }
+
 std::uint64_t integer(const Json& value, std::uint64_t maximum) {
     std::uint64_t result = 0;
     if (value.is_number_unsigned()) {
@@ -54,18 +59,21 @@ std::uint64_t integer(const Json& value, std::uint64_t maximum) {
     }
     return result;
 }
+
 Json vector(glm::vec3 value) {
     return {value.x, value.y, value.z};
 }
+
 glm::vec3 vector(const Json& value) {
     if (!value.is_array() || value.size() != 3) {
         throw std::invalid_argument("Light field camera requires three vector components");
     }
     return {value.at(0).get<float>(), value.at(1).get<float>(), value.at(2).get<float>()};
 }
+
 Json encode(const LightFieldCalibration& c) {
     const auto& camera = c.camera;
-    Json pupils = Json::array();
+    Json        pupils = Json::array();
     for (const auto p : c.pupils) {
         pupils.push_back({p.x, p.y});
     }
@@ -93,26 +101,27 @@ Json encode(const LightFieldCalibration& c) {
               {"rr", c.integrator.russian_roulette},
               {"rr_depth", c.integrator.roulette_depth}}}};
 }
+
 LightFieldCalibration decode(const Json& json) {
     LightFieldCalibration c;
-    const auto& camera = json.at("camera");
-    c.camera.position = vector(camera.at("position"));
-    c.camera.target = vector(camera.at("target"));
-    c.camera.up = vector(camera.at("up"));
+    const auto&           camera  = json.at("camera");
+    c.camera.position             = vector(camera.at("position"));
+    c.camera.target               = vector(camera.at("target"));
+    c.camera.up                   = vector(camera.at("up"));
     c.camera.vertical_fov_degrees = camera.at("fov").get<float>();
-    c.camera.near_plane = camera.at("near").get<float>();
-    c.camera.far_plane = camera.at("far").get<float>();
-    c.camera.aperture_radius = camera.at("aperture").get<float>();
-    c.camera.focus_distance = camera.at("focus").get<float>();
-    c.render.width = std::size_t(integer(json.at("width"), 16384));
-    c.render.height = std::size_t(integer(json.at("height"), 16384));
+    c.camera.near_plane           = camera.at("near").get<float>();
+    c.camera.far_plane            = camera.at("far").get<float>();
+    c.camera.aperture_radius      = camera.at("aperture").get<float>();
+    c.camera.focus_distance       = camera.at("focus").get<float>();
+    c.render.width                = std::size_t(integer(json.at("width"), 16384));
+    c.render.height               = std::size_t(integer(json.at("height"), 16384));
     c.render.samples_per_pixel =
         std::uint32_t(integer(json.at("spp"), std::numeric_limits<std::uint32_t>::max()));
-    c.render.seed = integer(json.at("seed"), std::numeric_limits<std::uint64_t>::max());
-    c.columns = std::uint32_t(integer(json.at("columns"), 15));
-    c.rows = std::uint32_t(integer(json.at("rows"), 15));
-    c.pupil_radius = json.at("radius").get<double>();
-    c.reference_focus = json.at("reference_focus").get<double>();
+    c.render.seed      = integer(json.at("seed"), std::numeric_limits<std::uint64_t>::max());
+    c.columns          = std::uint32_t(integer(json.at("columns"), 15));
+    c.rows             = std::uint32_t(integer(json.at("rows"), 15));
+    c.pupil_radius     = json.at("radius").get<double>();
+    c.reference_focus  = json.at("reference_focus").get<double>();
     const auto& pupils = json.at("pupils");
     if (!pupils.is_array() || pupils.size() != c.view_count()) {
         throw std::invalid_argument("Invalid light field pupil array");
@@ -123,14 +132,15 @@ LightFieldCalibration decode(const Json& json) {
         }
         c.pupils.push_back({p.at(0).get<double>(), p.at(1).get<double>()});
     }
-    const auto& integrator = json.at("integrator");
-    c.integrator.mode = parse_sampling_mode(integrator.at("mode").get<std::string>());
-    c.integrator.maximum_depth = std::uint32_t(integer(integrator.at("depth"), 128));
+    const auto& integrator        = json.at("integrator");
+    c.integrator.mode             = parse_sampling_mode(integrator.at("mode").get<std::string>());
+    c.integrator.maximum_depth    = std::uint32_t(integer(integrator.at("depth"), 128));
     c.integrator.russian_roulette = integrator.at("rr").get<bool>();
-    c.integrator.roulette_depth = std::uint32_t(integer(integrator.at("rr_depth"), 128));
+    c.integrator.roulette_depth   = std::uint32_t(integer(integrator.at("rr_depth"), 128));
     c.validate();
     return c;
 }
+
 void check_pixel(glm::vec3 p) {
     if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) {
         throw std::invalid_argument("Light field contains a nonfinite pixel");
@@ -156,46 +166,51 @@ std::shared_ptr<const LightFieldFile> LightFieldFile::open(const std::filesystem
     if (complete != 1 || metadata_bytes == 0 || metadata_bytes > maximum_metadata) {
         throw std::invalid_argument("Incomplete light field or invalid metadata length");
     }
-    auto file = std::shared_ptr<LightFieldFile>(new LightFieldFile);
+    auto file   = std::shared_ptr<LightFieldFile>(new LightFieldFile);
     file->path_ = std::filesystem::absolute(path).lexically_normal();
     std::string text(std::size_t(metadata_bytes), '\0');
     stream.read(text.data(), std::streamsize(text.size()));
-    file->calibration_ = decode(Json::parse(text));
+    file->calibration_    = decode(Json::parse(text));
     file->payload_offset_ = header_bytes + metadata_bytes;
-    const auto expected = file->calibration_.view_bytes() * file->calibration_.view_count();
+    const auto expected   = file->calibration_.view_bytes() * file->calibration_.view_count();
     if (payload_bytes != expected || paths > file->calibration_.total_paths() ||
         std::filesystem::file_size(file->path_) != file->payload_offset_ + expected) {
         throw std::invalid_argument(
             "Light field payload length or path count differs from its calibration");
     }
-    file->paths_ = paths;
+    file->paths_      = paths;
     file->file_bytes_ = file->payload_offset_ + expected;
     cancellation.check();
     return file;
 }
+
 const LightFieldCalibration& LightFieldFile::calibration() const noexcept {
     return calibration_;
 }
+
 std::uint64_t LightFieldFile::traced_paths() const noexcept {
     return paths_;
 }
+
 std::uint64_t LightFieldFile::file_bytes() const noexcept {
     return file_bytes_;
 }
+
 const std::filesystem::path& LightFieldFile::path() const noexcept {
     return path_;
 }
+
 void LightFieldFile::save(const std::filesystem::path& destination, CancellationToken cancellation,
                           LightFieldCallback progress) const {
     cancellation.check();
     detail::StagedFile output(destination);
-    std::ifstream source(path_, std::ios::binary);
+    std::ifstream      source(path_, std::ios::binary);
     if (!source) {
         throw std::runtime_error("Cannot open light field source for copying");
     }
     source.exceptions(std::ios::failbit | std::ios::badbit);
     std::array<char, 65536> buffer{};
-    std::uint64_t copied = 0;
+    std::uint64_t           copied = 0;
     while (copied < file_bytes_) {
         cancellation.check();
         const auto bytes = std::min<std::uint64_t>(buffer.size(), file_bytes_ - copied);
@@ -212,12 +227,13 @@ void LightFieldFile::save(const std::filesystem::path& destination, Cancellation
 }
 
 struct LightFieldWriter::Impl {
-    detail::StagedFile output;
+    detail::StagedFile    output;
     std::filesystem::path destination;
     LightFieldCalibration calibration;
-    std::vector<bool> written;
-    std::uint64_t offset;
-    bool finished = false;
+    std::vector<bool>     written;
+    std::uint64_t         offset;
+    bool                  finished = false;
+
     Impl(const std::filesystem::path& path, LightFieldCalibration c)
         : output(path), destination(path), calibration(std::move(c)) {
         calibration.validate();
@@ -237,10 +253,13 @@ struct LightFieldWriter::Impl {
         offset = header_bytes + json.size();
     }
 };
+
 LightFieldWriter::LightFieldWriter(const std::filesystem::path& path,
-                                   LightFieldCalibration calibration)
+                                   LightFieldCalibration        calibration)
     : impl_(std::make_unique<Impl>(path, std::move(calibration))) {}
+
 LightFieldWriter::~LightFieldWriter() = default;
+
 void LightFieldWriter::write_view(std::size_t index, const Image& image,
                                   CancellationToken cancellation, LightFieldCallback progress) {
     auto& self = *impl_;
@@ -251,7 +270,7 @@ void LightFieldWriter::write_view(std::size_t index, const Image& image,
     }
     auto& stream = self.output.stream();
     stream.seekp(std::streamoff(self.offset + index * self.calibration.view_bytes()));
-    constexpr std::size_t block_pixels = 4096;
+    constexpr std::size_t               block_pixels = 4096;
     std::array<char, block_pixels * 12> block{};
     for (std::size_t y = 0; y < image.height(); ++y) {
         cancellation.check();
@@ -276,6 +295,7 @@ void LightFieldWriter::write_view(std::size_t index, const Image& image,
     }
     self.written[index] = true;
 }
+
 std::shared_ptr<const LightFieldFile> LightFieldWriter::finish(std::uint64_t paths) {
     auto& self = *impl_;
     if (self.finished ||
@@ -293,14 +313,17 @@ std::shared_ptr<const LightFieldFile> LightFieldWriter::finish(std::uint64_t pat
 
 struct LightFieldReader::Impl {
     std::shared_ptr<const LightFieldFile> file;
-    std::uint64_t budget;
-    LightFieldCacheStatistics statistics;
-    std::list<std::size_t> recent;
+    std::uint64_t                         budget;
+    LightFieldCacheStatistics             statistics;
+    std::list<std::size_t>                recent;
+
     struct Entry {
-        std::shared_ptr<const Image> image;
+        std::shared_ptr<const Image>     image;
         std::list<std::size_t>::iterator position;
     };
+
     std::map<std::size_t, Entry> cache;
+
     Impl(std::shared_ptr<const LightFieldFile> source, std::uint64_t bytes)
         : file(std::move(source)), budget(bytes) {
         if (!file || bytes > 8ULL * 1024 * 1024 * 1024) {
@@ -308,24 +331,30 @@ struct LightFieldReader::Impl {
         }
     }
 };
+
 LightFieldReader::LightFieldReader(std::shared_ptr<const LightFieldFile> file, std::uint64_t budget)
     : impl_(std::make_unique<Impl>(std::move(file), budget)) {}
+
 LightFieldReader::~LightFieldReader() = default;
+
 const LightFieldFile& LightFieldReader::file() const noexcept {
     return *impl_->file;
 }
+
 std::uint64_t LightFieldReader::cache_budget_bytes() const noexcept {
     return impl_->budget;
 }
+
 LightFieldCacheStatistics LightFieldReader::statistics() const noexcept {
     return impl_->statistics;
 }
-std::shared_ptr<const Image> LightFieldReader::view(std::size_t index,
+
+std::shared_ptr<const Image> LightFieldReader::view(std::size_t       index,
                                                     CancellationToken cancellation) {
     cancellation.check();
-    auto& self = *impl_;
+    auto&       self = *impl_;
     const auto& file = *self.file;
-    const auto& c = file.calibration_;
+    const auto& c    = file.calibration_;
     if (index >= c.view_count()) {
         throw std::out_of_range("Light field view index is out of range");
     }
@@ -341,14 +370,14 @@ std::shared_ptr<const Image> LightFieldReader::view(std::size_t index,
         self.recent.pop_back();
         self.statistics.cached_bytes -= bytes;
     }
-    auto image = std::make_shared<Image>(c.render.width, c.render.height);
+    auto          image = std::make_shared<Image>(c.render.width, c.render.height);
     std::ifstream stream(file.path_, std::ios::binary);
     if (!stream) {
         throw std::runtime_error("Cannot read light field view " + std::to_string(index));
     }
     stream.exceptions(std::ios::failbit | std::ios::badbit);
     stream.seekg(std::streamoff(file.payload_offset_ + index * bytes));
-    constexpr std::size_t block_pixels = 4096;
+    constexpr std::size_t                        block_pixels = 4096;
     std::array<unsigned char, block_pixels * 12> block{};
     for (std::size_t y = 0; y < image->height(); ++y) {
         cancellation.check();

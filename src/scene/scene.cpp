@@ -1,3 +1,6 @@
+// 场景、网格、材质、相机与不可变渲染快照的数据约定。
+// 公开接口与参数约定见 include/minirender/scene/scene.hpp。
+
 #include <minirender/core/sampling.hpp>
 #include <minirender/geometry/uv_tangents.hpp>
 #include <minirender/scene/scene.hpp>
@@ -52,9 +55,9 @@ void MeshData::validate(CancellationToken cancellation) const {
             require(std::isfinite(corner.uv.x) && std::isfinite(corner.uv.y),
                     "Mesh UV must be finite");
         }
-        const auto a = positions[triangle.corners[0].position];
-        const auto b = positions[triangle.corners[1].position];
-        const auto c = positions[triangle.corners[2].position];
+        const auto a    = positions[triangle.corners[0].position];
+        const auto b    = positions[triangle.corners[1].position];
+        const auto c    = positions[triangle.corners[2].position];
         const auto area = glm::cross(b - a, c - a);
         require(glm::dot(area, area) > 1e-20F, "Degenerate mesh triangle");
     }
@@ -62,7 +65,7 @@ void MeshData::validate(CancellationToken cancellation) const {
 }
 
 void MeshValidationCache::validate(const std::shared_ptr<const MeshData>& mesh,
-                                   CancellationToken cancellation) {
+                                   CancellationToken                      cancellation) {
     cancellation.check();
     require(mesh != nullptr, "Mesh data is missing");
     std::erase_if(meshes_, [](const auto& value) { return value.expired(); });
@@ -73,7 +76,7 @@ void MeshValidationCache::validate(const std::shared_ptr<const MeshData>& mesh,
 }
 
 void MeshValidationCache::validate_cloth_uv(const std::shared_ptr<const MeshData>& mesh,
-                                            CancellationToken cancellation) {
+                                            CancellationToken                      cancellation) {
     validate(mesh, cancellation);
     std::erase_if(cloth_uv_meshes_, [](const auto& value) { return value.expired(); });
     if (cloth_uv_meshes_.contains(mesh)) {
@@ -86,8 +89,8 @@ void MeshValidationCache::validate_cloth_uv(const std::shared_ptr<const MeshData
         std::array<glm::vec3, 3> positions;
         std::array<glm::vec2, 3> coordinates;
         for (std::size_t corner = 0; corner < 3; ++corner) {
-            const auto& value = mesh->triangles[face].corners[corner];
-            positions[corner] = mesh->positions[value.position];
+            const auto& value   = mesh->triangles[face].corners[corner];
+            positions[corner]   = mesh->positions[value.position];
             coordinates[corner] = value.uv;
         }
         require(uv_tangents(positions, coordinates).has_value(),
@@ -122,9 +125,9 @@ void Transform::validate() const {
 glm::mat4 Transform::matrix() const {
     validate();
     glm::mat4 result = glm::translate(glm::mat4(1.0F), translation);
-    result = glm::rotate(result, glm::radians(rotation_degrees.z), {0, 0, 1});
-    result = glm::rotate(result, glm::radians(rotation_degrees.y), {0, 1, 0});
-    result = glm::rotate(result, glm::radians(rotation_degrees.x), {1, 0, 0});
+    result           = glm::rotate(result, glm::radians(rotation_degrees.z), {0, 0, 1});
+    result           = glm::rotate(result, glm::radians(rotation_degrees.y), {0, 1, 0});
+    result           = glm::rotate(result, glm::radians(rotation_degrees.x), {1, 0, 0});
     return glm::scale(result, scale);
 }
 
@@ -169,9 +172,9 @@ Ray Camera::generate_ray(glm::dvec2 pixel_uv, double aspect) const {
     require(std::isfinite(aspect) && aspect > 0 && std::isfinite(pixel_uv.x) &&
                 std::isfinite(pixel_uv.y),
             "Ray coordinates and aspect must be valid");
-    const auto forward = glm::normalize(glm::dvec3(target) - glm::dvec3(position));
-    const auto right = glm::normalize(glm::cross(forward, glm::dvec3(up)));
-    const auto camera_up = glm::cross(right, forward);
+    const auto   forward   = glm::normalize(glm::dvec3(target) - glm::dvec3(position));
+    const auto   right     = glm::normalize(glm::cross(forward, glm::dvec3(up)));
+    const auto   camera_up = glm::cross(right, forward);
     const double half_height =
         std::tan(glm::radians(static_cast<double>(vertical_fov_degrees)) * 0.5);
     const auto direction = forward + (2 * pixel_uv.x - 1) * aspect * half_height * right +
@@ -184,12 +187,12 @@ Ray Camera::generate_lens_ray(glm::dvec2 pixel_uv, double aspect, glm::dvec2 len
     if (aperture_radius == 0) {
         return pinhole;
     }
-    const auto disk = sample_disk(lens_u) * static_cast<double>(aperture_radius);
-    const auto forward = glm::normalize(glm::dvec3(target) - glm::dvec3(position));
-    const auto right = glm::normalize(glm::cross(forward, glm::dvec3(up)));
+    const auto disk      = sample_disk(lens_u) * static_cast<double>(aperture_radius);
+    const auto forward   = glm::normalize(glm::dvec3(target) - glm::dvec3(position));
+    const auto right     = glm::normalize(glm::cross(forward, glm::dvec3(up)));
     const auto camera_up = glm::cross(right, forward);
-    const auto focus = pinhole.origin + pinhole.direction * (static_cast<double>(focus_distance) /
-                                                             glm::dot(pinhole.direction, forward));
+    const auto focus  = pinhole.origin + pinhole.direction * (static_cast<double>(focus_distance) /
+                                                              glm::dot(pinhole.direction, forward));
     const auto origin = glm::dvec3(position) + disk.x * right + disk.y * camera_up;
     return {origin, glm::normalize(focus - origin)};
 }
@@ -302,7 +305,7 @@ void SceneDocument::validate(MeshValidationCache* cache, CancellationToken cance
         }
     }
     std::unordered_set<std::string> object_ids;
-    MeshValidationCache local_cloth_cache;
+    MeshValidationCache             local_cloth_cache;
     for (const auto& object : objects) {
         cancellation.check();
         unique_id(object_ids, object.id, "Object");
@@ -351,12 +354,12 @@ void SceneDocument::validate(MeshValidationCache* cache, CancellationToken cance
 std::shared_ptr<const SceneSnapshot> make_snapshot(const SceneDocument& document,
                                                    MeshValidationCache* cache) {
     document.validate(cache);
-    auto snapshot = std::make_shared<SceneSnapshot>();
-    snapshot->camera = document.camera;
-    snapshot->media = document.media;
-    snapshot->environment = document.environment;
-    snapshot->directional_lights = document.directional_lights;
-    snapshot->environment_strength = document.environment_map.strength;
+    auto snapshot                          = std::make_shared<SceneSnapshot>();
+    snapshot->camera                       = document.camera;
+    snapshot->media                        = document.media;
+    snapshot->environment                  = document.environment;
+    snapshot->directional_lights           = document.directional_lights;
+    snapshot->environment_strength         = document.environment_map.strength;
     snapshot->environment_rotation_degrees = document.environment_map.rotation_degrees;
     for (const auto& texture : document.textures) {
         if (texture.id == document.environment_map.texture_id) {

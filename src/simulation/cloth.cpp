@@ -1,3 +1,6 @@
+// 质量弹簧布料的状态、固定子步积分、风力与约束。
+// 公开接口与参数约定见 include/minirender/simulation/cloth.hpp。
+
 #include "cloth_collision.hpp"
 #include <minirender/simulation/cloth.hpp>
 
@@ -13,11 +16,13 @@ namespace {
 bool finite(glm::dvec3 value) {
     return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
 }
+
 void require(bool condition, const std::string& message) {
     if (!condition) {
         throw std::invalid_argument(message);
     }
 }
+
 bool range(double value, double low, double high) {
     return std::isfinite(value) && value >= low && value <= high;
 }
@@ -36,7 +41,8 @@ ClothEnvironment normalized_environment(ClothEnvironment environment) {
 void ClothGrid::validate() const {
     require(columns >= 2 && columns <= 256 && rows >= 2 && rows <= 256,
             "Cloth grid dimensions must be in 2..256");
-    const glm::dvec3 u(span_u), v(span_v);
+    const glm::dvec3 u(span_u);
+    const glm::dvec3 v(span_v);
     require(finite(glm::dvec3(origin)) && finite(u) && finite(v) &&
                 glm::all(glm::lessThanEqual(glm::abs(glm::dvec3(origin)), glm::dvec3(1e6))),
             "Cloth grid coordinates must be finite and within the working range");
@@ -90,9 +96,9 @@ void ClothEnvironment::validate() const {
 
 glm::dvec3 cloth_spring_force(const ClothSpring& spring, glm::dvec3 a, glm::dvec3 b,
                               glm::dvec3 velocity_a, glm::dvec3 velocity_b) {
-    const auto delta = b - a;
+    const auto   delta  = b - a;
     const double length = glm::length(delta);
-    const auto direction =
+    const auto   direction =
         length > 1e-12 * spring.rest_length ? delta / length : spring.rest_direction;
     const double relative_speed = glm::dot(velocity_b - velocity_a, direction);
     return (spring.stiffness * (length - spring.rest_length) + spring.damping * relative_speed) *
@@ -140,7 +146,7 @@ ClothSimulation::ClothSimulation(ClothGrid grid, ClothParameters parameters,
     }
     const auto spring = [&](std::uint32_t a, std::uint32_t b, ClothSpringKind kind,
                             double stiffness) {
-        const auto delta = rest_[b] - rest_[a];
+        const auto   delta  = rest_[b] - rest_[a];
         const double length = glm::length(delta);
         const double inverse_mass =
             (pinned_[a] ? 0 : 1 / masses_[a]) + (pinned_[b] ? 0 : 1 / masses_[b]);
@@ -184,7 +190,8 @@ ClothSimulation::ClothSimulation(ClothGrid grid, ClothParameters parameters,
             damping_sums[index] += edge.damping;
         }
     }
-    double k_bound = 0, c_bound = 0;
+    double k_bound = 0;
+    double c_bound = 0;
     for (std::size_t i = 0; i < count; ++i) {
         if (!pinned_[i]) {
             k_bound = std::max(k_bound, 2 * stiffness_sums[i] / masses_[i]);
@@ -207,24 +214,31 @@ ClothSimulation::ClothSimulation(ClothGrid grid, ClothParameters parameters,
 const ClothGrid& ClothSimulation::grid() const noexcept {
     return grid_;
 }
+
 const ClothParameters& ClothSimulation::parameters() const noexcept {
     return parameters_;
 }
+
 const ClothEnvironment& ClothSimulation::environment() const noexcept {
     return environment_;
 }
+
 const ClothState& ClothSimulation::state() const noexcept {
     return state_;
 }
+
 std::span<const double> ClothSimulation::masses() const noexcept {
     return masses_;
 }
+
 std::span<const ClothSpring> ClothSimulation::springs() const noexcept {
     return springs_;
 }
+
 std::span<const std::array<std::uint32_t, 3>> ClothSimulation::triangles() const noexcept {
     return triangles_;
 }
+
 std::uint32_t ClothSimulation::minimum_substeps() const noexcept {
     return minimum_substeps_;
 }
@@ -267,7 +281,7 @@ void ClothSimulation::validate_state(ClothState& state, CancellationToken cancel
             require(glm::length(state.positions[i] - rest_[i]) <= 1e-10 &&
                         glm::length(state.velocities[i]) <= 1e-10,
                     "Cloth state moved a fixed point");
-            state.positions[i] = rest_[i];
+            state.positions[i]  = rest_[i];
             state.velocities[i] = glm::dvec3(0);
         }
     }
@@ -309,10 +323,10 @@ void ClothSimulation::calculate_forces(const ClothState& state, std::span<glm::d
         if (i % 512 == 0) {
             cancellation.check();
         }
-        const auto [a, b, c] = triangles_[i];
-        const auto area_normal = glm::cross(state.positions[b] - state.positions[a],
-                                            state.positions[c] - state.positions[a]);
-        const double twice_area = glm::length(area_normal);
+        const auto [a, b, c]     = triangles_[i];
+        const auto   area_normal = glm::cross(state.positions[b] - state.positions[a],
+                                              state.positions[c] - state.positions[a]);
+        const double twice_area  = glm::length(area_normal);
         if (twice_area == 0) {
             continue;
         }
@@ -320,7 +334,7 @@ void ClothSimulation::calculate_forces(const ClothState& state, std::span<glm::d
         const auto velocity =
             (state.velocities[a] + state.velocities[b] + state.velocities[c]) / 3.0;
         const double speed = glm::dot(environment_.wind_velocity - velocity, normal);
-        const auto force = drag * (.5 * twice_area) * speed * std::abs(speed) * normal;
+        const auto   force = drag * (.5 * twice_area) * speed * std::abs(speed) * normal;
         values[a] += force;
         values[b] += force;
         values[c] += force;
@@ -349,8 +363,8 @@ ClothStatistics ClothSimulation::statistics(CancellationToken cancellation) cons
         if (i % 512 == 0) {
             cancellation.check();
         }
-        const auto& edge = springs_[i];
-        const double length = glm::length(state_.positions[edge.b] - state_.positions[edge.a]);
+        const auto&  edge    = springs_[i];
+        const double length  = glm::length(state_.positions[edge.b] - state_.positions[edge.a]);
         const double stretch = length - edge.rest_length;
         result.elastic_energy += .5 * edge.stiffness * stretch * stretch;
         result.maximum_spring_ratio =
@@ -367,7 +381,7 @@ ClothStepReport ClothSimulation::advance(std::uint32_t frames, CancellationToken
                 std::size_t(frames) <=
                     std::numeric_limits<std::size_t>::max() / parameters_.substeps,
             "Cloth frame count overflow");
-    const auto total = std::size_t(frames) * parameters_.substeps;
+    const auto total  = std::size_t(frames) * parameters_.substeps;
     const auto report = [&](std::size_t completed) {
         cancellation.check();
         if (progress) {
@@ -376,11 +390,11 @@ ClothStepReport ClothSimulation::advance(std::uint32_t frames, CancellationToken
         cancellation.check();
     };
     report(0);
-    auto next = state_;
+    auto                    next = state_;
     std::vector<glm::dvec3> force(rest_.size());
-    ClothStepReport result;
-    const double h = parameters_.frame_seconds / parameters_.substeps;
-    const double decay = std::exp(-parameters_.velocity_damping * h);
+    ClothStepReport         result;
+    const double            h     = parameters_.frame_seconds / parameters_.substeps;
+    const double            decay = std::exp(-parameters_.velocity_damping * h);
     for (std::uint32_t frame = 0; frame < frames; ++frame) {
         for (std::uint32_t step = 0; step < parameters_.substeps; ++step) {
             calculate_forces(next, force, cancellation);

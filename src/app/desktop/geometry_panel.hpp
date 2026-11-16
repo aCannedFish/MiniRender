@@ -1,3 +1,5 @@
+// 几何处理参数控件、状态刷新与用户操作回调。
+
 #pragma once
 
 #include "geometry_controller.hpp"
@@ -13,12 +15,12 @@ class QSpinBox;
 class QFormLayout;
 
 struct GeometryParameters {
-    minirender::LoopSettings loop;
+    minirender::LoopSettings                        loop;
     std::optional<minirender::DisplacementSettings> displacement;
-    std::string height_id;
-    std::optional<minirender::SimplifySettings> simplify;
-    std::optional<minirender::RemeshSettings> remesh;
-    std::optional<minirender::AdaptiveSettings> adaptive;
+    std::string                                     height_id;
+    std::optional<minirender::SimplifySettings>     simplify;
+    std::optional<minirender::RemeshSettings>       remesh;
+    std::optional<minirender::AdaptiveSettings>     adaptive;
 };
 
 // 几何参数只在点击生成时提交，修改控件只更新基于数组规模的预算估计。
@@ -37,35 +39,35 @@ class GeometryPanel final : public QWidget {
 
   private:
     void update();
-    GeometryController& controller_;
+    GeometryController&                         controller_;
     std::shared_ptr<const minirender::MeshData> mesh_;
-    bool external_busy_ = false;
-    QFormLayout* form_;
-    QWidget* height_row_;
-    QWidget* constraints_;
-    QWidget* remeshing_;
-    QFormLayout* tool_form_;
-    QWidget* adaptive_group_;
-    QSpinBox* adaptive_minimum_;
-    QSpinBox* adaptive_maximum_;
-    QSpinBox* adaptive_budget_;
-    QComboBox* adaptive_metric_;
-    QDoubleSpinBox* adaptive_error_;
-    QDoubleSpinBox* remesh_length_;
-    QDoubleSpinBox* remesh_step_;
-    QSpinBox* remesh_iterations_;
-    QSpinBox* remesh_budget_;
-    QCheckBox* remesh_projection_;
-    QComboBox* operation_;
-    QSpinBox* target_faces_;
-    QCheckBox *error_limit_, *boundary_, *uv_seams_, *hard_normals_, *creases_;
+    bool                                        external_busy_ = false;
+    QFormLayout*                                form_;
+    QWidget*                                    height_row_;
+    QWidget*                                    constraints_;
+    QWidget*                                    remeshing_;
+    QFormLayout*                                tool_form_;
+    QWidget*                                    adaptive_group_;
+    QSpinBox*                                   adaptive_minimum_;
+    QSpinBox*                                   adaptive_maximum_;
+    QSpinBox*                                   adaptive_budget_;
+    QComboBox*                                  adaptive_metric_;
+    QDoubleSpinBox*                             adaptive_error_;
+    QDoubleSpinBox*                             remesh_length_;
+    QDoubleSpinBox*                             remesh_step_;
+    QSpinBox*                                   remesh_iterations_;
+    QSpinBox*                                   remesh_budget_;
+    QCheckBox*                                  remesh_projection_;
+    QComboBox*                                  operation_;
+    QSpinBox*                                   target_faces_;
+    QCheckBox *     error_limit_, *boundary_, *uv_seams_, *hard_normals_, *creases_;
     QDoubleSpinBox *quadric_error_, *crease_angle_;
-    QLabel* note_;
-    QSpinBox *levels_, *budget_;
-    QCheckBox* displace_;
-    QComboBox* height_;
+    QLabel*         note_;
+    QSpinBox *      levels_, *budget_;
+    QCheckBox*      displace_;
+    QComboBox*      height_;
     QDoubleSpinBox *scale_, *midlevel_, *tolerance_;
-    QPushButton *apply_, *cancel_, *import_, *export_;
-    QLabel *target_, *estimate_, *stage_, *counts_, *result_, *metrics_;
-    QProgressBar* progress_;
+    QPushButton *   apply_, *cancel_, *import_, *export_;
+    QLabel *        target_, *estimate_, *stage_, *counts_, *result_, *metrics_;
+    QProgressBar*   progress_;
 };

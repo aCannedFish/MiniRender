@@ -1,3 +1,6 @@
+// Vulkan 窗口生命周期、输入交互、渲染调度与图像读回。
+// 本模块接口见 vulkan_viewport.hpp。
+
 #include "vulkan_viewport.hpp"
 #include "diagnostic_renderer.hpp"
 #include "offline_renderer.hpp"
@@ -46,9 +49,11 @@ void VulkanViewport::set_offscreen_rendering(bool enabled) {
     }
     offscreen_ = enabled;
 }
+
 bool VulkanViewport::offscreen_rendering() const noexcept {
     return offscreen_;
 }
+
 bool VulkanViewport::can_render() const noexcept {
     return offscreen_ || isExposed();
 }
@@ -77,7 +82,7 @@ void VulkanViewport::initialize() {
                       "present support");
             }
             if (present && (properties[index].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
-                physical_ = candidate;
+                physical_     = candidate;
                 queue_family_ = index;
                 break;
             }
@@ -105,30 +110,30 @@ void VulkanViewport::initialize() {
             enabled.push_back("VK_KHR_portability_subset");
         }
     }
-    const float priority = 1.0F;
+    const float             priority = 1.0F;
     VkDeviceQueueCreateInfo queue_info{};
-    queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queue_info.sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     queue_info.queueFamilyIndex = queue_family_;
-    queue_info.queueCount = 1;
+    queue_info.queueCount       = 1;
     queue_info.pQueuePriorities = &priority;
     VkDeviceCreateInfo device_info{};
-    device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    device_info.queueCreateInfoCount = 1;
-    device_info.pQueueCreateInfos = &queue_info;
-    device_info.enabledExtensionCount = static_cast<std::uint32_t>(enabled.size());
+    device_info.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    device_info.queueCreateInfoCount    = 1;
+    device_info.pQueueCreateInfos       = &queue_info;
+    device_info.enabledExtensionCount   = static_cast<std::uint32_t>(enabled.size());
     device_info.ppEnabledExtensionNames = enabled.data();
     check(vkCreateDevice(physical_, &device_info, nullptr, &device_), "create device");
     vkGetDeviceQueue(device_, queue_family_, 0, &queue_);
 
     VkCommandPoolCreateInfo pool{};
-    pool.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    pool.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     pool.queueFamilyIndex = queue_family_;
-    pool.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    pool.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     check(vkCreateCommandPool(device_, &pool, nullptr, &command_pool_), "create command pool");
     VkCommandBufferAllocateInfo allocate{};
-    allocate.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocate.commandPool = command_pool_;
-    allocate.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocate.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocate.commandPool        = command_pool_;
+    allocate.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocate.commandBufferCount = 1;
     check(vkAllocateCommandBuffers(device_, &allocate, &command_), "allocate command buffer");
     VkFenceCreateInfo fence{};
@@ -175,7 +180,7 @@ void VulkanViewport::recreate_swapchain() {
                                 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
                                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
                                 VK_IMAGE_ASPECT_COLOR_BIT);
-        images_ = {offscreen_color_.image()};
+        images_   = {offscreen_color_.image()};
         can_grab_ = true;
     } else {
         VkSurfaceCapabilitiesKHR capabilities{};
@@ -196,7 +201,7 @@ void VulkanViewport::recreate_swapchain() {
             throw std::runtime_error("An sRGB swapchain format is required");
         }
         color_format_ = found->format;
-        extent_ = capabilities.currentExtent;
+        extent_       = capabilities.currentExtent;
         if (extent_.width == std::numeric_limits<std::uint32_t>::max()) {
             extent_.width =
                 std::clamp(static_cast<std::uint32_t>(width() * devicePixelRatio()),
@@ -219,23 +224,23 @@ void VulkanViewport::recreate_swapchain() {
             }
         }
         VkSwapchainCreateInfoKHR create{};
-        create.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-        create.surface = surface_;
-        create.minImageCount = desired;
-        create.imageFormat = color_format_;
-        create.imageColorSpace = found->colorSpace;
-        create.imageExtent = extent_;
+        create.sType            = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        create.surface          = surface_;
+        create.minImageCount    = desired;
+        create.imageFormat      = color_format_;
+        create.imageColorSpace  = found->colorSpace;
+        create.imageExtent      = extent_;
         create.imageArrayLayers = 1;
-        create.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        create.imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
         can_grab_ = (capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0;
         if (can_grab_) {
             create.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         }
         create.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        create.preTransform = capabilities.currentTransform;
-        create.compositeAlpha = alpha;
-        create.presentMode = VK_PRESENT_MODE_FIFO_KHR;
-        create.clipped = VK_TRUE;
+        create.preTransform     = capabilities.currentTransform;
+        create.compositeAlpha   = alpha;
+        create.presentMode      = VK_PRESENT_MODE_FIFO_KHR;
+        create.clipped          = VK_TRUE;
         check(vkCreateSwapchainKHR(device_, &create, nullptr, &swapchain_), "create swapchain");
         check(vkGetSwapchainImagesKHR(device_, swapchain_, &count, nullptr),
               "count swapchain images");
@@ -251,10 +256,10 @@ void VulkanViewport::recreate_swapchain() {
             continue;
         }
         VkImageViewCreateInfo view{};
-        view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        view.image = images_[index];
-        view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        view.format = color_format_;
+        view.sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        view.image            = images_[index];
+        view.viewType         = VK_IMAGE_VIEW_TYPE_2D;
+        view.format           = color_format_;
         view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
         check(vkCreateImageView(device_, &view, nullptr, &views_[index]), "create swapchain view");
         VkSemaphoreCreateInfo semaphore{};
@@ -277,52 +282,52 @@ void VulkanViewport::recreate_swapchain() {
         throw std::runtime_error("No depth attachment format is supported");
     }
     VkImageCreateInfo depth_info{};
-    depth_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    depth_info.imageType = VK_IMAGE_TYPE_2D;
-    depth_info.format = depth_format_;
-    depth_info.extent = {extent_.width, extent_.height, 1};
-    depth_info.mipLevels = 1;
+    depth_info.sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    depth_info.imageType   = VK_IMAGE_TYPE_2D;
+    depth_info.format      = depth_format_;
+    depth_info.extent      = {extent_.width, extent_.height, 1};
+    depth_info.mipLevels   = 1;
     depth_info.arrayLayers = 1;
-    depth_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    depth_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    depth_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    depth_info.samples     = VK_SAMPLE_COUNT_1_BIT;
+    depth_info.tiling      = VK_IMAGE_TILING_OPTIMAL;
+    depth_info.usage       = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     check(vkCreateImage(device_, &depth_info, nullptr, &depth_), "create depth image");
     VkMemoryRequirements requirements{};
     vkGetImageMemoryRequirements(device_, depth_, &requirements);
     VkMemoryAllocateInfo memory{};
-    memory.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    memory.sType          = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     memory.allocationSize = requirements.size;
     memory.memoryTypeIndex =
         memory_type(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     check(vkAllocateMemory(device_, &memory, nullptr, &depth_memory_), "allocate depth memory");
     check(vkBindImageMemory(device_, depth_, depth_memory_, 0), "bind depth memory");
     VkImageViewCreateInfo view{};
-    view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    view.image = depth_;
-    view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view.format = depth_format_;
+    view.sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view.image            = depth_;
+    view.viewType         = VK_IMAGE_VIEW_TYPE_2D;
+    view.format           = depth_format_;
     view.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
     check(vkCreateImageView(device_, &view, nullptr, &depth_view_), "create depth view");
 
     std::array<VkAttachmentDescription, 2> attachments{};
-    attachments[0].format = color_format_;
-    attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachments[0].format         = color_format_;
+    attachments[0].samples        = VK_SAMPLE_COUNT_1_BIT;
+    attachments[0].loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachments[0].storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
+    attachments[0].stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    attachments[1] = attachments[0];
-    attachments[1].format = depth_format_;
-    attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    attachments[0].initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachments[0].finalLayout    = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    attachments[1]                = attachments[0];
+    attachments[1].format         = depth_format_;
+    attachments[1].storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[1].finalLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     VkAttachmentReference color_reference{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
     VkAttachmentReference depth_reference{1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_reference;
+    VkSubpassDescription  subpass{};
+    subpass.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount    = 1;
+    subpass.pColorAttachments       = &color_reference;
     subpass.pDepthStencilAttachment = &depth_reference;
     VkSubpassDependency dependency{};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -333,25 +338,25 @@ void VulkanViewport::recreate_swapchain() {
     dependency.dstAccessMask =
         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
     VkRenderPassCreateInfo pass{};
-    pass.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    pass.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     pass.attachmentCount = static_cast<std::uint32_t>(attachments.size());
-    pass.pAttachments = attachments.data();
-    pass.subpassCount = 1;
-    pass.pSubpasses = &subpass;
+    pass.pAttachments    = attachments.data();
+    pass.subpassCount    = 1;
+    pass.pSubpasses      = &subpass;
     pass.dependencyCount = 1;
-    pass.pDependencies = &dependency;
+    pass.pDependencies   = &dependency;
     check(vkCreateRenderPass(device_, &pass, nullptr, &render_pass_), "create render pass");
     framebuffers_.resize(images_.size(), VK_NULL_HANDLE);
     for (std::size_t index = 0; index < images_.size(); ++index) {
         std::array<VkImageView, 2> attachment_views{views_[index], depth_view_};
-        VkFramebufferCreateInfo framebuffer{};
-        framebuffer.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebuffer.renderPass = render_pass_;
+        VkFramebufferCreateInfo    framebuffer{};
+        framebuffer.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebuffer.renderPass      = render_pass_;
         framebuffer.attachmentCount = static_cast<std::uint32_t>(attachment_views.size());
-        framebuffer.pAttachments = attachment_views.data();
-        framebuffer.width = extent_.width;
-        framebuffer.height = extent_.height;
-        framebuffer.layers = 1;
+        framebuffer.pAttachments    = attachment_views.data();
+        framebuffer.width           = extent_.width;
+        framebuffer.height          = extent_.height;
+        framebuffer.layers          = 1;
         check(vkCreateFramebuffer(device_, &framebuffer, nullptr, &framebuffers_[index]),
               "create framebuffer");
     }
@@ -372,7 +377,7 @@ void VulkanViewport::render_frame(bool blocking_capture) {
         }
         // 普通帧只轮询，GPU 忙时将控制权交还给 Qt。显式截图使用有限等待。
         const std::uint64_t timeout = blocking_capture ? 2'000'000'000ULL : 0;
-        const auto ready = vkWaitForFences(device_, 1, &frame_fence_, VK_TRUE, timeout);
+        const auto          ready   = vkWaitForFences(device_, 1, &frame_fence_, VK_TRUE, timeout);
         if (ready == VK_TIMEOUT) {
             frame_wait_reason_ = "GPU fence pending";
             requestUpdate();
@@ -401,7 +406,7 @@ void VulkanViewport::render_frame(bool blocking_capture) {
             }
             if (acquired == VK_ERROR_OUT_OF_DATE_KHR) {
                 frame_wait_reason_ = "Swapchain recreation pending";
-                dirty_ = true;
+                dirty_             = true;
                 requestUpdate();
                 return;
             }
@@ -443,8 +448,8 @@ void VulkanViewport::frameReady() {
     transition.newLayout = offscreen_ ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     transition.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     transition.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    transition.image = images_[image_index_];
-    transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    transition.image               = images_[image_index_];
+    transition.subresourceRange    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     vkCmdPipelineBarrier(
         command_,
         capture_ ? VK_PIPELINE_STAGE_TRANSFER_BIT : VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -452,26 +457,26 @@ void VulkanViewport::frameReady() {
     check(vkEndCommandBuffer(command_), "end frame");
     check(vkResetFences(device_, 1, &frame_fence_), "reset frame fence");
     const VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    VkSubmitInfo submit{};
-    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit.waitSemaphoreCount = offscreen_ ? 0 : 1;
-    submit.pWaitSemaphores = offscreen_ ? nullptr : &acquired_;
-    submit.pWaitDstStageMask = offscreen_ ? nullptr : &wait_stage;
-    submit.commandBufferCount = 1;
-    submit.pCommandBuffers = &command_;
+    VkSubmitInfo               submit{};
+    submit.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit.waitSemaphoreCount   = offscreen_ ? 0 : 1;
+    submit.pWaitSemaphores      = offscreen_ ? nullptr : &acquired_;
+    submit.pWaitDstStageMask    = offscreen_ ? nullptr : &wait_stage;
+    submit.commandBufferCount   = 1;
+    submit.pCommandBuffers      = &command_;
     submit.signalSemaphoreCount = offscreen_ ? 0 : 1;
-    submit.pSignalSemaphores = offscreen_ ? nullptr : &rendered_[image_index_];
+    submit.pSignalSemaphores    = offscreen_ ? nullptr : &rendered_[image_index_];
     check(vkQueueSubmit(queue_, 1, &submit, frame_fence_), "submit frame");
     submitted_preview_revision_ = preview_revision_;
-    frame_wait_reason_ = "Frame submitted";
+    frame_wait_reason_          = "Frame submitted";
     if (!offscreen_) {
         VkPresentInfoKHR present{};
-        present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        present.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         present.waitSemaphoreCount = 1;
-        present.pWaitSemaphores = &rendered_[image_index_];
-        present.swapchainCount = 1;
-        present.pSwapchains = &swapchain_;
-        present.pImageIndices = &image_index_;
+        present.pWaitSemaphores    = &rendered_[image_index_];
+        present.swapchainCount     = 1;
+        present.pSwapchains        = &swapchain_;
+        present.pImageIndices      = &image_index_;
         vulkanInstance()->presentAboutToBeQueued(this);
         const auto result = vkQueuePresentKHR(queue_, &present);
         vulkanInstance()->presentQueued(this);
@@ -490,13 +495,13 @@ void VulkanViewport::record_readback() {
     const VkDeviceSize bytes = VkDeviceSize(extent_.width) * extent_.height * 4;
     VkBufferCreateInfo buffer{};
     buffer.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    buffer.size = bytes;
+    buffer.size  = bytes;
     buffer.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     check(vkCreateBuffer(device_, &buffer, nullptr, &readback_), "create readback buffer");
     VkMemoryRequirements requirements{};
     vkGetBufferMemoryRequirements(device_, readback_, &requirements);
     VkMemoryAllocateInfo allocation{};
-    allocation.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocation.sType          = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocation.allocationSize = requirements.size;
     allocation.memoryTypeIndex =
         memory_type(requirements.memoryTypeBits,
@@ -505,20 +510,20 @@ void VulkanViewport::record_readback() {
           "allocate readback memory");
     check(vkBindBufferMemory(device_, readback_, readback_memory_, 0), "bind readback memory");
     VkImageMemoryBarrier transition{};
-    transition.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    transition.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    transition.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-    transition.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    transition.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    transition.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    transition.srcAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    transition.dstAccessMask       = VK_ACCESS_TRANSFER_READ_BIT;
+    transition.oldLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    transition.newLayout           = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     transition.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     transition.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    transition.image = images_[image_index_];
-    transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    transition.image               = images_[image_index_];
+    transition.subresourceRange    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     vkCmdPipelineBarrier(command_, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                          VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &transition);
     VkBufferImageCopy copy{};
     copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    copy.imageExtent = {extent_.width, extent_.height, 1};
+    copy.imageExtent      = {extent_.width, extent_.height, 1};
     vkCmdCopyImageToBuffer(command_, images_[image_index_], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                            readback_, 1, &copy);
     // fence 等待使拷贝对 host 可见；使用 coherent memory，无需额外 invalidate。
@@ -537,7 +542,7 @@ void VulkanViewport::finish_readback() {
     vkUnmapMemory(device_, readback_memory_);
     vkDestroyBuffer(device_, readback_, nullptr);
     vkFreeMemory(device_, readback_memory_, nullptr);
-    readback_ = VK_NULL_HANDLE;
+    readback_        = VK_NULL_HANDLE;
     readback_memory_ = VK_NULL_HANDLE;
 }
 
@@ -546,7 +551,7 @@ QImage VulkanViewport::grab() {
         return {};
     }
     captured_ = {};
-    capture_ = true;
+    capture_  = true;
     render_frame(true);
     capture_ = false;
     return captured_;
@@ -574,8 +579,8 @@ void VulkanViewport::release_swapchain() {
     vkDestroyImageView(device_, depth_view_, nullptr);
     vkDestroyImage(device_, depth_, nullptr);
     vkFreeMemory(device_, depth_memory_, nullptr);
-    depth_view_ = VK_NULL_HANDLE;
-    depth_ = VK_NULL_HANDLE;
+    depth_view_   = VK_NULL_HANDLE;
+    depth_        = VK_NULL_HANDLE;
     depth_memory_ = VK_NULL_HANDLE;
     if (!offscreen_) {
         for (auto view : views_) {
@@ -623,15 +628,15 @@ void VulkanViewport::release() {
     vkDestroySemaphore(device_, acquired_, nullptr);
     vkDestroyCommandPool(device_, command_pool_, nullptr);
     vkDestroyDevice(device_, nullptr);
-    device_ = VK_NULL_HANDLE;
-    command_pool_ = VK_NULL_HANDLE;
-    command_ = VK_NULL_HANDLE;
-    frame_fence_ = VK_NULL_HANDLE;
-    acquired_ = VK_NULL_HANDLE;
-    readback_ = VK_NULL_HANDLE;
+    device_          = VK_NULL_HANDLE;
+    command_pool_    = VK_NULL_HANDLE;
+    command_         = VK_NULL_HANDLE;
+    frame_fence_     = VK_NULL_HANDLE;
+    acquired_        = VK_NULL_HANDLE;
+    readback_        = VK_NULL_HANDLE;
     readback_memory_ = VK_NULL_HANDLE;
-    surface_ = VK_NULL_HANDLE;
-    dirty_ = true;
+    surface_         = VK_NULL_HANDLE;
+    dirty_           = true;
 }
 
 bool VulkanViewport::event(QEvent* event) {
@@ -639,7 +644,7 @@ bool VulkanViewport::event(QEvent* event) {
         event->type() == QEvent::UngrabMouse) {
         finish_gizmo_drag(event->type() == QEvent::UngrabMouse);
         pressed_buttons_ = Qt::NoButton;
-        dragged_ = false;
+        dragged_         = false;
     }
     // QWidget 容器可以在 C++ 析构前销毁原生 surface；必须先释放关联交换链。
     if (event->type() == QEvent::PlatformSurface) {
@@ -678,39 +683,51 @@ void VulkanViewport::resizeEvent(QResizeEvent* event) {
 bool VulkanViewport::isValid() const noexcept {
     return render_pass_ != VK_NULL_HANDLE && failure_.isEmpty();
 }
+
 VkDevice VulkanViewport::device() const noexcept {
     return device_;
 }
+
 VkPhysicalDevice VulkanViewport::physicalDevice() const noexcept {
     return physical_;
 }
+
 const VkPhysicalDeviceProperties* VulkanViewport::physicalDeviceProperties() const noexcept {
     return &properties_;
 }
+
 VkRenderPass VulkanViewport::defaultRenderPass() const noexcept {
     return render_pass_;
 }
+
 VkCommandBuffer VulkanViewport::currentCommandBuffer() const noexcept {
     return command_;
 }
+
 VkFramebuffer VulkanViewport::currentFramebuffer() const {
     return framebuffers_.at(image_index_);
 }
+
 QSize VulkanViewport::swapChainImageSize() const noexcept {
     return {static_cast<int>(extent_.width), static_cast<int>(extent_.height)};
 }
+
 bool VulkanViewport::supportsGrab() const noexcept {
     return isValid() && can_grab_;
 }
+
 void VulkanViewport::report_frame() {
     ++frame_count_;
 }
+
 void VulkanViewport::report_swapchain() {
     ++swapchain_count_;
 }
+
 int VulkanViewport::rendered_frames() const noexcept {
     return frame_count_;
 }
+
 int VulkanViewport::resource_generations() const noexcept {
     return swapchain_count_;
 }
@@ -718,19 +735,24 @@ int VulkanViewport::resource_generations() const noexcept {
 const SceneUploadStatistics& VulkanViewport::upload_statistics() const noexcept {
     return upload_statistics_;
 }
+
 void VulkanViewport::report_mesh_upload() {
     ++upload_statistics_.mesh_uploads;
 }
+
 void VulkanViewport::report_mesh_allocation() {
     ++upload_statistics_.mesh_allocations;
     ++upload_statistics_.index_uploads;
 }
+
 void VulkanViewport::report_vertex_buffer_reuse() {
     ++upload_statistics_.vertex_buffer_reuses;
 }
+
 void VulkanViewport::report_descriptor_rebuild() {
     ++upload_statistics_.descriptor_rebuilds;
 }
+
 void VulkanViewport::report_scene_update(double milliseconds) {
     ++upload_statistics_.scene_updates;
     upload_statistics_.last_update_ms = milliseconds;
@@ -742,18 +764,22 @@ void VulkanViewport::mark_preview_changed() {
     }
     ++preview_revision_;
 }
+
 qint64 VulkanViewport::preview_wait_ms() const noexcept {
     return preview_revision_ != completed_preview_revision_ && preview_wait_.isValid()
                ? preview_wait_.elapsed()
                : 0;
 }
+
 QString VulkanViewport::frame_wait_reason() const {
     return frame_wait_reason_;
 }
+
 void VulkanViewport::report_failure(const QString& error) {
     failure_ = error;
     qCritical().noquote() << "Vulkan renderer:" << error;
 }
+
 QString VulkanViewport::failure() const {
     return failure_;
 }
@@ -783,25 +809,30 @@ void VulkanViewport::set_scene(std::shared_ptr<const minirender::SceneSnapshot> 
     mark_preview_changed();
     requestUpdate();
 }
+
 const std::shared_ptr<const minirender::SceneSnapshot>& VulkanViewport::scene() const noexcept {
     return scene_;
 }
+
 std::uint64_t VulkanViewport::scene_revision() const noexcept {
     return scene_revision_;
 }
 
 void VulkanViewport::supply_raster_mesh(
     const std::shared_ptr<const minirender::MeshData>& mesh,
-    std::shared_ptr<const minirender::RasterMeshData> prepared) {
+    std::shared_ptr<const minirender::RasterMeshData>  prepared) {
     raster_meshes_.supply(mesh, std::move(prepared));
 }
+
 std::shared_ptr<const minirender::RasterMeshData>
 VulkanViewport::raster_mesh(const std::shared_ptr<const minirender::MeshData>& mesh) {
     return raster_meshes_.find(mesh);
 }
+
 const minirender::Camera& VulkanViewport::camera() const noexcept {
     return camera_;
 }
+
 void VulkanViewport::set_camera(const minirender::Camera& camera) {
     camera.validate();
     finish_gizmo_drag(true);
@@ -823,26 +854,30 @@ void VulkanViewport::set_point_preview_data(
         set_point_preview_visible(false);
     }
     const bool first = !point_data_;
-    point_data_ = std::move(data);
+    point_data_      = std::move(data);
     if (first && point_data_) {
         reset_point_camera();
     }
     mark_preview_changed();
     requestUpdate();
 }
+
 const std::shared_ptr<const minirender::PointPreviewData>&
 VulkanViewport::point_preview_data() const noexcept {
     return point_data_;
 }
+
 void VulkanViewport::set_point_preview_settings(minirender::PointPreviewSettings settings) {
     settings.validate();
     point_settings_ = settings;
     mark_preview_changed();
     requestUpdate();
 }
+
 const minirender::PointPreviewSettings& VulkanViewport::point_preview_settings() const noexcept {
     return point_settings_;
 }
+
 void VulkanViewport::set_point_preview_visible(bool visible) {
     if (point_visible_ == visible) {
         return;
@@ -855,14 +890,14 @@ void VulkanViewport::set_point_preview_visible(bool visible) {
         set_sdf_visible(false);
         set_offline_visible(false);
         scene_camera_before_tools_ = camera_;
-        camera_ = point_camera_;
+        camera_                    = point_camera_;
     } else {
         point_camera_ = camera_;
-        camera_ = scene_camera_before_tools_;
+        camera_       = scene_camera_before_tools_;
     }
-    point_visible_ = visible;
+    point_visible_   = visible;
     pressed_buttons_ = Qt::NoButton;
-    dragged_ = false;
+    dragged_         = false;
     rebuild_gizmo();
     mark_preview_changed();
     if (on_point_preview_changed) {
@@ -870,29 +905,33 @@ void VulkanViewport::set_point_preview_visible(bool visible) {
     }
     requestUpdate();
 }
+
 bool VulkanViewport::point_preview_visible() const noexcept {
     return point_visible_;
 }
+
 void VulkanViewport::reset_point_camera() {
     minirender::Camera camera;
-    camera.position = {3, 2, 3};
-    camera.target = {0, 0, 0};
+    camera.position   = {3, 2, 3};
+    camera.target     = {0, 0, 0};
     camera.near_plane = .01F;
-    camera.far_plane = 100;
-    point_camera_ = camera;
+    camera.far_plane  = 100;
+    point_camera_     = camera;
     if (point_visible_) {
         set_camera(camera);
     }
 }
+
 void VulkanViewport::report_point_upload() {
     ++point_uploads_;
 }
+
 std::uint64_t VulkanViewport::point_uploads() const noexcept {
     return point_uploads_;
 }
 
 void VulkanViewport::set_sdf_document(std::shared_ptr<const minirender::SdfDocument> document,
-                                      bool reset_camera) {
+                                      bool                                           reset_camera) {
     if (document) {
         document->validate();
     } else {
@@ -908,10 +947,12 @@ void VulkanViewport::set_sdf_document(std::shared_ptr<const minirender::SdfDocum
     mark_preview_changed();
     requestUpdate();
 }
+
 const std::shared_ptr<const minirender::SdfDocument>&
 VulkanViewport::sdf_document() const noexcept {
     return sdf_document_;
 }
+
 void VulkanViewport::set_sdf_visible(bool visible) {
     if (visible == sdf_visible_) {
         return;
@@ -924,14 +965,14 @@ void VulkanViewport::set_sdf_visible(bool visible) {
         set_point_preview_visible(false);
         set_offline_visible(false);
         scene_camera_before_tools_ = camera_;
-        camera_ = sdf_camera_;
+        camera_                    = sdf_camera_;
     } else {
         sdf_camera_ = camera_;
-        camera_ = scene_camera_before_tools_;
+        camera_     = scene_camera_before_tools_;
     }
-    sdf_visible_ = visible;
+    sdf_visible_     = visible;
     pressed_buttons_ = Qt::NoButton;
-    dragged_ = false;
+    dragged_         = false;
     rebuild_gizmo();
     mark_preview_changed();
     if (on_sdf_visible_changed) {
@@ -939,9 +980,11 @@ void VulkanViewport::set_sdf_visible(bool visible) {
     }
     requestUpdate();
 }
+
 bool VulkanViewport::sdf_visible() const noexcept {
     return sdf_visible_;
 }
+
 void VulkanViewport::set_sdf_view(minirender::SdfView view) {
     if (view != minirender::SdfView::surface && view != minirender::SdfView::normals &&
         view != minirender::SdfView::depth && view != minirender::SdfView::steps) {
@@ -954,9 +997,11 @@ void VulkanViewport::set_sdf_view(minirender::SdfView view) {
     mark_preview_changed();
     requestUpdate();
 }
+
 minirender::SdfView VulkanViewport::sdf_view() const noexcept {
     return sdf_view_;
 }
+
 void VulkanViewport::set_sdf_shadows(bool enabled) {
     sdf_shadows_ = enabled;
     if (on_sdf_display_changed) {
@@ -965,34 +1010,43 @@ void VulkanViewport::set_sdf_shadows(bool enabled) {
     mark_preview_changed();
     requestUpdate();
 }
+
 bool VulkanViewport::sdf_shadows() const noexcept {
     return sdf_shadows_;
 }
+
 const minirender::Camera& VulkanViewport::sdf_camera() const noexcept {
     return sdf_visible_ ? camera_ : sdf_camera_;
 }
+
 void VulkanViewport::report_sdf_upload() {
     ++sdf_uploads_;
 }
+
 std::uint64_t VulkanViewport::sdf_uploads() const noexcept {
     return sdf_uploads_;
 }
+
 void VulkanViewport::set_exposure(float value) {
     exposure_ = value;
     mark_preview_changed();
     requestUpdate();
 }
+
 float VulkanViewport::exposure() const noexcept {
     return exposure_;
 }
+
 void VulkanViewport::set_preview_outline(bool enabled) {
     preview_outline_ = enabled;
     mark_preview_changed();
     requestUpdate();
 }
+
 bool VulkanViewport::preview_outline() const noexcept {
     return preview_outline_;
 }
+
 void VulkanViewport::set_preview_outline_strength(float strength) {
     if (!std::isfinite(strength) || strength < 0 || strength > 1) {
         throw std::invalid_argument("Preview outline strength must be in [0, 1]");
@@ -1001,17 +1055,21 @@ void VulkanViewport::set_preview_outline_strength(float strength) {
     mark_preview_changed();
     requestUpdate();
 }
+
 float VulkanViewport::preview_outline_strength() const noexcept {
     return preview_outline_strength_;
 }
+
 void VulkanViewport::set_preview_occlusion(bool enabled) {
     preview_occlusion_ = enabled;
     mark_preview_changed();
     requestUpdate();
 }
+
 bool VulkanViewport::preview_occlusion() const noexcept {
     return preview_occlusion_;
 }
+
 void VulkanViewport::set_view_mode(int mode) {
     set_sdf_visible(false);
     set_point_preview_visible(false);
@@ -1019,45 +1077,55 @@ void VulkanViewport::set_view_mode(int mode) {
     mark_preview_changed();
     requestUpdate();
 }
+
 int VulkanViewport::view_mode() const noexcept {
     return view_mode_;
 }
+
 void VulkanViewport::set_ssao_settings(minirender::SsaoSettings settings) {
     settings.validate();
     ssao_ = settings;
     mark_preview_changed();
     requestUpdate();
 }
+
 const minirender::SsaoSettings& VulkanViewport::ssao_settings() const noexcept {
     return ssao_;
 }
+
 void VulkanViewport::set_ibl_data(std::shared_ptr<const minirender::IblEnvironment> maps,
-                                  std::shared_ptr<const minirender::Image> lut) {
+                                  std::shared_ptr<const minirender::Image>          lut) {
     if (maps == ibl_maps_ && lut == ibl_lut_) {
         return;
     }
     ibl_maps_ = std::move(maps);
-    ibl_lut_ = std::move(lut);
+    ibl_lut_  = std::move(lut);
     mark_preview_changed();
     requestUpdate();
 }
+
 const std::shared_ptr<const minirender::IblEnvironment>& VulkanViewport::ibl_maps() const noexcept {
     return ibl_maps_;
 }
+
 const std::shared_ptr<const minirender::Image>& VulkanViewport::ibl_lut() const noexcept {
     return ibl_lut_;
 }
+
 void VulkanViewport::set_environment_background(bool enabled) {
     environment_background_ = enabled;
     mark_preview_changed();
     requestUpdate();
 }
+
 bool VulkanViewport::environment_background() const noexcept {
     return environment_background_;
 }
+
 void VulkanViewport::report_ibl_update() {
     ++ibl_texture_updates_;
 }
+
 std::uint64_t VulkanViewport::ibl_texture_updates() const noexcept {
     return ibl_texture_updates_;
 }
@@ -1075,28 +1143,33 @@ void VulkanViewport::set_offline_visible(bool visible) {
     offline_visible_ = visible;
     rebuild_gizmo();
     pressed_buttons_ = Qt::NoButton;
-    dragged_ = false;
+    dragged_         = false;
     mark_preview_changed();
     if (on_display_changed) {
         on_display_changed(visible);
     }
     requestUpdate();
 }
+
 bool VulkanViewport::offline_visible() const noexcept {
     return offline_visible_;
 }
+
 OfflineImageSource VulkanViewport::offline_source() const noexcept {
     return offline_source_;
 }
+
 void VulkanViewport::set_offline_image(std::shared_ptr<const minirender::Image> image,
-                                       OfflineImageSource source) {
-    if (source != offline_source_ || !image)
+                                       OfflineImageSource                       source) {
+    if (source != offline_source_ || !image) {
         ++display_revision_;
+    }
     offline_source_ = source;
-    offline_image_ = std::move(image);
+    offline_image_  = std::move(image);
     mark_preview_changed();
     requestUpdate();
 }
+
 const std::shared_ptr<const minirender::Image>& VulkanViewport::offline_image() const noexcept {
     return offline_image_;
 }
@@ -1109,15 +1182,15 @@ void VulkanViewport::mousePressEvent(QMouseEvent* event) {
     // 嵌入窗口的焦点由 QWidget 容器管理，避免把子窗口当顶层窗口激活。
     pressed_buttons_ = event->buttons();
     mouse_origin_ = last_mouse_ = event->position();
-    dragged_ = false;
+    dragged_                    = false;
     if (event->button() == Qt::LeftButton && event->modifiers() == Qt::NoModifier &&
         gizmo_target_) {
-        const glm::dvec2 pointer(event->position().x(), event->position().y());
-        const auto hit = gizmo_layout_.hit(pointer);
+        const glm::dvec2            pointer(event->position().x(), event->position().y());
+        const auto                  hit = gizmo_layout_.hit(pointer);
         const minirender::GizmoView view{camera_, {width(), height()}};
         auto drag = minirender::GizmoDrag::begin(view, *gizmo_target_, gizmo_layout_, hit, pointer);
         if (drag && on_transform_begin && on_transform_begin()) {
-            gizmo_drag_ = std::move(drag);
+            gizmo_drag_  = std::move(drag);
             gizmo_hover_ = hit.handle;
             mark_preview_changed();
             requestUpdate();
@@ -1125,6 +1198,7 @@ void VulkanViewport::mousePressEvent(QMouseEvent* event) {
     }
     event->accept();
 }
+
 void VulkanViewport::mouseMoveEvent(QMouseEvent* event) {
     if (!scene_ || offline_visible_) {
         return;
@@ -1162,12 +1236,12 @@ void VulkanViewport::mouseMoveEvent(QMouseEvent* event) {
         return;
     }
     const auto delta = event->position() - last_mouse_;
-    last_mouse_ = event->position();
+    last_mouse_      = event->position();
     if ((event->position() - mouse_origin_).manhattanLength() > 3.0) {
         dragged_ = true;
     }
-    const float dx = static_cast<float>(delta.x());
-    const float dy = static_cast<float>(delta.y());
+    const float dx       = static_cast<float>(delta.x());
+    const float dy       = static_cast<float>(delta.y());
     const float distance = glm::length(camera_.target - camera_.position);
     if (pressed_buttons_.testFlag(Qt::MiddleButton) ||
         (pressed_buttons_.testFlag(Qt::LeftButton) &&
@@ -1181,6 +1255,7 @@ void VulkanViewport::mouseMoveEvent(QMouseEvent* event) {
     }
     event->accept();
 }
+
 void VulkanViewport::mouseReleaseEvent(QMouseEvent* event) {
     if (gizmo_drag_ && event->button() == Qt::LeftButton) {
         finish_gizmo_drag(true);
@@ -1194,7 +1269,7 @@ void VulkanViewport::mouseReleaseEvent(QMouseEvent* event) {
         const glm::vec2 uv{static_cast<float>(event->position().x()) / static_cast<float>(width()),
                            static_cast<float>(event->position().y()) /
                                static_cast<float>(height())};
-        const auto selected = minirender::pick_object(
+        const auto      selected = minirender::pick_object(
             *scene_,
             camera_.generate_ray(uv, static_cast<float>(width()) / static_cast<float>(height())));
         if (on_object_picked) {
@@ -1203,6 +1278,7 @@ void VulkanViewport::mouseReleaseEvent(QMouseEvent* event) {
     }
     event->accept();
 }
+
 void VulkanViewport::wheelEvent(QWheelEvent* event) {
     finish_gizmo_drag(true);
     if (scene_ && !offline_visible_) {
@@ -1211,6 +1287,7 @@ void VulkanViewport::wheelEvent(QWheelEvent* event) {
     }
     event->accept();
 }
+
 void VulkanViewport::keyPressEvent(QKeyEvent* event) {
     if (!scene_ || offline_visible_) {
         return;
@@ -1262,7 +1339,7 @@ void VulkanViewport::set_gizmo_mode(minirender::GizmoMode mode) {
         return;
     }
     finish_gizmo_drag(true);
-    gizmo_mode_ = mode;
+    gizmo_mode_  = mode;
     gizmo_hover_ = minirender::GizmoHandle::none;
     rebuild_gizmo();
     mark_preview_changed();
@@ -1271,20 +1348,23 @@ void VulkanViewport::set_gizmo_mode(minirender::GizmoMode mode) {
         on_gizmo_mode_changed(mode);
     }
 }
+
 minirender::GizmoMode VulkanViewport::gizmo_mode() const noexcept {
     return gizmo_mode_;
 }
-void VulkanViewport::set_gizmo_target(std::string object_id,
+
+void VulkanViewport::set_gizmo_target(std::string                          object_id,
                                       std::optional<minirender::Transform> transform) {
     if (object_id != gizmo_target_id_) {
         finish_gizmo_drag(false);
     }
     gizmo_target_id_ = std::move(object_id);
-    gizmo_target_ = std::move(transform);
+    gizmo_target_    = std::move(transform);
     rebuild_gizmo();
     mark_preview_changed();
     requestUpdate();
 }
+
 void VulkanViewport::rebuild_gizmo() {
     gizmo_layout_ = {};
     if (gizmo_target_ && scene_ && !offline_visible_ && !point_visible_ && !sdf_visible_ &&
@@ -1293,24 +1373,28 @@ void VulkanViewport::rebuild_gizmo() {
         gizmo_layout_ = minirender::make_gizmo_layout(view, *gizmo_target_, gizmo_mode_);
     }
 }
+
 const minirender::GizmoLayout& VulkanViewport::gizmo_layout() const noexcept {
     return gizmo_layout_;
 }
+
 minirender::GizmoHandle VulkanViewport::highlighted_gizmo_handle() const noexcept {
     return gizmo_drag_ ? gizmo_drag_->handle() : gizmo_hover_;
 }
+
 bool VulkanViewport::gizmo_dragging() const noexcept {
     return gizmo_drag_.has_value();
 }
+
 void VulkanViewport::finish_gizmo_drag(bool commit) {
     if (!gizmo_drag_) {
         return;
     }
     // 先清空手势，再回调文档更新，允许回调重建场景或改变目标。
     gizmo_drag_.reset();
-    gizmo_hover_ = minirender::GizmoHandle::none;
+    gizmo_hover_     = minirender::GizmoHandle::none;
     pressed_buttons_ = Qt::NoButton;
-    dragged_ = true;
+    dragged_         = true;
     if (on_transform_end) {
         on_transform_end(commit);
     }
@@ -1324,6 +1408,7 @@ void VulkanViewport::set_shadows_enabled(bool enabled) {
     mark_preview_changed();
     requestUpdate();
 }
+
 bool VulkanViewport::shadows_enabled() const noexcept {
     return shadows_enabled_;
 }
@@ -1333,9 +1418,11 @@ void VulkanViewport::set_fxaa_enabled(bool enabled) {
     mark_preview_changed();
     requestUpdate();
 }
+
 bool VulkanViewport::fxaa_enabled() const noexcept {
     return fxaa_enabled_;
 }
+
 minirender::Image VulkanViewport::grab_hdr() {
     if (point_visible_) {
         throw std::logic_error("Return to the scene before exporting HDR");
@@ -1347,7 +1434,7 @@ minirender::Image VulkanViewport::grab_hdr() {
         throw std::logic_error("HDR capture requires a visible scene viewport");
     }
     const auto before = frame_count_;
-    auto* active =
+    auto*      active =
         sdf_visible_ ? static_cast<ViewportRenderer*>(sdf_renderer_.get()) : renderer_.get();
     active->request_hdr_capture();
     render_frame(true);

@@ -1,3 +1,6 @@
+// 回归测试：sRGB transfer preserves known values and round trips；Image rejects invalid extents and
+// stores unclipped linear values。
+
 #include <minirender/core/image.hpp>
 
 #include <catch2/catch_approx.hpp>
@@ -42,10 +45,10 @@ TEST_CASE("Image rejects invalid extents and stores unclipped linear values", "[
 TEST_CASE("PPM writes sRGB bytes and supports Unicode filesystem paths", "[image][io]") {
     const auto path = std::filesystem::temp_directory_path() /
                       std::filesystem::path(std::u8string(u8"minirender_图像 空格.ppm"));
-    Image image(1, 1);
+    Image      image(1, 1);
     image.at(0, 0) = {0.0F, 0.18F, 1.0F};
     image.write_ppm(path);
-    std::ifstream input(path, std::ios::binary);
+    std::ifstream     input(path, std::ios::binary);
     const std::string bytes((std::istreambuf_iterator<char>(input)), {});
     input.close();
     std::filesystem::remove(path);
@@ -60,7 +63,7 @@ TEST_CASE("Float EXR round trip preserves HDR, negative values and Unicode filen
           "[image][exr]") {
     const auto path = std::filesystem::temp_directory_path() /
                       std::filesystem::path(std::u8string(u8"minirender_HDR 图像.exr"));
-    Image source(3, 2);
+    Image      source(3, 2);
     source.at(0, 0) = {8.0F, 2.0F, 0.5F};
     source.at(1, 0) = {-0.25F, 1000.0F, 0.001F};
     source.at(2, 1) = {0.1F, 0.2F, 0.3F};

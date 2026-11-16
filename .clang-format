@@ -1,3 +1,5 @@
+# 自有 C++ 的共享排版规则；着色器目录覆盖 include 排序策略。
+
 BasedOnStyle: LLVM
 IndentWidth: 4
 ColumnLimit: 100
@@ -7,3 +9,13 @@ AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
 PointerAlignment: Left
 SortIncludes: CaseSensitive
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveDeclarations:
+  Enabled: true
+  AlignFunctionDeclarations: false
+  AlignFunctionPointers: false
+AlignConsecutiveBitFields: Consecutive
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+InsertBraces: true
+SeparateDefinitionBlocks: Always

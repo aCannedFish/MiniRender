@@ -1,3 +1,6 @@
+// JSON 中次表面材质参数的转换。
+// 本模块接口见 subsurface_io.hpp。
+
 #include "subsurface_io.hpp"
 
 #include <stdexcept>
@@ -14,12 +17,13 @@ glm::dvec3 coefficients(const nlohmann::json& value) {
 
 std::shared_ptr<const SubsurfaceParameters> read_subsurface(const nlohmann::json& value) {
     SubsurfaceParameters parameters;
-    parameters.absorption = coefficients(value.at("absorption"));
+    parameters.absorption         = coefficients(value.at("absorption"));
     parameters.reduced_scattering = coefficients(value.at("reduced_scattering"));
-    parameters.density = value.at("density").get<double>();
+    parameters.density            = value.at("density").get<double>();
     parameters.validate();
     return std::make_shared<const SubsurfaceParameters>(parameters);
 }
+
 nlohmann::json write_subsurface(const SubsurfaceParameters& parameters) {
     parameters.validate();
     return {

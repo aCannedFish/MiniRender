@@ -1,3 +1,6 @@
+// 回归测试：Subsurface path transports light across positions with all sampling modes；Subsurface
+// continuous environment MIS matches the full surface integral。
+
 #include "subsurface_fixture.hpp"
 
 #include <minirender/assets/scene_io.hpp>
@@ -15,17 +18,21 @@
 
 using namespace minirender;
 using namespace std::chrono_literals;
+
 namespace {
 
 struct Moments {
     std::size_t count = 0;
-    glm::dvec3 mean{0}, variance_sum{0};
+    glm::dvec3  mean{0};
+    glm::dvec3  variance_sum{0};
+
     void add(glm::dvec3 value) {
         ++count;
         const auto delta = value - mean;
         mean += delta / double(count);
         variance_sum += delta * (value - mean);
     }
+
     glm::dvec3 error() const {
         return glm::sqrt(variance_sum / double(count - 1) / double(count));
     }
@@ -33,11 +40,11 @@ struct Moments {
 
 // 唯一受方向光照射的左侧平面与相机可见的正面分开，参考直接做二维面积积分。
 glm::dvec3 side_reference(const SceneDocument& scene) {
-    const auto& material = scene.materials[0];
+    const auto&         material = scene.materials[0];
     const DipoleProfile profile(*material.subsurface, material.ior);
-    const double f0 = std::pow((material.ior - 1.) / (material.ior + 1.), 2);
-    glm::dvec3 integral(0);
-    constexpr int count = 256;
+    const double        f0 = std::pow((material.ior - 1.) / (material.ior + 1.), 2);
+    glm::dvec3          integral(0);
+    constexpr int       count = 256;
     for (int y = 0; y < count; ++y) {
         for (int z = 0; z < count; ++z) {
             const glm::dvec3 point{-.5, (y + .5) / count - .5, (z + .5) / count - .5};
@@ -51,7 +58,7 @@ glm::dvec3 side_reference(const SceneDocument& scene) {
 }
 
 SceneDocument side_scene() {
-    auto scene = sss_test::scene();
+    auto scene        = sss_test::scene();
     scene.environment = glm::vec3(0);
     scene.directional_lights.push_back({"side", {1, 0, 0}, {1, .8F, .6F}, 4});
     return scene;
@@ -73,10 +80,12 @@ class TemporaryDirectory {
                 std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
         std::filesystem::create_directories(path);
     }
+
     ~TemporaryDirectory() {
         std::error_code error;
         std::filesystem::remove_all(path, error);
     }
+
     std::filesystem::path path;
 };
 
@@ -84,8 +93,8 @@ class TemporaryDirectory {
 // 积分不使用投影轴、径向采样或 BSSRDF 的面积 PDF。
 glm::dvec3 integrate_triangle(const DipoleProfile& profile, glm::dvec3 origin,
                               const std::array<glm::dvec3, 3>& p, double tolerance, int depth = 0) {
-    const auto center = (p[0] + p[1] + p[2]) / 3.;
-    const double area = glm::length(glm::cross(p[1] - p[0], p[2] - p[0])) / 2;
+    const auto   center = (p[0] + p[1] + p[2]) / 3.;
+    const double area   = glm::length(glm::cross(p[1] - p[0], p[2] - p[0])) / 2;
     // 七点五次三角形求积；通过四个子三角形的同阶结果估计误差。
     const auto rule = [&](const std::array<glm::dvec3, 3>& triangle, double triangle_area) {
         glm::dvec3 sum =
@@ -114,7 +123,7 @@ glm::dvec3 integrate_triangle(const DipoleProfile& profile, glm::dvec3 origin,
     const double extent = std::max(
         {glm::length(p[0] - center), glm::length(p[1] - center), glm::length(p[2] - center)});
     const bool near_peak = glm::length(center - origin) < 3 * extent && extent > .00005;
-    const auto error = glm::abs(fine - coarse);
+    const auto error     = glm::abs(fine - coarse);
     if (depth >= 14 || (!near_peak && std::max({error.x, error.y, error.z}) < tolerance)) {
         return fine;
     }
@@ -127,13 +136,13 @@ glm::dvec3 integrate_triangle(const DipoleProfile& profile, glm::dvec3 origin,
 } // namespace
 
 TEST_CASE("Subsurface path transports light across positions with all sampling modes", "[sss]") {
-    const auto scene = side_scene();
+    const auto scene    = side_scene();
     const auto expected = side_reference(scene);
     const auto snapshot = make_snapshot(scene);
     for (const auto mode : {SamplingMode::bsdf, SamplingMode::light, SamplingMode::mis}) {
         const PathTracer tracer(snapshot, {mode, 1, false, 3});
-        Moments result;
-        PathStatistics statistics;
+        Moments          result;
+        PathStatistics   statistics;
         for (const std::uint64_t seed : {41ULL, 71ULL, 111ULL}) {
             for (std::uint64_t i = 0; i < 10000; ++i) {
                 auto random = Sampler::for_sample(seed, 0, i);
@@ -152,36 +161,36 @@ TEST_CASE("Subsurface path transports light across positions with all sampling m
         REQUIRE(statistics.subsurface_events <= statistics.scattering_events);
     }
     const PathTracer no_scattering(snapshot, {.maximum_depth = 0});
-    Sampler random(1);
+    Sampler          random(1);
     REQUIRE(no_scattering.trace({{0, 0, 3}, {0, 0, -1}}, random) == glm::dvec3(0));
 }
 
 // 凸体的外向半球都看见同一个环境，方向积分可独立化为 Fresnel 半球矩。
 TEST_CASE("Subsurface continuous environment MIS matches the full surface integral", "[sss]") {
-    const auto scene = sss_test::scene();
-    const auto snapshot = make_snapshot(scene);
-    const auto& object = snapshot->instances[0];
+    const auto          scene    = sss_test::scene();
+    const auto          snapshot = make_snapshot(scene);
+    const auto&         object   = snapshot->instances[0];
     const DipoleProfile profile(*object.material.subsurface, object.material.ior);
-    glm::dvec3 integral(0);
-    constexpr int count = 128;
+    glm::dvec3          integral(0);
+    constexpr int       count = 128;
     for (const auto& face : object.mesh->triangles) {
-        const auto p = sss_test::world_triangle(object, face);
+        const auto   p    = sss_test::world_triangle(object, face);
         const double area = glm::length(glm::cross(p[1] - p[0], p[2] - p[0])) / 2;
         for (int i = 0; i < count; ++i) {
             const double root = std::sqrt((i + .5) / count);
             for (int j = 0; j < count; ++j) {
-                const double v = (j + .5) / count;
-                const auto point = (1 - root) * p[0] + root * (1 - v) * p[1] + root * v * p[2];
+                const double v     = (j + .5) / count;
+                const auto   point = (1 - root) * p[0] + root * (1 - v) * p[1] + root * v * p[2];
                 integral += profile.evaluate(glm::length(point - glm::dvec3(0, 0, .5))) *
                             (area / (count * count));
             }
         }
     }
-    const double f0 = std::pow((object.material.ior - 1.) / (object.material.ior + 1.), 2);
-    const auto expected = f0 + (1 - f0) * profile.external_transmission() * integral;
+    const double f0       = std::pow((object.material.ior - 1.) / (object.material.ior + 1.), 2);
+    const auto   expected = f0 + (1 - f0) * profile.external_transmission() * integral;
     for (const auto mode : {SamplingMode::bsdf, SamplingMode::light, SamplingMode::mis}) {
         const PathTracer tracer(snapshot, {mode, 1, false, 3});
-        Moments result;
+        Moments          result;
         for (std::uint64_t i = 0; i < 40000; ++i) {
             auto random = Sampler::for_sample(181, 0, i);
             result.add(tracer.trace({{0, 0, 3}, {0, 0, -1}}, random));
@@ -198,34 +207,34 @@ TEST_CASE("Measured marble on a small curved mesh matches independent area integ
     auto scene =
         load_scene(std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/cornell-materials.json");
     std::erase_if(scene.objects, [](const auto& object) { return object.id != "glass_ball"; });
-    auto& object = scene.objects[0];
+    auto& object                 = scene.objects[0];
     object.transform.translation = {};
-    object.transform.scale = glm::vec3(.02F);
+    object.transform.scale       = glm::vec3(.02F);
     for (auto& material : scene.materials) {
         if (material.id == object.material_id) {
-            material.kind = MaterialKind::subsurface;
+            material.kind       = MaterialKind::subsurface;
             material.subsurface = make_subsurface_preset("marble").parameters;
         }
     }
-    scene.environment = glm::vec3(1);
-    const auto snapshot = make_snapshot(scene);
+    scene.environment       = glm::vec3(1);
+    const auto     snapshot = make_snapshot(scene);
     const SceneBvh bvh(snapshot);
-    const auto hit = bvh.intersect({{0, 0, .2}, {0, 0, -1}});
+    const auto     hit = bvh.intersect({{0, 0, .2}, {0, 0, -1}});
     REQUIRE(hit);
-    const auto& instance = snapshot->instances[0];
+    const auto&         instance = snapshot->instances[0];
     const DipoleProfile profile(*instance.material.subsurface, instance.material.ior);
-    glm::dvec3 integral(0);
+    glm::dvec3          integral(0);
     for (const auto& face : instance.mesh->triangles) {
         integral +=
             integrate_triangle(profile, hit->position, sss_test::world_triangle(instance, face),
                                1e-7 / double(instance.mesh->triangles.size()));
     }
-    const double cosine = glm::normalize(glm::dvec3(hit->geometric_normal)).z;
+    const double cosine     = glm::normalize(glm::dvec3(hit->geometric_normal)).z;
     const double reflection = fresnel_dielectric(cosine, 1, instance.material.ior);
-    const auto expected =
+    const auto   expected =
         reflection + (1 - reflection) * profile.external_transmission() * integral;
     const PathTracer tracer(snapshot, {SamplingMode::mis, 1, false, 3});
-    Moments result;
+    Moments          result;
     for (std::uint64_t i = 0; i < 40000; ++i) {
         auto random = Sampler::for_sample(201, 0, i);
         result.add(tracer.trace({{0, 0, .2}, {0, 0, -1}}, random));
@@ -240,17 +249,17 @@ TEST_CASE("Measured marble on a small curved mesh matches independent area integ
 }
 
 TEST_CASE("Subsurface shadow rays retain occlusion and external medium attenuation", "[sss]") {
-    auto scene = side_scene();
-    const auto base = side_reference(scene);
+    auto         scene = side_scene();
+    const auto   base  = side_reference(scene);
     MediumRegion medium;
-    medium.id = "absorber";
-    medium.minimum = {-1.5, -2, -2};
-    medium.maximum = {-.6, 2, 2};
+    medium.id                = "absorber";
+    medium.minimum           = {-1.5, -2, -2};
+    medium.maximum           = {-.6, 2, 2};
     medium.medium.absorption = {.1, .2, .3};
     scene.media.push_back(medium);
-    const auto expected = base * glm::exp(-.9 * medium.medium.absorption);
+    const auto       expected = base * glm::exp(-.9 * medium.medium.absorption);
     const PathTracer tracer(make_snapshot(scene), {SamplingMode::mis, 1, false, 3});
-    Moments result;
+    Moments          result;
     for (std::uint64_t i = 0; i < 30000; ++i) {
         auto random = Sampler::for_sample(131, 0, i);
         result.add(tracer.trace({{0, 0, 3}, {0, 0, -1}}, random));
@@ -276,9 +285,9 @@ TEST_CASE("Subsurface boundary reflection survives when diffusion has zero scatt
         std::make_shared<const SubsurfaceParameters>(SubsurfaceParameters{{1, 1, 1}, {0, 0, 0}, 1});
     scene.materials[0].double_sided = false;
     const PathTracer tracer(make_snapshot(scene), {SamplingMode::mis, 1, false, 3});
-    const double eta = scene.materials[0].ior;
-    const double expected = std::pow((eta - 1) / (eta + 1), 2);
-    Moments result;
+    const double     eta      = scene.materials[0].ior;
+    const double     expected = std::pow((eta - 1) / (eta + 1), 2);
+    Moments          result;
     for (std::uint64_t i = 0; i < 50000; ++i) {
         auto random = Sampler::for_sample(151, 0, i);
         result.add(tracer.trace({{0, 0, 3}, {0, 0, -1}}, random));
@@ -295,17 +304,17 @@ TEST_CASE("Subsurface boundary reflection survives when diffusion has zero scatt
 }
 
 TEST_CASE("Subsurface parameters preserve snapshots history and UTF8 scene files", "[sss]") {
-    auto scene = side_scene();
-    auto precise = *scene.materials[0].subsurface;
-    precise.absorption.x = .12345678901234567;
-    precise.reduced_scattering.y = 2.345678901234567;
-    precise.density = 1.2345678901234567;
+    auto scene                    = side_scene();
+    auto precise                  = *scene.materials[0].subsurface;
+    precise.absorption.x          = .12345678901234567;
+    precise.reduced_scattering.y  = 2.345678901234567;
+    precise.density               = 1.2345678901234567;
     scene.materials[0].subsurface = std::make_shared<const SubsurfaceParameters>(precise);
     SceneEditor editor(scene);
-    const auto old = editor.snapshot();
+    const auto  old = editor.snapshot();
     editor.edit([](SceneDocument& document) {
-        auto parameters = *document.materials[0].subsurface;
-        parameters.density = 3;
+        auto parameters                  = *document.materials[0].subsurface;
+        parameters.density               = 3;
         document.materials[0].subsurface = std::make_shared<const SubsurfaceParameters>(parameters);
     });
     REQUIRE(old->instances[0].material.subsurface->density == precise.density);
@@ -320,7 +329,7 @@ TEST_CASE("Subsurface parameters preserve snapshots history and UTF8 scene files
     }));
     REQUIRE(editor.document().materials[0].subsurface->density == 3);
     const TemporaryDirectory temporary;
-    const auto file = temporary.path / std::filesystem::path(u8"次表面 场景.json");
+    const auto               file = temporary.path / std::filesystem::path(u8"次表面 场景.json");
     save_scene(scene, file);
     const auto reopened = load_scene(file);
     REQUIRE(*reopened.materials[0].subsurface == precise);
@@ -335,11 +344,11 @@ TEST_CASE("Subsurface parameters preserve snapshots history and UTF8 scene files
 }
 
 TEST_CASE("Subsurface render sessions match serial samples and pause without blocking", "[sss]") {
-    const auto snapshot = make_snapshot(sss_test::scene());
+    const auto               snapshot = make_snapshot(sss_test::scene());
     const IntegratorSettings integrator{SamplingMode::mis, 2, false, 3};
-    const RenderSettings settings{12, 8, 8, 191};
-    const auto expected = PathTracer(snapshot, integrator).render(settings);
-    RenderSession task;
+    const RenderSettings     settings{12, 8, 8, 191};
+    const auto               expected = PathTracer(snapshot, integrator).render(settings);
+    RenderSession            task;
     task.start(snapshot, settings, integrator, {3, 4, 2});
     REQUIRE(task.wait_for(10s));
     task.wait();

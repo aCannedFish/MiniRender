@@ -1,3 +1,6 @@
+// 隐藏窗口回归：cloth playback 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 cloth_playback_smoke.hpp。
+
 #include "cloth_playback_smoke.hpp"
 #include "cloth_controller.hpp"
 #include "cloth_playback_deep_smoke.hpp"
@@ -23,41 +26,48 @@ void require(bool condition, const char* message) {
         throw std::runtime_error(message);
     }
 }
+
 template <class T> T* control(Workbench& window, const char* name) {
     auto* value = window.findChild<T*>(name);
     require(value != nullptr, "Simulation control is missing");
     return value;
 }
+
 void click(Workbench& window, const char* name) {
     control<QPushButton>(window, name)->click();
 }
+
 const minirender::SceneObject& target(Workbench& window) {
     const auto& objects = window.document().objects;
-    const auto found = std::find_if(objects.begin(), objects.end(),
-                                    [](const auto& object) { return object.id == "cloth"; });
+    const auto  found   = std::find_if(objects.begin(), objects.end(),
+                                       [](const auto& object) { return object.id == "cloth"; });
     require(found != objects.end(), "Simulation target is missing");
     return *found;
 }
+
 struct State {
-    int stage = 0, frame = 0, ticks = 0, paused_ticks = 0;
-    std::uint64_t paused_frame = 0;
+    int                                               stage        = 0;
+    int                                               frame        = 0;
+    int                                               ticks        = 0;
+    int                                               paused_ticks = 0;
+    std::uint64_t                                     paused_frame = 0;
     std::shared_ptr<const minirender::ClothComponent> initial;
     std::shared_ptr<const minirender::ClothComponent> expected;
-    SceneUploadStatistics uploads;
-    UiResponseProbe* probe = nullptr;
+    SceneUploadStatistics                             uploads;
+    UiResponseProbe*                                  probe = nullptr;
 };
 } // namespace
 
 void start_cloth_playback_smoke(Workbench& window, const QString& directory,
                                 bool enforce_response) {
-    auto state = std::make_shared<State>();
+    auto state   = std::make_shared<State>();
     state->probe = new UiResponseProbe(&window, "Simulation");
-    auto* timer = new QTimer(&window);
+    auto* timer  = new QTimer(&window);
     timer->setInterval(50);
     QObject::connect(
         timer, &QTimer::timeout, &window, [state, timer, &window, directory, enforce_response] {
             try {
-                auto* viewport = window.viewport();
+                auto* viewport   = window.viewport();
                 auto* controller = window.cloth_controller();
                 require(++state->ticks < 2500 && viewport->failure().isEmpty(),
                         "Simulation smoke timed out");

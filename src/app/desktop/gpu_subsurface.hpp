@@ -1,3 +1,5 @@
+// 次表面材质的实时表面近似与 GPU 参数打包。
+
 #pragma once
 
 #include <minirender/scene/scene.hpp>
@@ -16,9 +18,10 @@ class SubsurfacePreviewCache final {
   private:
     struct Entry {
         std::shared_ptr<const minirender::SubsurfaceParameters> source;
-        float ior = 0;
-        glm::vec3 color{0};
+        float                                                   ior = 0;
+        glm::vec3                                               color{0};
     };
+
     std::map<std::string, Entry> entries_;
-    std::set<std::string> used_;
+    std::set<std::string>        used_;
 };

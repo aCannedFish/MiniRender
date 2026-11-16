@@ -1,3 +1,6 @@
+// 只读半边拓扑、边界环、连通分量与流形校验。
+// 公开接口与参数约定见 include/minirender/geometry/halfedge.hpp。
+
 #include <minirender/geometry/halfedge.hpp>
 
 #include <algorithm>
@@ -67,25 +70,25 @@ HalfedgeMesh::HalfedgeMesh(const MeshData& mesh, CancellationToken cancellation)
                 invalid_face(face, "corner normal or UV is invalid");
             }
         }
-        const glm::dvec3 a = mesh.positions[corners[0].position];
-        const glm::dvec3 b = mesh.positions[corners[1].position];
-        const glm::dvec3 c = mesh.positions[corners[2].position];
-        const auto area = glm::cross(b - a, c - a);
+        const glm::dvec3 a    = mesh.positions[corners[0].position];
+        const glm::dvec3 b    = mesh.positions[corners[1].position];
+        const glm::dvec3 c    = mesh.positions[corners[2].position];
+        const auto       area = glm::cross(b - a, c - a);
         // 与 MeshData 的面积门槛相同，以 double 避免大坐标下 cross/dot 溢出。
         if (glm::dot(area, area) <= 1e-20) {
             invalid_face(face, "triangle is degenerate");
         }
-        const auto first = static_cast<MeshIndex>(face * 3);
+        const auto first      = static_cast<MeshIndex>(face * 3);
         faces_[face].halfedge = first;
         for (MeshIndex corner = 0; corner < 3; ++corner) {
             const auto origin = corners[corner].position;
-            const auto end = corners[(corner + 1) % 3].position;
-            const auto h = first + corner;
-            Halfedge halfedge;
-            halfedge.origin = origin;
-            halfedge.next = first + (corner + 1) % 3;
-            halfedge.previous = first + (corner + 2) % 3;
-            halfedge.face = static_cast<MeshIndex>(face);
+            const auto end    = corners[(corner + 1) % 3].position;
+            const auto h      = first + corner;
+            Halfedge   halfedge;
+            halfedge.origin              = origin;
+            halfedge.next                = first + (corner + 1) % 3;
+            halfedge.previous            = first + (corner + 2) % 3;
+            halfedge.face                = static_cast<MeshIndex>(face);
             const auto [entry, inserted] = edge_lookup.emplace(edge_key(origin, end), h);
             if (inserted) {
                 halfedge.edge = static_cast<MeshIndex>(edges_.size());
@@ -100,7 +103,7 @@ HalfedgeMesh::HalfedgeMesh(const MeshData& mesh, CancellationToken cancellation)
                 }
                 halfedge.edge = twin.edge;
                 halfedge.twin = entry->second;
-                twin.twin = h;
+                twin.twin     = h;
             }
             halfedges_.push_back(halfedge);
             vertices_[origin].halfedge = h;
@@ -130,29 +133,29 @@ HalfedgeMesh::HalfedgeMesh(const MeshData& mesh, CancellationToken cancellation)
             continue;
         }
         const auto origin = halfedges_[halfedges_[index].next].origin;
-        const auto h = static_cast<MeshIndex>(halfedges_.size());
+        const auto h      = static_cast<MeshIndex>(halfedges_.size());
         if (boundary_outgoing[origin] != invalid_mesh_index) {
             throw std::invalid_argument("Vertex " + std::to_string(origin) +
                                         " has multiple boundary fans");
         }
         Halfedge boundary;
-        boundary.origin = origin;
-        boundary.twin = static_cast<MeshIndex>(index);
-        boundary.edge = halfedges_[index].edge;
+        boundary.origin        = origin;
+        boundary.twin          = static_cast<MeshIndex>(index);
+        boundary.edge          = halfedges_[index].edge;
         halfedges_[index].twin = h;
         halfedges_.push_back(boundary);
-        boundary_outgoing[origin] = h;
+        boundary_outgoing[origin]  = h;
         vertices_[origin].halfedge = h;
         ++vertices_[origin].valence;
     }
     for (std::size_t index = interior_count; index < halfedges_.size(); ++index) {
         check_batch(cancellation, index);
-        const auto end = halfedges_[halfedges_[index].twin].origin;
+        const auto end  = halfedges_[halfedges_[index].twin].origin;
         const auto next = boundary_outgoing[end];
         if (next == invalid_mesh_index) {
             throw std::invalid_argument("Boundary does not form a closed loop");
         }
-        halfedges_[index].next = next;
+        halfedges_[index].next    = next;
         halfedges_[next].previous = static_cast<MeshIndex>(index);
     }
 
@@ -166,8 +169,8 @@ HalfedgeMesh::HalfedgeMesh(const MeshData& mesh, CancellationToken cancellation)
             continue;
         }
         ++statistics_.referenced_vertices;
-        auto current = v.halfedge;
-        MeshIndex count = 0;
+        auto      current = v.halfedge;
+        MeshIndex count   = 0;
         do {
             check_batch(cancellation, traversed++);
             ++count;
@@ -191,10 +194,10 @@ HalfedgeMesh::HalfedgeMesh(const MeshData& mesh, CancellationToken cancellation)
         do {
             check_batch(cancellation, traversed++);
             boundary_visited[current - interior_count] = true;
-            current = halfedges_[current].next;
+            current                                    = halfedges_[current].next;
         } while (current != index);
     }
-    std::vector<bool> visited(faces_.size(), false);
+    std::vector<bool>      visited(faces_.size(), false);
     std::vector<MeshIndex> stack;
     for (std::size_t face = 0; face < faces_.size(); ++face) {
         check_batch(cancellation, face);
@@ -217,9 +220,9 @@ HalfedgeMesh::HalfedgeMesh(const MeshData& mesh, CancellationToken cancellation)
             }
         }
     }
-    statistics_.edges = edges_.size();
-    statistics_.faces = faces_.size();
-    statistics_.boundary_edges = halfedges_.size() - interior_count;
+    statistics_.edges                = edges_.size();
+    statistics_.faces                = faces_.size();
+    statistics_.boundary_edges       = halfedges_.size() - interior_count;
     statistics_.euler_characteristic = static_cast<std::int64_t>(statistics_.referenced_vertices) -
                                        static_cast<std::int64_t>(statistics_.edges) +
                                        static_cast<std::int64_t>(statistics_.faces);
@@ -229,21 +232,27 @@ HalfedgeMesh::HalfedgeMesh(const MeshData& mesh, CancellationToken cancellation)
 std::span<const HalfedgeVertex> HalfedgeMesh::vertices() const noexcept {
     return vertices_;
 }
+
 std::span<const Halfedge> HalfedgeMesh::halfedges() const noexcept {
     return halfedges_;
 }
+
 std::span<const HalfedgeEdge> HalfedgeMesh::edges() const noexcept {
     return edges_;
 }
+
 std::span<const HalfedgeFace> HalfedgeMesh::faces() const noexcept {
     return faces_;
 }
+
 const TopologyStatistics& HalfedgeMesh::statistics() const noexcept {
     return statistics_;
 }
+
 MeshIndex HalfedgeMesh::destination(MeshIndex halfedge) const noexcept {
     return halfedges_[halfedges_[halfedge].twin].origin;
 }
+
 bool HalfedgeMesh::is_boundary(MeshIndex halfedge) const noexcept {
     return halfedges_[halfedge].face == invalid_mesh_index;
 }

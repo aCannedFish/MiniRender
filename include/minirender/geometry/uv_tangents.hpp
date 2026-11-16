@@ -1,3 +1,5 @@
+// 从几何和面角 UV 构造织物方向所需的切向基。
+
 #pragma once
 
 #include <array>

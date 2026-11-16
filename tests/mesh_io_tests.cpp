@@ -1,3 +1,6 @@
+// 回归测试：OBJ export round trips shared indices UV seams normals and Unicode paths；OBJ export
+// cancellation and errors retain the original destination。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/displacement.hpp>
 #include <minirender/geometry/loop.hpp>
@@ -30,10 +33,12 @@ class TemporaryDirectory {
             std::filesystem::temp_directory_path() / ("minirender-mesh-" + std::to_string(stamp));
         std::filesystem::create_directories(path);
     }
+
     ~TemporaryDirectory() {
         std::error_code error;
         std::filesystem::remove_all(path, error);
     }
+
     std::filesystem::path path;
 };
 
@@ -47,7 +52,7 @@ std::filesystem::path studio_file() {
 }
 
 SceneDocument generated_scene(std::uint32_t level = 2) {
-    auto scene = load_scene(studio_file());
+    auto scene           = load_scene(studio_file());
     scene.meshes[0].data = subdivide_loop(scene.meshes[0].data, {level}).mesh;
     scene.meshes[0].source.clear();
     return scene;
@@ -85,6 +90,7 @@ class CommaLocale {
     CommaLocale() : original_(std::locale()) {
         std::locale::global(std::locale(original_, new Punctuation));
     }
+
     ~CommaLocale() {
         std::locale::global(original_);
     }
@@ -98,9 +104,9 @@ class CommaLocale {
 TEST_CASE("OBJ export round trips shared indices UV seams normals and Unicode paths",
           "[geometry][obj][save]") {
     TemporaryDirectory directory;
-    const auto scene = generated_scene();
-    const auto& mesh = *scene.meshes[0].data;
-    const auto destination = directory.path / std::filesystem::path(u8"模型 空格.obj");
+    const auto         scene       = generated_scene();
+    const auto&        mesh        = *scene.meshes[0].data;
+    const auto         destination = directory.path / std::filesystem::path(u8"模型 空格.obj");
     std::vector<std::pair<std::size_t, std::size_t>> progress;
     save_obj(mesh, destination, {},
              [&](auto done, auto total) { progress.emplace_back(done, total); });
@@ -127,13 +133,13 @@ TEST_CASE("OBJ export round trips shared indices UV seams normals and Unicode pa
 
 TEST_CASE("OBJ export cancellation and errors retain the original destination", "[obj][save]") {
     TemporaryDirectory directory;
-    const auto mesh = generated_scene(3).meshes[0].data;
-    const auto target = directory.path / "existing.obj";
-    const std::string original = "original object bytes\n";
+    const auto         mesh     = generated_scene(3).meshes[0].data;
+    const auto         target   = directory.path / "existing.obj";
+    const std::string  original = "original object bytes\n";
     std::ofstream(target, std::ios::binary) << original;
     for (const bool at_end : {false, true}) {
         CancellationSource cancellation;
-        bool reached = false;
+        bool               reached = false;
         REQUIRE_THROWS_AS(save_obj(*mesh, target, cancellation.token(),
                                    [&](auto done, auto total) {
                                        if ((at_end && done == total) || (!at_end && done >= 1024)) {
@@ -149,7 +155,7 @@ TEST_CASE("OBJ export cancellation and errors retain the original destination", 
     CancellationSource early;
     early.request();
     REQUIRE_THROWS_AS(save_obj(*mesh, target, early.token()), OperationCancelled);
-    auto invalid = *mesh;
+    auto invalid                             = *mesh;
     invalid.triangles[0].corners[0].position = invalid_mesh_index;
     REQUIRE_THROWS_AS(save_obj(invalid, target), std::invalid_argument);
     REQUIRE(bytes(target) == original);
@@ -164,10 +170,10 @@ TEST_CASE("OBJ export cancellation and errors retain the original destination", 
 TEST_CASE("Generated meshes save alongside scenes without rewriting source assets",
           "[geometry][scene][save]") {
     TemporaryDirectory directory;
-    const auto original_cube = studio_file().parent_path() / "assets/cube.obj";
-    const auto original_bytes = bytes(original_cube);
-    const auto scene = generated_scene();
-    const auto file = directory.path / std::filesystem::path(u8"场景 空格.json");
+    const auto         original_cube  = studio_file().parent_path() / "assets/cube.obj";
+    const auto         original_bytes = bytes(original_cube);
+    const auto         scene          = generated_scene();
+    const auto         file           = directory.path / std::filesystem::path(u8"场景 空格.json");
     save_scene(scene, file);
     const auto reopened = load_scene(file);
     REQUIRE(reopened.meshes.size() == scene.meshes.size());
@@ -193,10 +199,10 @@ TEST_CASE("Generated meshes save alongside scenes without rewriting source asset
 
 TEST_CASE("Generated asset name collisions preserve different existing contents", "[scene][save]") {
     TemporaryDirectory directory;
-    const auto scene = generated_scene();
-    const auto file = directory.path / "scene.json";
+    const auto         scene = generated_scene();
+    const auto         file  = directory.path / "scene.json";
     save_scene(scene, file);
-    const auto first = load_scene(file).meshes[0].source;
+    const auto        first    = load_scene(file).meshes[0].source;
     const std::string occupied = "unrelated user file at the same generated name";
     std::ofstream(directory.path / first, std::ios::binary) << occupied;
     save_scene(scene, file);
@@ -213,14 +219,14 @@ TEST_CASE("Scene save cancels every precommit stage without replacing the origin
                              SceneSaveStage::compare, SceneSaveStage::copy,
                              SceneSaveStage::metadata, SceneSaveStage::commit}) {
         TemporaryDirectory directory;
-        const auto file = directory.path / "existing.json";
+        const auto         file = directory.path / "existing.json";
         if (stage == SceneSaveStage::compare) {
             save_scene(scene, file);
         }
         const std::string original = "original scene bytes\n";
         std::ofstream(file, std::ios::binary) << original;
         CancellationSource cancellation;
-        bool reached = false;
+        bool               reached = false;
         REQUIRE_THROWS_AS(
             save_scene(scene, file, cancellation.token(),
                        [&](auto p) {
@@ -242,8 +248,8 @@ TEST_CASE("Scene save cancels every precommit stage without replacing the origin
 
 TEST_CASE("Scene save failures preserve old JSON and clean staging files", "[scene][save]") {
     TemporaryDirectory directory;
-    const auto file = directory.path / "existing.json";
-    const std::string original = "original scene bytes\n";
+    const auto         file     = directory.path / "existing.json";
+    const std::string  original = "original scene bytes\n";
     std::ofstream(file, std::ios::binary) << original;
     auto scene = generated_scene();
     // 数据已加载但原始文件被移除时应报错，避免保存出无法重新打开的场景。
@@ -262,16 +268,16 @@ TEST_CASE("Scene save failures preserve old JSON and clean staging files", "[sce
 
 TEST_CASE("Concurrent generated scene saves publish a complete reloadable scene", "[scene][save]") {
     TemporaryDirectory directory;
-    const auto file = directory.path / "shared.json";
-    auto first = generated_scene(1), second = generated_scene(2);
-    first.camera.vertical_fov_degrees = 31;
+    const auto         file  = directory.path / "shared.json";
+    auto               first = generated_scene(1), second = generated_scene(2);
+    first.camera.vertical_fov_degrees  = 31;
     second.camera.vertical_fov_degrees = 52;
     auto one = std::async(std::launch::async, [&] { save_scene(first, file); });
     auto two = std::async(std::launch::async, [&] { save_scene(second, file); });
     REQUIRE_NOTHROW(one.get());
     REQUIRE_NOTHROW(two.get());
-    const auto reopened = load_scene(file);
-    const auto& winner = reopened.camera.vertical_fov_degrees == 31 ? first : second;
+    const auto  reopened = load_scene(file);
+    const auto& winner   = reopened.camera.vertical_fov_degrees == 31 ? first : second;
     REQUIRE(reopened.camera.vertical_fov_degrees == winner.camera.vertical_fov_degrees);
     same_mesh(*reopened.meshes[0].data, *winner.meshes[0].data);
     no_staging_directories(directory.path);
@@ -280,10 +286,10 @@ TEST_CASE("Concurrent generated scene saves publish a complete reloadable scene"
 TEST_CASE("Scene save refuses destinations that alias mesh or texture input assets",
           "[scene][save]") {
     TemporaryDirectory directory;
-    auto scene = generated_scene();
-    const auto input = directory.path / "input.obj";
+    auto               scene = generated_scene();
+    const auto         input = directory.path / "input.obj";
     save_obj(*scene.meshes[1].data, input);
-    const auto original = bytes(input);
+    const auto original    = bytes(input);
     scene.meshes[1].source = input;
     REQUIRE_THROWS_AS(save_scene(scene, input), std::invalid_argument);
     REQUIRE(bytes(input) == original);
@@ -291,7 +297,7 @@ TEST_CASE("Scene save refuses destinations that alias mesh or texture input asse
     std::filesystem::create_hard_link(input, alias);
     REQUIRE_THROWS_AS(save_scene(scene, alias), std::invalid_argument);
     REQUIRE(bytes(input) == original);
-    Image image(1, 1);
+    Image      image(1, 1);
     const auto texture_file = directory.path / "input.exr";
     image.write_exr(texture_file);
     const auto texture_bytes = bytes(texture_file);
@@ -305,16 +311,16 @@ TEST_CASE("Scene save refuses destinations that alias mesh or texture input asse
 TEST_CASE("Displaced assets preserve immutable undo snapshots through export and reload",
           "[geometry][scene][save]") {
     TemporaryDirectory directory;
-    SceneEditor editor(generated_scene(2));
-    const auto before = editor.snapshot();
-    Image image(2, 2);
+    SceneEditor        editor(generated_scene(2));
+    const auto         before = editor.snapshot();
+    Image              image(2, 2);
     for (std::size_t y = 0; y < 2; ++y) {
         for (std::size_t x = 0; x < 2; ++x) {
             image.at(x, y) = glm::vec3(1);
         }
     }
     const auto original_mesh = editor.document().meshes[0].data;
-    const auto displaced = displace_mesh(original_mesh, std::make_shared<const Texture>(image));
+    const auto displaced     = displace_mesh(original_mesh, std::make_shared<const Texture>(image));
     editor.edit([&](auto& document) { document.meshes[0].data = displaced.mesh; });
     REQUIRE(editor.document().meshes[0].data == displaced.mesh);
     REQUIRE(before->instances[1].mesh == original_mesh);
@@ -328,14 +334,14 @@ TEST_CASE("Displaced assets preserve immutable undo snapshots through export and
 
 TEST_CASE("Worker validation caches preserve transaction checks and reject failed mesh validation",
           "[geometry][scene]") {
-    SceneEditor editor(load_scene(studio_file()));
-    const auto original = editor.document().meshes[0].data;
-    const auto refined = subdivide_loop(original, {2}).mesh;
+    SceneEditor         editor(load_scene(studio_file()));
+    const auto          original = editor.document().meshes[0].data;
+    const auto          refined  = subdivide_loop(original, {2}).mesh;
     MeshValidationCache verified;
     verified.validate(refined);
     REQUIRE_THROWS_AS(editor.edit_prevalidated(
                           [&](auto& scene) {
-                              scene.meshes[0].data = refined;
+                              scene.meshes[0].data         = refined;
                               scene.objects[0].material_id = "missing";
                           },
                           verified),
@@ -349,7 +355,7 @@ TEST_CASE("Worker validation caches preserve transaction checks and reject faile
         },
         verified);
     REQUIRE(editor.document().meshes[0].data == refined);
-    auto invalid = std::make_shared<MeshData>(*refined);
+    auto invalid                              = std::make_shared<MeshData>(*refined);
     invalid->triangles[0].corners[0].position = invalid_mesh_index;
     MeshValidationCache rejected;
     REQUIRE_THROWS_AS(rejected.validate(invalid), std::invalid_argument);
@@ -359,7 +365,7 @@ TEST_CASE("Worker validation caches preserve transaction checks and reject faile
     REQUIRE(editor.document().meshes[0].data == refined);
     REQUIRE(editor.undo());
     REQUIRE(editor.document().meshes[0].data == original);
-    auto replacement = load_scene(studio_file());
+    auto replacement           = load_scene(studio_file());
     replacement.meshes[0].data = refined;
     replacement.meshes[0].source.clear();
     editor.replace_prevalidated(std::move(replacement), verified);
@@ -371,8 +377,8 @@ TEST_CASE("Worker validation caches preserve transaction checks and reject faile
 #ifdef _WIN32
 TEST_CASE("Scene save preserves an asset held by an exclusive Windows handle", "[scene][save]") {
     TemporaryDirectory directory;
-    const auto scene = generated_scene(1);
-    const auto file = directory.path / "scene.json";
+    const auto         scene = generated_scene(1);
+    const auto         file  = directory.path / "scene.json";
     save_scene(scene, file);
     const auto occupied = load_scene(file).meshes[0].source;
     const auto original = bytes(directory.path / occupied);

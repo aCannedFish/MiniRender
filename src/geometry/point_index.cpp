@@ -1,3 +1,6 @@
+// 点云 k-d 树索引与邻域查询。
+// 本模块接口见 point_index.hpp。
+
 #include "point_index.hpp"
 
 #include <algorithm>
@@ -14,6 +17,7 @@ void validate_query(glm::dvec3 point, double distance) {
             "Point query requires a finite position and nonnegative radius");
     }
 }
+
 bool ordered(const PointNeighbor& a, const PointNeighbor& b) {
     return a.squared_distance == b.squared_distance ? a.index < b.index
                                                     : a.squared_distance < b.squared_distance;
@@ -49,15 +53,15 @@ std::uint32_t PointIndex::build(std::size_t begin, std::size_t end) {
             cancellation_.check();
         }
         const auto p = glm::dvec3(positions_[order_[i]]);
-        node.low = glm::min(node.low, p);
-        node.high = glm::max(node.high, p);
+        node.low     = glm::min(node.low, p);
+        node.high    = glm::max(node.high, p);
     }
     const auto index = static_cast<std::uint32_t>(nodes_.size());
     nodes_.push_back(node);
     if (end - begin > 16) {
-        const auto size = node.high - node.low;
-        const int axis = size.x >= size.y && size.x >= size.z ? 0 : size.y >= size.z ? 1 : 2;
-        const auto middle = begin + (end - begin) / 2;
+        const auto  size   = node.high - node.low;
+        const int   axis   = size.x >= size.y && size.x >= size.z ? 0 : size.y >= size.z ? 1 : 2;
+        const auto  middle = begin + (end - begin) / 2;
         std::size_t comparisons = 0;
         std::nth_element(order_.begin() + static_cast<std::ptrdiff_t>(begin),
                          order_.begin() + static_cast<std::ptrdiff_t>(middle),
@@ -69,9 +73,9 @@ std::uint32_t PointIndex::build(std::size_t begin, std::size_t end) {
                                         ? a < b
                                         : positions_[a][axis] < positions_[b][axis];
                          });
-        const auto left = build(begin, middle);
-        const auto right = build(middle, end);
-        nodes_[index].left = left;
+        const auto left     = build(begin, middle);
+        const auto right    = build(middle, end);
+        nodes_[index].left  = left;
         nodes_[index].right = right;
     }
     return index;
@@ -84,7 +88,7 @@ double PointIndex::distance_to(const Node& node, glm::dvec3 point) {
 
 std::vector<PointNeighbor> PointIndex::nearest(glm::dvec3 point, std::size_t count,
                                                std::uint32_t exclude,
-                                               double maximum_distance) const {
+                                               double        maximum_distance) const {
     cancellation_.check();
     validate_query(point, maximum_distance);
     if (count == 0) {
@@ -92,16 +96,16 @@ std::vector<PointNeighbor> PointIndex::nearest(glm::dvec3 point, std::size_t cou
     }
     using Candidate = std::pair<double, std::uint32_t>;
     std::priority_queue<Candidate> heap;
-    const double bound = maximum_distance * maximum_distance;
-    std::vector<std::uint32_t> pending{0};
-    std::size_t visits = 0;
+    const double                   bound = maximum_distance * maximum_distance;
+    std::vector<std::uint32_t>     pending{0};
+    std::size_t                    visits = 0;
     while (!pending.empty()) {
         if (++visits % 128 == 0) {
             cancellation_.check();
         }
         const auto index = pending.back();
         pending.pop_back();
-        const auto& node = nodes_[index];
+        const auto&  node     = nodes_[index];
         const double farthest = heap.size() < count ? bound : std::min(bound, heap.top().first);
         if (distance_to(node, point) > farthest) {
             continue;
@@ -112,7 +116,7 @@ std::vector<PointNeighbor> PointIndex::nearest(glm::dvec3 point, std::size_t cou
                 if (id == exclude) {
                     continue;
                 }
-                const auto delta = point - glm::dvec3(positions_[id]);
+                const auto      delta = point - glm::dvec3(positions_[id]);
                 const Candidate candidate{glm::dot(delta, delta), id};
                 if (candidate.first <= bound && (heap.size() < count || candidate < heap.top())) {
                     heap.push(candidate);
@@ -144,10 +148,10 @@ std::vector<PointNeighbor> PointIndex::radius(glm::dvec3 point, double distance,
                                               std::size_t maximum_results) const {
     cancellation_.check();
     validate_query(point, distance);
-    const double bound = distance * distance;
+    const double               bound = distance * distance;
     std::vector<PointNeighbor> result;
     std::vector<std::uint32_t> pending{0};
-    std::size_t visits = 0;
+    std::size_t                visits = 0;
     while (!pending.empty()) {
         if (++visits % 128 == 0) {
             cancellation_.check();
@@ -159,7 +163,7 @@ std::vector<PointNeighbor> PointIndex::radius(glm::dvec3 point, double distance,
         }
         if (node.left == no_point) {
             for (std::size_t i = node.begin; i < node.end; ++i) {
-                const auto delta = point - glm::dvec3(positions_[order_[i]]);
+                const auto   delta   = point - glm::dvec3(positions_[order_[i]]);
                 const double squared = glm::dot(delta, delta);
                 if (squared <= bound) {
                     if (result.size() == maximum_results) {

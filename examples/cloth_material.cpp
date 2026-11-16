@@ -1,3 +1,5 @@
+// 可运行示例：微圆柱经纬织物参数、切向曲线与预置。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/render_session.hpp>
 #include <minirender/simulation/cloth.hpp>
@@ -37,18 +39,18 @@ SceneDocument cloth_scene() {
     auto scene = load_scene(std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/studio.json");
     std::erase_if(scene.objects, [](const auto& object) { return object.id != "ground"; });
     Material material;
-    material.id = "fabric";
-    material.name = "微圆柱布料";
-    material.kind = MaterialKind::cloth;
+    material.id         = "fabric";
+    material.name       = "微圆柱布料";
+    material.kind       = MaterialKind::cloth;
     material.base_color = glm::vec3(1);
-    const auto preset = make_cloth_preset("linen");
-    material.ior = static_cast<float>(preset.ior);
-    material.cloth = preset.appearance;
+    const auto preset   = make_cloth_preset("linen");
+    material.ior        = static_cast<float>(preset.ior);
+    material.cloth      = preset.appearance;
     scene.materials.push_back(material);
     scene.meshes.push_back({"cloth", {}, cloth.mesh});
     scene.objects.push_back({"cloth", "冻结布料", "cloth", "fabric", cloth.transform});
     scene.camera.position = {2.5F, 2.1F, 3.1F};
-    scene.camera.target = {0, .7F, 0};
+    scene.camera.target   = {0, .7F, 0};
     return scene;
 }
 
@@ -61,18 +63,18 @@ int main() {
         std::filesystem::create_directories(output);
         auto scene = cloth_scene();
         for (const auto* name : {"linen", "silk", "satin", "shot"}) {
-            const auto preset = make_cloth_preset(name);
-            auto& material = scene.materials.back();
-            material.ior = static_cast<float>(preset.ior);
-            material.cloth = preset.appearance;
-            const auto file = output / (std::string(name) + ".json");
+            const auto preset   = make_cloth_preset(name);
+            auto&      material = scene.materials.back();
+            material.ior        = static_cast<float>(preset.ior);
+            material.cloth      = preset.appearance;
+            const auto file     = output / (std::string(name) + ".json");
             save_scene(scene, file);
             const auto image = render(scene);
             image->write_exr(output / (std::string(name) + ".exr"));
             display_image(*image).write_png(output / (std::string(name) + ".png"));
             const auto reopened = load_scene(file);
             const auto repeated = render(reopened);
-            double maximum = 0;
+            double     maximum  = 0;
             for (std::size_t y = 0; y < image->height(); ++y) {
                 for (std::size_t x = 0; x < image->width(); ++x) {
                     maximum = std::max(maximum,

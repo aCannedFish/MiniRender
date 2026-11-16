@@ -1,3 +1,6 @@
+// 隐藏窗口回归：outline 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 outline_smoke.hpp。
+
 #include "outline_smoke.hpp"
 #include "geometry_smoke.hpp"
 #include "ui_response_probe.hpp"
@@ -21,21 +24,26 @@
 
 namespace {
 using namespace minirender;
+
 void require(bool condition, const char* error) {
     if (!condition) {
         throw std::runtime_error(error);
     }
 }
+
 std::filesystem::path native(const QString& path) {
     const auto bytes = path.toUtf8();
     return std::filesystem::path(std::u8string(bytes.begin(), bytes.end()));
 }
+
 void enabled(Workbench& window, bool value) {
     window.findChild<QCheckBox*>("preview_outline")->setChecked(value);
 }
+
 void strength(Workbench& window, double value) {
     window.findChild<QDoubleSpinBox*>("preview_outline_strength")->setValue(value);
 }
+
 void mode(Workbench& window, int value) {
     window.findChild<QComboBox*>("viewport_view_mode")->setCurrentIndex(value);
 }
@@ -51,22 +59,22 @@ SceneDocument fixture(const SceneDocument& input) {
     scene.directional_lights.clear();
     for (auto& material : scene.materials) {
         material.base_color = glm::vec3(.73F);
-        material.emission = glm::vec3(0);
-        material.kind = MaterialKind::diffuse;
+        material.emission   = glm::vec3(0);
+        material.kind       = MaterialKind::diffuse;
         material.base_color_texture.clear();
     }
     for (auto& object : scene.objects) {
         object.transform = {};
         if (object.id == "ground") {
-            object.transform.translation = {0, 1, -2};
+            object.transform.translation      = {0, 1, -2};
             object.transform.rotation_degrees = {90, 0, 0};
-            object.transform.scale = {5, 1, 5};
+            object.transform.scale            = {5, 1, 5};
         } else {
             object.transform.translation = {0, 1, 0};
         }
     }
-    scene.camera.position = {0, 1, 5};
-    scene.camera.target = {0, 1, 0};
+    scene.camera.position        = {0, 1, 5};
+    scene.camera.target          = {0, 1, 0};
     scene.camera.aperture_radius = 0;
     return scene;
 }
@@ -75,10 +83,10 @@ SceneDocument fixture(const SceneDocument& input) {
 void verify_edges(Workbench& window, const QImage& off, const QImage& on, bool expect_crease) {
     require(off.size() == on.size(), "Outline changed viewport dimensions");
     const SceneBvh bvh(window.viewport()->scene());
-    const auto& camera = window.viewport()->camera();
-    const double aspect = double(off.width()) / off.height();
-    const int radius = std::max(1, qRound(window.devicePixelRatioF()));
-    const auto hit = [&](int x, int y) {
+    const auto&    camera = window.viewport()->camera();
+    const double   aspect = double(off.width()) / off.height();
+    const int      radius = std::max(1, qRound(window.devicePixelRatioF()));
+    const auto     hit    = [&](int x, int y) {
         return bvh.intersect(
             camera.generate_ray({(x + .5) / off.width(), (y + .5) / off.height()}, aspect));
     };
@@ -93,7 +101,9 @@ void verify_edges(Workbench& window, const QImage& off, const QImage& on, bool e
             if (!center) {
                 continue;
             }
-            bool boundary = false, crease = false, flat = true;
+            bool boundary = false;
+            bool crease   = false;
+            bool flat     = true;
             for (const auto& direction : directions) {
                 const auto other = hit(x + direction.x() * radius, y + direction.y() * radius);
                 if (!other || other->instance_index != center->instance_index) {
@@ -104,7 +114,7 @@ void verify_edges(Workbench& window, const QImage& off, const QImage& on, bool e
                     flat = false;
                 } else if (glm::dot(center->shading_normal, other->shading_normal) < .8F) {
                     crease = true;
-                    flat = false;
+                    flat   = false;
                 }
                 const auto distant =
                     hit(x + direction.x() * radius * 3, y + direction.y() * radius * 3);
@@ -146,7 +156,7 @@ double hdr_error(const Image& a, const Image& b) {
     for (std::size_t y = 0; y < a.height(); ++y) {
         for (std::size_t x = 0; x < a.width(); ++x) {
             const auto d = glm::abs(a.at(x, y) - b.at(x, y));
-            result = std::max(result, double(std::max({d.x, d.y, d.z})));
+            result       = std::max(result, double(std::max({d.x, d.y, d.z})));
         }
     }
     return result;
@@ -158,21 +168,25 @@ void drag(VulkanViewport& viewport, QEvent::Type type, QPointF p, Qt::MouseButto
     QMouseEvent event(type, p, p, viewport.mapToGlobal(p), button, buttons, Qt::NoModifier);
     QCoreApplication::sendEvent(&viewport, &event);
 }
+
 struct State {
-    int stage = 0, ticks = 0, frame = 0, motion = 0;
-    QImage off, on, light;
+    int                          stage  = 0;
+    int                          ticks  = 0;
+    int                          frame  = 0;
+    int                          motion = 0;
+    QImage                       off, on, light;
     std::shared_ptr<const Image> hdr;
-    SceneDocument scene;
-    SceneUploadStatistics uploads;
-    minirender::Camera camera;
-    UiResponseProbe* probe = nullptr;
+    SceneDocument                scene;
+    SceneUploadStatistics        uploads;
+    minirender::Camera           camera;
+    UiResponseProbe*             probe = nullptr;
 };
 } // namespace
 
 void start_outline_smoke(Workbench& window, const QString& directory, bool measure_response) {
     require(QDir().mkpath(directory), "Cannot create outline output directory");
     require(window.viewport()->preview_outline(), "Outline is not enabled by default");
-    auto state = std::make_shared<State>();
+    auto  state = std::make_shared<State>();
     auto* timer = new QTimer(&window);
     timer->setInterval(60);
     QObject::connect(
@@ -229,8 +243,8 @@ void start_outline_smoke(Workbench& window, const QString& directory, bool measu
                     return;
                 case 3:
                     state->probe->verify([&] {
-                        const auto strong = view->grab();
-                        int changed = 0;
+                        const auto strong  = view->grab();
+                        int        changed = 0;
                         for (int y = 0; y < strong.height(); ++y) {
                             for (int x = 0; x < strong.width(); ++x) {
                                 require(strong.pixelColor(x, y).red() <=
@@ -277,7 +291,7 @@ void start_outline_smoke(Workbench& window, const QString& directory, bool measu
                                 view->upload_statistics().descriptor_rebuilds ==
                                     state->uploads.descriptor_rebuilds,
                             "Outline settings rebuilt scene resources");
-                    state->scene.camera.position = {2.3F, 2.4F, 5};
+                    state->scene.camera.position                         = {2.3F, 2.4F, 5};
                     state->scene.objects[1].transform.rotation_degrees.y = 25;
                     state->probe->verify([&] {
                         save_scene(state->scene, native(directory + "/tilted.json"));
@@ -351,10 +365,11 @@ void start_outline_smoke(Workbench& window, const QString& directory, bool measu
                     state->probe->verify(
                         [&] { capture_workbench_ui(window, directory + "/cornell.png"); });
                     // 全黑前景和背景仍须有可见轮廓。
-                    for (auto& material : state->scene.materials)
+                    for (auto& material : state->scene.materials) {
                         material.base_color = glm::vec3(0);
-                    state->scene.camera.position = {0, 1, 5};
-                    state->scene.camera.target = {0, 1, 0};
+                    }
+                    state->scene.camera.position                       = {0, 1, 5};
+                    state->scene.camera.target                         = {0, 1, 0};
                     state->scene.objects[1].transform.rotation_degrees = glm::vec3(0);
                     state->probe->verify([&] {
                         save_scene(state->scene, native(directory + "/dark.json"));

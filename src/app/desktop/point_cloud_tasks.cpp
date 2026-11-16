@@ -1,3 +1,5 @@
+// 点云导入、法线准备、重建和导出的后台任务。
+
 #include "geometry_controller.hpp"
 
 #include <minirender/assets/point_io.hpp>
@@ -41,6 +43,7 @@ const char* normal_stage(minirender::PointNormalStage stage) {
     }
     return "准备法线";
 }
+
 const char* ball_stage(minirender::BallPivotStage stage) {
     using Stage = minirender::BallPivotStage;
     switch (stage) {
@@ -65,12 +68,13 @@ const char* ball_stage(minirender::BallPivotStage stage) {
 }
 
 using Reporter = std::function<void(GeometryTaskProgress)>;
+
 std::shared_ptr<const PointNormalCache>
 prepare_normals(std::shared_ptr<const minirender::PointCloud> cloud,
                 minirender::PointNormalSettings settings, minirender::CancellationToken token,
                 const Reporter& report, ProgressRelay& relay) {
-    auto cache = std::make_shared<PointNormalCache>();
-    cache->source = std::move(cloud);
+    auto cache      = std::make_shared<PointNormalCache>();
+    cache->source   = std::move(cloud);
     cache->settings = settings;
     cache->value = minirender::prepare_point_normals(cache->source, settings, token, [&](auto p) {
         if (relay.ready()) {
@@ -99,7 +103,7 @@ void GeometryController::import_points(std::filesystem::path source, Completion 
         GeometryTaskKind::point_import,
         [source = std::move(source)](auto token, const Reporter& report) {
             GeometryTaskResult result;
-            ProgressRelay relay;
+            ProgressRelay      relay;
             report({"读取 PLY 点云", 0, 1});
             result.point_cloud = std::make_shared<const minirender::PointCloud>(
                 minirender::load_point_cloud(source, {}, token, [&](auto done, auto total) {
@@ -126,7 +130,7 @@ void GeometryController::sample_points(std::shared_ptr<const minirender::MeshDat
                 throw std::invalid_argument("Point sampling requires a source mesh");
             }
             GeometryTaskResult result;
-            ProgressRelay relay;
+            ProgressRelay      relay;
             report({"按表面面积采样", 0, 1});
             result.point_cloud =
                 std::make_shared<const minirender::PointCloud>(minirender::sample_mesh_surface(
@@ -143,13 +147,13 @@ void GeometryController::sample_points(std::shared_ptr<const minirender::MeshDat
 }
 
 void GeometryController::prepare_points(std::shared_ptr<const minirender::PointCloud> cloud,
-                                        minirender::PointNormalSettings settings,
-                                        Completion completion) {
+                                        minirender::PointNormalSettings               settings,
+                                        Completion                                    completion) {
     launch(
         GeometryTaskKind::point_normals,
         [cloud = std::move(cloud), settings](auto token, const Reporter& report) {
             GeometryTaskResult result;
-            ProgressRelay relay;
+            ProgressRelay      relay;
             report({"准备点云法线", 0, 1});
             result.point_normals = prepare_normals(cloud, settings, token, report, relay);
             prepare_preview(result, *result.point_normals->value.cloud, nullptr, token, report,
@@ -165,7 +169,7 @@ void GeometryController::reconstruct_points(PointReconstructionInput input, Comp
         GeometryTaskKind::point_reconstruct,
         [input = std::move(input)](auto token, const Reporter& report) {
             GeometryTaskResult result;
-            ProgressRelay relay;
+            ProgressRelay      relay;
             report({"准备点云重建", 0, 1});
             if (input.cached_normals && input.cached_normals->matches(input.cloud, input.normals)) {
                 result.point_normals = input.cached_normals;
@@ -198,7 +202,7 @@ void GeometryController::reconstruct_points(PointReconstructionInput input, Comp
             }
             result.point_reconstruction =
                 std::make_shared<const minirender::BallPivotResult>(std::move(reconstruction));
-            result.mesh = result.point_reconstruction->mesh;
+            result.mesh     = result.point_reconstruction->mesh;
             result.topology = result.point_reconstruction->topology;
             report({"检查发布数据", 0, 1});
             result.validated_meshes.validate(result.mesh, token);
@@ -217,9 +221,9 @@ void GeometryController::reconstruct_points(PointReconstructionInput input, Comp
         std::move(completion));
 }
 
-void GeometryController::export_points(minirender::SceneDocument sources,
+void GeometryController::export_points(minirender::SceneDocument                     sources,
                                        std::shared_ptr<const minirender::PointCloud> cloud,
-                                       std::filesystem::path input_file,
+                                       std::filesystem::path                         input_file,
                                        std::filesystem::path destination, Completion completion) {
     launch(
         GeometryTaskKind::point_export,
@@ -246,8 +250,8 @@ void GeometryController::export_points(minirender::SceneDocument sources,
                                          });
             GeometryTaskResult result;
             result.file_committed = true;
-            result.saved_path = destination;
-            result.summary = "点云已导出";
+            result.saved_path     = destination;
+            result.summary        = "点云已导出";
             return result;
         },
         std::move(completion));

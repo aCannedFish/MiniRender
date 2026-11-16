@@ -1,3 +1,6 @@
+// 环境光参数控件、状态刷新与用户操作回调。
+// 本模块接口见 environment_panel.hpp。
+
 #include "environment_panel.hpp"
 
 #include <QCheckBox>
@@ -30,6 +33,7 @@ QString stage_name(minirender::IblStage stage) {
     return {};
 }
 } // namespace
+
 EnvironmentPanel::EnvironmentPanel(VulkanViewport& viewport, IblController& controller,
                                    QWidget* parent)
     : QWidget(parent) {
@@ -54,11 +58,11 @@ EnvironmentPanel::EnvironmentPanel(VulkanViewport& viewport, IblController& cont
         return field;
     };
     auto* colors = new QWidget(this);
-    auto* row = new QHBoxLayout(colors);
+    auto* row    = new QHBoxLayout(colors);
     row->setContentsMargins(0, 0, 0, 0);
     const std::array<const char*, 3> names{"environment_constant_r", "environment_constant_g",
                                            "environment_constant_b"};
-    const std::array<QString, 3> prefixes{"R ", "G ", "B "};
+    const std::array<QString, 3>     prefixes{"R ", "G ", "B "};
     for (std::size_t i = 0; i < 3; ++i) {
         constant_[i] = spin(names[i], 0, 100, 0.05);
         constant_[i]->setPrefix(prefixes[i]);
@@ -156,13 +160,14 @@ EnvironmentPanel::EnvironmentPanel(VulkanViewport& viewport, IblController& cont
             });
     timer->start();
 }
+
 void EnvironmentPanel::set_document(const minirender::SceneDocument& document) {
     const QSignalBlocker texture_block(texture_), strength_block(strength_),
         rotation_block(rotation_);
     texture_->clear();
     texture_->addItem("无", QString());
     for (const auto& texture : document.textures) {
-        const auto id = QString::fromStdString(texture.id);
+        const auto id       = QString::fromStdString(texture.id);
         const auto filename = QString::fromStdU16String(texture.source.filename().u16string());
         texture_->addItem(filename.isEmpty() ? id : filename + " (" + id + ")", id);
     }
@@ -178,19 +183,21 @@ void EnvironmentPanel::set_document(const minirender::SceneDocument& document) {
         constant_[static_cast<std::size_t>(i)]->setValue(document.environment[i]);
     }
 }
+
 void EnvironmentPanel::edit() {
     if (!on_edited) {
         return;
     }
     minirender::EnvironmentMap map;
-    map.texture_id = texture_->currentData().toString().toStdString();
-    map.strength = static_cast<float>(strength_->value());
+    map.texture_id       = texture_->currentData().toString().toStdString();
+    map.strength         = static_cast<float>(strength_->value());
     map.rotation_degrees = static_cast<float>(rotation_->value());
     const glm::vec3 constant{static_cast<float>(constant_[0]->value()),
                              static_cast<float>(constant_[1]->value()),
                              static_cast<float>(constant_[2]->value())};
     on_edited(constant, map);
 }
+
 void EnvironmentPanel::set_import_enabled(bool enabled) {
     import_->setEnabled(enabled);
 }

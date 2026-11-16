@@ -1,3 +1,6 @@
+// 几何处理参数控件、状态刷新与用户操作回调。
+// 本模块接口见 geometry_panel.hpp。
+
 #include "geometry_panel.hpp"
 
 #include <QCheckBox>
@@ -44,7 +47,7 @@ GeometryPanel::GeometryPanel(GeometryController& controller, QWidget* parent)
     : QWidget(parent), controller_(controller) {
     setObjectName("geometry_panel");
     auto* form = new QFormLayout(this);
-    form_ = form;
+    form_      = form;
     form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     form->setRowWrapPolicy(QFormLayout::WrapLongRows);
     form->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
@@ -59,14 +62,14 @@ GeometryPanel::GeometryPanel(GeometryController& controller, QWidget* parent)
     operation_->addItems(
         {"Loop 与高度位移", "QEM 网格简化", "各向同性重网格", "自适应 Loop 与位移"});
     form->addRow("操作", operation_);
-    remeshing_ = new QWidget(this);
+    remeshing_        = new QWidget(this);
     auto* remesh_form = new QFormLayout(remeshing_);
     remesh_form->setContentsMargins(0, 0, 0, 0);
     remesh_form->setRowWrapPolicy(QFormLayout::WrapLongRows);
     remesh_form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     remesh_length_ = scalar(remeshing_, "geometry_remesh_length", 0.000001, 10000, 0.1, 6, 0.01);
     remesh_length_->setSuffix(" m");
-    remesh_step_ = scalar(remeshing_, "geometry_remesh_smoothing", 0, 1, 0.5, 2, 0.1);
+    remesh_step_       = scalar(remeshing_, "geometry_remesh_smoothing", 0, 1, 0.5, 2, 0.1);
     remesh_iterations_ = new QSpinBox(remeshing_);
     remesh_iterations_->setObjectName("geometry_remesh_iterations");
     remesh_iterations_->setRange(0, 20);
@@ -86,7 +89,7 @@ GeometryPanel::GeometryPanel(GeometryController& controller, QWidget* parent)
     remesh_form->addRow("平滑步长", remesh_step_);
     remesh_form->addRow(remesh_projection_);
     form->addRow(remeshing_);
-    adaptive_group_ = new QWidget(this);
+    adaptive_group_     = new QWidget(this);
     auto* adaptive_form = new QFormLayout(adaptive_group_);
     adaptive_form->setContentsMargins(0, 0, 0, 0);
     adaptive_form->setRowWrapPolicy(QFormLayout::WrapLongRows);
@@ -101,7 +104,7 @@ GeometryPanel::GeometryPanel(GeometryController& controller, QWidget* parent)
     };
     adaptive_minimum_ = level_field("geometry_adaptive_min", 0);
     adaptive_maximum_ = level_field("geometry_adaptive_max", 4);
-    adaptive_budget_ = new QSpinBox(adaptive_group_);
+    adaptive_budget_  = new QSpinBox(adaptive_group_);
     adaptive_budget_->setObjectName("geometry_adaptive_budget");
     adaptive_budget_->setRange(1, 1000000);
     adaptive_budget_->setValue(500000);
@@ -117,9 +120,9 @@ GeometryPanel::GeometryPanel(GeometryController& controller, QWidget* parent)
     adaptive_form->addRow("目标误差", adaptive_error_);
     adaptive_form->addRow("面数上限", adaptive_budget_);
     form->addRow(adaptive_group_);
-    constraints_ = new QWidget(this);
+    constraints_        = new QWidget(this);
     auto* simplify_form = new QFormLayout(constraints_);
-    tool_form_ = simplify_form;
+    tool_form_          = simplify_form;
     simplify_form->setContentsMargins(0, 0, 0, 0);
     simplify_form->setRowWrapPolicy(QFormLayout::WrapLongRows);
     simplify_form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
@@ -137,14 +140,14 @@ GeometryPanel::GeometryPanel(GeometryController& controller, QWidget* parent)
         connect(field, &QCheckBox::toggled, this, [this] { update(); });
         return field;
     };
-    boundary_ = toggle("geometry_preserve_boundary", "固定边界位置");
-    uv_seams_ = toggle("geometry_preserve_uv", "保护 UV 接缝");
+    boundary_     = toggle("geometry_preserve_boundary", "固定边界位置");
+    uv_seams_     = toggle("geometry_preserve_uv", "保护 UV 接缝");
     hard_normals_ = toggle("geometry_preserve_normals", "保护硬法线");
-    creases_ = toggle("geometry_preserve_creases", "固定几何折痕");
+    creases_      = toggle("geometry_preserve_creases", "固定几何折痕");
     crease_angle_ = scalar(constraints_, "geometry_crease_angle", 1, 180, 60, 1, 5);
     crease_angle_->setSuffix(" °");
     simplify_form->addRow("折痕夹角", crease_angle_);
-    error_limit_ = toggle("geometry_limit_error", "限制 QEM 代价");
+    error_limit_   = toggle("geometry_limit_error", "限制 QEM 代价");
     quadric_error_ = scalar(constraints_, "geometry_quadric_error", 0, 1000000, 0.01, 9, 0.001);
     quadric_error_->setSuffix(" m²");
     simplify_form->addRow("代价上限", quadric_error_);
@@ -171,8 +174,8 @@ GeometryPanel::GeometryPanel(GeometryController& controller, QWidget* parent)
     displace_ = new QCheckBox("启用高度位移", this);
     displace_->setObjectName("geometry_displacement");
     form->addRow(displace_);
-    auto* height_row = new QWidget(this);
-    height_row_ = height_row;
+    auto* height_row    = new QWidget(this);
+    height_row_         = height_row;
     auto* height_layout = new QHBoxLayout(height_row);
     height_layout->setContentsMargins(0, 0, 0, 0);
     height_layout->setSpacing(6);
@@ -189,19 +192,19 @@ GeometryPanel::GeometryPanel(GeometryController& controller, QWidget* parent)
     form->addRow("线性高度图", height_row);
     scale_ = scalar(this, "geometry_scale", -100, 100, 0.1, 4, 0.01);
     scale_->setSuffix(" m");
-    midlevel_ = scalar(this, "geometry_midlevel", -1000000, 1000000, 0.5, 4, 0.1);
+    midlevel_  = scalar(this, "geometry_midlevel", -1000000, 1000000, 0.5, 4, 0.1);
     tolerance_ = scalar(this, "geometry_tolerance", 0, 1, 1e-6, 8, 1e-6);
     tolerance_->setSuffix(" m");
     form->addRow("位移幅度", scale_);
     form->addRow("高度中值", midlevel_);
     form->addRow("接缝容差", tolerance_);
     auto* note = text_label(this, "geometry_note");
-    note_ = note;
+    note_      = note;
     note->setText("高度取线性 R 通道，距离为物体局部米。生成基于当前网格；再次生成会继续细分，"
                   "可通过撤销恢复。原始共享资产保留，仅更新启动任务时选中的物体。");
     form->addRow(note);
     auto* buttons = new QWidget(this);
-    auto* row = new QHBoxLayout(buttons);
+    auto* row     = new QHBoxLayout(buttons);
     row->setContentsMargins(0, 0, 0, 0);
     apply_ = new QPushButton("生成网格", buttons);
     apply_->setObjectName("geometry_apply");
@@ -213,13 +216,13 @@ GeometryPanel::GeometryPanel(GeometryController& controller, QWidget* parent)
     row->addWidget(export_);
     row->addWidget(cancel_);
     form->addRow(buttons);
-    stage_ = text_label(this, "geometry_stage");
-    counts_ = text_label(this, "geometry_counts");
+    stage_    = text_label(this, "geometry_stage");
+    counts_   = text_label(this, "geometry_counts");
     progress_ = new QProgressBar(this);
     progress_->setObjectName("geometry_progress");
     progress_->setRange(0, 1000);
     progress_->setValue(0);
-    result_ = text_label(this, "geometry_result");
+    result_  = text_label(this, "geometry_result");
     metrics_ = text_label(this, "geometry_metrics");
     form->addRow(stage_);
     form->addRow(progress_);
@@ -277,39 +280,39 @@ GeometryParameters GeometryPanel::parameters() const {
     GeometryParameters result;
     if (operation_->currentIndex() == 2) {
         minirender::RemeshSettings settings;
-        settings.target_edge_length = remesh_length_->value();
-        settings.iterations = static_cast<std::uint32_t>(remesh_iterations_->value());
-        settings.maximum_triangles = static_cast<std::size_t>(remesh_budget_->value());
-        settings.smoothing_step = remesh_step_->value();
-        settings.project_to_surface = remesh_projection_->isChecked();
-        settings.preserve_boundary = boundary_->isChecked();
-        settings.preserve_uv_seams = uv_seams_->isChecked();
+        settings.target_edge_length    = remesh_length_->value();
+        settings.iterations            = static_cast<std::uint32_t>(remesh_iterations_->value());
+        settings.maximum_triangles     = static_cast<std::size_t>(remesh_budget_->value());
+        settings.smoothing_step        = remesh_step_->value();
+        settings.project_to_surface    = remesh_projection_->isChecked();
+        settings.preserve_boundary     = boundary_->isChecked();
+        settings.preserve_uv_seams     = uv_seams_->isChecked();
         settings.preserve_hard_normals = hard_normals_->isChecked();
-        settings.preserve_creases = creases_->isChecked();
-        settings.crease_angle_degrees = crease_angle_->value();
-        result.remesh = settings;
+        settings.preserve_creases      = creases_->isChecked();
+        settings.crease_angle_degrees  = crease_angle_->value();
+        result.remesh                  = settings;
         return result;
     }
     if (operation_->currentIndex() == 1) {
         minirender::SimplifySettings settings;
-        settings.target_triangles = static_cast<std::size_t>(target_faces_->value());
-        settings.preserve_boundary = boundary_->isChecked();
-        settings.preserve_uv_seams = uv_seams_->isChecked();
+        settings.target_triangles      = static_cast<std::size_t>(target_faces_->value());
+        settings.preserve_boundary     = boundary_->isChecked();
+        settings.preserve_uv_seams     = uv_seams_->isChecked();
         settings.preserve_hard_normals = hard_normals_->isChecked();
-        settings.preserve_creases = creases_->isChecked();
-        settings.crease_angle_degrees = crease_angle_->value();
+        settings.preserve_creases      = creases_->isChecked();
+        settings.crease_angle_degrees  = crease_angle_->value();
         if (error_limit_->isChecked()) {
             settings.maximum_quadric_error = quadric_error_->value();
         }
         result.simplify = settings;
         return result;
     }
-    result.loop.levels = static_cast<std::uint32_t>(levels_->value());
+    result.loop.levels            = static_cast<std::uint32_t>(levels_->value());
     result.loop.maximum_triangles = static_cast<std::size_t>(budget_->value());
     if (operation_->currentIndex() == 3) {
         minirender::AdaptiveSettings settings;
-        settings.minimum_level = static_cast<std::uint32_t>(adaptive_minimum_->value());
-        settings.maximum_level = static_cast<std::uint32_t>(adaptive_maximum_->value());
+        settings.minimum_level     = static_cast<std::uint32_t>(adaptive_minimum_->value());
+        settings.maximum_level     = static_cast<std::uint32_t>(adaptive_maximum_->value());
         settings.maximum_triangles = static_cast<std::size_t>(adaptive_budget_->value());
         settings.maximum_evaluation_points =
             std::min<std::size_t>(4000000, settings.maximum_triangles * 4);
@@ -319,9 +322,9 @@ GeometryParameters GeometryPanel::parameters() const {
     }
     result.height_id = height_->currentData().toString().toStdString();
     if (displace_->isChecked()) {
-        result.displacement = minirender::DisplacementSettings{};
-        result.displacement->scale = scale_->value();
-        result.displacement->midlevel = midlevel_->value();
+        result.displacement                 = minirender::DisplacementSettings{};
+        result.displacement->scale          = scale_->value();
+        result.displacement->midlevel       = midlevel_->value();
         result.displacement->seam_tolerance = tolerance_->value();
         if (result.adaptive) {
             result.adaptive->displacement = result.displacement;
@@ -331,10 +334,10 @@ GeometryParameters GeometryPanel::parameters() const {
 }
 
 void GeometryPanel::set_context(const minirender::SceneDocument& document,
-                                const std::string& selected_id) {
+                                const std::string&               selected_id) {
     const auto object = std::find_if(document.objects.begin(), document.objects.end(),
                                      [&](const auto& item) { return item.id == selected_id; });
-    const auto old = mesh_;
+    const auto old    = mesh_;
     mesh_.reset();
     if (object != document.objects.end()) {
         const auto mesh =
@@ -354,7 +357,7 @@ void GeometryPanel::set_context(const minirender::SceneDocument& document,
     if (old != mesh_) {
         metrics_->clear();
     }
-    const auto chosen = height_->currentData();
+    const auto           chosen = height_->currentData();
     const QSignalBlocker blocker(height_);
     height_->clear();
     height_->addItem("无", QString());
@@ -372,11 +375,13 @@ void GeometryPanel::set_asset_task_busy(bool busy) {
     external_busy_ = busy;
     update();
 }
+
 void GeometryPanel::select_height(const std::string& id) {
     height_->setCurrentIndex(std::max(0, height_->findData(QString::fromStdString(id))));
     displace_->setChecked(true);
     update();
 }
+
 void GeometryPanel::show_result(const GeometryTaskResult& result) {
     if (result.adaptation) {
         const auto& a = *result.adaptation;
@@ -408,7 +413,7 @@ void GeometryPanel::show_result(const GeometryTaskResult& result) {
         return;
     }
     if (result.remeshing) {
-        const auto& r = *result.remeshing;
+        const auto&  r        = *result.remeshing;
         const double fraction = r.after.edges
                                     ? 100.0 * static_cast<double>(r.after.in_target_range) /
                                           static_cast<double>(r.after.edges)
@@ -447,7 +452,7 @@ void GeometryPanel::show_result(const GeometryTaskResult& result) {
         return;
     }
     if (result.simplification) {
-        const auto& s = *result.simplification;
+        const auto&   s      = *result.simplification;
         const QString reason = s.stop == minirender::SimplifyStop::target_reached ? "已达到目标"
                                : s.stop == minirender::SimplifyStop::error_limit
                                    ? "已达 QEM 代价上限"
@@ -477,16 +482,16 @@ void GeometryPanel::show_result(const GeometryTaskResult& result) {
 }
 
 void GeometryPanel::update() {
-    const auto status = controller_.status();
-    const bool running = controller_.busy();
-    const bool blocked = running || external_busy_;
-    bool permitted = mesh_ != nullptr;
+    const auto status    = controller_.status();
+    const bool running   = controller_.busy();
+    const bool blocked   = running || external_busy_;
+    bool       permitted = mesh_ != nullptr;
     adaptive_minimum_->setMaximum(adaptive_maximum_->value());
     adaptive_maximum_->setMinimum(adaptive_minimum_->value());
-    const auto params = parameters();
-    const bool adapting = params.adaptive.has_value();
+    const auto params      = parameters();
+    const bool adapting    = params.adaptive.has_value();
     const bool simplifying = params.simplify.has_value();
-    const bool remeshing = params.remesh.has_value();
+    const bool remeshing   = params.remesh.has_value();
     for (QWidget* field : std::array<QWidget*, 7>{levels_, budget_, displace_, height_row_, scale_,
                                                   midlevel_, tolerance_}) {
         form_->setRowVisible(field, !simplifying && !remeshing);
@@ -514,7 +519,7 @@ void GeometryPanel::update() {
               "可通过撤销恢复。原始共享资产保留，仅更新启动任务时选中的物体。");
     if (mesh_ && !simplifying && !remeshing && !adapting) {
         std::uint64_t faces = mesh_->triangles.size(), positions = mesh_->positions.size();
-        bool over_budget = faces > params.loop.maximum_triangles;
+        bool          over_budget = faces > params.loop.maximum_triangles;
         for (std::uint32_t level = 0; level < params.loop.levels && !over_budget; ++level) {
             over_budget = faces > params.loop.maximum_triangles / 4;
             if (!over_budget) {
@@ -523,9 +528,9 @@ void GeometryPanel::update() {
             }
         }
         // 包含新旧 CPU 数据、邻接/法线临时量与 GPU 缓冲的保守上界，不扫描网格。
-        const auto estimated = faces * 768 + positions * 96 + mesh_->triangles.size() * 128;
+        const auto estimated   = faces * 768 + positions * 96 + mesh_->triangles.size() * 128;
         const bool over_memory = estimated > 2ULL * 1024 * 1024 * 1024;
-        permitted = !over_budget && !over_memory;
+        permitted              = !over_budget && !over_memory;
         estimate_->setText(over_budget
                                ? "预计面数超过上限，请减少层数或调整面数上限。"
                                : QString("预计 %1 个三角形，工作内存约 %2 MiB（不含已有资产）。%3")
@@ -536,9 +541,9 @@ void GeometryPanel::update() {
         estimate_->clear();
     }
     if (mesh_ && simplifying) {
-        const auto faces = mesh_->triangles.size();
+        const auto faces     = mesh_->triangles.size();
         const auto estimated = faces * 1536 + mesh_->positions.size() * 256;
-        permitted = faces <= 2000000 && estimated <= 2ULL * 1024 * 1024 * 1024;
+        permitted            = faces <= 2000000 && estimated <= 2ULL * 1024 * 1024 * 1024;
         estimate_->setText(QString("输入 %1 面，目标 %2 面。工作内存估计 %3 MiB。%4")
                                .arg(faces)
                                .arg(params.simplify->target_triangles)
@@ -546,7 +551,7 @@ void GeometryPanel::update() {
                                .arg(permitted ? "" : "超过几何任务预算，请先缩小输入。"));
     }
     if (mesh_ && remeshing) {
-        const auto faces = mesh_->triangles.size();
+        const auto faces     = mesh_->triangles.size();
         const auto estimated = faces * 1792 + mesh_->positions.size() * 256;
         permitted =
             faces <= params.remesh->maximum_triangles && estimated <= 2ULL * 1024 * 1024 * 1024;

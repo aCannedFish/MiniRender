@@ -1,3 +1,6 @@
+// 体积介质参数控件、状态刷新与用户操作回调。
+// 本模块接口见 volume_panel.hpp。
+
 #include "volume_panel.hpp"
 
 #include <QCheckBox>
@@ -33,6 +36,7 @@ class CompactScalar final : public QDoubleSpinBox {
         return text == "-0" ? "0" : text;
     }
 };
+
 QWidget* row(QWidget* parent, std::initializer_list<QWidget*> controls) {
     auto* widget = new QWidget(parent);
     auto* layout = new QHBoxLayout(widget);
@@ -47,11 +51,13 @@ QWidget* row(QWidget* parent, std::initializer_list<QWidget*> controls) {
     widget->setMinimumWidth(minimum_width + layout->spacing() * (int(controls.size()) - 1));
     return widget;
 }
+
 void configure(QFormLayout& form) {
     form.setVerticalSpacing(8);
     form.setRowWrapPolicy(QFormLayout::WrapLongRows);
     form.setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
 }
+
 QDoubleSpinBox* scalar(QWidget* parent, const char* name, double low, double high, int decimals) {
     auto* spin = new CompactScalar(parent);
     spin->setObjectName(name);
@@ -64,6 +70,7 @@ QDoubleSpinBox* scalar(QWidget* parent, const char* name, double low, double hig
     spin->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     return spin;
 }
+
 void value(QDoubleSpinBox* spin, double number) {
     spin->setValue(number);
     spin->setToolTip("场景值：" +
@@ -115,14 +122,14 @@ VolumePanel::VolumePanel(QWidget* parent) : QWidget(parent) {
         }
     });
     form->addRow("介质区域", regions_);
-    add_ = button("新增", "volume_add", [this] { add(); });
+    add_    = button("新增", "volume_add", [this] { add(); });
     remove_ = button("删除", "volume_remove", [this] { remove(); });
     form->addRow(row(this, {add_, remove_}));
     summary_ = new QLabel(this);
     summary_->setWordWrap(true);
     summary_->setTextFormat(Qt::PlainText);
     form->addRow(summary_);
-    parameters_ = new QWidget(this);
+    parameters_      = new QWidget(this);
     auto* parameters = new QFormLayout(parameters_);
     parameters->setContentsMargins(0, 0, 0, 0);
     configure(*parameters);
@@ -176,9 +183,9 @@ VolumePanel::VolumePanel(QWidget* parent) : QWidget(parent) {
 QWidget* VolumePanel::vector_field(const char* name, std::array<QDoubleSpinBox*, 3>& controls,
                                    VectorAccess access, double low, double high, bool rgb) {
     for (std::size_t i = 0; i < 3; ++i) {
-        const auto id = std::string(name) + '.' + std::to_string(i);
-        auto* spin = scalar(parameters_, id.c_str(), low, high, 9);
-        controls[i] = spin;
+        const auto id   = std::string(name) + '.' + std::to_string(i);
+        auto*      spin = scalar(parameters_, id.c_str(), low, high, 9);
+        controls[i]     = spin;
         spin->setPrefix(
             (rgb ? QStringList{"R ", "G ", "B "} : QStringList{"X ", "Y ", "Z "})[int(i)]);
         connect(spin, &QDoubleSpinBox::valueChanged, this, [this, access, i](double number) {
@@ -189,13 +196,13 @@ QWidget* VolumePanel::vector_field(const char* name, std::array<QDoubleSpinBox*,
 }
 
 void VolumePanel::set_document(std::span<const minirender::MediumRegion> regions,
-                               std::uint64_t generation) {
+                               std::uint64_t                             generation) {
     if (initialized_ && generation_ == generation && source_.size() == regions.size() &&
         std::equal(source_.begin(), source_.end(), regions.begin())) {
         return;
     }
     initialized_ = true;
-    generation_ = generation;
+    generation_  = generation;
     source_.assign(regions.begin(), regions.end());
     refreshing_ = true;
     regions_->clear();
@@ -208,15 +215,17 @@ void VolumePanel::set_document(std::span<const minirender::MediumRegion> regions
     refreshing_ = false;
     select();
 }
+
 void VolumePanel::select() {
-    selected_ = regions_->currentData().toString().toStdString();
+    selected_        = regions_->currentData().toString().toStdString();
     const auto found = std::find_if(source_.begin(), source_.end(),
                                     [&](const auto& region) { return region.id == selected_; });
-    draft_ = found == source_.end() ? std::nullopt : std::optional(*found);
-    dirty_ = false;
+    draft_           = found == source_.end() ? std::nullopt : std::optional(*found);
+    dirty_           = false;
     notice_->clear();
     refresh_fields();
 }
+
 void VolumePanel::refresh_fields() {
     refreshing_ = true;
     if (draft_) {
@@ -234,6 +243,7 @@ void VolumePanel::refresh_fields() {
     refreshing_ = false;
     update_buttons();
 }
+
 void VolumePanel::edit(const std::function<void(minirender::MediumRegion&)>& operation) {
     if (refreshing_ || !draft_) {
         return;
@@ -241,14 +251,16 @@ void VolumePanel::edit(const std::function<void(minirender::MediumRegion&)>& ope
     operation(*draft_);
     const auto original = std::find_if(source_.begin(), source_.end(),
                                        [&](const auto& region) { return region.id == selected_; });
-    dirty_ = original == source_.end() || *draft_ != *original;
+    dirty_              = original == source_.end() || *draft_ != *original;
     notice_->setText(dirty_ ? "草稿尚未应用。" : "");
     update_buttons();
 }
+
 void VolumePanel::set_asset_busy(bool busy) {
     busy_ = busy;
     update_buttons();
 }
+
 void VolumePanel::update_buttons() {
     parameters_->setEnabled(draft_.has_value() && !busy_);
     add_->setEnabled(!busy_ && source_.size() < minirender::maximum_medium_regions);
@@ -262,6 +274,7 @@ void VolumePanel::update_buttons() {
                           .arg(source_.size())
                           .arg(minirender::maximum_medium_regions));
 }
+
 void VolumePanel::invoke(const std::function<void()>& operation) {
     try {
         operation();
@@ -269,13 +282,14 @@ void VolumePanel::invoke(const std::function<void()>& operation) {
         notice_->setText(QString::fromUtf8(error.what()));
     }
 }
+
 void VolumePanel::publish(std::vector<minirender::MediumRegion> regions, std::string selected) {
     minirender::validate_medium_regions(regions);
     if (!on_changed) {
         return;
     }
     const auto previous = selected_;
-    selected_ = std::move(selected);
+    selected_           = std::move(selected);
     try {
         on_changed(std::move(regions));
     } catch (...) {
@@ -283,13 +297,14 @@ void VolumePanel::publish(std::vector<minirender::MediumRegion> regions, std::st
         throw;
     }
 }
+
 void VolumePanel::apply() {
     if (!draft_) {
         return;
     }
-    auto regions = source_;
-    const auto found = std::find_if(regions.begin(), regions.end(),
-                                    [&](const auto& region) { return region.id == selected_; });
+    auto       regions = source_;
+    const auto found   = std::find_if(regions.begin(), regions.end(),
+                                      [&](const auto& region) { return region.id == selected_; });
     if (found == regions.end()) {
         return;
     }
@@ -297,8 +312,9 @@ void VolumePanel::apply() {
     publish(std::move(regions), selected_);
     notice_->setText("区域已应用，开始离线渲染可查看结果。");
 }
+
 void VolumePanel::add() {
-    auto regions = source_;
+    auto                     regions = source_;
     minirender::MediumRegion region;
     for (std::size_t i = 1;; ++i) {
         region.id = "medium_" + std::to_string(i);
@@ -307,7 +323,7 @@ void VolumePanel::add() {
             break;
         }
     }
-    region.name = "介质区域";
+    region.name              = "介质区域";
     region.medium.absorption = glm::dvec3(.05);
     region.medium.scattering = glm::dvec3(.25);
     if (!regions.empty()) {
@@ -322,6 +338,7 @@ void VolumePanel::add() {
     regions.push_back(std::move(region));
     publish(std::move(regions), id);
 }
+
 void VolumePanel::remove() {
     auto regions = source_;
     std::erase_if(regions, [&](const auto& region) { return region.id == selected_; });

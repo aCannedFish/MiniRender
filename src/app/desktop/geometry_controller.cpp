@@ -1,3 +1,6 @@
+// 后台几何和文件任务的取消、进度及结果发布。
+// 本模块接口见 geometry_controller.hpp。
+
 #include "geometry_controller.hpp"
 
 #include <QtConcurrent/QtConcurrentRun>
@@ -153,6 +156,7 @@ const char* adaptive_stage(minirender::AdaptiveStage stage) {
 } // namespace
 
 GeometryController::GeometryController(QObject* parent) : QObject(parent) {}
+
 GeometryController::~GeometryController() {
     cancellation_.request();
     if (watcher_) {
@@ -164,6 +168,7 @@ GeometryController::~GeometryController() {
 bool GeometryController::busy() const noexcept {
     return watcher_ != nullptr;
 }
+
 GeometryTaskStatus GeometryController::status() const {
     auto result = status_;
     if (progress_) {
@@ -175,6 +180,7 @@ GeometryTaskStatus GeometryController::status() const {
     }
     return result;
 }
+
 void GeometryController::cancel() {
     if (watcher_) {
         cancellation_.request();
@@ -186,46 +192,46 @@ void GeometryController::launch(GeometryTaskKind kind, Work work, Completion com
     if (watcher_) {
         throw std::logic_error("A geometry or asset task is already running");
     }
-    const auto jobs = status_.jobs_started;
-    status_ = {};
-    status_.kind = kind;
-    status_.state = GeometryTaskState::running;
+    const auto jobs      = status_.jobs_started;
+    status_              = {};
+    status_.kind         = kind;
+    status_.state        = GeometryTaskState::running;
     status_.jobs_started = jobs + 1;
-    cancellation_ = minirender::CancellationSource();
-    progress_ = std::make_shared<Progress>();
-    const auto progress = progress_;
-    const auto token = cancellation_.token();
+    cancellation_        = minirender::CancellationSource();
+    progress_            = std::make_shared<Progress>();
+    const auto progress  = progress_;
+    const auto token     = cancellation_.token();
     elapsed_.start();
-    watcher_ = new QFutureWatcher<GeometryTaskResult>(this);
+    watcher_      = new QFutureWatcher<GeometryTaskResult>(this);
     auto* watcher = watcher_;
     connect(watcher, &QFutureWatcher<GeometryTaskResult>::finished, this,
             [this, watcher, token, completion = std::move(completion)] {
                 auto result = watcher->result();
-                watcher_ = nullptr;
+                watcher_    = nullptr;
                 watcher->deleteLater();
                 status_.elapsed_ms = elapsed_.elapsed();
                 if (token.requested() && !result.file_committed) {
                     result.cancelled = true;
                 }
                 if (!result.error.empty()) {
-                    status_.state = GeometryTaskState::failed;
+                    status_.state   = GeometryTaskState::failed;
                     status_.message = result.error;
                 } else if (result.cancelled) {
-                    status_.state = GeometryTaskState::cancelled;
+                    status_.state   = GeometryTaskState::cancelled;
                     status_.message = "任务已取消";
                 } else {
-                    status_.state = GeometryTaskState::ready;
+                    status_.state   = GeometryTaskState::ready;
                     status_.message = result.summary;
                 }
                 // 完成回调也负责释放 Workbench 的互斥状态；取消和失败同样通知调用方。
                 try {
                     if (completion && !completion(result) &&
                         status_.state == GeometryTaskState::ready) {
-                        status_.state = GeometryTaskState::discarded;
+                        status_.state   = GeometryTaskState::discarded;
                         status_.message = "目标网格或场景已变化，本次结果未应用";
                     }
                 } catch (const std::exception& error) {
-                    status_.state = GeometryTaskState::failed;
+                    status_.state   = GeometryTaskState::failed;
                     status_.message = error.what();
                 }
             });
@@ -254,10 +260,10 @@ void GeometryController::build_mesh(GeometryTaskInput input, Completion completi
         GeometryTaskKind::mesh,
         [input = std::move(input)](auto token, const Reporter& report) {
             GeometryTaskResult result;
-            const auto prefix = input.target_name + " | ";
-            const int tools = static_cast<int>(input.remesh.has_value()) +
-                              static_cast<int>(input.simplify.has_value()) +
-                              static_cast<int>(input.adaptive.has_value());
+            const auto         prefix = input.target_name + " | ";
+            const int          tools  = static_cast<int>(input.remesh.has_value()) +
+                                        static_cast<int>(input.simplify.has_value()) +
+                                        static_cast<int>(input.adaptive.has_value());
             if (tools > 1) {
                 throw std::invalid_argument("Select one geometry operation per task");
             }
@@ -269,8 +275,8 @@ void GeometryController::build_mesh(GeometryTaskInput input, Completion completi
                                     std::to_string(p.evaluation_points),
                                 p.completed, p.total});
                     });
-                result.mesh = result.adaptation->mesh;
-                result.topology = result.adaptation->topology;
+                result.mesh                 = result.adaptation->mesh;
+                result.topology             = result.adaptation->topology;
                 result.maximum_displacement = result.adaptation->maximum_displacement;
             } else if (input.remesh) {
                 result.remeshing =
@@ -281,7 +287,7 @@ void GeometryController::build_mesh(GeometryTaskInput input, Completion completi
                                     std::to_string(p.current_triangles) + " 面",
                                 p.completed, p.total});
                     });
-                result.mesh = result.remeshing->mesh;
+                result.mesh     = result.remeshing->mesh;
                 result.topology = result.remeshing->topology;
             } else if (input.simplify) {
                 result.simplification =
@@ -290,7 +296,7 @@ void GeometryController::build_mesh(GeometryTaskInput input, Completion completi
                                     std::to_string(p.current_triangles) + " 面",
                                 p.completed, p.total});
                     });
-                result.mesh = result.simplification->mesh;
+                result.mesh     = result.simplification->mesh;
                 result.topology = result.simplification->topology;
             } else {
                 auto refined =
@@ -307,15 +313,15 @@ void GeometryController::build_mesh(GeometryTaskInput input, Completion completi
                             report({std::move(stage), p.completed, p.total});
                         }
                     });
-                result.mesh = std::move(refined.mesh);
+                result.mesh     = std::move(refined.mesh);
                 result.topology = refined.levels.back();
                 if (input.height_settings && input.height_settings->scale != 0) {
                     auto displaced = minirender::displace_mesh(
                         result.mesh, input.height, *input.height_settings, token, [&](auto p) {
                             report({prefix + displacement_stage(p.stage), p.completed, p.total});
                         });
-                    result.mesh = std::move(displaced.mesh);
-                    result.topology = displaced.topology;
+                    result.mesh                 = std::move(displaced.mesh);
+                    result.topology             = displaced.topology;
                     result.maximum_displacement = displaced.maximum_displacement;
                 }
             }
@@ -351,13 +357,13 @@ void GeometryController::import_height(std::filesystem::path source, Completion 
             report({"生成高度 mip", 0, 1});
             result.height = std::make_shared<const minirender::Texture>(std::move(image), token);
             result.saved_path = source;
-            result.summary = "高度图已读取：" + utf8_path(source.filename());
+            result.summary    = "高度图已读取：" + utf8_path(source.filename());
             return result;
         },
         std::move(completion));
 }
 
-void GeometryController::export_obj(minirender::SceneDocument sources,
+void GeometryController::export_obj(minirender::SceneDocument                   sources,
                                     std::shared_ptr<const minirender::MeshData> mesh,
                                     std::filesystem::path destination, Completion completion) {
     launch(
@@ -373,8 +379,8 @@ void GeometryController::export_obj(minirender::SceneDocument sources,
             minirender::save_obj(*mesh, destination, token,
                                  [&](auto done, auto total) { report({"写出 OBJ", done, total}); });
             result.file_committed = true;
-            result.saved_path = destination;
-            result.summary = "OBJ 已保存：" + utf8_path(destination);
+            result.saved_path     = destination;
+            result.summary        = "OBJ 已保存：" + utf8_path(destination);
             return result;
         },
         std::move(completion));
@@ -384,7 +390,7 @@ void GeometryController::save_scene(minirender::SceneDocument scene,
                                     std::filesystem::path destination, Completion completion) {
     launch(
         GeometryTaskKind::scene_save,
-        [scene = std::move(scene), destination = std::move(destination)](auto token,
+        [scene = std::move(scene), destination = std::move(destination)](auto            token,
                                                                          const Reporter& report) {
             GeometryTaskResult result;
             minirender::save_scene(scene, destination, token, [&](auto p) {
@@ -397,8 +403,8 @@ void GeometryController::save_scene(minirender::SceneDocument scene,
                 report({save_stage(p.stage) + asset, p.completed, p.total});
             });
             result.file_committed = true;
-            result.saved_path = destination;
-            result.summary = "场景快照已保存：" + utf8_path(destination);
+            result.saved_path     = destination;
+            result.summary        = "场景快照已保存：" + utf8_path(destination);
             return result;
         },
         std::move(completion));

@@ -1,3 +1,6 @@
+// 离线渲染参数控件、状态刷新与用户操作回调。
+// 本模块接口见 offline_panel.hpp。
+
 #include "offline_panel.hpp"
 #include "vulkan_viewport.hpp"
 
@@ -100,24 +103,24 @@ QString stage(minirender::RenderState state) {
 } // namespace
 
 OfflinePanel::OfflinePanel(
-    VulkanViewport& viewport,
+    VulkanViewport&                                                   viewport,
     std::function<std::shared_ptr<const minirender::SceneSnapshot>()> snapshot, QWidget* parent)
     : QWidget(parent), viewport_(viewport), snapshot_(std::move(snapshot)),
       session_(std::make_shared<minirender::RenderSession>()) {
     setObjectName("offline_panel");
     auto* layout = new QVBoxLayout(this);
-    settings_ = new QWidget(this);
-    auto* form = new QFormLayout(settings_);
+    settings_    = new QWidget(this);
+    auto* form   = new QFormLayout(settings_);
     form->setContentsMargins(0, 0, 0, 0);
     form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     form->setRowWrapPolicy(QFormLayout::WrapLongRows);
     backend_ = new QComboBox(settings_);
     backend_->setObjectName("offline_backend");
     backend_->addItems({"Path Tracing", "SPPM"});
-    width_ = integer(settings_, "offline_width", 1, 16384, 256);
-    height_ = integer(settings_, "offline_height", 1, 16384, 256);
-    spp_ = integer(settings_, "offline_spp", 1, 1000000, 64);
-    depth_ = integer(settings_, "offline_depth", 0, 128, 8);
+    width_   = integer(settings_, "offline_width", 1, 16384, 256);
+    height_  = integer(settings_, "offline_height", 1, 16384, 256);
+    spp_     = integer(settings_, "offline_spp", 1, 1000000, 64);
+    depth_   = integer(settings_, "offline_depth", 0, 128, 8);
     threads_ = integer(settings_, "offline_threads", 0, 32, 0);
     threads_->setSpecialValueText("自动，保留一个 CPU 核");
     seed_ = new QLineEdit("1", settings_);
@@ -143,13 +146,13 @@ OfflinePanel::OfflinePanel(
     form->addRow("工作线程", threads_);
     form->addRow(rr_);
     form->addRow("RR 起始深度", rr_depth_);
-    sppm_settings_ = new QWidget(settings_);
+    sppm_settings_    = new QWidget(settings_);
     auto* photon_form = new QFormLayout(sppm_settings_);
     photon_form->setContentsMargins(0, 0, 0, 0);
     photon_form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     photon_form->setRowWrapPolicy(QFormLayout::WrapLongRows);
     photons_ = integer(sppm_settings_, "offline_photons", 1, 100000000, 100000);
-    radius_ = scalar(sppm_settings_, "offline_radius", 1e-6, 1e6, .01);
+    radius_  = scalar(sppm_settings_, "offline_radius", 1e-6, 1e6, .01);
     radius_->setValue(sppm_options_.initial_radius);
     alpha_ = scalar(sppm_settings_, "offline_alpha", 0, 1, .05);
     alpha_->setValue(sppm_options_.alpha);
@@ -168,7 +171,7 @@ OfflinePanel::OfflinePanel(
     form->addRow(sppm_settings_);
     layout->addWidget(settings_);
     auto* buttons = new QGridLayout;
-    start_ = new QPushButton("开始", this);
+    start_        = new QPushButton("开始", this);
     start_->setObjectName("offline_start");
     pause_ = new QPushButton("暂停", this);
     pause_->setObjectName("offline_pause");
@@ -188,7 +191,7 @@ OfflinePanel::OfflinePanel(
     show_->setObjectName("offline_show");
     layout->addWidget(show_);
     auto* display = new QFormLayout;
-    exposure_ = new QDoubleSpinBox(this);
+    exposure_     = new QDoubleSpinBox(this);
     exposure_->setObjectName("offline_exposure");
     exposure_->setRange(-10, 10);
     exposure_->setSingleStep(0.25);
@@ -241,7 +244,7 @@ OfflinePanel::OfflinePanel(
     connect(save_png_, &QPushButton::clicked, this, [this] { choose_export(false); });
     connect(show_, &QCheckBox::toggled, this, [this](bool visible) {
         if (visible && viewport_.offline_source() != OfflineImageSource::render) {
-            preview_samples_ = 0;
+            preview_samples_  = 0;
             preview_terminal_ = false;
             viewport_.set_offline_image(nullptr);
         }
@@ -294,9 +297,10 @@ OfflinePanel::~OfflinePanel() {
     session_->cancel();
     session_->wait();
 }
-void OfflinePanel::set_settings(minirender::RenderSettings render,
+
+void OfflinePanel::set_settings(minirender::RenderSettings     render,
                                 minirender::IntegratorSettings integrator,
-                                minirender::SessionSettings session) {
+                                minirender::SessionSettings    session) {
     render.validate();
     integrator.validate();
     session.validate();
@@ -337,7 +341,8 @@ void OfflinePanel::update_backend_controls() {
     mode_->setToolTip(sppm ? "SPPM 固定组合直接光采样和光子合并，无须选择 PT 采样方式。"
                            : "方向采样在表面使用 BSDF，在介质内使用相函数。");
 }
-void OfflinePanel::prepare_import(minirender::RenderSettings render,
+
+void OfflinePanel::prepare_import(minirender::RenderSettings     render,
                                   minirender::IntegratorSettings integrator) {
     render.validate();
     integrator.validate();
@@ -353,18 +358,18 @@ void OfflinePanel::start() {
         if (exporting_) {
             throw std::logic_error("Wait for image export before starting another render");
         }
-        bool valid = false;
-        const auto seed = seed_->text().toULongLong(&valid);
+        bool       valid = false;
+        const auto seed  = seed_->text().toULongLong(&valid);
         if (!valid) {
             throw std::invalid_argument("Seed must be an unsigned 64-bit integer");
         }
         const minirender::RenderSettings render{static_cast<std::size_t>(width_->value()),
                                                 static_cast<std::size_t>(height_->value()),
                                                 static_cast<std::uint32_t>(spp_->value()), seed};
-        const auto integrator = integrator_settings();
-        auto settings = session_settings_;
-        settings.threads = static_cast<std::uint32_t>(threads_->value());
-        const auto snapshot = snapshot_();
+        const auto                       integrator = integrator_settings();
+        auto                             settings   = session_settings_;
+        settings.threads                            = static_cast<std::uint32_t>(threads_->value());
+        const auto snapshot                         = snapshot_();
         if (integrator.kind == minirender::IntegratorKind::sppm) {
             if (snapshot->camera.aperture_radius != 0) {
                 throw std::invalid_argument("SPPM 需要针孔相机，请将相机光圈半径设为 0。");
@@ -378,9 +383,9 @@ void OfflinePanel::start() {
             }
         }
         session_->start(snapshot, render, integrator, settings);
-        job_iterations_ = render.samples_per_pixel;
-        stale_ = false;
-        preview_samples_ = 0;
+        job_iterations_   = render.samples_per_pixel;
+        stale_            = false;
+        preview_samples_  = 0;
         preview_terminal_ = false;
         export_message_.clear();
         viewport_.set_offline_image(nullptr);
@@ -392,6 +397,7 @@ void OfflinePanel::start() {
         poll();
     }
 }
+
 void OfflinePanel::scene_changed() {
     if (session_->progress().job_id) {
         stale_ = true;
@@ -406,7 +412,7 @@ void OfflinePanel::poll() {
         set_settings(settings.render, settings.integrator, {});
     }
     using minirender::RenderState;
-    const auto p = session_->progress();
+    const auto p        = session_->progress();
     const bool terminal = minirender::render_terminal(p.state);
     settings_->setEnabled(terminal && !exporting_);
     update_backend_controls();
@@ -450,8 +456,8 @@ void OfflinePanel::poll() {
                                    .arg(p.sppm.maximum_radius, 0, 'g', 6)
                                    .arg(double(p.sppm.estimated_bytes) / (1024 * 1024), 0, 'f', 1));
         phase_progress_->setRange(0, 10000);
-        const bool advancing = p.state == RenderState::running;
-        const auto& work = p.sppm_progress;
+        const bool  advancing = p.state == RenderState::running;
+        const auto& work      = p.sppm_progress;
         phase_status_->setText(
             advancing ? QString("第 %1 轮 · %2：%3 / %4")
                             .arg(std::min(p.sppm.iterations + 1, std::uint64_t(job_iterations_)))
@@ -495,7 +501,7 @@ void OfflinePanel::poll() {
         const auto preview = session_->preview();
         if (preview.image) {
             viewport_.set_offline_image(preview.image);
-            preview_samples_ = preview.recorded_samples;
+            preview_samples_  = preview.recorded_samples;
             preview_terminal_ = terminal;
         }
     }
@@ -513,22 +519,23 @@ void OfflinePanel::choose_export(bool exr) {
         save_image(path, exr);
     }
 }
+
 void OfflinePanel::save_image(const QString& path, bool exr) {
     if (exporting_ || session_->progress().recorded_samples == 0) {
         throw std::logic_error("No recorded image is available, or an export is active");
     }
-    exporting_ = true;
+    exporting_      = true;
     export_message_ = "正在导出图像…";
     poll();
     auto* watcher = new QFutureWatcher<QString>(this);
     connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher] {
         const auto error = watcher->result();
         watcher->deleteLater();
-        exporting_ = false;
+        exporting_      = false;
         export_message_ = error.isEmpty() ? "图像已导出" : error;
         poll();
     });
-    const auto session = session_;
+    const auto session  = session_;
     const auto exposure = viewport_.exposure();
     watcher->setFuture(QtConcurrent::run([session, path, exr, exposure] {
         try {
@@ -544,7 +551,7 @@ void OfflinePanel::save_image(const QString& path, bool exr) {
                 throw std::runtime_error("Image is busy. Try export again");
             }
             const auto bytes = path.toUtf8();
-            const auto file = std::filesystem::path(std::u8string(bytes.begin(), bytes.end()));
+            const auto file  = std::filesystem::path(std::u8string(bytes.begin(), bytes.end()));
             if (exr) {
                 image->write_exr(file);
             } else {
@@ -556,12 +563,15 @@ void OfflinePanel::save_image(const QString& path, bool exr) {
         }
     }));
 }
+
 bool OfflinePanel::exporting() const noexcept {
     return exporting_;
 }
+
 bool OfflinePanel::stale() const noexcept {
     return stale_;
 }
+
 minirender::IntegratorSettings OfflinePanel::integrator_settings() const {
     minirender::IntegratorSettings result{
         static_cast<minirender::SamplingMode>(mode_->currentIndex()),
@@ -572,6 +582,7 @@ minirender::IntegratorSettings OfflinePanel::integrator_settings() const {
     result.sppm = sppm_options_;
     return result;
 }
+
 void OfflinePanel::set_integrator_kind(minirender::IntegratorKind kind) {
     if (!minirender::render_terminal(session_->progress().state) || exporting_) {
         throw std::logic_error("Cannot change an active render backend");
@@ -582,6 +593,7 @@ void OfflinePanel::set_integrator_kind(minirender::IntegratorKind kind) {
     }
     backend_->setCurrentIndex(kind == minirender::IntegratorKind::sppm ? 1 : 0);
 }
+
 const minirender::RenderSession& OfflinePanel::session() const noexcept {
     return *session_;
 }

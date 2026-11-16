@@ -1,3 +1,5 @@
+// PLY 点云的文本及二进制编码读写。
+
 #pragma once
 
 #include <minirender/geometry/point_cloud.hpp>
@@ -8,10 +10,10 @@ enum class PlyFormat { ascii, little_endian, big_endian };
 
 // 文件与标量预算同时覆盖被跳过的属性及元素，避免长 list 绕过点数限制。
 struct PlyReadOptions {
-    std::size_t maximum_points = 2000000;
-    std::size_t maximum_records = 8000000;
-    std::size_t maximum_values = 64000000;
-    std::size_t maximum_file_bytes = 2ULL * 1024 * 1024 * 1024;
+    std::size_t maximum_points       = 2000000;
+    std::size_t maximum_records      = 8000000;
+    std::size_t maximum_values       = 64000000;
+    std::size_t maximum_file_bytes   = 2ULL * 1024 * 1024 * 1024;
     std::size_t maximum_header_bytes = 1024 * 1024;
 };
 
@@ -23,7 +25,7 @@ PointCloud load_point_cloud(const std::filesystem::path& path, PlyReadOptions op
 // 写位置与可选法线，默认采用紧凑的 binary little-endian。
 // 临时文件成功写出后再原子替换目标；进度单位为点，失败或取消保留原文件。
 void save_point_cloud(const PointCloud& cloud, const std::filesystem::path& path,
-                      PlyFormat format = PlyFormat::little_endian,
+                      PlyFormat         format       = PlyFormat::little_endian,
                       CancellationToken cancellation = {}, PointProgress progress = {});
 
 } // namespace minirender

@@ -1,3 +1,6 @@
+// 点云 PCA 法线估计、邻域尺度及最小生成森林定向。
+// 公开接口与参数约定见 include/minirender/geometry/point_normals.hpp。
+
 #include "point_cloud_utils.hpp"
 #include "point_index.hpp"
 #include "symmetric_eigen.hpp"
@@ -16,21 +19,24 @@ namespace {
 struct NormalEdge {
     std::uint32_t a;
     std::uint32_t b;
-    double cost;
+    double        cost;
 };
+
 // 按秩合并与路径压缩维护森林分量，Kruskal 据此排除形成环的边。
 class DisjointSets final {
   public:
     explicit DisjointSets(std::size_t size) : parents_(size), ranks_(size, 0) {
         std::iota(parents_.begin(), parents_.end(), std::uint32_t{0});
     }
+
     std::uint32_t root(std::uint32_t index) {
         while (parents_[index] != index) {
             parents_[index] = parents_[parents_[index]];
-            index = parents_[index];
+            index           = parents_[index];
         }
         return index;
     }
+
     bool join(std::uint32_t a, std::uint32_t b) {
         a = root(a);
         b = root(b);
@@ -49,7 +55,7 @@ class DisjointSets final {
 
   private:
     std::vector<std::uint32_t> parents_;
-    std::vector<std::uint8_t> ranks_;
+    std::vector<std::uint8_t>  ranks_;
 };
 
 // 坐标先相对中心点平移，再计算均值与协方差，避免大平移参与相减。
@@ -77,7 +83,7 @@ glm::vec3 fit_normal(const PointCloud& cloud, std::uint32_t point,
                                     std::to_string(point));
     }
     auto normal = eigen.vectors[0];
-    int axis = 0;
+    int  axis   = 0;
     for (int i = 1; i < 3; ++i) {
         if (std::abs(normal[i]) > std::abs(normal[axis])) {
             axis = i;
@@ -100,9 +106,9 @@ void PointNormalSettings::validate() const {
 }
 
 PointNormalResult prepare_point_normals(std::shared_ptr<const PointCloud> input,
-                                        PointNormalSettings settings,
-                                        CancellationToken cancellation,
-                                        PointNormalCallback progress) {
+                                        PointNormalSettings               settings,
+                                        CancellationToken                 cancellation,
+                                        PointNormalCallback               progress) {
     cancellation.check();
     settings.validate();
     if (!input || input->positions.size() > 2000000) {
@@ -118,11 +124,11 @@ PointNormalResult prepare_point_normals(std::shared_ptr<const PointCloud> input,
     report(PointNormalStage::validation, 0, 1);
     input->validate(cancellation);
     report(PointNormalStage::validation, 1, 1);
-    auto unique = detail::unique_points(*input, cancellation, [&](auto done, auto total) {
+    auto       unique = detail::unique_points(*input, cancellation, [&](auto done, auto total) {
         report(PointNormalStage::duplicates, done, total);
     });
-    auto cloud = std::make_shared<PointCloud>(std::move(unique.cloud));
-    const auto count = cloud->positions.size();
+    auto       cloud  = std::make_shared<PointCloud>(std::move(unique.cloud));
+    const auto count  = cloud->positions.size();
     if (count < 3 || count > settings.maximum_neighbor_links / (settings.neighbors - 1)) {
         throw std::length_error(
             "Point normal input has too few unique points or exceeds its neighbor budget");
@@ -135,7 +141,7 @@ PointNormalResult prepare_point_normals(std::shared_ptr<const PointCloud> input,
     report(PointNormalStage::index, 1, 1);
     cloud->normals.resize(count);
     std::vector<NormalEdge> edges;
-    std::vector<double> spacing;
+    std::vector<double>     spacing;
     report(PointNormalStage::estimation, 0, count);
     for (std::uint32_t i = 0; i < count; ++i) {
         const auto neighbors = index.nearest(glm::dvec3(cloud->positions[i]),
@@ -166,9 +172,9 @@ PointNormalResult prepare_point_normals(std::shared_ptr<const PointCloud> input,
                 cancellation.check();
             }
             auto& edge = edges[i];
-            edge.cost = 1 - std::clamp(std::abs(glm::dot(glm::dvec3(cloud->normals[edge.a]),
-                                                         glm::dvec3(cloud->normals[edge.b]))),
-                                       0.0, 1.0);
+            edge.cost  = 1 - std::clamp(std::abs(glm::dot(glm::dvec3(cloud->normals[edge.a]),
+                                                          glm::dvec3(cloud->normals[edge.b]))),
+                                        0.0, 1.0);
         }
         std::size_t comparisons = 0;
         std::sort(edges.begin(), edges.end(), [&](const auto& a, const auto& b) {
@@ -177,9 +183,9 @@ PointNormalResult prepare_point_normals(std::shared_ptr<const PointCloud> input,
             }
             return std::tie(a.cost, a.a, a.b) < std::tie(b.cost, b.a, b.b);
         });
-        DisjointSets sets(count);
+        DisjointSets                              sets(count);
         std::vector<std::array<std::uint32_t, 2>> tree;
-        std::vector<std::size_t> offsets(count + 1, 0);
+        std::vector<std::size_t>                  offsets(count + 1, 0);
         for (std::size_t i = 0; i < edges.size(); ++i) {
             if (i % 1024 == 0) {
                 cancellation.check();
@@ -205,12 +211,12 @@ PointNormalResult prepare_point_normals(std::shared_ptr<const PointCloud> input,
             offsets[i + 1] += offsets[i];
         }
         std::vector<std::uint32_t> adjacent(offsets.back());
-        auto cursors = offsets;
+        auto                       cursors = offsets;
         for (std::size_t i = 0; i < tree.size(); ++i) {
             if (i % 1024 == 0) {
                 cancellation.check();
             }
-            const auto [a, b] = tree[i];
+            const auto [a, b]      = tree[i];
             adjacent[cursors[a]++] = b;
             adjacent[cursors[b]++] = a;
         }
@@ -223,7 +229,7 @@ PointNormalResult prepare_point_normals(std::shared_ptr<const PointCloud> input,
             const auto n = cloud->normals[root];
             if ((n.z != 0 ? n.z : n.y != 0 ? n.y : n.x) < 0) {
                 cloud->normals[root] = -n;
-                reversed[root] = true;
+                reversed[root]       = true;
             }
             std::vector<std::array<std::uint32_t, 2>> pending{{root, detail::no_point}};
             while (!pending.empty()) {
@@ -236,7 +242,7 @@ PointNormalResult prepare_point_normals(std::shared_ptr<const PointCloud> input,
                     }
                     if (glm::dot(cloud->normals[point], cloud->normals[next]) < 0) {
                         cloud->normals[next] = -cloud->normals[next];
-                        reversed[next] = true;
+                        reversed[next]       = true;
                     }
                     pending.push_back({next, point});
                 }
@@ -264,13 +270,13 @@ PointNormalResult prepare_point_normals(std::shared_ptr<const PointCloud> input,
         return a < b;
     });
     if (!spacing.empty()) {
-        result.spacing_p10 = spacing[(spacing.size() - 1) / 10];
+        result.spacing_p10    = spacing[(spacing.size() - 1) / 10];
         result.spacing_median = spacing[(spacing.size() - 1) / 2];
-        result.spacing_p90 = spacing[(spacing.size() - 1) * 9 / 10];
+        result.spacing_p90    = spacing[(spacing.size() - 1) * 9 / 10];
     }
     cloud->validate(cancellation);
-    result.cloud = std::move(cloud);
-    result.source_indices = std::move(unique.source_indices);
+    result.cloud            = std::move(cloud);
+    result.source_indices   = std::move(unique.source_indices);
     result.duplicate_points = input->positions.size() - count;
     report(PointNormalStage::complete, 1, 1);
     return result;

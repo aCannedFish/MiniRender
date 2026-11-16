@@ -1,3 +1,5 @@
+// 回归测试：subsurface fixture。
+
 #pragma once
 
 #include <minirender/render/path_tracer.hpp>
@@ -12,7 +14,7 @@ using namespace minirender;
 
 // 从整格体素边界生成共享顶点、朝外绕序的闭合网格，可构造有凹槽的单个连通体。
 inline std::shared_ptr<MeshData> voxel_mesh(const std::set<std::array<int, 3>>& cells) {
-    auto mesh = std::make_shared<MeshData>();
+    auto                                        mesh = std::make_shared<MeshData>();
     std::map<std::array<int, 3>, std::uint32_t> vertices;
     for (const auto& cell : cells) {
         for (int axis = 0; axis < 3; ++axis) {
@@ -22,7 +24,7 @@ inline std::shared_ptr<MeshData> voxel_mesh(const std::set<std::array<int, 3>>& 
                 if (cells.contains(neighbor)) {
                     continue;
                 }
-                std::array<std::uint32_t, 4> quad{};
+                std::array<std::uint32_t, 4>                quad{};
                 constexpr std::array<std::array<int, 2>, 4> square{
                     {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}};
                 for (std::size_t c = 0; c < 4; ++c) {
@@ -61,14 +63,14 @@ inline std::shared_ptr<MeshData> voxel_mesh(const std::set<std::array<int, 3>>& 
 
 inline SceneDocument scene(bool concave = false) {
     SceneDocument result;
-    result.environment = glm::vec3(1);
-    result.camera.position = {0, 0, 3};
-    result.camera.target = {0, 0, 0};
+    result.environment       = glm::vec3(1);
+    result.camera.position   = {0, 0, 3};
+    result.camera.target     = {0, 0, 0};
     result.camera.near_plane = .01F;
     Material material;
-    material.id = "sss";
-    material.kind = MaterialKind::subsurface;
-    material.ior = 1.3F;
+    material.id         = "sss";
+    material.kind       = MaterialKind::subsurface;
+    material.ior        = 1.3F;
     material.subsurface = std::make_shared<const SubsurfaceParameters>(
         SubsurfaceParameters{{.1, .2, .3}, {1, 2, 3}, 1});
     result.materials.push_back(material);
@@ -82,11 +84,11 @@ inline SceneDocument scene(bool concave = false) {
 }
 
 inline SurfaceHit entry(const SceneBvh& bvh, glm::dvec3 local = {0, 0, .5}) {
-    const auto& object = bvh.scene().instances[0];
+    const auto&      object = bvh.scene().instances[0];
     const glm::dvec3 point(object.object_to_world * glm::vec4(glm::vec3(local), 1));
     const auto normal = glm::normalize(glm::dmat3(object.normal_to_world) *
                                        (local.y == .5 ? glm::dvec3(0, 1, 0) : glm::dvec3(0, 0, 1)));
-    const auto hit = bvh.intersect({point + 5.0 * normal, -normal});
+    const auto hit    = bvh.intersect({point + 5.0 * normal, -normal});
     if (!hit) {
         throw std::runtime_error("Subsurface fixture entry ray missed");
     }
@@ -94,7 +96,7 @@ inline SurfaceHit entry(const SceneBvh& bvh, glm::dvec3 local = {0, 0, .5}) {
 }
 
 inline std::array<glm::dvec3, 3> world_triangle(const RenderInstance& object,
-                                                const MeshTriangle& face) {
+                                                const MeshTriangle&   face) {
     std::array<glm::dvec3, 3> points;
     for (std::size_t c = 0; c < 3; ++c) {
         points[c] = glm::vec3(object.object_to_world *

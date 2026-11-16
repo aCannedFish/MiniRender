@@ -1,3 +1,6 @@
+// 次表面散射参数与表面位置采样。
+// 公开接口与参数约定见 include/minirender/scene/subsurface.hpp。
+
 #include <minirender/scene/subsurface.hpp>
 
 #include <cmath>
@@ -21,13 +24,13 @@ void SubsurfaceParameters::validate() const {
 
 SubsurfacePreset make_subsurface_preset(const std::string& name) {
     SubsurfaceParameters parameters;
-    double ior = 1.5;
+    double               ior = 1.5;
     if (name == "marble") {
         // 原文表格以 mm^-1 表示，默认参数已乘 1000 换成引擎的米制。
     } else if (name == "wax") {
-        parameters.absorption = {12, 35, 80};
+        parameters.absorption         = {12, 35, 80};
         parameters.reduced_scattering = {450, 550, 700};
-        ior = 1.44;
+        ior                           = 1.44;
     } else {
         throw std::invalid_argument("Unknown subsurface preset: " + name);
     }

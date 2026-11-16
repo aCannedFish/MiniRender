@@ -1,3 +1,6 @@
+// 隐藏窗口回归：sdf 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 sdf_smoke.hpp。
+
 #include "sdf_smoke.hpp"
 #include "geometry_smoke.hpp"
 #include "sdf_editor_smoke.hpp"
@@ -22,15 +25,16 @@ void require(bool value, const char* message) {
 
 // 从二次方程直接求距离、法线及观察深度，不调用距离场的 CPU 追踪器。
 void analytic_sphere(VulkanViewport& viewport, bool normals) {
-    const auto image = viewport.grab_hdr();
-    std::size_t hits = 0, misses = 0;
+    const auto  image  = viewport.grab_hdr();
+    std::size_t hits   = 0;
+    std::size_t misses = 0;
     for (std::size_t y = 2; y < image.height(); y += 5) {
         for (std::size_t x = 2; x < image.width(); x += 5) {
             const auto ray =
                 viewport.camera().generate_ray({(double(x) + .5) / double(image.width()),
                                                 (double(y) + .5) / double(image.height())},
                                                double(image.width()) / double(image.height()));
-            const double b = glm::dot(ray.origin, ray.direction);
+            const double b            = glm::dot(ray.origin, ray.direction);
             const double discriminant = b * b - glm::dot(ray.origin, ray.origin) + 1;
             if (std::abs(discriminant) < .05) {
                 continue;
@@ -38,9 +42,9 @@ void analytic_sphere(VulkanViewport& viewport, bool normals) {
             glm::vec3 expected(0);
             if (discriminant > 0) {
                 const double t = -b - std::sqrt(discriminant);
-                const auto n = glm::normalize(ray.origin + ray.direction * t);
-                expected = normals ? glm::vec3(n * .5 + .5)
-                                   : glm::vec3(float(1 / (1 - t * ray.direction.z)));
+                const auto   n = glm::normalize(ray.origin + ray.direction * t);
+                expected       = normals ? glm::vec3(n * .5 + .5)
+                                         : glm::vec3(float(1 / (1 - t * ray.direction.z)));
                 ++hits;
             } else {
                 ++misses;
@@ -56,33 +60,34 @@ void analytic_sphere(VulkanViewport& viewport, bool normals) {
 
 // CSG 棱边及阴影边界附近的差分法线会放大 float 误差。用 CPU 邻域选择稳定像素。
 void compare_cpu(VulkanViewport& viewport, const QString& directory, const QString& label) {
-    const auto actual = viewport.grab_hdr();
-    auto document = *viewport.sdf_document();
-    document.camera = viewport.camera();
+    const auto actual    = viewport.grab_hdr();
+    auto       document  = *viewport.sdf_document();
+    document.camera      = viewport.camera();
     const auto reference = minirender::render_sdf(
         document, {actual.width(), actual.height(), viewport.sdf_view(), viewport.sdf_shadows()});
     require(reference.limited == 0, "CPU reference exhausted its step budget");
     require(reference.hits > 1000, "SDF reference has too few surface samples");
-    std::size_t count = 0, matched = 0;
-    float maximum = 0;
+    std::size_t count     = 0;
+    std::size_t matched   = 0;
+    float       maximum   = 0;
     const float tolerance = viewport.sdf_view() == minirender::SdfView::steps   ? .02F
                             : viewport.sdf_view() == minirender::SdfView::depth ? .00005F
                                                                                 : .003F;
     for (std::size_t y = 2; y + 2 < actual.height(); y += 5) {
         for (std::size_t x = 2; x + 2 < actual.width(); x += 5) {
             const auto expected = reference.image.at(x, y);
-            bool stable = true;
+            bool       stable   = true;
             for (const auto offset :
                  {glm::ivec2(2, 0), glm::ivec2(-2, 0), glm::ivec2(0, 2), glm::ivec2(0, -2)}) {
                 const auto neighbor = reference.image.at(std::size_t(int(x) + offset.x),
                                                          std::size_t(int(y) + offset.y));
-                stable = stable && glm::length(neighbor - expected) < .06F;
+                stable              = stable && glm::length(neighbor - expected) < .06F;
             }
             if (!stable) {
                 continue;
             }
             const float error = glm::length(actual.at(x, y) - expected);
-            maximum = std::max(maximum, error);
+            maximum           = std::max(maximum, error);
             matched += error < tolerance ? 1 : 0;
             ++count;
         }
@@ -99,7 +104,7 @@ void compare_cpu(VulkanViewport& viewport, const QString& directory, const QStri
                 linear *= std::exp2(viewport.exposure());
                 linear /= glm::vec3(1) + linear;
             }
-            const auto pixel = display.pixelColor(int(x), int(y));
+            const auto       pixel = display.pixelColor(int(x), int(y));
             const std::array channels{pixel.red(), pixel.green(), pixel.blue()};
             for (int channel = 0; channel < 3; ++channel) {
                 const int expected =
@@ -112,12 +117,12 @@ void compare_cpu(VulkanViewport& viewport, const QString& directory, const QStri
 }
 
 struct State {
-    int stage = 0;
-    int frame = 0;
-    int ticks = 0;
+    int                stage = 0;
+    int                frame = 0;
+    int                ticks = 0;
     minirender::Camera scene_camera;
     minirender::Camera sdf_camera;
-    std::uint64_t uploads = 0;
+    std::uint64_t      uploads = 0;
 };
 
 } // namespace
@@ -128,9 +133,9 @@ void verify_sdf_gpu(Workbench& window, const QString& directory, const QString& 
 
 void start_sdf_smoke(Workbench& window, const QString& directory, bool enforce_response) {
     QDir().mkpath(directory);
-    auto state = std::make_shared<State>();
+    auto state          = std::make_shared<State>();
     state->scene_camera = window.viewport()->camera();
-    auto* timer = new QTimer(&window);
+    auto* timer         = new QTimer(&window);
     timer->setInterval(70);
     QObject::connect(
         timer, &QTimer::timeout, &window, [state, timer, &window, directory, enforce_response] {
@@ -151,7 +156,7 @@ void start_sdf_smoke(Workbench& window, const QString& directory, bool enforce_r
                     document->nodes.push_back(
                         {"sphere", "Sphere", minirender::SdfKind::sphere, {1, 0, 0}});
                     document->camera.position = {0, 0, 4};
-                    document->camera.target = {0, 0, 0};
+                    document->camera.target   = {0, 0, 0};
                     viewport->set_sdf_document(document, true);
                     viewport->set_sdf_view(minirender::SdfView::normals);
                     viewport->set_sdf_visible(true);
@@ -194,7 +199,7 @@ void start_sdf_smoke(Workbench& window, const QString& directory, bool enforce_r
                 case 6:
                     compare_cpu(*viewport, directory, "sdf-steps");
                     state->sdf_camera = viewport->camera();
-                    state->uploads = viewport->sdf_uploads();
+                    state->uploads    = viewport->sdf_uploads();
                     viewport->set_sdf_visible(false);
                     require(viewport->camera().position == state->scene_camera.position,
                             "SDF view lost the scene camera");
@@ -210,33 +215,33 @@ void start_sdf_smoke(Workbench& window, const QString& directory, bool enforce_r
                     require(window.document().camera.position == state->scene_camera.position,
                             "SDF changed the scene document");
                     {
-                        auto doc = std::make_shared<minirender::SdfDocument>();
-                        doc->nodes = {{"sphere",
-                                       "Sphere",
-                                       minirender::SdfKind::sphere,
-                                       {1, 0, 0},
-                                       {-.3F, 0, 0}},
-                                      {"box",
-                                       "Box",
-                                       minirender::SdfKind::box,
-                                       {.75F, .75F, .75F},
-                                       {.3F, 0, 0},
-                                       {0, 30, 20},
-                                       .9F},
-                                      {"root",
-                                       "Intersection",
-                                       minirender::SdfKind::intersect,
-                                       {},
-                                       {},
-                                       {},
-                                       1,
-                                       {},
-                                       0,
-                                       1}};
-                        doc->root = 2;
+                        auto doc                 = std::make_shared<minirender::SdfDocument>();
+                        doc->nodes               = {{"sphere",
+                                                     "Sphere",
+                                                     minirender::SdfKind::sphere,
+                                                     {1, 0, 0},
+                                                     {-.3F, 0, 0}},
+                                                    {"box",
+                                                     "Box",
+                                                     minirender::SdfKind::box,
+                                                     {.75F, .75F, .75F},
+                                                     {.3F, 0, 0},
+                                                     {0, 30, 20},
+                                                     .9F},
+                                                    {"root",
+                                                     "Intersection",
+                                                     minirender::SdfKind::intersect,
+                                                     {},
+                                                     {},
+                                                     {},
+                                                     1,
+                                                     {},
+                                                     0,
+                                                     1}};
+                        doc->root                = 2;
                         doc->trace.maximum_steps = 1024;
-                        doc->camera.position = {0, 0, 4};
-                        doc->camera.target = {0, 0, 0};
+                        doc->camera.position     = {0, 0, 4};
+                        doc->camera.target       = {0, 0, 0};
                         viewport->set_sdf_document(doc, true);
                         viewport->set_sdf_view(minirender::SdfView::normals);
                     }
@@ -245,9 +250,9 @@ void start_sdf_smoke(Workbench& window, const QString& directory, bool enforce_r
                 case 8:
                     compare_cpu(*viewport, directory, "sdf-intersection");
                     {
-                        auto camera = viewport->camera();
+                        auto camera     = viewport->camera();
                         camera.position = {0, 0, 0};
-                        camera.target = {0, 0, -1};
+                        camera.target   = {0, 0, -1};
                         viewport->set_camera(camera);
                     }
                     advance();
@@ -264,7 +269,7 @@ void start_sdf_smoke(Workbench& window, const QString& directory, bool enforce_r
                     advance();
                     return;
                 case 10: {
-                    const auto image = viewport->grab_hdr();
+                    const auto  image   = viewport->grab_hdr();
                     std::size_t samples = 0;
                     for (std::size_t y = 3; y < image.height(); y += 17) {
                         for (std::size_t x = 3; x < image.width(); x += 17) {

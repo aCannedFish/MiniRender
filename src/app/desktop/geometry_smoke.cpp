@@ -1,3 +1,6 @@
+// 隐藏窗口回归：geometry 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 geometry_smoke.hpp。
+
 #include "geometry_smoke.hpp"
 #include "geometry_panel.hpp"
 #include "ibl_controller.hpp"
@@ -56,7 +59,7 @@ template <class T> T* control(Workbench& window, const char* name) {
 }
 
 const minirender::SceneObject& object(const minirender::SceneDocument& scene,
-                                      const std::string& id) {
+                                      const std::string&               id) {
     const auto found = std::find_if(scene.objects.begin(), scene.objects.end(),
                                     [&](const auto& item) { return item.id == id; });
     require(found != scene.objects.end(), "Geometry target is missing");
@@ -64,10 +67,10 @@ const minirender::SceneObject& object(const minirender::SceneDocument& scene,
 }
 
 std::shared_ptr<const minirender::MeshData> mesh_for(const minirender::SceneDocument& scene,
-                                                     const std::string& id) {
+                                                     const std::string&               id) {
     const auto& target = object(scene, id);
-    const auto found = std::find_if(scene.meshes.begin(), scene.meshes.end(),
-                                    [&](const auto& item) { return item.id == target.mesh_id; });
+    const auto  found  = std::find_if(scene.meshes.begin(), scene.meshes.end(),
+                                      [&](const auto& item) { return item.id == target.mesh_id; });
     require(found != scene.meshes.end(), "Geometry asset is missing");
     return found->data;
 }
@@ -88,7 +91,7 @@ void prepare(Workbench& window, const QString& directory) {
     std::ofstream(native(directory + "/cancelled.json"), std::ios::binary)
         << "preserve existing scene bytes\n";
     window.viewport()->set_fxaa_enabled(false);
-    auto ao = window.viewport()->ssao_settings();
+    auto ao    = window.viewport()->ssao_settings();
     ao.enabled = false;
     window.viewport()->set_ssao_settings(ao);
     window.select_object("blue_cube");
@@ -101,10 +104,10 @@ void verify_layout(Workbench& window) {
     require(area && area->widget()->width() <= area->viewport()->width(),
             "Geometry panel requires hidden horizontal scrolling");
     auto* panel = area->widget();
-    auto* form = qobject_cast<QFormLayout*>(panel->layout());
+    auto* form  = qobject_cast<QFormLayout*>(panel->layout());
     require(form, "Geometry form is missing");
     std::vector<QWidget*> fields;
-    QWidget* bottom = nullptr;
+    QWidget*              bottom = nullptr;
     for (int i = 0; i < form->count(); ++i) {
         auto* field = form->itemAt(i)->widget();
         if (!field || !field->isVisibleTo(panel)) {
@@ -132,21 +135,23 @@ void verify_layout(Workbench& window) {
 // 使用 CPU 世界空间命中法线和相机深度，核对新网格的实际 GPU 缓冲内容。
 QImage verify_gpu(Workbench& window, const QString& directory, const QString& label,
                   const std::string& target_id = "blue_cube") {
-    auto* viewport = window.viewport();
-    const auto snapshot = minirender::make_snapshot(window.document());
+    auto*                      viewport = window.viewport();
+    const auto                 snapshot = minirender::make_snapshot(window.document());
     const minirender::SceneBvh bvh(snapshot);
     control<QComboBox>(window, "view_mode")->setCurrentIndex(1);
     const auto normals = viewport->grab();
     control<QComboBox>(window, "view_mode")->setCurrentIndex(2);
     const auto depth = viewport->grab();
     require(normals.size() == depth.size(), "Geometry debug capture dimensions changed");
-    int checked = 0, matched = 0, target = 0;
-    const double aspect = static_cast<double>(normals.width()) / normals.height();
+    int              checked = 0;
+    int              matched = 0;
+    int              target  = 0;
+    const double     aspect  = static_cast<double>(normals.width()) / normals.height();
     const glm::dmat4 view(snapshot->camera.view_matrix());
     for (int gy = 0; gy < 64; ++gy) {
         for (int gx = 0; gx < 80; ++gx) {
-            const int x = static_cast<int>((gx + 0.43) * normals.width() / 80);
-            const int y = static_cast<int>((gy + 0.37) * normals.height() / 64);
+            const int  x   = static_cast<int>((gx + 0.43) * normals.width() / 80);
+            const int  y   = static_cast<int>((gy + 0.37) * normals.height() / 64);
             const auto ray = snapshot->camera.generate_ray(
                 {(x + 0.5) / normals.width(), (y + 0.5) / normals.height()}, aspect);
             const auto hit = bvh.intersect(ray);
@@ -158,12 +163,12 @@ QImage verify_gpu(Workbench& window, const QString& directory, const QString& la
             if (glm::dot(n, -ray.direction) < 0) {
                 n = -n;
             }
-            const auto expected_normal = glm::vec3(n * 0.5 + 0.5);
-            const double d = -(view * glm::dvec4(hit->position, 1)).z;
-            const auto expected_depth = static_cast<float>(1 / (1 + d));
-            const auto actual = normals.pixelColor(x, y);
-            const int channels[] = {actual.red(), actual.green(), actual.blue()};
-            bool equal = true;
+            const auto   expected_normal = glm::vec3(n * 0.5 + 0.5);
+            const double d               = -(view * glm::dvec4(hit->position, 1)).z;
+            const auto   expected_depth  = static_cast<float>(1 / (1 + d));
+            const auto   actual          = normals.pixelColor(x, y);
+            const int    channels[]      = {actual.red(), actual.green(), actual.blue()};
+            bool         equal           = true;
             for (int channel = 0; channel < 3; ++channel) {
                 const int value =
                     minirender::encode_unorm8(minirender::linear_to_srgb(expected_normal[channel]));
@@ -204,7 +209,7 @@ int changed_pixels(const QImage& first, const QImage& second) {
 
 // 地面阴影以 CPU 方向光遮挡查询为参照，剔除 PCF 边界附近的采样点。
 void verify_shadows(Workbench& window, const QString& directory) {
-    auto* viewport = window.viewport();
+    auto*      viewport = window.viewport();
     const auto snapshot = minirender::make_snapshot(window.document());
     require(snapshot->directional_lights.size() == 1, "Geometry shadow fixture requires one light");
     const minirender::SceneBvh bvh(snapshot);
@@ -215,16 +220,19 @@ void verify_shadows(Workbench& window, const QString& directory) {
     const auto off = viewport->grab();
     control<QCheckBox>(window, "shadows_enabled")->setChecked(true);
     require(on.size() == off.size(), "Geometry shadow capture dimensions changed");
-    const auto direction = -glm::normalize(glm::dvec3(snapshot->directional_lights[0].direction));
-    const double aspect = static_cast<double>(on.width()) / on.height();
-    const auto matrix = snapshot->camera.projection_matrix(static_cast<float>(aspect)) *
-                        snapshot->camera.view_matrix();
-    int blocked = 0, blocked_matches = 0, lit = 0, lit_matches = 0;
+    const auto   direction = -glm::normalize(glm::dvec3(snapshot->directional_lights[0].direction));
+    const double aspect    = static_cast<double>(on.width()) / on.height();
+    const auto   matrix    = snapshot->camera.projection_matrix(static_cast<float>(aspect)) *
+                             snapshot->camera.view_matrix();
+    int          blocked   = 0;
+    int          blocked_matches = 0;
+    int          lit             = 0;
+    int          lit_matches     = 0;
     for (int gz = -40; gz <= 40; ++gz) {
         for (int gx = -40; gx <= 40; ++gx) {
             const glm::vec3 point{static_cast<float>(gx) * 0.06F, 0,
                                   static_cast<float>(gz) * 0.06F};
-            const auto clip = matrix * glm::vec4(point, 1);
+            const auto      clip = matrix * glm::vec4(point, 1);
             if (clip.w <= 0) {
                 continue;
             }
@@ -232,17 +240,17 @@ void verify_shadows(Workbench& window, const QString& directory) {
             if (uv.x < 0.02F || uv.x > 0.98F || uv.y < 0.02F || uv.y > 0.98F) {
                 continue;
             }
-            const int x = static_cast<int>(uv.x * static_cast<float>(on.width()));
-            const int y = static_cast<int>(uv.y * static_cast<float>(on.height()));
+            const int  x   = static_cast<int>(uv.x * static_cast<float>(on.width()));
+            const int  y   = static_cast<int>(uv.y * static_cast<float>(on.height()));
             const auto ray = snapshot->camera.generate_ray(
                 {(x + 0.5) / on.width(), (y + 0.5) / on.height()}, aspect);
             const auto hit = bvh.intersect(ray);
             if (!hit || snapshot->instances[hit->instance_index].object_id != "ground") {
                 continue;
             }
-            const auto origin = minirender::offset_origin(*hit, direction);
+            const auto origin   = minirender::offset_origin(*hit, direction);
             const bool expected = bvh.occluded({origin, direction});
-            bool stable = true;
+            bool       stable   = true;
             for (const auto offset : {glm::dvec3(0.03, 0, 0), glm::dvec3(-0.03, 0, 0),
                                       glm::dvec3(0, 0, 0.03), glm::dvec3(0, 0, -0.03)}) {
                 stable = stable && bvh.occluded({origin + offset, direction}) == expected;
@@ -267,11 +275,12 @@ void verify_shadows(Workbench& window, const QString& directory) {
     require(blocked >= 3 && lit >= 100 && blocked_matches * 100 >= blocked * 90 &&
                 lit_matches * 100 >= lit * 98,
             "Generated geometry GPU shadows disagree with CPU rays");
-    int surface_lit = 0, surface_matches = 0;
+    int surface_lit     = 0;
+    int surface_matches = 0;
     for (int gy = 0; gy < 80; ++gy) {
         for (int gx = 0; gx < 100; ++gx) {
-            const int x = static_cast<int>((gx + 0.43) * on.width() / 100);
-            const int y = static_cast<int>((gy + 0.37) * on.height() / 80);
+            const int  x   = static_cast<int>((gx + 0.43) * on.width() / 100);
+            const int  y   = static_cast<int>((gy + 0.37) * on.height() / 80);
             const auto ray = snapshot->camera.generate_ray(
                 {(x + 0.5) / on.width(), (y + 0.5) / on.height()}, aspect);
             const auto hit = bvh.intersect(ray);
@@ -298,23 +307,24 @@ void verify_shadows(Workbench& window, const QString& directory) {
 
 minirender::RenderSettings offline_settings() {
     minirender::RenderSettings settings;
-    settings.width = 16;
-    settings.height = 12;
+    settings.width             = 16;
+    settings.height            = 12;
     settings.samples_per_pixel = 8;
-    settings.seed = 101;
+    settings.seed              = 101;
     return settings;
 }
+
 minirender::IntegratorSettings integrator() {
     minirender::IntegratorSettings result;
-    result.maximum_depth = 3;
+    result.maximum_depth    = 3;
     result.russian_roulette = false;
     return result;
 }
 
 void verify_offline(Workbench& window, std::shared_ptr<const minirender::SceneSnapshot> snapshot) {
     const minirender::PathTracer reference(std::move(snapshot), integrator());
-    const auto expected = reference.render(offline_settings());
-    const auto actual = window.offline_panel()->session().result();
+    const auto                   expected = reference.render(offline_settings());
+    const auto                   actual   = window.offline_panel()->session().result();
     require(actual && actual->width() == expected.width() && actual->height() == expected.height(),
             "Geometry offline result has incorrect dimensions");
     for (std::size_t y = 0; y < expected.height(); ++y) {
@@ -327,9 +337,9 @@ void verify_offline(Workbench& window, std::shared_ptr<const minirender::SceneSn
 
 // QWidget 截图中补入同一视口的原生 QWindow 读回，保留表单与实际渲染画面。
 void capture_ui(Workbench& window, const QString& path) {
-    auto image = window.grab();
+    auto       image          = window.grab();
     const auto viewport_image = window.viewport()->grab();
-    QPainter painter(&image);
+    QPainter   painter(&image);
     const auto origin =
         window.viewport()->mapToGlobal(QPoint(0, 0)) - window.mapToGlobal(QPoint(0, 0));
     painter.drawImage(QRect(origin, window.viewport()->size()), viewport_image);
@@ -383,48 +393,55 @@ enum class Stage {
 };
 
 struct State {
-    Stage stage = Stage::startup;
-    int ticks = 0, maximum_ticks = 4000, frame = 0;
-    std::uint64_t uploads = 0;
-    bool monitor = false, numeric_progress = false, cancel_sent = false, renderable = true;
-    bool active = false;
-    bool offscreen = false;
-    qint64 last = 0, maximum_gap = 0, cancel_at = 0;
-    qint64 maximum_event_latency = 0;
-    std::size_t probe_samples = 0;
-    std::atomic<std::uint64_t> probe_epoch{0};
-    QObject* probe_receiver = nullptr;
-    int probe_event_type = 0;
-    std::chrono::steady_clock::time_point measurement_started{};
-    QElapsedTimer clock;
+    Stage                                       stage            = Stage::startup;
+    int                                         ticks            = 0;
+    int                                         maximum_ticks    = 4000;
+    int                                         frame            = 0;
+    std::uint64_t                               uploads          = 0;
+    bool                                        monitor          = false;
+    bool                                        numeric_progress = false;
+    bool                                        cancel_sent      = false;
+    bool                                        renderable       = true;
+    bool                                        active           = false;
+    bool                                        offscreen        = false;
+    qint64                                      last = 0, maximum_gap = 0, cancel_at = 0;
+    qint64                                      maximum_event_latency = 0;
+    std::size_t                                 probe_samples         = 0;
+    std::atomic<std::uint64_t>                  probe_epoch{0};
+    QObject*                                    probe_receiver   = nullptr;
+    int                                         probe_event_type = 0;
+    std::chrono::steady_clock::time_point       measurement_started{};
+    QElapsedTimer                               clock;
     std::shared_ptr<const minirender::MeshData> source, generated, large, simplified, remeshed,
         remesh_input;
-    minirender::RemeshSettings remesh_settings;
+    minirender::RemeshSettings                       remesh_settings;
     std::shared_ptr<const minirender::SceneSnapshot> snapshot;
-    QImage baseline, after, qem_before, qem_after, remesh_before, remesh_after;
-    std::size_t original_meshes = 0, original_objects = 0;
-    float saved_x = 0;
+    QImage                baseline, after, qem_before, qem_after, remesh_before, remesh_after;
+    std::size_t           original_meshes  = 0;
+    std::size_t           original_objects = 0;
+    float                 saved_x          = 0;
     std::filesystem::path input_file;
-    std::string original_input;
+    std::string           original_input;
 };
 
 struct UiProbeEvent final : QEvent {
     explicit UiProbeEvent(int type) : QEvent(static_cast<QEvent::Type>(type)) {}
+
     std::chrono::steady_clock::time_point sent;
-    std::uint64_t epoch = 0;
+    std::uint64_t                         epoch = 0;
 };
 
 // 先创建事件，再记录投递时间，避免把发送线程的事件分配耗时计入界面排队时延。
 class UiEventProbe final : public QObject {
   public:
     UiEventProbe(QObject* parent, std::shared_ptr<State> state) : QObject(parent), state_(state) {
-        state_->probe_receiver = this;
+        state_->probe_receiver   = this;
         state_->probe_event_type = QEvent::registerEventType();
-        worker_ = std::jthread([this, state](std::stop_token stop) {
+        worker_                  = std::jthread([this, state](std::stop_token stop) {
             while (!stop.stop_requested()) {
-                auto* event = new UiProbeEvent(state->probe_event_type);
+                auto* event  = new UiProbeEvent(state->probe_event_type);
                 event->epoch = state->probe_epoch.load(std::memory_order_relaxed);
-                event->sent = std::chrono::steady_clock::now();
+                event->sent  = std::chrono::steady_clock::now();
                 QCoreApplication::postEvent(this, event);
                 std::this_thread::sleep_for(std::chrono::milliseconds(20));
             }
@@ -456,7 +473,7 @@ class UiEventProbe final : public QObject {
 
   private:
     std::shared_ptr<State> state_;
-    std::jthread worker_;
+    std::jthread           worker_;
 };
 
 void record_gap(State& state) {
@@ -484,7 +501,7 @@ template <class Work> void verify(State& state, Work work) {
     state.monitor = false;
     state.probe_epoch.fetch_add(1, std::memory_order_relaxed);
     work();
-    state.last = state.clock.elapsed();
+    state.last                = state.clock.elapsed();
     state.measurement_started = std::chrono::steady_clock::now();
     state.probe_epoch.fetch_add(1, std::memory_order_relaxed);
     state.monitor = true;
@@ -493,10 +510,12 @@ template <class Work> void verify(State& state, Work work) {
 bool finished(Workbench& window) {
     return !window.geometry_controller()->busy() && !window.asset_loading();
 }
+
 void ready(Workbench& window) {
     require(window.geometry_controller()->status().state == GeometryTaskState::ready,
             "Geometry task did not finish successfully");
 }
+
 void generate(Workbench& window, int levels, bool displace) {
     control<QComboBox>(window, "geometry_operation")->setCurrentIndex(0);
     control<QSpinBox>(window, "geometry_levels")->setValue(levels);
@@ -514,12 +533,15 @@ QImage verify_geometry_gpu(Workbench& window, const QString& directory, const QS
                            const std::string& target_id) {
     return verify_gpu(window, directory, label, target_id);
 }
+
 void verify_geometry_shadows(Workbench& window, const QString& directory) {
     verify_shadows(window, directory);
 }
+
 void verify_geometry_layout(Workbench& window) {
     verify_layout(window);
 }
+
 void capture_workbench_ui(Workbench& window, const QString& path) {
     capture_ui(window, path);
 }
@@ -528,9 +550,9 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
                           bool measure_responsiveness) {
     require(QDir().mkpath(directory), "Cannot create geometry output directory");
     prepare(window, directory);
-    const auto state = std::make_shared<State>();
-    bool budget_valid = false;
-    const int budget =
+    const auto state        = std::make_shared<State>();
+    bool       budget_valid = false;
+    const int  budget =
         qEnvironmentVariableIntValue("MINIRENDER_GEOMETRY_TEST_TICKS", &budget_valid);
     if (budget_valid && budget > 0 && budget <= 20000) {
         state->maximum_ticks = budget;
@@ -542,7 +564,7 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
     QObject::connect(qGuiApp, &QGuiApplication::applicationStateChanged, &window,
                      [state](Qt::ApplicationState value) {
                          state->active = state->offscreen || value == Qt::ApplicationActive;
-                         state->last = 0;
+                         state->last   = 0;
                          state->measurement_started = std::chrono::steady_clock::now();
                          state->probe_epoch.fetch_add(1, std::memory_order_relaxed);
                      });
@@ -560,9 +582,9 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
         timer, &QTimer::timeout, &window,
         [state, timer, &window, directory, measure_responsiveness] {
             try {
-                auto* viewport = window.viewport();
-                auto* tasks = window.geometry_controller();
-                const auto status = tasks->status();
+                auto*      viewport = window.viewport();
+                auto*      tasks    = window.geometry_controller();
+                const auto status   = tasks->status();
                 if (++state->ticks > state->maximum_ticks || !viewport->failure().isEmpty()) {
                     throw std::runtime_error("Geometry test timed out or renderer failed");
                 }
@@ -576,8 +598,8 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
                 const auto advance = [&](Stage stage) {
                     qInfo() << "Geometry stage" << static_cast<int>(state->stage) << "->"
                             << static_cast<int>(stage);
-                    state->stage = stage;
-                    state->frame = viewport->rendered_frames();
+                    state->stage   = stage;
+                    state->frame   = viewport->rendered_frames();
                     state->uploads = viewport->upload_statistics().mesh_uploads;
                 };
                 const auto preview_ready = [&] {
@@ -598,12 +620,12 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
                     state->source = mesh_for(window.document(), "blue_cube");
                     require(mesh_for(window.document(), "metal_cube") == state->source,
                             "Geometry fixture does not share the cube mesh");
-                    state->original_meshes = window.document().meshes.size();
+                    state->original_meshes  = window.document().meshes.size();
                     state->original_objects = window.document().objects.size();
                     state->input_file =
                         window.document().asset_directory / window.document().meshes[0].source;
-                    state->original_input = bytes(state->input_file);
-                    state->monitor = true;
+                    state->original_input      = bytes(state->input_file);
+                    state->monitor             = true;
                     state->measurement_started = std::chrono::steady_clock::now();
                     state->probe_epoch.fetch_add(1, std::memory_order_relaxed);
                     verify(*state, [&] { verify_layout(window); });
@@ -798,7 +820,7 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
                             return;
                         }
                         control<QPushButton>(window, "geometry_cancel")->click();
-                        state->cancel_at = state->clock.elapsed();
+                        state->cancel_at   = state->clock.elapsed();
                         state->cancel_sent = true;
                         return;
                     }
@@ -844,7 +866,7 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
                     // 读取同一轮 UI 刷新的进度条与计数；worker 可能已经进入下一个阶段。
                     // 将最新 worker 阶段与上一次 UI 刷新混用，会漏掉短阶段的真实显示。
                     {
-                        const auto* bar = control<QProgressBar>(window, "geometry_progress");
+                        const auto* bar    = control<QProgressBar>(window, "geometry_progress");
                         const auto* counts = control<QLabel>(window, "geometry_counts");
                         state->numeric_progress =
                             state->numeric_progress ||
@@ -935,7 +957,7 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
                         return;
                     }
                     state->generated = mesh_for(window.document(), "blue_cube");
-                    state->source = mesh_for(window.document(), "metal_cube");
+                    state->source    = mesh_for(window.document(), "metal_cube");
                     verify(*state, [&] {
                         verify_layout(window);
                         state->qem_before = verify_gpu(window, directory, "qem-before");
@@ -1087,7 +1109,7 @@ void start_geometry_smoke(Workbench& window, const QString& directory,
                                 "QEM saved scene lost its generated asset");
                     });
                     state->remesh_input = mesh_for(window.document(), "blue_cube");
-                    state->snapshot = minirender::make_snapshot(window.document());
+                    state->snapshot     = minirender::make_snapshot(window.document());
                     verify(*state, [&] {
                         state->remesh_before = verify_gpu(window, directory, "remesh-before");
                     });

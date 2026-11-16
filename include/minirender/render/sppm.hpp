@@ -1,3 +1,5 @@
+// 随机渐进光子映射的相机路径、光子合并和逐像素统计。
+
 #pragma once
 
 #include <minirender/render/path_tracer.hpp>
@@ -10,36 +12,45 @@ namespace minirender {
 
 // 原文 Eq8–11 的逐像素持久统计。visible point 每轮更换，下面四项跨迭代保留。
 struct SppmPixel {
-    double radius = 0;
-    double effective_photons = 0;
+    double     radius            = 0;
+    double     effective_photons = 0;
     glm::dvec3 tau{0};
     glm::dvec3 direct_sum{0};
 };
+
 // Phi 已包含当前相机路径吞吐；没有新光子时半径及 tau 保持不变。
 SppmPixel update_sppm_pixel(SppmPixel previous, std::uint64_t photons, glm::dvec3 phi,
                             glm::dvec3 direct, double alpha);
 
 enum class SppmPhase { camera, grid, photons, update };
 std::string_view sppm_phase_name(SppmPhase phase);
+
 struct SppmProgress {
-    SppmPhase phase = SppmPhase::camera;
+    SppmPhase     phase     = SppmPhase::camera;
     std::uint64_t completed = 0;
-    std::uint64_t total = 0;
+    std::uint64_t total     = 0;
 };
+
 using SppmCallback = std::function<void(SppmProgress)>;
+
 struct SppmStatistics {
-    std::uint64_t iterations = 0;
-    std::uint64_t emitted_photons = 0;
-    std::uint64_t photon_hits = 0;
+    std::uint64_t iterations             = 0;
+    std::uint64_t emitted_photons        = 0;
+    std::uint64_t photon_hits            = 0;
     std::uint64_t gathered_contributions = 0;
     // 非零合并贡献中，光源侧含 delta、两侧都含 delta 的数量；后者验证 SDS 场景。
-    std::uint64_t specular_light_contributions = 0, sds_contributions = 0;
-    std::uint64_t camera_paths = 0;
-    std::uint64_t camera_scattering_events = 0, photon_scattering_events = 0, shadow_rays = 0;
+    std::uint64_t   specular_light_contributions = 0;
+    std::uint64_t   sds_contributions            = 0;
+    std::uint64_t   camera_paths                 = 0;
+    std::uint64_t   camera_scattering_events     = 0;
+    std::uint64_t   photon_scattering_events     = 0;
+    std::uint64_t   shadow_rays                  = 0;
     TraceStatistics geometry;
-    double minimum_radius = 0, maximum_radius = 0, mean_radius = 0;
-    std::uint64_t estimated_bytes = 0;
-    std::uint32_t workers = 0;
+    double          minimum_radius  = 0;
+    double          maximum_radius  = 0;
+    double          mean_radius     = 0;
+    std::uint64_t   estimated_bytes = 0;
+    std::uint32_t   workers         = 0;
 };
 
 // 单个控制线程持有积分器，每轮内部可并行。advance 在完整迭代结束时提交新统计。
@@ -50,7 +61,7 @@ class SppmIntegrator final {
                    IntegratorSettings settings, std::uint32_t threads = 1,
                    CancellationToken cancellation = {});
     ~SppmIntegrator();
-    SppmIntegrator(const SppmIntegrator&) = delete;
+    SppmIntegrator(const SppmIntegrator&)            = delete;
     SppmIntegrator& operator=(const SppmIntegrator&) = delete;
     void advance(CancellationToken cancellation = {}, SppmCallback progress = {});
     Image image(CancellationToken cancellation = {}) const;

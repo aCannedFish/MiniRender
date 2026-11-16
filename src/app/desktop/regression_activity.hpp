@@ -1,3 +1,5 @@
+// macOS 隐藏窗口回归的进程活动生命周期。
+
 #pragma once
 
 // macOS 回归期间保留 NSProcessInfo activity，避免 App Nap 合并后台定时器和采样线程的唤醒。
@@ -6,7 +8,7 @@ class RegressionActivity final {
   public:
     explicit RegressionActivity(bool enabled);
     ~RegressionActivity();
-    RegressionActivity(const RegressionActivity&) = delete;
+    RegressionActivity(const RegressionActivity&)            = delete;
     RegressionActivity& operator=(const RegressionActivity&) = delete;
 
   private:

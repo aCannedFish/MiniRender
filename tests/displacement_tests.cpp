@@ -1,3 +1,6 @@
+// 回归测试：Displacement moves real geometry along smooth normals using signed linear
+// red；Displacement sampling agrees with UV orientation repeat and bilinear texel centers。
+
 #include <minirender/geometry/displacement.hpp>
 #include <minirender/geometry/loop.hpp>
 #include <minirender/render/path_tracer.hpp>
@@ -66,10 +69,10 @@ SceneDocument scene_for(std::shared_ptr<const MeshData> mesh) {
 
 TEST_CASE("Displacement moves real geometry along smooth normals using signed linear red",
           "[geometry][displacement]") {
-    const auto source = patch();
+    const auto           source = patch();
     DisplacementSettings settings;
     settings.scale = 0.4;
-    auto result = displace_mesh(source, constant_height(0.75F), settings);
+    auto result    = displace_mesh(source, constant_height(0.75F), settings);
     REQUIRE(result.mesh->positions.size() == 4);
     REQUIRE(result.mesh->triangles.size() == 2);
     REQUIRE(result.maximum_displacement == Approx(0.1));
@@ -80,19 +83,19 @@ TEST_CASE("Displacement moves real geometry along smooth normals using signed li
         REQUIRE(p.x == source->positions[v].x);
         REQUIRE(p.y == source->positions[v].y);
         REQUIRE(p.z == Approx(0.1));
-        REQUIRE(source->positions[v].z == 0);
+        REQUIRE(source->positions[v].z == 0.0F);
     }
     for (const auto& triangle : result.mesh->triangles) {
         for (const auto& corner : triangle.corners) {
             REQUIRE(glm::length(corner.normal - glm::vec3(0, 0, 1)) < 1e-6F);
         }
     }
-    settings.scale = -0.2;
+    settings.scale    = -0.2;
     settings.midlevel = 0;
-    result = displace_mesh(source, constant_height(-2), settings);
+    result            = displace_mesh(source, constant_height(-2), settings);
     REQUIRE(result.mesh->positions[0].z == Approx(0.4));
     settings.scale = 0;
-    result = displace_mesh(source, constant_height(9), settings);
+    result         = displace_mesh(source, constant_height(9), settings);
     REQUIRE(result.mesh == source);
     REQUIRE(result.mesh->positions == source->positions);
     REQUIRE(result.maximum_displacement == 0);
@@ -107,9 +110,9 @@ TEST_CASE("Displacement sampling agrees with UV orientation repeat and bilinear 
             image.at(x, y) = {static_cast<float>(x + y * 3) / 5, 0, 0};
         }
     }
-    const auto height = std::make_shared<const Texture>(image);
+    const auto           height = std::make_shared<const Texture>(image);
     DisplacementSettings settings;
-    settings.scale = 1;
+    settings.scale    = 1;
     settings.midlevel = 0;
     for (const auto uv : {glm::vec2(0), glm::vec2(1.0F / 6, 0.75F), glm::vec2(-0.3F, 2.8F),
                           glm::vec2(0.47F, 0.2F), glm::vec2(1, -1)}) {
@@ -127,33 +130,33 @@ TEST_CASE("Displacement sampling agrees with UV orientation repeat and bilinear 
 
 TEST_CASE("Displacement reports inconsistent heights at shared vertices",
           "[geometry][displacement]") {
-    auto mesh = std::make_shared<MeshData>(*patch());
+    auto  mesh = std::make_shared<MeshData>(*patch());
     Image image(2, 2);
-    image.at(0, 0) = glm::vec3(0);
-    image.at(1, 0) = glm::vec3(1);
-    image.at(0, 1) = glm::vec3(0);
-    image.at(1, 1) = glm::vec3(1);
+    image.at(0, 0)                   = glm::vec3(0);
+    image.at(1, 0)                   = glm::vec3(1);
+    image.at(0, 1)                   = glm::vec3(0);
+    image.at(1, 1)                   = glm::vec3(1);
     mesh->triangles[1].corners[0].uv = {0.75F, 0.75F};
-    const auto height = std::make_shared<const Texture>(image);
+    const auto height                = std::make_shared<const Texture>(image);
     REQUIRE_THROWS_WITH(displace_mesh(mesh, height), ContainsSubstring("at vertex"));
-    REQUIRE(mesh->positions[0].z == 0);
+    REQUIRE(mesh->positions[0].z == 0.0F);
 }
 
 TEST_CASE("Displacement checks edge interiors even when all endpoint heights match",
           "[geometry][displacement]") {
-    auto mesh = std::make_shared<MeshData>(*patch());
+    auto  mesh = std::make_shared<MeshData>(*patch());
     Image image(4, 4);
-    image.at(1, 1) = glm::vec3(1);
+    image.at(1, 1)                   = glm::vec3(1);
     mesh->triangles[0].corners[0].uv = {0.125F, 0.875F};
     mesh->triangles[0].corners[1].uv = {0.5F, 0.875F};
     mesh->triangles[0].corners[2].uv = {0.875F, 0.875F};
     mesh->triangles[1].corners[0].uv = {0.125F, 0.625F};
     mesh->triangles[1].corners[1].uv = {0.875F, 0.625F};
     mesh->triangles[1].corners[2].uv = {0.125F, 0.125F};
-    const auto height = std::make_shared<const Texture>(image);
+    const auto height                = std::make_shared<const Texture>(image);
     for (const auto& face : mesh->triangles) {
         for (const auto& corner : face.corners) {
-            REQUIRE(height->sample(corner.uv, 0, TextureFilter::bilinear).r == 0);
+            REQUIRE(height->sample(corner.uv, 0, TextureFilter::bilinear).r == 0.0F);
         }
     }
     REQUIRE_THROWS_WITH(displace_mesh(mesh, height), ContainsSubstring("at edge"));
@@ -161,7 +164,7 @@ TEST_CASE("Displacement checks edge interiors even when all endpoint heights mat
 
 TEST_CASE("Displacement tests quadratic extrema between endpoints and midpoint",
           "[geometry][displacement]") {
-    auto mesh = std::make_shared<MeshData>(*patch());
+    auto  mesh = std::make_shared<MeshData>(*patch());
     Image image(2, 2);
     image.at(1, 1) = glm::vec3(1);
     // 在第一个面上 h(t)=(0.1+0.4t)*(0.7-0.4t)，t=0.75 时达到 0.16。
@@ -173,14 +176,14 @@ TEST_CASE("Displacement tests quadratic extrema between endpoints and midpoint",
     }
     mesh->triangles[0].corners[0].uv = {0.3F, 0.4F};
     mesh->triangles[0].corners[2].uv = {0.5F, 0.6F};
-    const auto height = std::make_shared<const Texture>(image);
+    const auto           height      = std::make_shared<const Texture>(image);
     DisplacementSettings settings;
-    settings.scale = 1;
-    settings.midlevel = 0;
+    settings.scale          = 1;
+    settings.midlevel       = 0;
     settings.seam_tolerance = 0.155;
     REQUIRE_THROWS_WITH(displace_mesh(mesh, height, settings), ContainsSubstring("at edge"));
     settings.seam_tolerance = 0.161;
-    const auto result = displace_mesh(mesh, height, settings);
+    const auto result       = displace_mesh(mesh, height, settings);
     REQUIRE(result.seam_edges == 1);
     REQUIRE(result.seam_segments == 1);
     REQUIRE(result.maximum_seam_difference == Approx(0.16).margin(2e-7));
@@ -217,14 +220,14 @@ TEST_CASE("Displacement validates settings rejects reversal and avoids position 
     DisplacementSettings settings;
     settings.midlevel = std::numeric_limits<double>::quiet_NaN();
     REQUIRE_THROWS_AS(displace_mesh(source, height, settings), std::invalid_argument);
-    settings = {};
+    settings                = {};
     settings.seam_tolerance = -1;
     REQUIRE_THROWS_AS(displace_mesh(source, height, settings), std::invalid_argument);
-    settings = {};
+    settings       = {};
     settings.scale = std::numeric_limits<double>::max();
     REQUIRE_THROWS_AS(displace_mesh(source, height, settings), std::invalid_argument);
 
-    auto tetra = std::make_shared<MeshData>();
+    auto tetra       = std::make_shared<MeshData>();
     tetra->positions = {{1, 1, 1}, {-1, -1, 1}, {-1, 1, -1}, {1, -1, -1}};
     for (const auto& indices : {std::array{0U, 2U, 1U}, std::array{0U, 1U, 3U},
                                 std::array{0U, 3U, 2U}, std::array{1U, 2U, 3U}}) {
@@ -237,19 +240,19 @@ TEST_CASE("Displacement validates settings rejects reversal and avoids position 
     }
     Image asymmetric(4, 1);
     asymmetric.at(0, 0) = glm::vec3(1);
-    settings = {};
-    settings.scale = -8;
-    settings.midlevel = 0;
+    settings            = {};
+    settings.scale      = -8;
+    settings.midlevel   = 0;
     REQUIRE_THROWS_WITH(displace_mesh(tetra, std::make_shared<const Texture>(asymmetric), settings),
                         ContainsSubstring("reverses face"));
 }
 
 TEST_CASE("Displacement cancellation progress and previous immutable results survive all stages",
           "[geometry][displacement]") {
-    const auto source = patch(32);
-    const auto height = constant_height(0.6F);
-    const auto previous = displace_mesh(source, height);
-    const auto previous_position = previous.mesh->positions[0];
+    const auto                        source            = patch(32);
+    const auto                        height            = constant_height(0.6F);
+    const auto                        previous          = displace_mesh(source, height);
+    const auto                        previous_position = previous.mesh->positions[0];
     std::vector<DisplacementProgress> progress;
     displace_mesh(source, height, {}, {}, [&](auto p) { progress.push_back(p); });
     REQUIRE(progress.front().stage == DisplacementStage::topology);
@@ -265,8 +268,8 @@ TEST_CASE("Displacement cancellation progress and previous immutable results sur
           DisplacementStage::seams, DisplacementStage::positions, DisplacementStage::normals,
           DisplacementStage::complete}) {
         CancellationSource cancellation;
-        bool reached = false;
-        const bool scan =
+        bool               reached = false;
+        const bool         scan =
             stage != DisplacementStage::topology && stage != DisplacementStage::complete;
         REQUIRE_THROWS_AS(displace_mesh(source, height, {}, cancellation.token(),
                                         [&](auto p) {
@@ -279,29 +282,29 @@ TEST_CASE("Displacement cancellation progress and previous immutable results sur
                           OperationCancelled);
         REQUIRE(reached);
         REQUIRE(previous.mesh->positions[0] == previous_position);
-        REQUIRE(source->positions[0].z == 0);
+        REQUIRE(source->positions[0].z == 0.0F);
     }
 }
 
 TEST_CASE("Displacement changes existing BVH intersections shadow occlusion and paths",
           "[geometry][displacement]") {
-    const auto source = patch();
-    const auto result = displace_mesh(source, constant_height(0.75F), {0.4});
-    const auto original = make_snapshot(scene_for(source));
-    const auto displaced = make_snapshot(scene_for(result.mesh));
+    const auto     source    = patch();
+    const auto     result    = displace_mesh(source, constant_height(0.75F), {0.4});
+    const auto     original  = make_snapshot(scene_for(source));
+    const auto     displaced = make_snapshot(scene_for(result.mesh));
     const SceneBvh before(original), after(displaced);
-    const Ray ray{{0.2, 0.2, 2}, {0, 0, -1}};
+    const Ray      ray{{0.2, 0.2, 2}, {0, 0, -1}};
     REQUIRE(before.intersect(ray)->distance == Approx(2));
     REQUIRE(after.intersect(ray)->distance == Approx(1.9));
     const Ray shadow{{0.2, 0.2, 0.05}, {0, 0, 1}};
     REQUIRE_FALSE(before.occluded(shadow, {0, 0.1}));
     REQUIRE(after.occluded(shadow, {0, 0.1}));
     IntegratorSettings settings;
-    settings.mode = SamplingMode::bsdf;
-    settings.maximum_depth = 2;
+    settings.mode             = SamplingMode::bsdf;
+    settings.maximum_depth    = 2;
     settings.russian_roulette = false;
     const PathTracer tracer(displaced, settings);
-    Sampler sampler(101);
-    const auto value = tracer.trace(ray, sampler);
+    Sampler          sampler(101);
+    const auto       value = tracer.trace(ray, sampler);
     REQUIRE(glm::length(value - glm::dvec3(0.7)) < 1e-6);
 }

@@ -1,3 +1,5 @@
+// 距离场参数控件、状态刷新与用户操作回调。
+
 #pragma once
 
 #include <QWidget>
@@ -41,22 +43,22 @@ class SdfPanel final : public QWidget {
     void restore_history(bool redo);
     std::uint32_t selected_index() const;
     std::string new_id(const minirender::SdfDocument& document) const;
-    VulkanViewport& viewport_;
-    minirender::SdfDocument document_;
+    VulkanViewport&                      viewport_;
+    minirender::SdfDocument              document_;
     std::vector<minirender::SdfDocument> undo_, redo_;
-    bool refreshing_ = false;
-    QComboBox *nodes_ = nullptr, *root_ = nullptr, *left_ = nullptr, *right_ = nullptr;
-    QComboBox* view_ = nullptr;
-    QLineEdit* name_ = nullptr;
-    QCheckBox *visible_ = nullptr, *shadows_ = nullptr;
-    QLabel *notice_ = nullptr, *kind_ = nullptr;
-    QPushButton *undo_button_ = nullptr, *redo_button_ = nullptr, *remove_ = nullptr;
-    QWidget *primitive_ = nullptr, *operation_ = nullptr;
+    bool                                 refreshing_ = false;
+    QComboBox *     nodes_ = nullptr, *root_ = nullptr, *left_ = nullptr, *right_ = nullptr;
+    QComboBox*      view_    = nullptr;
+    QLineEdit*      name_    = nullptr;
+    QCheckBox *     visible_ = nullptr, *shadows_ = nullptr;
+    QLabel *        notice_ = nullptr, *kind_ = nullptr;
+    QPushButton *   undo_button_ = nullptr, *redo_button_ = nullptr, *remove_ = nullptr;
+    QWidget *       primitive_ = nullptr, *operation_ = nullptr;
     SdfVectorField *parameters_ = nullptr, *position_ = nullptr, *rotation_ = nullptr;
     SdfVectorField *color_ = nullptr, *light_ = nullptr, *light_color_ = nullptr,
                    *ambient_ = nullptr;
     QDoubleSpinBox *scale_ = nullptr, *intensity_ = nullptr;
     QDoubleSpinBox *epsilon_ = nullptr, *relative_ = nullptr, *normal_ = nullptr;
     QDoubleSpinBox *distance_ = nullptr, *safety_ = nullptr;
-    QSpinBox *steps_ = nullptr, *shadow_steps_ = nullptr;
+    QSpinBox *      steps_ = nullptr, *shadow_steps_ = nullptr;
 };

@@ -1,3 +1,5 @@
+# 构建桌面工作台，编译并嵌入 GLSL、样式资源，部署内置场景。
+
 find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets Concurrent)
 find_package(Vulkan 1.2 REQUIRED COMPONENTS glslangValidator)
 
@@ -71,6 +73,7 @@ qt_add_executable(minirender_desktop
     gpu_image.cpp gpu_image.hpp gpu_shader.cpp gpu_shader.hpp
     hdr_targets.cpp hdr_targets.hpp post_process.cpp post_process.hpp
     scene_renderer.cpp scene_renderer.hpp shadow_map.cpp shadow_map.hpp workbench.cpp workbench.hpp
+    workbench_internal.hpp workbench_widgets.cpp workbench_properties.cpp workbench_assets.cpp workbench_geometry.cpp
     scene_smoke.cpp scene_smoke.hpp texture_smoke.cpp texture_smoke.hpp interaction_smoke.cpp interaction_smoke.hpp
     parameter_smoke.cpp parameter_smoke.hpp wire_smoke.cpp wire_smoke.hpp)
 if(APPLE)

@@ -1,3 +1,5 @@
+// 布料粒子与平面、球体的连续碰撞及接触修正。
+
 #pragma once
 
 #include <minirender/simulation/cloth.hpp>
@@ -5,8 +7,8 @@
 namespace minirender::detail {
 
 struct ClothContacts {
-    std::size_t count = 0;
-    bool limited = false;
+    std::size_t count   = 0;
+    bool        limited = false;
 };
 
 // 在剩余时间中反复选择最早接触，更新速度后继续运动。最多八次事件，达到上限时停止粒子。

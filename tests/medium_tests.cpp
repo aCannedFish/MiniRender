@@ -1,3 +1,6 @@
+// 回归测试：HG uses outgoing directions and matches analytic angular moments；HG inverse CDF
+// preserves forward mean under arbitrary frames。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/medium.hpp>
 
@@ -13,29 +16,33 @@
 
 using namespace minirender;
 using Catch::Approx;
+
 namespace {
 constexpr double pi = std::numbers::pi;
 
 MediumRegion box(std::string id, double low, double high) {
     MediumRegion result;
-    result.id = std::move(id);
-    result.minimum = {low, -1, -1};
-    result.maximum = {high, 1, 1};
+    result.id                = std::move(id);
+    result.minimum           = {low, -1, -1};
+    result.maximum           = {high, 1, 1};
     result.medium.absorption = {.1, .2, .4};
     return result;
 }
+
 void close(glm::dvec3 actual, glm::dvec3 expected, double tolerance = 1e-12) {
     REQUIRE(glm::length(actual - expected) < tolerance);
 }
+
 double integrate(const std::function<double(double)>& f) {
-    constexpr int n = 200000;
-    double sum = f(-1) + f(1);
+    constexpr int n   = 200000;
+    double        sum = f(-1) + f(1);
     for (int i = 1; i < n; ++i) {
         const double c = -1 + 2.0 * i / n;
         sum += (i % 2 == 0 ? 2 : 4) * f(c);
     }
     return sum * (2.0 / n) / 3;
 }
+
 class TemporaryDirectory final {
   public:
     TemporaryDirectory() {
@@ -44,10 +51,12 @@ class TemporaryDirectory final {
                 std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
         std::filesystem::create_directories(path);
     }
+
     ~TemporaryDirectory() {
         std::error_code error;
         std::filesystem::remove_all(path, error);
     }
+
     std::filesystem::path path;
 };
 } // namespace
@@ -70,19 +79,21 @@ TEST_CASE("HG uses outgoing directions and matches analytic angular moments", "[
 }
 
 TEST_CASE("HG inverse CDF preserves forward mean under arbitrary frames", "[medium][phase]") {
-    const auto wo = glm::normalize(glm::dvec3(.3, -.4, .7));
+    const auto    wo    = glm::normalize(glm::dvec3(.3, -.4, .7));
     constexpr int count = 131072;
     for (const double g : {-.97, -.8, -1e-10, 0.0, 1e-10, .8, .97}) {
         glm::dvec3 sum(0);
-        double second = 0, length_error = 0, pdf_error = 0;
+        double     second       = 0;
+        double     length_error = 0;
+        double     pdf_error    = 0;
         for (int i = 0; i < count; ++i) {
             const glm::dvec2 u{(i + .5) / count, std::fmod(i * .6180339887498949, 1)};
-            const auto value = sample_henyey_greenstein(wo, g, u);
-            const double cosine = -glm::dot(wo, value.direction);
+            const auto       value  = sample_henyey_greenstein(wo, g, u);
+            const double     cosine = -glm::dot(wo, value.direction);
             sum += value.direction;
             second += cosine * cosine;
             length_error = std::max(length_error, std::abs(glm::length(value.direction) - 1));
-            pdf_error = std::max(
+            pdf_error    = std::max(
                 pdf_error, std::abs(value.probability - henyey_greenstein(wo, value.direction, g)));
         }
         close(sum / double(count), -g * wo, 6e-5);
@@ -110,20 +121,21 @@ TEST_CASE("Medium Beer Lambert handles RGB vacuum zero length and infinity", "[m
 
 TEST_CASE("RGB free flight preserves mixed distance and escape probability", "[medium]") {
     const HomogeneousMedium medium{{.1, .2, .3}, {.3, 0, .9}, .5};
-    constexpr int count = 120000;
-    constexpr double length = 1.7;
-    const auto extinction = medium.extinction();
-    const auto tr = medium_transmittance(medium, length);
-    const double escape_probability = (tr.x + tr.y + tr.z) / 3;
-    Sampler random(719);
-    int escaped = 0;
-    std::array<int, 4> bins{};
-    glm::dvec3 escape_weight(0), scatter_weight(0);
-    double largest_weight = 0;
+    constexpr int           count              = 120000;
+    constexpr double        length             = 1.7;
+    const auto              extinction         = medium.extinction();
+    const auto              tr                 = medium_transmittance(medium, length);
+    const double            escape_probability = (tr.x + tr.y + tr.z) / 3;
+    Sampler                 random(719);
+    int                     escaped = 0;
+    std::array<int, 4>      bins{};
+    glm::dvec3              escape_weight(0);
+    glm::dvec3              scatter_weight(0);
+    double                  largest_weight = 0;
     for (int i = 0; i < count; ++i) {
-        const double channel = random.next_1d();
+        const double channel  = random.next_1d();
         const double distance = random.next_1d();
-        const auto value = sample_medium_distance(medium, length, channel, distance);
+        const auto   value    = sample_medium_distance(medium, length, channel, distance);
         largest_weight = std::max({largest_weight, value.weight.x, value.weight.y, value.weight.z});
         if (value.scattered) {
             ++bins[std::min(std::size_t(value.distance / length * 4), std::size_t(3))];
@@ -139,8 +151,8 @@ TEST_CASE("RGB free flight preserves mixed distance and escape probability", "[m
           .012);
     REQUIRE(largest_weight <= 3 + 1e-12);
     for (int bin = 0; bin < 4; ++bin) {
-        const auto a = medium_transmittance(medium, length * bin / 4);
-        const auto b = medium_transmittance(medium, length * (bin + 1) / 4);
+        const auto   a           = medium_transmittance(medium, length * bin / 4);
+        const auto   b           = medium_transmittance(medium, length * (bin + 1) / 4);
         const double probability = ((a.x - b.x) + (a.y - b.y) + (a.z - b.z)) / 3;
         REQUIRE(double(bins[std::size_t(bin)]) / count == Approx(probability).margin(.006));
     }
@@ -148,7 +160,7 @@ TEST_CASE("RGB free flight preserves mixed distance and escape probability", "[m
 
 TEST_CASE("Free flight retains zero channel escape mass and stable extreme weights", "[medium]") {
     const HomogeneousMedium medium{{0, .2, .3}, {0, .5, .9}, 0};
-    const auto zero_channel = sample_medium_distance(medium, 4, .1, .5);
+    const auto              zero_channel = sample_medium_distance(medium, 4, .1, .5);
     REQUIRE_FALSE(zero_channel.scattered);
     const auto tr = medium_transmittance(medium, 4);
     close(zero_channel.weight, tr * (3 / (tr.x + tr.y + tr.z)));
@@ -156,21 +168,21 @@ TEST_CASE("Free flight retains zero channel escape mass and stable extreme weigh
     REQUIRE_FALSE(vacuum.scattered);
     close(vacuum.weight, glm::dvec3(1));
     const HomogeneousMedium tiny{{0, 0, 0}, {1e-300, 1e-300, 1e-300}, 0};
-    const auto thin = sample_medium_distance(tiny, 1e308, .5, .5);
+    const auto              thin = sample_medium_distance(tiny, 1e308, .5, .5);
     REQUIRE(thin.scattered);
     close(thin.weight, glm::dvec3(1), 1e-12);
     const HomogeneousMedium dense{{0, 0, 0}, {1e300, 1e300, 1e300}, 0};
-    const auto thick = sample_medium_distance(dense, 1, .5, .5);
+    const auto              thick = sample_medium_distance(dense, 1, .5, .5);
     REQUIRE(thick.scattered);
     close(thick.weight, glm::dvec3(1), 1e-12);
 }
 
 TEST_CASE("Medium segments sort disjoint regions and clip primary and shadow intervals",
           "[medium]") {
-    const std::array regions{box("far", 3, 5), box("near", 0, 1), box("touch", 1, 2)};
+    const std::array  regions{box("far", 3, 5), box("near", 0, 1), box("touch", 1, 2)};
     const MediumField field(regions);
-    const Ray ray{{-1, 0, 0}, {1, 0, 0}};
-    const auto parts = field.segments(ray, {0, 100});
+    const Ray         ray{{-1, 0, 0}, {1, 0, 0}};
+    const auto        parts = field.segments(ray, {0, 100});
     REQUIRE(parts.count == 3);
     REQUIRE(parts.values[0].region == 1);
     REQUIRE(parts.values[1].region == 2);
@@ -189,14 +201,14 @@ TEST_CASE("Medium segments sort disjoint regions and clip primary and shadow int
 }
 
 TEST_CASE("Pure absorption and vacuum consume no medium random dimensions", "[medium]") {
-    const std::array regions{box("absorber", 0, 1)};
+    const std::array  regions{box("absorber", 0, 1)};
     const MediumField field(regions);
-    Sampler first(91), reference(91);
-    const auto sampled = field.sample({{-.5, 0, 0}, {1, 0, 0}}, {0, 100}, first);
+    Sampler           first(91), reference(91);
+    const auto        sampled = field.sample({{-.5, 0, 0}, {1, 0, 0}}, {0, 100}, first);
     REQUIRE_FALSE(sampled.interaction);
     close(sampled.weight, medium_transmittance(regions[0].medium, 1));
     REQUIRE(first.next_u32() == reference.next_u32());
-    auto vacuum_regions = regions;
+    auto vacuum_regions      = regions;
     vacuum_regions[0].medium = {};
     const auto vacuum =
         MediumField(vacuum_regions).sample({{-.5, 0, 0}, {1, 0, 0}}, {0, 100}, first);
@@ -243,24 +255,24 @@ TEST_CASE("Medium validation rejects invalid shapes coefficients overlap and can
 
 TEST_CASE("Medium scene files and snapshots preserve full double parameters", "[medium][io]") {
     SceneDocument scene;
-    auto region = box("fog", 0, 1);
-    region.name = "彩色雾";
-    region.minimum.x = .12345678901234567;
+    auto          region     = box("fog", 0, 1);
+    region.name              = "彩色雾";
+    region.minimum.x         = .12345678901234567;
     region.medium.scattering = {.23456789012345678, .3, .7};
     region.medium.anisotropy = .23456789012345678;
     scene.media.push_back(region);
-    const auto snapshot = make_snapshot(scene);
+    const auto snapshot                = make_snapshot(scene);
     scene.media[0].medium.scattering.x = .9;
     REQUIRE(snapshot->media[0].medium.scattering.x == region.medium.scattering.x);
     TemporaryDirectory directory;
-    const auto file = directory.path / std::filesystem::path(u8"介质 场景.json");
+    const auto         file = directory.path / std::filesystem::path(u8"介质 场景.json");
     save_scene(scene, file);
     const auto loaded = load_scene(file);
     REQUIRE(loaded.media.size() == 1);
     REQUIRE(loaded.media[0].minimum == scene.media[0].minimum);
     REQUIRE(loaded.media[0].medium.scattering == scene.media[0].medium.scattering);
     REQUIRE(loaded.media[0].medium.anisotropy == region.medium.anisotropy);
-    auto json = nlohmann::json::parse(std::ifstream(file));
+    auto json                      = nlohmann::json::parse(std::ifstream(file));
     json["media"][0]["anisotropy"] = 1;
     std::ofstream(file) << json.dump();
     REQUIRE_THROWS(load_scene(file));

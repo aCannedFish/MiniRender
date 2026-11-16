@@ -1,3 +1,6 @@
+// 隐藏窗口回归：ssao 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 ssao_smoke.hpp。
+
 #include "ssao_smoke.hpp"
 #include "workbench.hpp"
 #include <minirender/assets/scene_io.hpp>
@@ -25,14 +28,16 @@ void require(bool condition, const char* message) {
         throw std::runtime_error(message);
     }
 }
+
 std::filesystem::path path(const QString& value) {
     const auto bytes = value.toUtf8();
     return std::filesystem::path(std::u8string(bytes.begin(), bytes.end()));
 }
+
 minirender::SceneDocument prepare_scene(Workbench& window, const QString& directory) {
     const auto& meshes = window.document().meshes;
-    const auto cube = std::find_if(meshes.begin(), meshes.end(),
-                                   [](const auto& mesh) { return mesh.id == "cube"; });
+    const auto  cube   = std::find_if(meshes.begin(), meshes.end(),
+                                      [](const auto& mesh) { return mesh.id == "cube"; });
     require(cube != meshes.end(), "AO test requires the studio cube asset");
     const auto room = path(directory + "/room.obj");
     std::ofstream(room) << "v -3 0 -2\nv 3 0 -2\nv 3 0 3\nv -3 0 3\n"
@@ -42,8 +47,8 @@ minirender::SceneDocument prepare_scene(Workbench& window, const QString& direct
     minirender::SceneDocument scene;
     scene.asset_directory = window.document().asset_directory;
     scene.camera.position = {3, 2.4F, 4.2F};
-    scene.camera.target = {0, 0.4F, 0};
-    scene.environment = glm::vec3(0.6F);
+    scene.camera.target   = {0, 0.4F, 0};
+    scene.environment     = glm::vec3(0.6F);
     scene.materials.push_back({"mat", "mat"});
     scene.materials[0].base_color = glm::vec3(0.5F);
     scene.meshes.push_back(*cube);
@@ -54,17 +59,19 @@ minirender::SceneDocument prepare_scene(Workbench& window, const QString& direct
     scene.objects[1].transform.translation.y = 0.5F;
     return scene;
 }
+
 void install(Workbench& window, const minirender::SceneDocument& scene, const QString& directory) {
     minirender::save_scene(scene, path(directory + "/scene.json"));
     window.load_scene_file(directory + "/scene.json");
 }
+
 QPoint project(const VulkanViewport& viewport, glm::vec3 point, QSize size) {
     const auto& camera = viewport.camera();
-    const auto clip = camera.projection_matrix(static_cast<float>(size.width()) /
-                                               static_cast<float>(size.height())) *
-                      camera.view_matrix() * glm::vec4(point, 1);
+    const auto  clip   = camera.projection_matrix(static_cast<float>(size.width()) /
+                                                  static_cast<float>(size.height())) *
+                         camera.view_matrix() * glm::vec4(point, 1);
     require(clip.w > 0, "AO probe is behind camera");
-    const auto uv = glm::vec2(clip) / clip.w * 0.5F + 0.5F;
+    const auto   uv = glm::vec2(clip) / clip.w * 0.5F + 0.5F;
     const QPoint pixel(static_cast<int>(uv.x * static_cast<float>(size.width())),
                        static_cast<int>(uv.y * static_cast<float>(size.height())));
     require(pixel.x() > 8 && pixel.x() + 8 < size.width() && pixel.y() > 8 &&
@@ -72,6 +79,7 @@ QPoint project(const VulkanViewport& viewport, glm::vec3 point, QSize size) {
             "AO probe is outside viewport");
     return pixel;
 }
+
 double average(const QImage& image, QPoint center) {
     double sum = 0;
     for (int y = -3; y <= 3; ++y) {
@@ -81,6 +89,7 @@ double average(const QImage& image, QPoint center) {
     }
     return sum / 49;
 }
+
 double variation(const QImage& image, QPoint center) {
     double sum = 0;
     for (int y = -5; y <= 5; ++y) {
@@ -93,6 +102,7 @@ double variation(const QImage& image, QPoint center) {
     }
     return sum;
 }
+
 void equal_hdr(const minirender::Image& first, const minirender::Image& second) {
     require(first.width() == second.width() && first.height() == second.height(),
             "AO HDR dimensions differ");
@@ -105,18 +115,20 @@ void equal_hdr(const minirender::Image& first, const minirender::Image& second) 
     qInfo() << "AO isolated HDR max difference:" << error;
     require(error < 1e-6F, "AO changed an unoccluded lighting component");
 }
+
 // 直接查询场景几何，不复刻 shader 的深度比较。
 double cpu_visibility(std::shared_ptr<const minirender::SceneSnapshot> scene, glm::dvec3 point) {
     minirender::SceneBvh bvh(std::move(scene));
-    minirender::Sampler random(702);
-    int open = 0;
+    minirender::Sampler  random(702);
+    int                  open = 0;
     for (int i = 0; i < 2048; ++i) {
-        const auto local = minirender::sample_cosine_hemisphere(random.next_2d());
+        const auto       local = minirender::sample_cosine_hemisphere(random.next_2d());
         const glm::dvec3 direction{local.x, local.z, local.y};
         open += !bvh.occluded({point, direction}, {0.001, 0.9});
     }
     return static_cast<double>(open) / 2048;
 }
+
 void check_composite(const minirender::Image& baseline, const minirender::Image& hdr,
                      const QImage& ao) {
     qInfo() << "AO dimensions baseline/HDR/mask" << baseline.width() << baseline.height()
@@ -126,15 +138,17 @@ void check_composite(const minirender::Image& baseline, const minirender::Image&
     require(static_cast<int>(hdr.width()) == ao.width() &&
                 static_cast<int>(hdr.height()) == ao.height(),
             "AO and HDR dimensions differ");
-    std::size_t geometry = 0, darkened = 0, background = 0;
-    float error = 0;
+    std::size_t geometry   = 0;
+    std::size_t darkened   = 0;
+    std::size_t background = 0;
+    float       error      = 0;
     for (int y = 0; y < ao.height(); ++y) {
         for (int x = 0; x < ao.width(); ++x) {
             const auto original =
                 baseline.at(static_cast<std::size_t>(x), static_cast<std::size_t>(y));
             if (std::abs(original.x - 0.3F) < 1e-5F) {
                 const float factor = static_cast<float>(ao.pixelColor(x, y).redF());
-                const auto actual =
+                const auto  actual =
                     hdr.at(static_cast<std::size_t>(x), static_cast<std::size_t>(y));
                 error = std::max(error, glm::length(actual - original * factor));
                 ++geometry;
@@ -154,19 +168,24 @@ void check_composite(const minirender::Image& baseline, const minirender::Image&
     require(geometry > 1000 && darkened > geometry / 1000 && background > 0 && error < 0.0021F,
             "AO composition disagrees with the recorded mask");
 }
+
 struct State {
-    int step = 0, ticks = 0, generation = 0, drag = 0, frame = 0;
-    minirender::Camera camera;
-    QSize previous_extent, stable_size;
-    int stable_frames = 0;
-    minirender::SceneDocument scene;
+    int                              step       = 0;
+    int                              ticks      = 0;
+    int                              generation = 0;
+    int                              drag       = 0;
+    int                              frame      = 0;
+    minirender::Camera               camera;
+    QSize                            previous_extent, stable_size;
+    int                              stable_frames = 0;
+    minirender::SceneDocument        scene;
     std::optional<minirender::Image> baseline;
-    QImage raw;
-    SceneUploadStatistics uploads;
+    QImage                           raw;
+    SceneUploadStatistics            uploads;
 };
 
 bool stable_extent(const VulkanViewport& viewport, State& state) {
-    const auto extent = viewport.swapChainImageSize();
+    const auto  extent = viewport.swapChainImageSize();
     const QSize requested(static_cast<int>(viewport.width() * viewport.devicePixelRatio()),
                           static_cast<int>(viewport.height() * viewport.devicePixelRatio()));
     if (extent != requested) {
@@ -174,7 +193,7 @@ bool stable_extent(const VulkanViewport& viewport, State& state) {
         return false;
     }
     if (extent != state.stable_size) {
-        state.stable_size = extent;
+        state.stable_size   = extent;
         state.stable_frames = 0;
     }
     return ++state.stable_frames >= 2;
@@ -184,7 +203,7 @@ bool stable_extent(const VulkanViewport& viewport, State& state) {
 void start_ssao_smoke(Workbench& window, const QString& directory) {
     require(QDir().mkpath(directory), "Cannot create AO output directory");
     const auto state = std::make_shared<State>();
-    auto* timer = new QTimer(&window);
+    auto*      timer = new QTimer(&window);
     timer->setInterval(180);
     QObject::connect(timer, &QTimer::timeout, &window, [state, timer, &window, directory] {
         try {
@@ -194,8 +213,8 @@ void start_ssao_smoke(Workbench& window, const QString& directory) {
             if (viewport->rendered_frames() < 5 || !viewport->can_render()) {
                 return;
             }
-            auto* mode = window.findChild<QComboBox*>("view_mode");
-            auto* enabled = window.findChild<QCheckBox*>("ssao_enabled");
+            auto*      mode    = window.findChild<QComboBox*>("view_mode");
+            auto*      enabled = window.findChild<QCheckBox*>("ssao_enabled");
             const auto capture = [&](const char* name) {
                 const auto image = viewport->grab();
                 require(!image.isNull() && image.save(directory + "/" + name + ".png"),
@@ -216,9 +235,9 @@ void start_ssao_smoke(Workbench& window, const QString& directory) {
                     --state->step;
                     return;
                 }
-                state->baseline = viewport->grab_hdr();
-                state->camera = viewport->camera();
-                state->uploads = viewport->upload_statistics();
+                state->baseline   = viewport->grab_hdr();
+                state->camera     = viewport->camera();
+                state->uploads    = viewport->upload_statistics();
                 state->generation = viewport->resource_generations();
                 state->baseline->write_exr(path(directory + "/baseline.exr"));
                 minirender::display_image(*state->baseline)
@@ -242,18 +261,19 @@ void start_ssao_smoke(Workbench& window, const QString& directory) {
                 window.findChild<QCheckBox*>("ssao_filtered")->setChecked(false);
                 enabled->setChecked(true);
                 mode->setCurrentIndex(4);
-                state->raw = capture("raw-ao");
+                state->raw     = capture("raw-ao");
                 const auto hdr = viewport->grab_hdr();
                 check_composite(*state->baseline, hdr, state->raw);
                 hdr.write_exr(path(directory + "/raw-composite.exr"));
-                const glm::vec3 near{0.62F, 0.002F, 0.2F}, far{1.8F, 0.002F, 0.7F};
-                const double near_ao =
+                const glm::vec3 near{0.62F, 0.002F, 0.2F};
+                const glm::vec3 far{1.8F, 0.002F, 0.7F};
+                const double    near_ao =
                     average(state->raw, project(*viewport, near, state->raw.size()));
                 const double far_ao =
                     average(state->raw, project(*viewport, far, state->raw.size()));
-                const auto snapshot = minirender::make_snapshot(state->scene);
+                const auto   snapshot = minirender::make_snapshot(state->scene);
                 const double cpu_near = cpu_visibility(snapshot, near),
-                             cpu_far = cpu_visibility(snapshot, far);
+                             cpu_far  = cpu_visibility(snapshot, far);
                 qInfo() << "AO near/far GPU" << near_ao << far_ao << "CPU geometry" << cpu_near
                         << cpu_far;
                 require(near_ao + 0.04 < far_ao && cpu_near + 0.1 < cpu_far && far_ao > 0.98,
@@ -264,11 +284,11 @@ void start_ssao_smoke(Workbench& window, const QString& directory) {
                 window.findChild<QCheckBox*>("ssao_filtered")->setChecked(true);
                 mode->setCurrentIndex(5);
                 const auto filtered = capture("filtered-ao");
-                const auto hdr = viewport->grab_hdr();
+                const auto hdr      = viewport->grab_hdr();
                 check_composite(*state->baseline, hdr, filtered);
-                const auto probe = project(*viewport, {0.65F, 0.002F, 0.2F}, filtered.size());
+                const auto probe  = project(*viewport, {0.65F, 0.002F, 0.2F}, filtered.size());
                 const auto before = variation(state->raw, probe),
-                           after = variation(filtered, probe);
+                           after  = variation(filtered, probe);
                 qInfo() << "AO local gradient energy raw/filtered:" << before << after;
                 require(before > 0.001 && after < before * 0.8,
                         "AO filter did not reduce sampling noise");
@@ -285,7 +305,7 @@ void start_ssao_smoke(Workbench& window, const QString& directory) {
                 break;
             }
             case 4:
-                state->scene.environment = glm::vec3(0);
+                state->scene.environment           = glm::vec3(0);
                 state->scene.materials[0].emission = {0.2F, 0.1F, 0.05F};
                 state->scene.directional_lights.push_back({"sun", {-1, -2, -1}, {1, 1, 1}, 2});
                 install(window, state->scene, directory);
@@ -302,9 +322,9 @@ void start_ssao_smoke(Workbench& window, const QString& directory) {
                 state->baseline = viewport->grab_hdr();
                 enabled->setChecked(true);
                 equal_hdr(*state->baseline, viewport->grab_hdr());
-                state->generation = viewport->resource_generations();
+                state->generation      = viewport->resource_generations();
                 state->previous_extent = viewport->swapChainImageSize();
-                state->stable_frames = 0;
+                state->stable_frames   = 0;
                 window.resize(1000, 600);
                 break;
             case 6:
@@ -323,7 +343,8 @@ void start_ssao_smoke(Workbench& window, const QString& directory) {
                     require(moved.size() == viewport->swapChainImageSize() &&
                                 moved.size() == state->raw.size(),
                             "AO resize dimensions are stale");
-                    std::size_t changed = 0, contact = 0;
+                    std::size_t changed = 0;
+                    std::size_t contact = 0;
                     for (int y = 0; y < moved.height(); ++y) {
                         for (int x = 0; x < moved.width(); ++x) {
                             const int current = moved.pixelColor(x, y).red();
@@ -337,15 +358,15 @@ void start_ssao_smoke(Workbench& window, const QString& directory) {
                 break;
             case 7: {
                 const QPointF origin(viewport->width() * 0.5, viewport->height() * 0.5);
-                const auto send = [&](QEvent::Type type, QPointF point, Qt::MouseButton button,
-                                      Qt::MouseButtons buttons) {
+                const auto    send = [&](QEvent::Type type, QPointF point, Qt::MouseButton button,
+                                         Qt::MouseButtons buttons) {
                     QMouseEvent event(type, point, viewport->mapToGlobal(point), button, buttons,
                                       Qt::NoModifier);
                     QCoreApplication::sendEvent(viewport, &event);
                 };
                 if (state->drag == 0) {
                     state->camera = viewport->camera();
-                    state->frame = viewport->rendered_frames();
+                    state->frame  = viewport->rendered_frames();
                     send(QEvent::MouseButtonPress, origin, Qt::LeftButton, Qt::LeftButton);
                 } else if (state->drag < 6) {
                     send(QEvent::MouseMove, origin + QPointF(state->drag * 5, state->drag * 2),

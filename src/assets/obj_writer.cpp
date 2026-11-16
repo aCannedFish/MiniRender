@@ -1,3 +1,6 @@
+// 生成网格的 OBJ 输出及取消检查。
+// 本模块接口见 obj_writer.hpp。
+
 #include "obj_writer.hpp"
 #include "staged_file.hpp"
 
@@ -10,7 +13,7 @@ namespace detail {
 
 void write_obj_content(const MeshData& mesh, std::ostream& stream, CancellationToken cancellation,
                        const MeshWriteProgress& progress) {
-    const auto total = mesh.positions.size() + mesh.triangles.size() * 7;
+    const auto total  = mesh.positions.size() + mesh.triangles.size() * 7;
     const auto report = [&](std::size_t completed) {
         cancellation.check();
         if (progress) {
@@ -19,7 +22,7 @@ void write_obj_content(const MeshData& mesh, std::ostream& stream, CancellationT
         cancellation.check();
     };
     std::size_t completed = 0;
-    const auto advance = [&] {
+    const auto  advance   = [&] {
         if (++completed % 1024 == 0) {
             report(completed);
         }

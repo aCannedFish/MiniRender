@@ -1,3 +1,5 @@
+// 可运行示例：光场标定、瞳孔阵列与重聚焦接口。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/lightfield_capture.hpp>
 
@@ -8,6 +10,7 @@
 #include <numbers>
 
 using namespace minirender;
+
 namespace {
 
 // 两个等投影尺寸的棋盘，物距分别为2m和6m；正向平行光提供一致的纹理照明。
@@ -21,15 +24,15 @@ SceneDocument scene(const std::filesystem::path& directory) {
     const auto texture_path = directory / "checker.exr";
     pattern.write_exr(texture_path);
     SceneDocument result;
-    result.camera.position = {0, 1, 5};
-    result.camera.target = {0, 1, 0};
-    result.camera.focus_distance = 4;
+    result.camera.position        = {0, 1, 5};
+    result.camera.target          = {0, 1, 0};
+    result.camera.focus_distance  = 4;
     result.camera.aperture_radius = .2F;
-    result.environment = glm::vec3(0);
-    result.directional_lights = {{"sun", {0, 0, -1}, {1, 1, 1}, float(std::numbers::pi)}};
+    result.environment            = glm::vec3(0);
+    result.directional_lights     = {{"sun", {0, 0, -1}, {1, 1, 1}, float(std::numbers::pi)}};
     result.textures.push_back({"checker", texture_path, ColorEncoding::linear,
                                std::make_shared<const Texture>(std::move(pattern))});
-    auto mesh = std::make_shared<MeshData>();
+    auto mesh       = std::make_shared<MeshData>();
     mesh->positions = {{-.5F, -.5F, 0}, {.5F, -.5F, 0}, {.5F, .5F, 0}, {-.5F, .5F, 0}};
     const std::array<glm::vec2, 4> uv{{{0, 0}, {1, 0}, {1, 1}, {0, 1}}};
     for (const auto indices : {std::array{0U, 1U, 2U}, std::array{0U, 2U, 3U}}) {
@@ -42,11 +45,11 @@ SceneDocument scene(const std::filesystem::path& directory) {
     result.meshes.push_back({"card", {}, mesh});
     for (int i = 0; i < 2; ++i) {
         const std::string id = i == 0 ? "near" : "far";
-        Material material;
-        material.id = id;
+        Material          material;
+        material.id         = id;
         material.base_color = i == 0 ? glm::vec3(.9F, .15F, .1F) : glm::vec3(.12F, .35F, .9F);
         material.base_color_texture = "checker";
-        material.texture_filter = TextureFilter::nearest;
+        material.texture_filter     = TextureFilter::nearest;
         result.materials.push_back(material);
         result.objects.push_back({id,
                                   id,
@@ -70,6 +73,7 @@ double sharpness(const Image& image, std::size_t x0, std::size_t x1, int channel
     }
     return total;
 }
+
 void output(const LightFieldFile& file, const LightFieldReconstruction& result,
             const std::filesystem::path& directory, const std::string& name) {
     result.image.write_exr(directory / (name + ".exr"));
@@ -87,10 +91,10 @@ int main() {
         const auto document = scene(directory);
         save_scene(document, directory / "scene.json");
         LightFieldCaptureSettings settings;
-        settings.render = {128, 128, 32, 101};
+        settings.render          = {128, 128, 32, 101};
         settings.aperture_radius = .2;
         settings.reference_focus = 4;
-        settings.threads = 4;
+        settings.threads         = 4;
         LightFieldCaptureSession capture;
         capture.start(make_snapshot(document), settings, {SamplingMode::mis, 1, false, 3});
         while (!capture.wait_for(std::chrono::milliseconds(1000))) {
@@ -107,10 +111,10 @@ int main() {
         const auto file = capture.result();
         file->save(directory / "capture.mrlf");
         LightFieldReader reader(file);
-        const auto near = refocus_lightfield(reader, {2, .2});
-        const auto far = refocus_lightfield(reader, {6, .2});
-        const auto original = refocus_lightfield(reader, {4, .2});
-        const auto pinhole = refocus_lightfield(reader, {2, 0});
+        const auto       near     = refocus_lightfield(reader, {2, .2});
+        const auto       far      = refocus_lightfield(reader, {6, .2});
+        const auto       original = refocus_lightfield(reader, {4, .2});
+        const auto       pinhole  = refocus_lightfield(reader, {2, 0});
         output(*file, near, directory, "near");
         output(*file, far, directory, "far");
         output(*file, original, directory, "reference");
@@ -127,8 +131,8 @@ int main() {
             throw std::runtime_error("Light field demo did not restore both depth planes");
         }
         LightFieldReader reopened(LightFieldFile::open(directory / "capture.mrlf"), 0);
-        const auto repeated = refocus_lightfield(reopened, {2, .2});
-        double maximum = 0;
+        const auto       repeated = refocus_lightfield(reopened, {2, .2});
+        double           maximum  = 0;
         for (std::size_t y = 0; y < 128; ++y) {
             for (std::size_t x = 0; x < 128; ++x) {
                 maximum = std::max(

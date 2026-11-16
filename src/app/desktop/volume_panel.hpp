@@ -1,3 +1,5 @@
+// 体积介质参数控件、状态刷新与用户操作回调。
+
 #pragma once
 
 #include <minirender/scene/medium.hpp>
@@ -25,9 +27,9 @@ class VolumePanel final : public QWidget {
     void set_document(std::span<const minirender::MediumRegion> regions, std::uint64_t generation);
     void set_asset_busy(bool busy);
     std::function<void(std::vector<minirender::MediumRegion>)> on_changed;
-    std::function<void(const QString&)> on_demo;
-    std::function<void()> on_render;
-    std::function<bool()> render_active;
+    std::function<void(const QString&)>                        on_demo;
+    std::function<void()>                                      on_render;
+    std::function<bool()>                                      render_active;
 
   private:
     using VectorAccess = std::function<glm::dvec3&(minirender::MediumRegion&)>;
@@ -42,18 +44,21 @@ class VolumePanel final : public QWidget {
     void add();
     void remove();
     void publish(std::vector<minirender::MediumRegion> regions, std::string selected);
-    std::vector<minirender::MediumRegion> source_;
+    std::vector<minirender::MediumRegion>   source_;
     std::optional<minirender::MediumRegion> draft_;
-    std::string selected_;
-    std::uint64_t generation_ = 0;
-    bool initialized_ = false, refreshing_ = false, dirty_ = false, busy_ = false;
-    QComboBox *regions_ = nullptr, *demo_ = nullptr;
-    QLineEdit* name_ = nullptr;
-    QCheckBox* enabled_ = nullptr;
-    std::array<QDoubleSpinBox*, 3> minimum_{}, maximum_{}, absorption_{}, scattering_{};
-    QDoubleSpinBox* g_ = nullptr;
-    QWidget* parameters_ = nullptr;
-    QLabel *notice_ = nullptr, *summary_ = nullptr;
-    QPushButton *add_ = nullptr, *remove_ = nullptr, *apply_ = nullptr;
-    QPushButton *load_ = nullptr, *render_ = nullptr;
+    std::string                             selected_;
+    std::uint64_t                           generation_  = 0;
+    bool                                    initialized_ = false;
+    bool                                    refreshing_  = false;
+    bool                                    dirty_       = false;
+    bool                                    busy_        = false;
+    QComboBox *                             regions_ = nullptr, *demo_ = nullptr;
+    QLineEdit*                              name_    = nullptr;
+    QCheckBox*                              enabled_ = nullptr;
+    std::array<QDoubleSpinBox*, 3>          minimum_{}, maximum_{}, absorption_{}, scattering_{};
+    QDoubleSpinBox*                         g_          = nullptr;
+    QWidget*                                parameters_ = nullptr;
+    QLabel *                                notice_ = nullptr, *summary_ = nullptr;
+    QPushButton *                           add_ = nullptr, *remove_ = nullptr, *apply_ = nullptr;
+    QPushButton *                           load_ = nullptr, *render_ = nullptr;
 };

@@ -1,3 +1,5 @@
+// 按需生成的 Loop 层级与邻接关系。
+
 #pragma once
 
 #include <minirender/geometry/halfedge.hpp>
@@ -10,7 +12,7 @@ namespace minirender::detail {
 // 开放一环的首尾为两个边界邻点；环中连续邻点与中心组成正向三角形。
 struct LoopRing {
     std::vector<MeshIndex> neighbors;
-    bool boundary = false;
+    bool                   boundary = false;
 };
 
 // 按需生成虚拟均匀 Loop 拓扑。旧点在各层沿用几何 ID，新点由父边和层级唯一确定。
@@ -33,36 +35,39 @@ class LoopHierarchy final {
   private:
     // 出生点的父层四点决定 odd 位置，delta/rho 决定之后任意有限层的 even 位置。
     struct Point {
-        std::uint32_t birth = 0;
-        MeshIndex a = invalid_mesh_index;
-        MeshIndex b = invalid_mesh_index;
-        MeshIndex left = invalid_mesh_index;
-        MeshIndex right = invalid_mesh_index;
-        bool boundary = false;
-        bool ready = false;
-        bool coefficient_ready = false;
-        glm::dvec3 position{0};
-        glm::dvec3 delta{0};
-        double rho = 0;
+        std::uint32_t birth             = 0;
+        MeshIndex     a                 = invalid_mesh_index;
+        MeshIndex     b                 = invalid_mesh_index;
+        MeshIndex     left              = invalid_mesh_index;
+        MeshIndex     right             = invalid_mesh_index;
+        bool          boundary          = false;
+        bool          ready             = false;
+        bool          coefficient_ready = false;
+        glm::dvec3    position{0};
+        glm::dvec3    delta{0};
+        double        rho = 0;
     };
+
     struct EdgeKey {
-        MeshIndex a;
-        MeshIndex b;
+        MeshIndex     a;
+        MeshIndex     b;
         std::uint32_t level;
         bool operator==(const EdgeKey&) const = default;
     };
+
     struct EdgeHash {
         std::size_t operator()(const EdgeKey& key) const noexcept;
     };
+
     void validate_query(MeshIndex vertex, std::uint32_t level) const;
     glm::dvec3 birth_position(MeshIndex vertex);
     void prepare_coefficient(MeshIndex vertex);
-    std::shared_ptr<const MeshData> input_;
-    std::deque<Point> points_;
+    std::shared_ptr<const MeshData>                  input_;
+    std::deque<Point>                                points_;
     std::unordered_map<EdgeKey, MeshIndex, EdgeHash> edges_;
-    std::unordered_map<std::uint64_t, LoopRing> rings_;
-    std::size_t maximum_points_;
-    CancellationToken cancellation_;
+    std::unordered_map<std::uint64_t, LoopRing>      rings_;
+    std::size_t                                      maximum_points_;
+    CancellationToken                                cancellation_;
 };
 
 } // namespace minirender::detail

@@ -1,3 +1,5 @@
+// 微圆柱经纬织物参数、切向曲线与预置。
+
 #pragma once
 
 #include <glm/vec3.hpp>
@@ -20,27 +22,27 @@ struct ClothTangentCurve {
 
 // Sadeghi 2013 的表面与内部散射参数。albedo 为内部散射的线性 RGB，kd 为各向同性比例。
 struct ClothThread {
-    glm::dvec3 albedo{.06, .24, .3};
-    double kd = .3;
-    double surface_width_degrees = 12;
-    double volume_width_degrees = 24;
+    glm::dvec3        albedo{.06, .24, .3};
+    double            kd                    = .3;
+    double            surface_width_degrees = 12;
+    double            volume_width_degrees  = 24;
     ClothTangentCurve curve;
 };
 
 struct ClothAppearanceSettings {
     std::array<ClothThread, 2> threads;
-    std::array<double, 2> coverage{.33, .33};
-    std::uint32_t samples_per_thread = 8;
-    double rotation_degrees = 0;
-    double correlation_width_degrees = 20;
+    std::array<double, 2>      coverage{.33, .33};
+    std::uint32_t              samples_per_thread        = 8;
+    double                     rotation_degrees          = 0;
+    double                     correlation_width_degrees = 20;
     void validate() const;
 };
 
 // 按曲线长度等距中点求积。weight 包含纱线覆盖率，用于论文的加权求和及归一项。
 struct ClothTangentSample {
-    double cosine = 1;
-    double sine = 0;
-    double weight = 0;
+    double        cosine = 1;
+    double        sine   = 0;
+    double        weight = 0;
     std::uint32_t thread = 0;
 };
 
@@ -53,13 +55,13 @@ class ClothAppearance final {
     double coverage() const noexcept;
 
   private:
-    ClothAppearanceSettings settings_;
+    ClothAppearanceSettings         settings_;
     std::vector<ClothTangentSample> samples_;
 };
 
 struct ClothPreset {
-    std::string name;
-    double ior = 1.46;
+    std::string                            name;
+    double                                 ior = 1.46;
     std::shared_ptr<const ClothAppearance> appearance;
 };
 

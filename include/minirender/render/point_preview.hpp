@@ -1,3 +1,5 @@
+// 点云预览数据的准备、归一化与抽样。
+
 #pragma once
 
 #include <minirender/geometry/point_cloud.hpp>
@@ -9,6 +11,7 @@ struct PointPreviewVertex {
     glm::vec3 position{0};
     glm::vec3 normal{0};
 };
+
 static_assert(sizeof(PointPreviewVertex) == 24);
 
 // 原始坐标与网格保持不变；预览将最长轴映射到 [-1,1]，相机使用这一独立空间。
@@ -17,21 +20,21 @@ struct PointPreviewData {
     std::vector<PointPreviewVertex> points;
     std::vector<PointPreviewVertex> normal_samples;
     std::vector<PointPreviewVertex> boundary_vertices;
-    glm::vec3 minimum{0};
-    glm::vec3 maximum{0};
-    glm::dvec3 center{0};
-    double scale = 1;
-    bool has_normals = false;
-    std::size_t boundary_edges = 0;
+    glm::vec3                       minimum{0};
+    glm::vec3                       maximum{0};
+    glm::dvec3                      center{0};
+    double                          scale          = 1;
+    bool                            has_normals    = false;
+    std::size_t                     boundary_edges = 0;
 };
 
 // 诊断显示参数使用物理像素与归一预览空间，不参与重建或修改原始数据。
 struct PointPreviewSettings {
-    float point_radius = 2;
-    float normal_length = .06F;
-    bool normal_colors = false;
-    bool show_normals = false;
-    bool show_boundaries = true;
+    float point_radius    = 2;
+    float normal_length   = .06F;
+    bool  normal_colors   = false;
+    bool  show_normals    = false;
+    bool  show_boundaries = true;
     void validate() const;
 };
 

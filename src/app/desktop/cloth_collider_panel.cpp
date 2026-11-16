@@ -1,3 +1,6 @@
+// 布料碰撞体参数控件、状态刷新与用户操作回调。
+// 本模块接口见 cloth_collider_panel.hpp。
+
 #include "cloth_collider_panel.hpp"
 
 #include <QCheckBox>
@@ -26,14 +29,14 @@ ClothColliderPanel::ClothColliderPanel(QWidget* parent) : QGroupBox("布料碰�
     form->addRow("摩擦系数", friction_);
     connect(enabled_, &QCheckBox::toggled, this, [this](bool enabled) {
         if (!refreshing_ && current_ && on_changed) {
-            auto value = *current_;
+            auto value    = *current_;
             value.enabled = enabled;
             on_changed(value);
         }
     });
     connect(friction_, &QDoubleSpinBox::valueChanged, this, [this](double friction) {
         if (!refreshing_ && current_ && on_changed) {
-            auto value = *current_;
+            auto value     = *current_;
             value.friction = friction;
             on_changed(value);
         }
@@ -43,7 +46,7 @@ ClothColliderPanel::ClothColliderPanel(QWidget* parent) : QGroupBox("布料碰�
 
 void ClothColliderPanel::set_collider(std::optional<minirender::ClothCollider> collider) {
     refreshing_ = true;
-    current_ = std::move(collider);
+    current_    = std::move(collider);
     setVisible(current_.has_value());
     if (current_) {
         const bool sphere = current_->kind == minirender::ClothColliderKind::sphere;

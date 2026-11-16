@@ -1,3 +1,5 @@
+// 基础 Vulkan 诊断场景的纹理与颜色输出。
+
 #version 450
 
 layout(binding = 0) uniform sampler2D checker;

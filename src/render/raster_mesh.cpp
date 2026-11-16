@@ -1,3 +1,6 @@
+// 面角顶点和线框数据的准备与不可变网格缓存。
+// 公开接口与参数约定见 include/minirender/render/raster_mesh.hpp。
+
 #include <minirender/geometry/uv_tangents.hpp>
 #include <minirender/render/raster_mesh.hpp>
 
@@ -8,8 +11,8 @@
 
 namespace minirender {
 
-std::shared_ptr<const RasterMeshData> prepare_raster_mesh(const MeshData& mesh,
-                                                          CancellationToken cancellation,
+std::shared_ptr<const RasterMeshData> prepare_raster_mesh(const MeshData&    mesh,
+                                                          CancellationToken  cancellation,
                                                           RasterMeshProgress progress) {
     cancellation.check();
     if (mesh.positions.empty() || mesh.triangles.empty()) {
@@ -18,7 +21,7 @@ std::shared_ptr<const RasterMeshData> prepare_raster_mesh(const MeshData& mesh,
     if (mesh.triangles.size() > std::numeric_limits<std::uint32_t>::max() / 6U) {
         throw std::length_error("Raster mesh exceeds the draw index range");
     }
-    const auto total = mesh.positions.size() + mesh.triangles.size();
+    const auto total  = mesh.positions.size() + mesh.triangles.size();
     const auto report = [&](std::size_t completed) {
         cancellation.check();
         if (progress) {
@@ -27,40 +30,40 @@ std::shared_ptr<const RasterMeshData> prepare_raster_mesh(const MeshData& mesh,
         cancellation.check();
     };
     report(0);
-    auto data = std::make_shared<RasterMeshData>();
+    auto data     = std::make_shared<RasterMeshData>();
     data->minimum = glm::vec3(std::numeric_limits<float>::infinity());
     data->maximum = glm::vec3(-std::numeric_limits<float>::infinity());
     data->vertices.resize(mesh.triangles.size() * 3);
     data->edges.resize(mesh.triangles.size() * 6);
     for (std::size_t vertex = 0; vertex < mesh.positions.size(); ++vertex) {
         const auto point = mesh.positions[vertex];
-        data->minimum = glm::min(data->minimum, point);
-        data->maximum = glm::max(data->maximum, point);
+        data->minimum    = glm::min(data->minimum, point);
+        data->maximum    = glm::max(data->maximum, point);
         if ((vertex + 1) % 1024 == 0) {
             report(vertex + 1);
         }
     }
     for (std::size_t face = 0; face < mesh.triangles.size(); ++face) {
-        const auto& triangle = mesh.triangles[face];
-        const auto a = glm::dvec3(mesh.positions.at(triangle.corners[0].position));
-        const auto b = glm::dvec3(mesh.positions.at(triangle.corners[1].position));
-        const auto c = glm::dvec3(mesh.positions.at(triangle.corners[2].position));
-        const auto geometric = glm::vec3(glm::normalize(glm::cross(b - a, c - a)));
+        const auto&              triangle = mesh.triangles[face];
+        const auto               a = glm::dvec3(mesh.positions.at(triangle.corners[0].position));
+        const auto               b = glm::dvec3(mesh.positions.at(triangle.corners[1].position));
+        const auto               c = glm::dvec3(mesh.positions.at(triangle.corners[2].position));
+        const auto               geometric = glm::vec3(glm::normalize(glm::cross(b - a, c - a)));
         std::array<glm::vec3, 3> positions;
         std::array<glm::vec2, 3> coordinates;
         for (std::size_t corner = 0; corner < 3; ++corner) {
-            positions[corner] = mesh.positions[triangle.corners[corner].position];
+            positions[corner]   = mesh.positions[triangle.corners[corner].position];
             coordinates[corner] = triangle.corners[corner].uv;
         }
         const auto tangents = uv_tangents(positions, coordinates);
         for (std::size_t corner = 0; corner < 3; ++corner) {
-            const auto& source = mesh.triangles[face].corners[corner];
-            data->vertices[face * 3 + corner] = {mesh.positions.at(source.position),
-                                                 source.normal,
-                                                 source.uv,
-                                                 geometric,
-                                                 tangents ? glm::vec3(tangents->u) : glm::vec3(0),
-                                                 tangents ? glm::vec3(tangents->v) : glm::vec3(0)};
+            const auto& source                 = mesh.triangles[face].corners[corner];
+            data->vertices[face * 3 + corner]  = {mesh.positions.at(source.position),
+                                                  source.normal,
+                                                  source.uv,
+                                                  geometric,
+                                                  tangents ? glm::vec3(tangents->u) : glm::vec3(0),
+                                                  tangents ? glm::vec3(tangents->v) : glm::vec3(0)};
             data->edges[face * 6 + corner * 2] = static_cast<std::uint32_t>(face * 3 + corner);
             data->edges[face * 6 + corner * 2 + 1] =
                 static_cast<std::uint32_t>(face * 3 + (corner + 1) % 3);
@@ -75,7 +78,7 @@ std::shared_ptr<const RasterMeshData> prepare_raster_mesh(const MeshData& mesh,
 }
 
 void RasterMeshCache::supply(const std::shared_ptr<const MeshData>& mesh,
-                             std::shared_ptr<const RasterMeshData> prepared) {
+                             std::shared_ptr<const RasterMeshData>  prepared) {
     if (!mesh || !prepared) {
         throw std::invalid_argument("Raster cache requires a mesh and prepared data");
     }

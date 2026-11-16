@@ -1,3 +1,5 @@
+// 布料材质参数控件、状态刷新与用户操作回调。
+
 #pragma once
 
 #include <QWidget>
@@ -25,21 +27,22 @@ class ClothMaterialPanel final : public QWidget {
   private:
     struct ThreadControls {
         std::array<QDoubleSpinBox*, 3> color{};
-        QDoubleSpinBox *kd = nullptr, *surface = nullptr, *volume = nullptr;
-        QLineEdit *angles = nullptr, *lengths = nullptr;
+        QDoubleSpinBox *               kd = nullptr, *surface = nullptr, *volume = nullptr;
+        QLineEdit *                    angles = nullptr, *lengths = nullptr;
     };
+
     void build_thread(std::size_t index, QFormLayout* layout);
     void edit(const std::function<void(minirender::ClothAppearanceSettings&)>& work);
     void apply_curve(std::size_t index);
     void refresh();
     std::shared_ptr<const minirender::ClothAppearance> appearance_;
-    std::string material_id_;
-    std::uint64_t generation_ = 0;
-    bool refreshing_ = false;
-    QComboBox* preset_ = nullptr;
-    QSpinBox* samples_ = nullptr;
+    std::string                                        material_id_;
+    std::uint64_t                                      generation_ = 0;
+    bool                                               refreshing_ = false;
+    QComboBox*                                         preset_     = nullptr;
+    QSpinBox*                                          samples_    = nullptr;
     QDoubleSpinBox *rotation_ = nullptr, *coverage_ = nullptr, *ratio_ = nullptr,
                    *correlation_ = nullptr;
     std::array<ThreadControls, 2> threads_;
-    QLabel* notice_ = nullptr;
+    QLabel*                       notice_ = nullptr;
 };

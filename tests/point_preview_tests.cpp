@@ -1,3 +1,6 @@
+// 回归测试：Point preview centers extreme coordinates and preserves source data；Point preview
+// extracts all boundary edges and honors cancellation。
+
 #include <minirender/render/point_preview.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -11,10 +14,10 @@ using namespace minirender;
 TEST_CASE("Point preview centers extreme coordinates and preserves source data",
           "[point-preview]") {
     PointCloud cloud;
-    cloud.positions = {{1e30F, 1e30F, 0}, {1.1e30F, 1.05e30F, 0}, {1e30F, 1.1e30F, 0}};
-    cloud.normals = {{0, 0, 2}, {0, 0, -3}, {0, 4, 0}};
+    cloud.positions     = {{1e30F, 1e30F, 0}, {1.1e30F, 1.05e30F, 0}, {1e30F, 1.1e30F, 0}};
+    cloud.normals       = {{0, 0, 2}, {0, 0, -3}, {0, 4, 0}};
     const auto original = cloud;
-    const auto preview = prepare_point_preview(cloud, nullptr, {}, {}, 2);
+    const auto preview  = prepare_point_preview(cloud, nullptr, {}, {}, 2);
     REQUIRE(preview->points.size() == 3);
     REQUIRE(preview->normal_samples.size() == 2);
     REQUIRE(preview->has_normals);
@@ -50,7 +53,7 @@ TEST_CASE("Point preview extracts all boundary edges and honors cancellation", "
     }
     mesh.triangles.push_back(face);
     std::size_t completed = 0;
-    const auto preview = prepare_point_preview(cloud, &mesh, {}, [&](auto done, auto total) {
+    const auto  preview   = prepare_point_preview(cloud, &mesh, {}, [&](auto done, auto total) {
         REQUIRE(done <= total);
         completed = done;
     });

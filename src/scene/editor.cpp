@@ -1,3 +1,6 @@
+// 场景编辑事务、历史撤销重做与相机导航。
+// 公开接口与参数约定见 include/minirender/scene/editor.hpp。
+
 #include <minirender/scene/editor.hpp>
 #include <minirender/simulation/cloth_component.hpp>
 
@@ -26,7 +29,7 @@ void SceneEditor::replace(SceneDocument document) {
     redo_.clear();
 }
 
-void SceneEditor::replace_prevalidated(SceneDocument document,
+void SceneEditor::replace_prevalidated(SceneDocument              document,
                                        const MeshValidationCache& validated) {
     validated_meshes_.merge_validated(validated);
     replace(std::move(document));
@@ -46,14 +49,14 @@ void SceneEditor::edit(const std::function<void(SceneDocument&)>& operation) {
 }
 
 void SceneEditor::edit_prevalidated(const std::function<void(SceneDocument&)>& operation,
-                                    const MeshValidationCache& validated) {
+                                    const MeshValidationCache&                 validated) {
     validated_meshes_.merge_validated(validated);
     edit(operation);
 }
 
-bool SceneEditor::update_cloth_frame(const std::string& object_id,
+bool SceneEditor::update_cloth_frame(const std::string&                           object_id,
                                      const std::shared_ptr<const ClothComponent>& expected,
-                                     const Transform& expected_transform,
+                                     const Transform&                      expected_transform,
                                      std::shared_ptr<const ClothComponent> frame,
                                      const MeshValidationCache& validated, bool history) {
     if (!frame || transform_edit_) {
@@ -67,16 +70,16 @@ bool SceneEditor::update_cloth_frame(const std::string& object_id,
         found->transform.scale != expected_transform.scale) {
         return false;
     }
-    auto candidate = document_;
-    auto& object = candidate.objects[std::size_t(found - document_.objects.begin())];
-    auto mesh = std::find_if(candidate.meshes.begin(), candidate.meshes.end(),
-                             [&](const auto& value) { return value.id == object.mesh_id; });
+    auto       candidate = document_;
+    auto&      object    = candidate.objects[std::size_t(found - document_.objects.begin())];
+    auto       mesh = std::find_if(candidate.meshes.begin(), candidate.meshes.end(),
+                                   [&](const auto& value) { return value.id == object.mesh_id; });
     const auto users =
         std::count_if(candidate.objects.begin(), candidate.objects.end(),
                       [&](const auto& value) { return value.mesh_id == object.mesh_id; });
     if (users > 1) {
         const auto base = "cloth-runtime-" + object.id;
-        auto id = base;
+        auto       id   = base;
         for (std::uint32_t suffix = 1;
              std::any_of(candidate.meshes.begin(), candidate.meshes.end(),
                          [&](const auto& value) { return value.id == id; });
@@ -130,6 +133,7 @@ bool SceneEditor::redo() {
 bool SceneEditor::can_undo() const noexcept {
     return (transform_edit_ && transform_edit_->changed) || !undo_.empty();
 }
+
 bool SceneEditor::can_redo() const noexcept {
     return !(transform_edit_ && transform_edit_->changed) && !redo_.empty();
 }
@@ -151,7 +155,7 @@ void SceneEditor::preview_transform(const Transform& transform) {
         throw std::logic_error("Begin a transform gesture before updating its preview");
     }
     transform.validate();
-    auto candidate = document_;
+    auto       candidate = document_;
     const auto target =
         std::find_if(candidate.objects.begin(), candidate.objects.end(),
                      [&](const auto& item) { return item.id == transform_edit_->object_id; });
@@ -166,7 +170,7 @@ void SceneEditor::preview_transform(const Transform& transform) {
     transform_edit_->changed = transform.translation != original->transform.translation ||
                                transform.rotation_degrees != original->transform.rotation_degrees ||
                                transform.scale != original->transform.scale;
-    document_ = std::move(candidate);
+    document_                = std::move(candidate);
 }
 
 bool SceneEditor::commit_transform_edit() {
@@ -190,7 +194,7 @@ bool SceneEditor::cancel_transform_edit() {
         return false;
     }
     const bool changed = transform_edit_->changed;
-    document_ = std::move(transform_edit_->initial);
+    document_          = std::move(transform_edit_->initial);
     transform_edit_.reset();
     return changed;
 }
@@ -213,14 +217,14 @@ std::shared_ptr<const SceneSnapshot> SceneEditor::snapshot() {
 
 Camera rotate_camera(Camera camera, float yaw_delta, float pitch_delta, bool orbit) {
     camera.validate();
-    const auto up = glm::normalize(camera.up);
-    const auto direction = glm::normalize(camera.target - camera.position);
-    const float distance = glm::length(camera.target - camera.position);
+    const auto  up        = glm::normalize(camera.up);
+    const auto  direction = glm::normalize(camera.target - camera.position);
+    const float distance  = glm::length(camera.target - camera.position);
     const float old_pitch = std::asin(std::clamp(glm::dot(direction, up), -1.0F, 1.0F));
     const float pitch =
         std::clamp(old_pitch + pitch_delta, glm::radians(-85.0F), glm::radians(85.0F));
-    auto horizontal = glm::normalize(direction - glm::dot(direction, up) * up);
-    horizontal = glm::mat3(glm::rotate(glm::mat4(1), yaw_delta, up)) * horizontal;
+    auto horizontal    = glm::normalize(direction - glm::dot(direction, up) * up);
+    horizontal         = glm::mat3(glm::rotate(glm::mat4(1), yaw_delta, up)) * horizontal;
     const auto forward = std::cos(pitch) * horizontal + std::sin(pitch) * up;
     if (orbit) {
         camera.position = camera.target - distance * forward;
@@ -237,8 +241,8 @@ Camera pan_camera(Camera camera, glm::vec2 displacement) {
 Camera move_camera(Camera camera, glm::vec3 local_displacement) {
     camera.validate();
     const auto forward = glm::normalize(camera.target - camera.position);
-    const auto right = glm::normalize(glm::cross(forward, camera.up));
-    const auto up = glm::cross(right, forward);
+    const auto right   = glm::normalize(glm::cross(forward, camera.up));
+    const auto up      = glm::cross(right, forward);
     const auto delta =
         right * local_displacement.x + up * local_displacement.y + forward * local_displacement.z;
     camera.position += delta;
@@ -248,14 +252,14 @@ Camera move_camera(Camera camera, glm::vec3 local_displacement) {
 
 Camera dolly_camera(Camera camera, float distance_factor) {
     camera.validate();
-    const auto delta = camera.position - camera.target;
+    const auto  delta    = camera.position - camera.target;
     const float distance = std::clamp(glm::length(delta) * distance_factor, 0.1F, 1000.0F);
-    camera.position = camera.target + glm::normalize(delta) * distance;
+    camera.position      = camera.target + glm::normalize(delta) * distance;
     return camera;
 }
 
 std::optional<std::string> pick_object(const SceneSnapshot& scene, const Ray& ray) {
-    double nearest = std::numeric_limits<double>::infinity();
+    double                     nearest = std::numeric_limits<double>::infinity();
     std::optional<std::string> selected;
     for (const auto& instance : scene.instances) {
         const bool mirrored = glm::determinant(glm::mat3(instance.object_to_world)) < 0;
@@ -267,9 +271,9 @@ std::optional<std::string> pick_object(const SceneSnapshot& scene, const Ray& ra
                               glm::vec4(instance.mesh->positions[triangle.corners[k].position], 1));
             }
             // Möller–Trumbore；t 使用世界空间距离，朝向规则与 BVH 和预览一致。
-            const auto edge1 = p[1] - p[0];
-            const auto edge2 = p[2] - p[0];
-            const auto cross = glm::cross(ray.direction, edge2);
+            const auto   edge1       = p[1] - p[0];
+            const auto   edge2       = p[2] - p[0];
+            const auto   cross       = glm::cross(ray.direction, edge2);
             const double determinant = glm::dot(edge1, cross);
             if (std::abs(determinant) < 1e-9F) {
                 continue;
@@ -278,13 +282,13 @@ std::optional<std::string> pick_object(const SceneSnapshot& scene, const Ray& ra
                 continue;
             }
             const double inverse = 1.0 / determinant;
-            const auto offset = ray.origin - p[0];
-            const double u = glm::dot(offset, cross) * inverse;
-            const auto q = glm::cross(offset, edge1);
-            const double v = glm::dot(ray.direction, q) * inverse;
-            const double t = glm::dot(edge2, q) * inverse;
+            const auto   offset  = ray.origin - p[0];
+            const double u       = glm::dot(offset, cross) * inverse;
+            const auto   q       = glm::cross(offset, edge1);
+            const double v       = glm::dot(ray.direction, q) * inverse;
+            const double t       = glm::dot(edge2, q) * inverse;
             if (u >= 0 && v >= 0 && u + v <= 1 && t > 1e-5F && t < nearest) {
-                nearest = t;
+                nearest  = t;
                 selected = instance.object_id;
             }
         }

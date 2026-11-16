@@ -1,3 +1,6 @@
+// JSON 场景加载、资产解析与场景保存。
+// 公开接口与参数约定见 include/minirender/assets/scene_io.hpp。
+
 #include "asset_writer.hpp"
 #include "cloth_material_io.hpp"
 #include "cloth_simulation_io.hpp"
@@ -51,42 +54,42 @@ SceneDocument load_scene(const std::filesystem::path& path) {
             throw std::invalid_argument("Unsupported scene version");
         }
         SceneDocument scene;
-        scene.asset_directory = std::filesystem::absolute(path).parent_path();
-        const auto& camera = json.at("camera");
-        scene.camera.position = vector3(camera.at("position"));
-        scene.camera.target = vector3(camera.at("target"));
-        scene.camera.up = vector3(camera.at("up"));
+        scene.asset_directory             = std::filesystem::absolute(path).parent_path();
+        const auto& camera                = json.at("camera");
+        scene.camera.position             = vector3(camera.at("position"));
+        scene.camera.target               = vector3(camera.at("target"));
+        scene.camera.up                   = vector3(camera.at("up"));
         scene.camera.vertical_fov_degrees = camera.at("vertical_fov").get<float>();
-        scene.camera.near_plane = camera.at("near").get<float>();
-        scene.camera.far_plane = camera.at("far").get<float>();
-        scene.camera.aperture_radius = camera.value("aperture_radius", 0.0F);
-        scene.camera.focus_distance = camera.value("focus_distance", 4.0F);
-        scene.environment = vector3(json.at("environment"));
+        scene.camera.near_plane           = camera.at("near").get<float>();
+        scene.camera.far_plane            = camera.at("far").get<float>();
+        scene.camera.aperture_radius      = camera.value("aperture_radius", 0.0F);
+        scene.camera.focus_distance       = camera.value("focus_distance", 4.0F);
+        scene.environment                 = vector3(json.at("environment"));
         if (json.contains("media")) {
             scene.media = detail::read_media(json.at("media"));
         }
         if (json.contains("environment_map")) {
-            const auto& environment = json.at("environment_map");
-            scene.environment_map.texture_id = environment.value("texture", std::string{});
-            scene.environment_map.strength = environment.value("strength", 1.0F);
+            const auto& environment                = json.at("environment_map");
+            scene.environment_map.texture_id       = environment.value("texture", std::string{});
+            scene.environment_map.strength         = environment.value("strength", 1.0F);
             scene.environment_map.rotation_degrees = environment.value("rotation_degrees", 0.0F);
         }
         for (const auto& value : json.at("materials")) {
             Material material;
-            material.id = value.at("id").get<std::string>();
-            material.name = value.value("name", material.id);
-            material.kind = parse_material_kind(value.at("kind").get<std::string>());
+            material.id         = value.at("id").get<std::string>();
+            material.name       = value.value("name", material.id);
+            material.kind       = parse_material_kind(value.at("kind").get<std::string>());
             material.base_color = vector3(value.at("base_color"));
-            material.emission = vector3(value.value("emission", Json::array({0, 0, 0})));
-            material.roughness = value.value("roughness", 0.35F);
-            material.ior = value.value("ior", 1.5F);
+            material.emission   = vector3(value.value("emission", Json::array({0, 0, 0})));
+            material.roughness  = value.value("roughness", 0.35F);
+            material.ior        = value.value("ior", 1.5F);
             if (value.contains("cloth")) {
                 material.cloth = detail::read_cloth_appearance(value.at("cloth"));
             }
             if (value.contains("subsurface")) {
                 material.subsurface = detail::read_subsurface(value.at("subsurface"));
             }
-            material.double_sided = value.value("double_sided", true);
+            material.double_sided       = value.value("double_sided", true);
             material.base_color_texture = value.value("base_color_texture", std::string{});
             material.texture_filter =
                 parse_texture_filter(value.value("texture_filter", std::string("trilinear")));
@@ -94,7 +97,7 @@ SceneDocument load_scene(const std::filesystem::path& path) {
         }
         for (const auto& value : json.at("meshes")) {
             MeshAsset mesh;
-            mesh.id = value.at("id").get<std::string>();
+            mesh.id     = value.at("id").get<std::string>();
             mesh.source = path_from_utf8(value.at("source").get<std::string>());
             mesh.data =
                 std::make_shared<const MeshData>(load_obj(scene.asset_directory / mesh.source));
@@ -102,28 +105,28 @@ SceneDocument load_scene(const std::filesystem::path& path) {
         }
         for (const auto& value : json.value("textures", Json::array())) {
             TextureAsset texture;
-            texture.id = value.at("id").get<std::string>();
-            texture.source = path_from_utf8(value.at("source").get<std::string>());
+            texture.id          = value.at("id").get<std::string>();
+            texture.source      = path_from_utf8(value.at("source").get<std::string>());
             const auto encoding = value.value("encoding", std::string("srgb"));
             if (encoding != "srgb" && encoding != "linear") {
                 throw std::invalid_argument("Unknown texture encoding");
             }
             texture.encoding = encoding == "srgb" ? ColorEncoding::srgb : ColorEncoding::linear;
-            texture.data = std::make_shared<const Texture>(
+            texture.data     = std::make_shared<const Texture>(
                 Image::read(scene.asset_directory / texture.source, texture.encoding));
             scene.textures.push_back(std::move(texture));
         }
         for (const auto& value : json.at("objects")) {
             SceneObject object;
-            object.id = value.at("id").get<std::string>();
-            object.name = value.value("name", object.id);
-            object.mesh_id = value.at("mesh").get<std::string>();
-            object.material_id = value.at("material").get<std::string>();
-            object.visible = value.value("visible", true);
-            const auto& transform = value.at("transform");
-            object.transform.translation = vector3(transform.at("translation"));
+            object.id                         = value.at("id").get<std::string>();
+            object.name                       = value.value("name", object.id);
+            object.mesh_id                    = value.at("mesh").get<std::string>();
+            object.material_id                = value.at("material").get<std::string>();
+            object.visible                    = value.value("visible", true);
+            const auto& transform             = value.at("transform");
+            object.transform.translation      = vector3(transform.at("translation"));
             object.transform.rotation_degrees = vector3(transform.at("rotation"));
-            object.transform.scale = vector3(transform.at("scale"));
+            object.transform.scale            = vector3(transform.at("scale"));
             if (value.contains("cloth_collider")) {
                 object.cloth_collider = detail::read_cloth_collider(value.at("cloth_collider"));
             }
@@ -155,13 +158,13 @@ void ensure_asset_destination(const SceneDocument& document, const std::filesyst
                               CancellationToken cancellation) {
     cancellation.check();
     // 场景目标不能与输入资产重合，硬链接或符号链接别名也须拒绝。
-    const auto destination = std::filesystem::weakly_canonical(std::filesystem::absolute(path));
+    const auto destination    = std::filesystem::weakly_canonical(std::filesystem::absolute(path));
     const auto protect_source = [&](const auto& asset) {
         cancellation.check();
         if (asset.source.empty()) {
             return;
         }
-        const auto source = document.asset_directory / asset.source;
+        const auto      source = document.asset_directory / asset.source;
         std::error_code error;
         if (std::filesystem::weakly_canonical(std::filesystem::absolute(source)) == destination ||
             std::filesystem::equivalent(source, path, error)) {
@@ -179,7 +182,7 @@ void ensure_asset_destination(const SceneDocument& document, const std::filesyst
 void save_scene(const SceneDocument& document, const std::filesystem::path& path,
                 CancellationToken cancellation, SceneSaveCallback progress) {
     const auto asset_count = document.meshes.size() + document.textures.size();
-    const auto report = [&](SceneSaveStage stage, std::size_t completed, std::size_t total) {
+    const auto report      = [&](SceneSaveStage stage, std::size_t completed, std::size_t total) {
         cancellation.check();
         if (progress) {
             progress({stage, 0, asset_count, completed, total});
@@ -191,19 +194,19 @@ void save_scene(const SceneDocument& document, const std::filesystem::path& path
     ensure_asset_destination(document, path, cancellation);
     report(SceneSaveStage::validation, 1, 1);
     detail::StagedFile staged(path);
-    Json json;
-    json["version"] = 1;
-    const auto& camera = document.camera;
-    json["camera"] = {{"position", vector3(camera.position)},
-                      {"target", vector3(camera.target)},
-                      {"up", vector3(camera.up)},
-                      {"vertical_fov", camera.vertical_fov_degrees},
-                      {"near", camera.near_plane},
-                      {"far", camera.far_plane},
-                      {"aperture_radius", camera.aperture_radius},
-                      {"focus_distance", camera.focus_distance}};
-    json["environment"] = vector3(document.environment);
-    json["media"] = detail::write_media(document.media);
+    Json               json;
+    json["version"]         = 1;
+    const auto& camera      = document.camera;
+    json["camera"]          = {{"position", vector3(camera.position)},
+                               {"target", vector3(camera.target)},
+                               {"up", vector3(camera.up)},
+                               {"vertical_fov", camera.vertical_fov_degrees},
+                               {"near", camera.near_plane},
+                               {"far", camera.far_plane},
+                               {"aperture_radius", camera.aperture_radius},
+                               {"focus_distance", camera.focus_distance}};
+    json["environment"]     = vector3(document.environment);
+    json["media"]           = detail::write_media(document.media);
     json["environment_map"] = {{"texture", document.environment_map.texture_id},
                                {"strength", document.environment_map.strength},
                                {"rotation_degrees", document.environment_map.rotation_degrees}};
@@ -229,8 +232,8 @@ void save_scene(const SceneDocument& document, const std::filesystem::path& path
             json["materials"].back()["subsurface"] = detail::write_subsurface(*material.subsurface);
         }
     }
-    const auto destination_directory = std::filesystem::absolute(path).parent_path();
-    std::size_t asset_index = 0;
+    const auto  destination_directory = std::filesystem::absolute(path).parent_path();
+    std::size_t asset_index           = 0;
     for (const auto& mesh : document.meshes) {
         cancellation.check();
         const auto relative =

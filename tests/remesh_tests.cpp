@@ -1,3 +1,6 @@
+// 回归测试：Remeshing splits long edges into a conforming planar triangulation；Remeshing collapses
+// dense input while preserving boundaries and UV。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/loop.hpp>
 #include <minirender/geometry/remesh.hpp>
@@ -20,9 +23,9 @@ std::shared_ptr<const MeshData> grid(MeshIndex side, double jitter = 0) {
     auto mesh = std::make_shared<MeshData>();
     for (MeshIndex y = 0; y <= side; ++y) {
         for (MeshIndex x = 0; x <= side; ++x) {
-            const bool interior = x > 0 && y > 0 && x < side && y < side;
-            const double dx = interior ? jitter * std::sin(x * 17.0 + y * 13.0) : 0;
-            const double dy = interior ? jitter * std::cos(x * 11.0 - y * 19.0) : 0;
+            const bool   interior = x > 0 && y > 0 && x < side && y < side;
+            const double dx       = interior ? jitter * std::sin(x * 17.0 + y * 13.0) : 0;
+            const double dy       = interior ? jitter * std::cos(x * 11.0 - y * 19.0) : 0;
             mesh->positions.emplace_back((x + dx) / side, (y + dy) / side, 0);
         }
     }
@@ -76,9 +79,9 @@ void equal_mesh(const MeshData& a, const MeshData& b) {
 
 TEST_CASE("Remeshing splits long edges into a conforming planar triangulation",
           "[geometry][remesh]") {
-    const auto input = grid(2);
+    const auto input    = grid(2);
     const auto original = *input;
-    const auto result = remesh_isotropic(
+    const auto result   = remesh_isotropic(
         input, {.target_edge_length = 0.1, .iterations = 3, .maximum_triangles = 3000});
     INFO("splits=" << result.splits << " collapses=" << result.collapses
                    << " flips=" << result.flips);
@@ -100,7 +103,7 @@ TEST_CASE("Remeshing splits long edges into a conforming planar triangulation",
 
 TEST_CASE("Remeshing collapses dense input while preserving boundaries and UV",
           "[geometry][remesh]") {
-    const auto input = grid(10);
+    const auto input  = grid(10);
     const auto result = remesh_isotropic(input, {.target_edge_length = 0.2, .iterations = 4});
     INFO("faces=" << result.topology.faces << " collapses=" << result.collapses);
     REQUIRE(result.collapses > 0);
@@ -119,7 +122,7 @@ TEST_CASE("Remeshing flips edges to improve fan valences", "[geometry][remesh]")
         input->positions.emplace_back(std::cos(angle), std::sin(angle), 0);
     }
     for (MeshIndex i = 0; i < 8; ++i) {
-        MeshTriangle triangle;
+        MeshTriangle     triangle;
         const std::array ids{MeshIndex{0}, i + 1, (i + 1) % 8 + 1};
         for (std::size_t j = 0; j < 3; ++j) {
             triangle.corners[j] = {ids[j], {0, 0, 1}, glm::vec2(input->positions[ids[j]])};
@@ -128,9 +131,9 @@ TEST_CASE("Remeshing flips edges to improve fan valences", "[geometry][remesh]")
     }
     RemeshSettings settings;
     settings.target_edge_length = 1;
-    settings.iterations = 1;
-    settings.smoothing_step = 0;
-    const auto result = remesh_isotropic(input, settings);
+    settings.iterations         = 1;
+    settings.smoothing_step     = 0;
+    const auto result           = remesh_isotropic(input, settings);
     REQUIRE(result.splits == 0);
     REQUIRE(result.flips > 0);
     REQUIRE(result.topology.faces == input->triangles.size());
@@ -140,7 +143,7 @@ TEST_CASE("Remeshing flips edges to improve fan valences", "[geometry][remesh]")
 }
 
 TEST_CASE("Remeshing improves edge distribution on an irregular plane", "[geometry][remesh]") {
-    const auto input = grid(18, 0.23);
+    const auto input  = grid(18, 0.23);
     const auto result = remesh_isotropic(input, {.target_edge_length = 1.0 / 18, .iterations = 5});
     INFO("before=" << result.before.edge_p10 << ',' << result.before.edge_p90
                    << " after=" << result.after.edge_p10 << ',' << result.after.edge_p90
@@ -228,7 +231,7 @@ TEST_CASE("Remeshing preserves a hard cube and projects curved output to its inp
         REQUIRE(result.topology.boundary_edges == 0);
         same_topology(result);
         const MeshSurface surface(input);
-        double maximum = 0;
+        double            maximum = 0;
         for (const auto p : result.mesh->positions) {
             maximum = std::max(maximum, std::sqrt(surface.closest(glm::dvec3(p)).distance_squared));
         }
@@ -238,7 +241,7 @@ TEST_CASE("Remeshing preserves a hard cube and projects curved output to its inp
 }
 
 TEST_CASE("Remeshing keeps separate nearby surfaces and isolated positions", "[geometry][remesh]") {
-    auto input = std::make_shared<MeshData>(*grid(5));
+    auto       input  = std::make_shared<MeshData>(*grid(5));
     const auto second = grid(5);
     const auto offset = static_cast<MeshIndex>(input->positions.size());
     for (const auto p : second->positions) {
@@ -270,8 +273,8 @@ TEST_CASE("Remeshing keeps separate nearby surfaces and isolated positions", "[g
 
 TEST_CASE("Remeshing no-op settings budgets and cancellation preserve the source",
           "[geometry][remesh]") {
-    const auto input = grid(6, 0.2);
-    const auto original = *input;
+    const auto input     = grid(6, 0.2);
+    const auto original  = *input;
     const auto unchanged = remesh_isotropic(input, {.iterations = 0});
     REQUIRE(unchanged.mesh == input);
     REQUIRE(unchanged.target_edge_length == Approx(0.1));

@@ -1,3 +1,5 @@
+// 共享取消标记与 OperationCancelled 异常，供后台算法定期检查任务状态。
+
 #pragma once
 
 #include <atomic>
@@ -20,9 +22,11 @@ class OperationCancelled final : public std::exception {
 class CancellationToken {
   public:
     CancellationToken() = default;
+
     bool requested() const noexcept {
         return state_ && state_->load(std::memory_order_acquire);
     }
+
     void check() const {
         if (requested()) {
             throw OperationCancelled();
@@ -31,8 +35,10 @@ class CancellationToken {
 
   private:
     friend class CancellationSource;
+
     explicit CancellationToken(std::shared_ptr<std::atomic<bool>> state)
         : state_(std::move(state)) {}
+
     std::shared_ptr<std::atomic<bool>> state_;
 };
 
@@ -40,9 +46,11 @@ class CancellationToken {
 class CancellationSource {
   public:
     CancellationSource() : state_(std::make_shared<std::atomic<bool>>(false)) {}
+
     CancellationToken token() const {
         return CancellationToken(state_);
     }
+
     void request() noexcept {
         state_->store(true, std::memory_order_release);
     }

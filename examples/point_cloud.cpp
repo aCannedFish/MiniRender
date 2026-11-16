@@ -1,3 +1,5 @@
+// 可运行示例：点云数据校验与三角网格表面采样。
+
 #include <minirender/assets/point_io.hpp>
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/ball_pivot.hpp>
@@ -22,14 +24,14 @@ namespace {
 
 // 自建环面提供完整参照三角面与光滑法线，采样后清除连接和法线再重建。
 std::shared_ptr<const MeshData> reference_torus() {
-    auto mesh = std::make_shared<MeshData>();
+    auto                    mesh   = std::make_shared<MeshData>();
     constexpr std::uint32_t around = 64;
-    constexpr std::uint32_t tube = 32;
-    std::vector<glm::vec3> normals;
+    constexpr std::uint32_t tube   = 32;
+    std::vector<glm::vec3>  normals;
     for (std::uint32_t u = 0; u < around; ++u) {
         for (std::uint32_t v = 0; v < tube; ++v) {
-            const double theta = 2 * std::numbers::pi * u / around;
-            const double phi = 2 * std::numbers::pi * v / tube;
+            const double theta  = 2 * std::numbers::pi * u / around;
+            const double phi    = 2 * std::numbers::pi * v / tube;
             const double radius = 1 + .35 * std::cos(phi);
             mesh->positions.emplace_back(radius * std::cos(theta), .35 * std::sin(phi),
                                          radius * std::sin(theta));
@@ -59,12 +61,13 @@ std::shared_ptr<const MeshData> reference_torus() {
 std::filesystem::path native(const char* text) {
     return std::filesystem::path(std::u8string(reinterpret_cast<const char8_t*>(text)));
 }
+
 std::vector<double> parse_radii(std::string_view text) {
     std::vector<double> radii;
     while (!text.empty()) {
-        const auto comma = text.find(',');
-        const auto token = text.substr(0, comma);
-        double radius = 0;
+        const auto         comma  = text.find(',');
+        const auto         token  = text.substr(0, comma);
+        double             radius = 0;
         std::istringstream input{std::string(token)};
         input.imbue(std::locale::classic());
         input >> std::noskipws >> radius;
@@ -86,29 +89,29 @@ std::vector<double> parse_radii(std::string_view text) {
 // 重建保持输入单位；用于展示时只通过物体变换缩放至约两米，底部放在地面上方。
 SceneDocument preview_scene(std::shared_ptr<const MeshData> mesh) {
     auto scene = load_scene(std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/studio.json");
-    auto low = glm::vec3(std::numeric_limits<float>::infinity());
-    auto high = glm::vec3(-std::numeric_limits<float>::infinity());
+    auto low   = glm::vec3(std::numeric_limits<float>::infinity());
+    auto high  = glm::vec3(-std::numeric_limits<float>::infinity());
     for (const auto point : mesh->positions) {
-        low = glm::min(low, point);
+        low  = glm::min(low, point);
         high = glm::max(high, point);
     }
-    const auto extent = high - low;
-    const float scale = 2 / std::max({extent.x, extent.y, extent.z});
-    const auto center = low + extent * .5F;
+    const auto  extent = high - low;
+    const float scale  = 2 / std::max({extent.x, extent.y, extent.z});
+    const auto  center = low + extent * .5F;
     scene.meshes.push_back({"reconstruction", {}, std::move(mesh)});
     std::erase_if(scene.objects, [](const auto& object) { return object.id == "metal_cube"; });
     for (auto& object : scene.objects) {
         if (object.id == "blue_cube") {
-            object.mesh_id = "reconstruction";
-            object.name = "点云重建";
+            object.mesh_id                    = "reconstruction";
+            object.name                       = "点云重建";
             object.transform.rotation_degrees = {0, 0, 0};
-            object.transform.scale = glm::vec3(scale);
-            object.transform.translation = {-center.x * scale, .03F - low.y * scale,
-                                            -center.z * scale};
+            object.transform.scale            = glm::vec3(scale);
+            object.transform.translation      = {-center.x * scale, .03F - low.y * scale,
+                                                 -center.z * scale};
         }
     }
     scene.camera.position = {3, 2.4F, 3};
-    scene.camera.target = {0, .7F, 0};
+    scene.camera.target   = {0, .7F, 0};
     return scene;
 }
 
@@ -125,7 +128,7 @@ int main(int argc, char** argv) {
         const auto output =
             argc >= 3 ? native(argv[2]) : std::filesystem::current_path() / "outputs/a5.1";
         std::filesystem::create_directories(output);
-        PointCloud input;
+        PointCloud                      input;
         std::shared_ptr<const MeshData> reference;
         if (argc >= 2) {
             const auto source = std::filesystem::weakly_canonical(native(argv[1]));
@@ -139,7 +142,7 @@ int main(int argc, char** argv) {
             input = load_point_cloud(source);
         } else {
             reference = reference_torus();
-            input = sample_mesh_surface(*reference, 5000, 101);
+            input     = sample_mesh_surface(*reference, 5000, 101);
             input.normals.clear();
             save_point_cloud(input, output / "input.ply");
             input = load_point_cloud(output / "input.ply");
@@ -180,8 +183,8 @@ int main(int argc, char** argv) {
                       << " reactivated=" << pass.restarted_edges << '\n';
         }
         const MeshSurface surface(reconstruction.mesh);
-        double squared = 0;
-        double maximum_distance = 0;
+        double            squared          = 0;
+        double            maximum_distance = 0;
         for (const auto p : input.positions) {
             const double distance = surface.closest(glm::dvec3(p)).distance_squared;
             squared += distance;
@@ -200,7 +203,7 @@ int main(int argc, char** argv) {
         const auto scene = preview_scene(reconstruction.mesh);
         save_scene(scene, output / "scene.json");
         const RenderSettings render{128, 128, 32, 101};
-        const auto image = PathTracer(make_snapshot(scene)).render(render);
+        const auto           image = PathTracer(make_snapshot(scene)).render(render);
         image.write_exr(output / "reconstruction.exr");
         display_image(image).write_png(output / "reconstruction.png");
         const auto reopened =

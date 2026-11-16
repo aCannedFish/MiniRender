@@ -1,3 +1,5 @@
+// PNG/JPEG 等光栅图像的读写及颜色空间转换。
+
 #include <minirender/core/image.hpp>
 
 #include <stb_image.h>
@@ -21,8 +23,8 @@ struct FreeStb {
 };
 
 void append_encoded_bytes(void* context, void* bytes, int count) {
-    auto& output = *static_cast<std::vector<unsigned char>*>(context);
-    const auto* data = static_cast<unsigned char*>(bytes);
+    auto&       output = *static_cast<std::vector<unsigned char>*>(context);
+    const auto* data   = static_cast<unsigned char*>(bytes);
     output.insert(output.end(), data, data + count);
 }
 
@@ -54,8 +56,10 @@ Image Image::read(const std::filesystem::path& path, ColorEncoding encoding) {
     if (bytes.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
         throw std::runtime_error("Encoded image is too large");
     }
-    const int size = static_cast<int>(bytes.size());
-    int width = 0, height = 0, components = 0;
+    const int size       = static_cast<int>(bytes.size());
+    int       width      = 0;
+    int       height     = 0;
+    int       components = 0;
     if (!stbi_info_from_memory(bytes.data(), size, &width, &height, &components)) {
         throw std::runtime_error("Unsupported or corrupt texture image");
     }

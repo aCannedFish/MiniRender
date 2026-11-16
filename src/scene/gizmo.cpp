@@ -1,3 +1,6 @@
+// 物体移动和旋转操纵器的布局、命中测试与变换计算。
+// 公开接口与参数约定见 include/minirender/scene/gizmo.hpp。
+
 #include <minirender/scene/gizmo.hpp>
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -14,6 +17,7 @@ namespace {
 bool finite(glm::dvec2 p) {
     return std::isfinite(p.x) && std::isfinite(p.y);
 }
+
 glm::dvec3 axis(GizmoHandle handle) {
     switch (handle) {
     case GizmoHandle::x:
@@ -43,7 +47,8 @@ std::optional<glm::dvec3> plane_point(const Ray& ray, glm::dvec3 point, glm::dve
 // 保存的欧拉角可以跨分支变化，实际旋转矩阵保持连续。
 glm::vec3 euler_zyx(const glm::dmat4& rotation) {
     const auto y = std::asin(std::clamp(-rotation[0][2], -1.0, 1.0));
-    double x = 0, z = 0;
+    double     x = 0;
+    double     z = 0;
     if (std::abs(std::cos(y)) > 1e-8) {
         x = std::atan2(rotation[1][2], rotation[2][2]);
         z = std::atan2(rotation[0][1], rotation[0][0]);
@@ -97,13 +102,13 @@ GizmoLayout make_gizmo_layout(const GizmoView& view, const Transform& transform,
     view.validate();
     transform.validate();
     GizmoLayout layout;
-    layout.mode = mode;
-    layout.pivot = glm::dvec3(transform.translation);
+    layout.mode       = mode;
+    layout.pivot      = glm::dvec3(transform.translation);
     const auto center = view.project(layout.pivot);
     if (!center || mode == GizmoMode::select) {
         return layout;
     }
-    layout.center = *center;
+    layout.center  = *center;
     layout.visible = true;
     const auto forward =
         glm::normalize(glm::dvec3(view.camera.target) - glm::dvec3(view.camera.position));
@@ -155,7 +160,7 @@ GizmoHit GizmoLayout::hit(glm::dvec2 pointer, double tolerance_pixels) const {
     }
     GizmoHit best;
     best.distance_pixels = tolerance_pixels;
-    double best_depth = std::numeric_limits<double>::infinity();
+    double best_depth    = std::numeric_limits<double>::infinity();
     for (const auto& segment : segments) {
         const auto edge = segment.b - segment.a;
         const auto t =
@@ -164,8 +169,8 @@ GizmoHit GizmoLayout::hit(glm::dvec2 pointer, double tolerance_pixels) const {
         if (distance < best.distance_pixels - 0.25 ||
             (distance <= best.distance_pixels &&
              std::abs(distance - best.distance_pixels) <= 0.25 && segment.depth < best_depth)) {
-            best = {segment.handle, segment.world_a + t * (segment.world_b - segment.world_a),
-                    distance};
+            best       = {segment.handle, segment.world_a + t * (segment.world_b - segment.world_a),
+                          distance};
             best_depth = segment.depth;
         }
     }
@@ -181,14 +186,14 @@ std::optional<GizmoDrag> GizmoDrag::begin(const GizmoView& view, const Transform
         return {};
     }
     GizmoDrag drag;
-    drag.view_ = view;
+    drag.view_     = view;
     drag.original_ = transform;
-    drag.current_ = transform;
-    drag.mode_ = layout.mode;
-    drag.handle_ = hit.handle;
-    drag.pivot_ = layout.pivot;
-    drag.axis_ = axis(hit.handle);
-    drag.pointer_ = pointer;
+    drag.current_  = transform;
+    drag.mode_     = layout.mode;
+    drag.handle_   = hit.handle;
+    drag.pivot_    = layout.pivot;
+    drag.axis_     = axis(hit.handle);
+    drag.pointer_  = pointer;
     const auto forward =
         glm::normalize(glm::dvec3(view.camera.target) - glm::dvec3(view.camera.position));
     if (layout.mode == GizmoMode::translate) {
@@ -199,7 +204,7 @@ std::optional<GizmoDrag> GizmoDrag::begin(const GizmoView& view, const Transform
             return {};
         }
         drag.plane_normal_ = glm::normalize(normal);
-        const auto point = plane_point(view.ray(pointer), drag.pivot_, drag.plane_normal_);
+        const auto point   = plane_point(view.ray(pointer), drag.pivot_, drag.plane_normal_);
         if (!point) {
             return {};
         }
@@ -208,15 +213,15 @@ std::optional<GizmoDrag> GizmoDrag::begin(const GizmoView& view, const Transform
         if (hit.handle == GizmoHandle::screen || glm::length(hit.anchor - drag.pivot_) < 1e-12) {
             return {};
         }
-        drag.radial_ = glm::normalize(hit.anchor - drag.pivot_);
+        drag.radial_     = glm::normalize(hit.anchor - drag.pivot_);
         const auto point = plane_point(view.ray(pointer), drag.pivot_, drag.axis_);
         if (point && std::abs(glm::dot(view.ray(pointer).direction, drag.axis_)) > 0.05 &&
             glm::length(*point - drag.pivot_) > 1e-10) {
-            drag.radial_ = glm::normalize(*point - drag.pivot_);
+            drag.radial_         = glm::normalize(*point - drag.pivot_);
             drag.plane_rotation_ = true;
         }
         const auto tangent = glm::cross(drag.axis_, drag.radial_);
-        const auto a = view.project(drag.pivot_ + layout.world_radius * drag.radial_);
+        const auto a       = view.project(drag.pivot_ + layout.world_radius * drag.radial_);
         const auto b =
             view.project(drag.pivot_ + layout.world_radius * (drag.radial_ + tangent * 0.01));
         if (!a || !b || glm::length(*b - *a) < 1e-6) {
@@ -249,8 +254,8 @@ Transform GizmoDrag::update(glm::dvec2 pointer) {
                 return current_;
             }
             const auto current = glm::normalize(*point - pivot_);
-            const auto angle = std::atan2(glm::dot(axis_, glm::cross(radial_, current)),
-                                          glm::dot(radial_, current));
+            const auto angle   = std::atan2(glm::dot(axis_, glm::cross(radial_, current)),
+                                            glm::dot(radial_, current));
             total_angle_ += std::remainder(angle - last_angle_, 2 * std::numbers::pi);
             last_angle_ = angle;
         } else {

@@ -1,3 +1,6 @@
+// 线性 RGB 图像存储、像素访问与 sRGB 编码约定。
+// 公开接口与参数约定见 include/minirender/core/image.hpp。
+
 #include <minirender/core/image.hpp>
 
 #include <algorithm>

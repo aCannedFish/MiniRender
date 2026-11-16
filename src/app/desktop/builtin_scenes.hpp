@@ -1,3 +1,5 @@
+// 内置场景的菜单信息、资源位置和推荐渲染参数。
+
 #pragma once
 
 #include <QString>
@@ -7,13 +9,14 @@
 
 // 每个示例带独立场景文件和离线建议，导入后的数据仍由普通 SceneEditor 编辑。
 struct BuiltinScene {
-    QString id;
-    QString name;
-    QString filename;
-    QString description;
-    std::string selected_object;
-    minirender::RenderSettings render;
+    QString                        id;
+    QString                        name;
+    QString                        filename;
+    QString                        description;
+    std::string                    selected_object;
+    minirender::RenderSettings     render;
     minirender::IntegratorSettings integrator;
 };
+
 const std::array<BuiltinScene, 14>& builtin_scenes();
 QString builtin_scene_directory();

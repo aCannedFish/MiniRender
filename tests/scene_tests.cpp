@@ -1,3 +1,6 @@
+// 回归测试：Camera rays agree with Vulkan projection and pixel coordinates；Inverse transpose
+// preserves normal tangent orthogonality。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/scene/editor.hpp>
 #include <minirender/scene/shadow.hpp>
@@ -25,10 +28,12 @@ class TemporaryDirectory {
             std::filesystem::temp_directory_path() / ("minirender-scene-" + std::to_string(stamp));
         std::filesystem::create_directories(path);
     }
+
     ~TemporaryDirectory() {
         std::error_code error;
         std::filesystem::remove_all(path, error);
     }
+
     std::filesystem::path path;
 };
 
@@ -39,12 +44,12 @@ std::filesystem::path studio_file() {
 } // namespace
 
 TEST_CASE("Camera rays agree with Vulkan projection and pixel coordinates", "[camera]") {
-    Camera camera;
+    Camera          camera;
     constexpr float aspect = 16.0F / 9.0F;
     for (glm::vec2 uv : {glm::vec2(0.5F), glm::vec2(0.1F, 0.2F), glm::vec2(0.9F, 0.85F)}) {
-        const Ray ray = camera.generate_ray(uv, aspect);
-        const glm::vec4 clip = camera.projection_matrix(aspect) * camera.view_matrix() *
-                               glm::vec4(ray.origin + 5.0 * ray.direction, 1.0F);
+        const Ray       ray       = camera.generate_ray(uv, aspect);
+        const glm::vec4 clip      = camera.projection_matrix(aspect) * camera.view_matrix() *
+                                    glm::vec4(ray.origin + 5.0 * ray.direction, 1.0F);
         const glm::vec2 projected = glm::vec2(clip) / clip.w * 0.5F + 0.5F;
         REQUIRE(projected.x == Approx(uv.x).margin(1e-5F));
         REQUIRE(projected.y == Approx(uv.y).margin(1e-5F));
@@ -56,13 +61,13 @@ TEST_CASE("Camera rays agree with Vulkan projection and pixel coordinates", "[ca
 
 TEST_CASE("Inverse transpose preserves normal tangent orthogonality", "[transform]") {
     Transform transform;
-    transform.translation = {4, -2, 1};
+    transform.translation      = {4, -2, 1};
     transform.rotation_degrees = {15, 35, -10};
-    transform.scale = {2, 0.5F, 3};
-    const auto normal = glm::normalize(glm::vec3(1, 1, 0));
-    const auto tangent = glm::normalize(glm::vec3(1, -1, 0));
-    const auto world_normal = glm::normalize(transform.normal_matrix() * normal);
-    const auto world_tangent = glm::mat3(transform.matrix()) * tangent;
+    transform.scale            = {2, 0.5F, 3};
+    const auto normal          = glm::normalize(glm::vec3(1, 1, 0));
+    const auto tangent         = glm::normalize(glm::vec3(1, -1, 0));
+    const auto world_normal    = glm::normalize(transform.normal_matrix() * normal);
+    const auto world_tangent   = glm::mat3(transform.matrix()) * tangent;
     REQUIRE(glm::dot(world_normal, world_tangent) == Approx(0.0F).margin(1e-6F));
     transform.scale.x = 0;
     REQUIRE_THROWS_AS(transform.matrix(), std::invalid_argument);
@@ -105,12 +110,12 @@ TEST_CASE("OBJ face corners preserve UV seams with shared position indices", "[o
 }
 
 TEST_CASE("Scene snapshot freezes values and excludes hidden objects", "[scene]") {
-    auto document = load_scene(studio_file());
+    auto document                   = load_scene(studio_file());
     document.objects.back().visible = false;
-    const auto snapshot = make_snapshot(document);
+    const auto snapshot             = make_snapshot(document);
     REQUIRE(snapshot->instances.size() == 2);
-    const auto old_color = snapshot->instances.front().material.base_color;
-    const auto old_matrix = snapshot->instances.front().object_to_world;
+    const auto old_color                  = snapshot->instances.front().material.base_color;
+    const auto old_matrix                 = snapshot->instances.front().object_to_world;
     document.materials.front().base_color = glm::vec3(1.0F, 0, 0);
     document.objects.front().transform.translation = glm::vec3(10.0F);
     REQUIRE(snapshot->instances.front().material.base_color == old_color);
@@ -120,15 +125,15 @@ TEST_CASE("Scene snapshot freezes values and excludes hidden objects", "[scene]"
 
 TEST_CASE("Scene Save As preserves Unicode paths and model references", "[scene][io]") {
     TemporaryDirectory temp;
-    auto scene = load_scene(studio_file());
-    scene.objects.front().name = "修改后的地面";
+    auto               scene                           = load_scene(studio_file());
+    scene.objects.front().name                         = "修改后的地面";
     scene.objects.front().transform.rotation_degrees.y = 23.0F;
     const auto directory = temp.path / std::filesystem::path(std::u8string(u8"模型 空格"));
     std::filesystem::create_directories(directory);
     const auto model = directory / std::filesystem::path(std::u8string(u8"方块.obj"));
     std::filesystem::copy_file(studio_file().parent_path() / "assets/cube.obj", model);
     scene.meshes.front().source = model;
-    const auto destination = directory / std::filesystem::path(std::u8string(u8"场景.json"));
+    const auto destination      = directory / std::filesystem::path(std::u8string(u8"场景.json"));
     save_scene(scene, destination);
     const auto reloaded = load_scene(destination);
     REQUIRE(reloaded.objects.front().name == scene.objects.front().name);
@@ -171,15 +176,15 @@ TEST_CASE("Scene loader rejects unsupported format versions", "[scene][io]") {
 TEST_CASE("Scene editor commits valid transactions and keeps invalid edits out of history",
           "[editor]") {
     SceneEditor editor(load_scene(studio_file()));
-    const auto original = editor.document().objects.front().transform.translation;
+    const auto  original = editor.document().objects.front().transform.translation;
     REQUIRE_THROWS(editor.edit([](auto& scene) { scene.objects.front().transform.scale.x = 0; }));
     REQUIRE_FALSE(editor.can_undo());
     editor.edit([](auto& scene) { scene.objects.front().transform.translation.x = 2; });
-    REQUIRE(editor.document().objects.front().transform.translation.x == 2);
+    REQUIRE(editor.document().objects.front().transform.translation.x == 2.0F);
     REQUIRE(editor.undo());
     REQUIRE(editor.document().objects.front().transform.translation == original);
     REQUIRE(editor.redo());
-    REQUIRE(editor.document().objects.front().transform.translation.x == 2);
+    REQUIRE(editor.document().objects.front().transform.translation.x == 2.0F);
     editor.undo();
     editor.edit([](auto& scene) { scene.objects.front().name = "changed"; });
     REQUIRE_FALSE(editor.can_redo());
@@ -187,9 +192,9 @@ TEST_CASE("Scene editor commits valid transactions and keeps invalid edits out o
 
 TEST_CASE("Transform previews create one undo entry for a complete drag", "[editor][gesture]") {
     SceneEditor editor(load_scene(studio_file()));
-    const auto id = editor.document().objects.front().id;
-    const auto original = editor.document().objects.front().transform;
-    const auto mesh = editor.document().meshes.front().data;
+    const auto  id       = editor.document().objects.front().id;
+    const auto  original = editor.document().objects.front().transform;
+    const auto  mesh     = editor.document().meshes.front().data;
     editor.begin_transform_edit(id);
     auto value = original;
     for (int step = 1; step <= 150; ++step) {
@@ -214,14 +219,14 @@ TEST_CASE("Transform cancellation and unchanged drags preserve redo history", "[
     editor.edit([](auto& scene) { scene.objects.front().visible = false; });
     REQUIRE(editor.undo());
     REQUIRE(editor.can_redo());
-    const auto id = editor.document().objects.front().id;
+    const auto id       = editor.document().objects.front().id;
     const auto original = editor.document().objects.front().transform;
     editor.begin_transform_edit(id);
     auto changed = original;
     changed.translation.x += 2;
     editor.preview_transform(changed);
     REQUIRE_FALSE(editor.can_redo());
-    auto invalid = changed;
+    auto invalid    = changed;
     invalid.scale.x = 0;
     REQUIRE_THROWS_AS(editor.preview_transform(invalid), std::invalid_argument);
     REQUIRE_THROWS_AS(editor.edit([](auto& scene) { scene.camera.vertical_fov_degrees = 0; }),
@@ -244,7 +249,7 @@ TEST_CASE("Transform cancellation and unchanged drags preserve redo history", "[
 TEST_CASE("Ordinary edits commit a transform preview before their own transaction",
           "[editor][gesture]") {
     SceneEditor editor(load_scene(studio_file()));
-    const auto original = editor.document().objects.front();
+    const auto  original = editor.document().objects.front();
     editor.begin_transform_edit(original.id);
     auto moved = original.transform;
     moved.translation.z += 1;
@@ -263,7 +268,7 @@ TEST_CASE("Ordinary edits commit a transform preview before their own transactio
 TEST_CASE("Undo cancels an active transform and scene replacement clears its state",
           "[editor][gesture]") {
     SceneEditor editor(load_scene(studio_file()));
-    const auto original = editor.document().objects.front();
+    const auto  original = editor.document().objects.front();
     editor.begin_transform_edit(original.id);
     auto moved = original.transform;
     moved.rotation_degrees.x += 45;
@@ -287,7 +292,7 @@ TEST_CASE("Undo cancels an active transform and scene replacement clears its sta
 TEST_CASE("Cached mesh validation still rejects new invalid geometry and metadata",
           "[scene][editor]") {
     SceneEditor editor(load_scene(studio_file()));
-    const auto original = editor.snapshot();
+    const auto  original = editor.snapshot();
     editor.edit([](auto& scene) { scene.materials.front().roughness = 0.2F; });
     REQUIRE(editor.snapshot()->instances.front().mesh == original->instances.front().mesh);
     REQUIRE_THROWS(editor.edit([](auto& scene) {
@@ -304,7 +309,7 @@ TEST_CASE("Cached mesh validation still rejects new invalid geometry and metadat
 }
 
 TEST_CASE("Camera navigation preserves orbit target and produces finite views", "[camera]") {
-    Camera camera;
+    Camera     camera;
     const auto orbit = rotate_camera(camera, 0.4F, 0.3F, true);
     REQUIRE(orbit.target == camera.target);
     REQUIRE(glm::length(orbit.position - orbit.target) ==
@@ -322,7 +327,7 @@ TEST_CASE("Camera navigation preserves orbit target and produces finite views", 
 
 TEST_CASE("World space picking selects the closest transformed object", "[picking]") {
     const auto snapshot = make_snapshot(load_scene(studio_file()));
-    const Ray ray{{-0.65F, 0.5F, 4.0F}, {0, 0, -1}};
+    const Ray  ray{{-0.65F, 0.5F, 4.0F}, {0, 0, -1}};
     REQUIRE(pick_object(*snapshot, ray) == "blue_cube");
     REQUIRE_FALSE(pick_object(*snapshot, {{0, 5, 0}, {0, 1, 0}}).has_value());
 }
@@ -334,7 +339,7 @@ TEST_CASE("Directional shadow projection encloses visible geometry in Vulkan dep
         const auto matrix = directional_shadow_matrix(*snapshot, direction);
         for (const auto& instance : snapshot->instances) {
             for (const auto position : instance.mesh->positions) {
-                const auto clip = matrix * instance.object_to_world * glm::vec4(position, 1);
+                const auto clip  = matrix * instance.object_to_world * glm::vec4(position, 1);
                 const auto point = glm::vec3(clip) / clip.w;
                 REQUIRE(std::abs(point.x) <= 1.0F);
                 REQUIRE(std::abs(point.y) <= 1.0F);

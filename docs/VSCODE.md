@@ -33,3 +33,9 @@ A0.1 检查了配置 JSON 和扩展支持的配置键。使用 desktop-debug 的
 配置依据：[Microsoft IntelliSense 文档](https://code.visualstudio.com/docs/cpp/configure-intellisense)、[C/C++ 配置参考](https://code.visualstudio.com/docs/cpp/customize-cpp-settings)。
 
 macOS 桌面回归的 `regression_activity.mm` 使用 Objective-C++ 调用系统 activity API。desktop preset 配置该编译器并为文件记录 `-fobjc-arc`；C++ 头文件通过普通指针隔离原生类型，核心和 Windows 构建不编译该文件。
+
+## 代码排版
+
+工作区使用仓库根目录的 `.clang-format`：4 空格缩进、100 列换行、连续赋值对齐、函数之间留空行，控制流保留花括号。GLSL 使用 `shaders/.clang-format` 继承相同排版，但保留 include 顺序，确保共享声明先于使用者。
+
+新增源码使用不带空格的 snake_case 文件名。提交前可运行 `python3 -B scripts/check_source_names.py`，该检查也会发现未提交的本地数字副本。

@@ -1,3 +1,5 @@
+// 原三角曲面的最近点、属性投影及双向采样距离。
+
 #pragma once
 
 #include <minirender/geometry/halfedge.hpp>
@@ -10,8 +12,8 @@ namespace minirender {
 struct MeshClosestPoint {
     glm::dvec3 position{0};
     glm::dvec3 barycentric{0};
-    double distance_squared = std::numeric_limits<double>::infinity();
-    MeshIndex triangle = invalid_mesh_index;
+    double     distance_squared = std::numeric_limits<double>::infinity();
+    MeshIndex  triangle         = invalid_mesh_index;
 };
 
 // 只读局部表面查询，拥有不可变网格，使用中位数划分的 AABB 树剪枝。
@@ -24,25 +26,27 @@ class MeshSurface {
 
   private:
     struct Node {
-        glm::dvec3 low{0}, high{0};
-        MeshIndex first = 0, count = 0, right = 0;
+        glm::dvec3 low{0};
+        glm::dvec3 high{0};
+        MeshIndex  first = 0, count = 0, right = 0;
     };
+
     MeshIndex build(MeshIndex begin, MeshIndex end, const CancellationToken& cancellation);
     std::shared_ptr<const MeshData> mesh_;
-    std::vector<MeshIndex> order_;
-    std::vector<Node> nodes_;
+    std::vector<MeshIndex>          order_;
+    std::vector<Node>               nodes_;
 };
 
 struct SurfaceDistance {
     std::size_t samples = 0;
-    double rms = 0;     // 采样点到另一网格三角形表面的 RMS，单位 m。
-    double maximum = 0; // 相同采样集合中的最大距离，单位 m。
+    double      rms     = 0; // 采样点到另一网格三角形表面的 RMS，单位 m。
+    double      maximum = 0; // 相同采样集合中的最大距离，单位 m。
 };
 
 struct SurfaceComparison {
     SurfaceDistance original_to_result, result_to_original;
-    double symmetric_rms = 0;
-    double sampled_maximum = 0;
+    double          symmetric_rms   = 0;
+    double          sampled_maximum = 0;
 };
 
 using SurfaceProgress = std::function<void(std::size_t completed, std::size_t total)>;
@@ -52,7 +56,7 @@ using SurfaceProgress = std::function<void(std::size_t completed, std::size_t to
 // 包含树构建和逐样本查询的取消检查，回调在调用线程执行。
 SurfaceComparison compare_surfaces(std::shared_ptr<const MeshData> original,
                                    std::shared_ptr<const MeshData> result,
-                                   CancellationToken cancellation = {},
-                                   SurfaceProgress progress = {});
+                                   CancellationToken               cancellation = {},
+                                   SurfaceProgress                 progress     = {});
 
 } // namespace minirender

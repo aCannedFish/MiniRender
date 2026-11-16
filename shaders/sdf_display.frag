@@ -1,9 +1,13 @@
+// 距离场渲染附件的屏幕显示转换。
+
 #version 450
 layout(binding = 0) uniform sampler2D image;
+
 layout(push_constant) uniform Display {
     float exposure;
-    int surface;
+    int   surface;
 }
+
 display;
 layout(location = 0) in vec2 uv;
 layout(location = 0) out vec4 color;

@@ -1,3 +1,5 @@
+// 从已采集子视图平移叠加重建焦面与覆盖率。
+
 #include <minirender/assets/lightfield_io.hpp>
 
 #include <algorithm>
@@ -13,10 +15,10 @@ std::uint64_t lightfield_refocus_scratch_bytes(const RenderSettings& render) {
            65536;
 }
 
-LightFieldReconstruction refocus_lightfield(LightFieldReader& reader,
+LightFieldReconstruction refocus_lightfield(LightFieldReader&         reader,
                                             LightFieldRefocusSettings settings,
-                                            CancellationToken cancellation,
-                                            LightFieldCallback progress) {
+                                            CancellationToken         cancellation,
+                                            LightFieldCallback        progress) {
     cancellation.check();
     const auto& c = reader.file().calibration();
     if (!std::isfinite(settings.focus_distance) || settings.focus_distance < 1e-6 ||
@@ -26,7 +28,7 @@ LightFieldReconstruction refocus_lightfield(LightFieldReader& reader,
         settings.memory_budget_bytes > 8ULL * 1024 * 1024 * 1024) {
         throw std::invalid_argument("Invalid light field focus, aperture or memory budget");
     }
-    const auto pixels = c.render.width * c.render.height;
+    const auto          pixels = c.render.width * c.render.height;
     const std::uint64_t required =
         lightfield_refocus_scratch_bytes(c.render) +
         std::min(reader.cache_budget_bytes(), c.view_bytes() * c.view_count());
@@ -41,12 +43,12 @@ LightFieldReconstruction refocus_lightfield(LightFieldReader& reader,
         }
     }
     LightFieldReconstruction result(c.render.width, c.render.height);
-    result.selected_views = selected.size();
+    result.selected_views  = selected.size();
     result.estimated_bytes = required;
-    std::vector<glm::dvec3> sums(pixels, glm::dvec3(0));
+    std::vector<glm::dvec3>    sums(pixels, glm::dvec3(0));
     std::vector<std::uint16_t> counts(pixels, 0);
-    std::uint64_t completed = 0;
-    const auto total = std::uint64_t(selected.size()) * c.render.height;
+    std::uint64_t              completed = 0;
+    const auto                 total     = std::uint64_t(selected.size()) * c.render.height;
     for (const auto view : selected) {
         cancellation.check();
         const auto image = reader.view(view, cancellation);
@@ -54,20 +56,22 @@ LightFieldReconstruction refocus_lightfield(LightFieldReader& reader,
         for (std::size_t y = 0; y < c.render.height; ++y) {
             cancellation.check();
             for (std::size_t x = 0; x < c.render.width; ++x) {
-                const double sx = double(x) + shift.x, sy = double(y) + shift.y;
+                const double sx = double(x) + shift.x;
+                const double sy = double(y) + shift.y;
                 if (sx < 0 || sy < 0 || sx > double(c.render.width - 1) ||
                     sy > double(c.render.height - 1)) {
                     continue;
                 }
-                const auto ix = std::size_t(std::floor(sx)), iy = std::size_t(std::floor(sy));
-                const auto jx = std::min(ix + 1, c.render.width - 1),
-                           jy = std::min(iy + 1, c.render.height - 1);
-                const double tx = sx - double(ix), ty = sy - double(iy);
-                const auto color = (1 - ty) * ((1 - tx) * glm::dvec3(image->at(ix, iy)) +
-                                               tx * glm::dvec3(image->at(jx, iy))) +
-                                   ty * ((1 - tx) * glm::dvec3(image->at(ix, jy)) +
-                                         tx * glm::dvec3(image->at(jx, jy)));
-                const auto pixel = y * c.render.width + x;
+                const auto   ix = std::size_t(std::floor(sx)), iy = std::size_t(std::floor(sy));
+                const auto   jx    = std::min(ix + 1, c.render.width - 1),
+                             jy    = std::min(iy + 1, c.render.height - 1);
+                const double tx    = sx - double(ix);
+                const double ty    = sy - double(iy);
+                const auto   color = (1 - ty) * ((1 - tx) * glm::dvec3(image->at(ix, iy)) +
+                                                 tx * glm::dvec3(image->at(jx, iy))) +
+                                     ty * ((1 - tx) * glm::dvec3(image->at(ix, jy)) +
+                                           tx * glm::dvec3(image->at(jx, jy)));
+                const auto   pixel = y * c.render.width + x;
                 sums[pixel] += color;
                 ++counts[pixel];
             }

@@ -1,3 +1,6 @@
+// 回归测试：Mesh surface queries recover analytic face edge and vertex projections；Mesh surface
+// tree matches planar analytic distances and brute force triangles。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/loop.hpp>
 #include <minirender/geometry/simplify.hpp>
@@ -35,8 +38,8 @@ std::shared_ptr<const MeshData> grid(MeshIndex side, float wave = 0) {
                 MeshTriangle face;
                 for (std::size_t i = 0; i < 3; ++i) {
                     face.corners[i].position = ids[i];
-                    face.corners[i].uv = glm::vec2(mesh->positions[ids[i]]);
-                    face.corners[i].normal = {0, 0, 1};
+                    face.corners[i].uv       = glm::vec2(mesh->positions[ids[i]]);
+                    face.corners[i].normal   = {0, 0, 1};
                 }
                 mesh->triangles.push_back(face);
             }
@@ -46,7 +49,7 @@ std::shared_ptr<const MeshData> grid(MeshIndex side, float wave = 0) {
 }
 
 std::shared_ptr<const MeshData> tetrahedron() {
-    auto mesh = std::make_shared<MeshData>();
+    auto mesh       = std::make_shared<MeshData>();
     mesh->positions = {{1, 1, 1}, {-1, -1, 1}, {-1, 1, -1}, {1, -1, -1}};
     for (const auto ids : {std::array<MeshIndex, 3>{0, 2, 1}, {0, 1, 3}, {0, 3, 2}, {1, 2, 3}}) {
         MeshTriangle face;
@@ -60,11 +63,11 @@ std::shared_ptr<const MeshData> tetrahedron() {
 
 SimplifySettings unprotected(std::size_t target) {
     SimplifySettings settings;
-    settings.target_triangles = target;
-    settings.preserve_boundary = false;
-    settings.preserve_uv_seams = false;
+    settings.target_triangles      = target;
+    settings.preserve_boundary     = false;
+    settings.preserve_uv_seams     = false;
     settings.preserve_hard_normals = false;
-    settings.preserve_creases = false;
+    settings.preserve_creases      = false;
     return settings;
 }
 
@@ -78,7 +81,7 @@ void same_topology(const TopologyStatistics& a, const TopologyStatistics& b) {
 
 TEST_CASE("Mesh surface queries recover analytic face edge and vertex projections",
           "[geometry][surface]") {
-    auto mesh = std::make_shared<MeshData>();
+    auto mesh       = std::make_shared<MeshData>();
     mesh->positions = {{0, 0, 0}, {2, 0, 0}, {0, 2, 0}};
     MeshTriangle face;
     for (MeshIndex i = 0; i < 3; ++i) {
@@ -86,7 +89,7 @@ TEST_CASE("Mesh surface queries recover analytic face edge and vertex projection
     }
     mesh->triangles.push_back(face);
     const MeshSurface surface(mesh);
-    const auto inside = surface.closest({0.5, 0.5, 2});
+    const auto        inside = surface.closest({0.5, 0.5, 2});
     REQUIRE(inside.distance_squared == Approx(4));
     REQUIRE(glm::length(inside.barycentric - glm::dvec3(0.5, 0.25, 0.25)) < 1e-14);
     const auto edge = surface.closest({2, 2, -1});
@@ -103,20 +106,20 @@ TEST_CASE("Mesh surface queries recover analytic face edge and vertex projection
 
 TEST_CASE("Mesh surface tree matches planar analytic distances and brute force triangles",
           "[geometry][surface]") {
-    const auto mesh = grid(13, 0.2F);
-    const MeshSurface accelerated(mesh);
+    const auto                                mesh = grid(13, 0.2F);
+    const MeshSurface                         accelerated(mesh);
     std::vector<std::unique_ptr<MeshSurface>> triangles;
     for (const auto& face : mesh->triangles) {
-        auto single = std::make_shared<MeshData>();
+        auto single       = std::make_shared<MeshData>();
         single->positions = mesh->positions;
         single->triangles = {face};
         triangles.push_back(std::make_unique<MeshSurface>(single));
     }
-    std::mt19937 random(101);
+    std::mt19937                           random(101);
     std::uniform_real_distribution<double> uniform(-0.5, 1.5);
     for (int i = 0; i < 100; ++i) {
         const glm::dvec3 point(uniform(random), uniform(random), uniform(random));
-        double expected = std::numeric_limits<double>::infinity();
+        double           expected = std::numeric_limits<double>::infinity();
         for (const auto& surface : triangles) {
             expected = std::min(expected, surface->closest(point).distance_squared);
         }
@@ -131,11 +134,11 @@ TEST_CASE("Mesh surface tree matches planar analytic distances and brute force t
 
 TEST_CASE("QEM reduces planar meshes with exact boundaries and continuous UV",
           "[geometry][simplify]") {
-    const auto mesh = grid(12);
-    const auto original_positions = mesh->positions;
+    const auto       mesh               = grid(12);
+    const auto       original_positions = mesh->positions;
     SimplifySettings settings;
     settings.target_triangles = 90;
-    const auto result = simplify_qem(mesh, settings);
+    const auto result         = simplify_qem(mesh, settings);
     REQUIRE(result.stop == SimplifyStop::target_reached);
     REQUIRE(result.topology.faces <= settings.target_triangles);
     REQUIRE(result.collapses > 0);
@@ -170,7 +173,7 @@ TEST_CASE("QEM reduces planar meshes with exact boundaries and continuous UV",
 TEST_CASE("QEM preserves closed topology and reports measured curved surface error",
           "[geometry][simplify]") {
     const auto refined = subdivide_loop(tetrahedron(), {.levels = 3}).mesh;
-    const auto result = simplify_qem(refined, unprotected(51));
+    const auto result  = simplify_qem(refined, unprotected(51));
     REQUIRE(result.stop == SimplifyStop::target_reached);
     REQUIRE(result.topology.faces == 50);
     REQUIRE(result.collapses == (256 - 50) / 2);
@@ -183,12 +186,12 @@ TEST_CASE("QEM preserves closed topology and reports measured curved surface err
 }
 
 TEST_CASE("QEM rejects tetrahedron duplicate faces and boundary pinches", "[geometry][simplify]") {
-    const auto tetra = tetrahedron();
+    const auto tetra   = tetrahedron();
     const auto blocked = simplify_qem(tetra, unprotected(1));
     REQUIRE(blocked.mesh == tetra);
     REQUIRE(blocked.stop == SimplifyStop::constrained);
     REQUIRE(blocked.collapses == 0);
-    const auto disk = grid(1);
+    const auto disk     = grid(1);
     const auto triangle = simplify_qem(disk, unprotected(1));
     REQUIRE(triangle.topology.faces == 1);
     same_topology(triangle.input_topology, triangle.topology);
@@ -199,7 +202,7 @@ TEST_CASE("QEM rejects tetrahedron duplicate faces and boundary pinches", "[geom
 
 TEST_CASE("QEM keeps UV seams and authored hard normals", "[geometry][simplify]") {
     const auto original = grid(8);
-    auto seams = std::make_shared<MeshData>(*original);
+    auto       seams    = std::make_shared<MeshData>(*original);
     // 右半面片使用另一个 UV 图块与硬法线，接缝位置仍为共享索引。
     for (auto& face : seams->triangles) {
         const auto center = (seams->positions[face.corners[0].position] +
@@ -215,7 +218,7 @@ TEST_CASE("QEM keeps UV seams and authored hard normals", "[geometry][simplify]"
     }
     SimplifySettings settings;
     settings.target_triangles = 70;
-    const auto result = simplify_qem(seams, settings);
+    const auto result         = simplify_qem(seams, settings);
     REQUIRE(result.collapses > 0);
     for (const auto& face : seams->triangles) {
         for (const auto& c : face.corners) {
@@ -238,13 +241,13 @@ TEST_CASE("QEM keeps UV seams and authored hard normals", "[geometry][simplify]"
 
 TEST_CASE("QEM error limits no-op and cancellation preserve immutable inputs",
           "[geometry][simplify]") {
-    const auto mesh = grid(9, 0.4F);
+    const auto mesh  = grid(9, 0.4F);
     const auto no_op = simplify_qem(mesh, {.target_triangles = 1000});
     REQUIRE(no_op.mesh == mesh);
     REQUIRE(no_op.stop == SimplifyStop::target_reached);
-    auto settings = unprotected(20);
+    auto settings                  = unprotected(20);
     settings.maximum_quadric_error = 0;
-    const auto limited = simplify_qem(mesh, settings);
+    const auto limited             = simplify_qem(mesh, settings);
     REQUIRE(limited.stop == SimplifyStop::error_limit);
     REQUIRE(limited.maximum_quadric_error == 0);
     REQUIRE(limited.topology.faces > 20);
@@ -274,8 +277,8 @@ TEST_CASE("QEM error limits no-op and cancellation preserve immutable inputs",
 
 TEST_CASE("Surface comparison measures two directions and ignores isolated positions",
           "[geometry][surface]") {
-    const auto mesh = grid(3);
-    auto translated = std::make_shared<MeshData>(*mesh);
+    const auto mesh       = grid(3);
+    auto       translated = std::make_shared<MeshData>(*mesh);
     for (auto& p : translated->positions) {
         p.z = 0.25F;
     }
@@ -289,7 +292,7 @@ TEST_CASE("Surface comparison measures two directions and ignores isolated posit
 
 TEST_CASE("QEM preserves handles disconnected components and isolated positions",
           "[geometry][simplify]") {
-    auto mesh = std::make_shared<MeshData>();
+    auto                mesh   = std::make_shared<MeshData>();
     constexpr MeshIndex around = 16, tube = 10;
     for (MeshIndex i = 0; i < around; ++i) {
         for (MeshIndex j = 0; j < tube; ++j) {
@@ -313,7 +316,7 @@ TEST_CASE("QEM preserves handles disconnected components and isolated positions"
             }
         }
     }
-    const auto tetra = tetrahedron();
+    const auto tetra  = tetrahedron();
     const auto offset = static_cast<MeshIndex>(mesh->positions.size());
     for (const auto p : tetra->positions) {
         mesh->positions.push_back(p + glm::vec3(8, 0, 0));
@@ -344,14 +347,14 @@ TEST_CASE("QEM geometric crease protection is independent of normal attributes",
             c.normal = {0, 0, 1};
         }
     }
-    auto settings = unprotected(8);
-    settings.preserve_creases = true;
+    auto settings                 = unprotected(8);
+    settings.preserve_creases     = true;
     settings.crease_angle_degrees = 1;
-    const auto protected_result = simplify_qem(mesh, settings);
+    const auto protected_result   = simplify_qem(mesh, settings);
     REQUIRE(protected_result.stop == SimplifyStop::constrained);
     REQUIRE(protected_result.mesh == mesh);
     settings.preserve_creases = false;
-    const auto reduced = simplify_qem(mesh, settings);
+    const auto reduced        = simplify_qem(mesh, settings);
     REQUIRE(reduced.topology.faces == 8);
     settings.crease_angle_degrees = 0;
     REQUIRE_THROWS_AS(simplify_qem(mesh, settings), std::invalid_argument);
@@ -366,7 +369,7 @@ TEST_CASE("QEM remains stable after large translations and keeps heightfield fac
     SimplifySettings settings;
     settings.target_triangles = 80;
     settings.preserve_creases = false;
-    const auto result = simplify_qem(mesh, settings);
+    const auto result         = simplify_qem(mesh, settings);
     REQUIRE(result.stop == SimplifyStop::target_reached);
     REQUIRE(std::isfinite(result.error.symmetric_rms));
     REQUIRE(result.error.sampled_maximum < 1);

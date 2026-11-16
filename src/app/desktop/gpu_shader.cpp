@@ -1,3 +1,6 @@
+// SPIR-V 资源加载、着色器模块与 Vulkan 错误处理。
+// 本模块接口见 gpu_shader.hpp。
+
 #include "gpu_shader.hpp"
 #include "gpu_buffer.hpp"
 
@@ -19,14 +22,16 @@ GpuShader::GpuShader(VkDevice device, const char* resource) : device_(device) {
     std::vector<std::uint32_t> words(static_cast<std::size_t>(bytes.size()) / 4);
     std::memcpy(words.data(), bytes.constData(), static_cast<std::size_t>(bytes.size()));
     VkShaderModuleCreateInfo info{};
-    info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    info.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     info.codeSize = static_cast<std::size_t>(bytes.size());
-    info.pCode = words.data();
+    info.pCode    = words.data();
     check_vk(vkCreateShaderModule(device_, &info, nullptr, &module_), "create shader module");
 }
+
 GpuShader::~GpuShader() {
     vkDestroyShaderModule(device_, module_, nullptr);
 }
+
 VkShaderModule GpuShader::handle() const noexcept {
     return module_;
 }

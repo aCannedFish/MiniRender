@@ -1,3 +1,5 @@
+# 在 macOS 与 Windows 上检查源码命名并构建、测试 CPU 核心。
+
 name: Core
 on:
   push:
@@ -15,6 +17,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Check source filenames
+        run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} -B scripts/check_source_names.py
       - name: Test application installer
         run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} -B -m unittest discover -s tests -p test_install_macos.py -v
       - name: Configure without Qt or GPU SDKs

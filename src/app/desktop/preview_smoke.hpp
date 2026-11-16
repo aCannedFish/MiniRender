@@ -1,3 +1,5 @@
+// 隐藏窗口回归：preview 的控件操作、渲染结果与资源生命周期检查。
+
 #pragma once
 
 #include <QString>

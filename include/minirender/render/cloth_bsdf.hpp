@@ -1,3 +1,5 @@
+// 布料散射模型的方向求值、混合采样与概率密度。
+
 #pragma once
 
 #include <minirender/scene/cloth_material.hpp>
@@ -29,9 +31,9 @@ class ClothBsdf final {
     glm::dvec3 response_normalized(glm::dvec3 wo, glm::dvec3 wi) const;
     double pdf_normalized(glm::dvec3 wo, glm::dvec3 wi) const;
     std::shared_ptr<const ClothAppearance> appearance_;
-    double ior_;
-    glm::dvec3 dye_;
-    std::array<glm::dvec3, 2> axes_;
+    double                                 ior_;
+    glm::dvec3                             dye_;
+    std::array<glm::dvec3, 2>              axes_;
 };
 
 } // namespace minirender

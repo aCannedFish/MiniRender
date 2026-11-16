@@ -1,3 +1,5 @@
+// 布料碰撞体参数控件、状态刷新与用户操作回调。
+
 #pragma once
 
 #include <minirender/scene/cloth_collider.hpp>
@@ -19,8 +21,8 @@ class ClothColliderPanel final : public QGroupBox {
 
   private:
     std::optional<minirender::ClothCollider> current_;
-    QCheckBox* enabled_ = nullptr;
-    QDoubleSpinBox* friction_ = nullptr;
-    QLabel* kind_ = nullptr;
-    bool refreshing_ = false;
+    QCheckBox*                               enabled_    = nullptr;
+    QDoubleSpinBox*                          friction_   = nullptr;
+    QLabel*                                  kind_       = nullptr;
+    bool                                     refreshing_ = false;
 };

@@ -1,3 +1,6 @@
+// 均匀 Loop 细分、共享边顶点与面角属性插值。
+// 公开接口与参数约定见 include/minirender/geometry/loop.hpp。
+
 #include "loop_rules.hpp"
 #include <minirender/geometry/loop.hpp>
 #include <minirender/geometry/normals.hpp>
@@ -11,7 +14,7 @@ namespace {
 // 使用相对位移求加权和，减少平移较大时的舍入误差；最后存回场景统一的 float 位置。
 glm::vec3 even_position(const MeshData& mesh, const HalfedgeMesh& topology, MeshIndex vertex,
                         const CancellationToken& cancellation) {
-    const auto& v = topology.vertices()[vertex];
+    const auto&      v = topology.vertices()[vertex];
     const glm::dvec3 p = mesh.positions[vertex];
     if (v.halfedge == invalid_mesh_index) {
         return glm::vec3(p);
@@ -23,8 +26,8 @@ glm::vec3 even_position(const MeshData& mesh, const HalfedgeMesh& topology, Mesh
         return glm::vec3(p + ((a - p) + (b - p)) / 8.0);
     }
     const double beta = detail::loop_beta(v.valence);
-    glm::dvec3 relative_sum(0);
-    auto current = v.halfedge;
+    glm::dvec3   relative_sum(0);
+    auto         current = v.halfedge;
     for (MeshIndex index = 0; index < v.valence; ++index) {
         if (index % 1024 == 0) {
             cancellation.check();
@@ -36,11 +39,11 @@ glm::vec3 even_position(const MeshData& mesh, const HalfedgeMesh& topology, Mesh
 }
 
 glm::vec3 odd_position(const MeshData& mesh, const HalfedgeMesh& topology, MeshIndex edge) {
-    const auto halfedges = topology.halfedges();
-    const auto h = topology.edges()[edge].halfedge;
-    const auto twin = halfedges[h].twin;
-    const glm::dvec3 a = mesh.positions[halfedges[h].origin];
-    const glm::dvec3 b = mesh.positions[halfedges[twin].origin];
+    const auto       halfedges = topology.halfedges();
+    const auto       h         = topology.edges()[edge].halfedge;
+    const auto       twin      = halfedges[h].twin;
+    const glm::dvec3 a         = mesh.positions[halfedges[h].origin];
+    const glm::dvec3 b         = mesh.positions[halfedges[twin].origin];
     if (topology.is_boundary(twin)) {
         return glm::vec3(a + (b - a) / 2.0);
     }
@@ -54,12 +57,12 @@ void split_face(const MeshTriangle& parent, const HalfedgeMesh& topology, std::s
                 MeshIndex old_vertices, std::span<MeshTriangle, 4> children) {
     std::array<MeshCorner, 6> corners;
     for (std::size_t corner = 0; corner < 3; ++corner) {
-        corners[corner] = parent.corners[corner];
-        auto& midpoint = corners[corner + 3];
+        corners[corner]   = parent.corners[corner];
+        auto& midpoint    = corners[corner + 3];
         midpoint.position = old_vertices + topology.halfedges()[face * 3 + corner].edge;
-        midpoint.uv = glm::vec2((glm::dvec2(parent.corners[corner].uv) +
-                                 glm::dvec2(parent.corners[(corner + 1) % 3].uv)) /
-                                2.0);
+        midpoint.uv       = glm::vec2((glm::dvec2(parent.corners[corner].uv) +
+                                       glm::dvec2(parent.corners[(corner + 1) % 3].uv)) /
+                                      2.0);
     }
     constexpr std::array<std::array<std::size_t, 3>, 4> indices{
         {{0, 3, 5}, {1, 4, 3}, {2, 5, 4}, {3, 4, 5}}};
@@ -141,17 +144,17 @@ LoopResult subdivide_loop(std::shared_ptr<const MeshData> input, LoopSettings se
             split_face(source.triangles[face], topology, face,
                        static_cast<MeshIndex>(source.positions.size()),
                        std::span<MeshTriangle, 4>(next->triangles.data() + face * 4, 4));
-            const auto& parent = source.triangles[face].corners;
-            const glm::dvec3 a = source.positions[parent[0].position];
-            const glm::dvec3 b = source.positions[parent[1].position];
-            const glm::dvec3 c = source.positions[parent[2].position];
-            const auto parent_area = glm::cross(b - a, c - a);
+            const auto&      parent      = source.triangles[face].corners;
+            const glm::dvec3 a           = source.positions[parent[0].position];
+            const glm::dvec3 b           = source.positions[parent[1].position];
+            const glm::dvec3 c           = source.positions[parent[2].position];
+            const auto       parent_area = glm::cross(b - a, c - a);
             for (std::size_t child = face * 4; child < face * 4 + 4; ++child) {
-                const auto& corners = next->triangles[child].corners;
-                const glm::dvec3 x = next->positions[corners[0].position];
-                const glm::dvec3 y = next->positions[corners[1].position];
-                const glm::dvec3 z = next->positions[corners[2].position];
-                const auto area = glm::cross(y - x, z - x);
+                const auto&      corners = next->triangles[child].corners;
+                const glm::dvec3 x       = next->positions[corners[0].position];
+                const glm::dvec3 y       = next->positions[corners[1].position];
+                const glm::dvec3 z       = next->positions[corners[2].position];
+                const auto       area    = glm::cross(y - x, z - x);
                 if (glm::dot(area, area) <= 1e-20) {
                     throw std::invalid_argument("Loop level " + std::to_string(level) + " face " +
                                                 std::to_string(child) + " is degenerate");
@@ -178,7 +181,7 @@ LoopResult subdivide_loop(std::shared_ptr<const MeshData> input, LoopSettings se
         report(LoopStage::output_topology, level, 1, 1);
         result.levels.push_back(next_topology.statistics());
         result.mesh = std::move(next);
-        topology = std::move(next_topology);
+        topology    = std::move(next_topology);
     }
     report(LoopStage::complete, settings.levels, 1, 1);
     return result;

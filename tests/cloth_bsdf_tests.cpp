@@ -1,3 +1,6 @@
+// 回归测试：Cloth appearance compiles length weighted tangent curves and presets；Cloth flat thread
+// has a closed form normal response and untinted surface lobe。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/core/sampling.hpp>
 #include <minirender/geometry/uv_tangents.hpp>
@@ -15,6 +18,7 @@
 
 using namespace minirender;
 using Catch::Approx;
+
 namespace {
 constexpr double pi = std::numbers::pi;
 
@@ -28,7 +32,7 @@ glm::dvec3 integrate(const ClothBsdf& bsdf, glm::dvec3 wo, int z_steps = 128, in
     glm::dvec3 result(0);
     for (int z = 0; z < z_steps; ++z) {
         const double cosine = (z + .5) / z_steps;
-        const double sine = std::sqrt(1 - cosine * cosine);
+        const double sine   = std::sqrt(1 - cosine * cosine);
         for (int phi = 0; phi < phi_steps; ++phi) {
             const double angle = 2 * pi * (phi + .5) / phi_steps;
             result += bsdf.response(wo, {sine * std::cos(angle), sine * std::sin(angle), cosine});
@@ -38,23 +42,23 @@ glm::dvec3 integrate(const ClothBsdf& bsdf, glm::dvec3 wo, int z_steps = 128, in
 }
 
 SceneDocument cloth_scene() {
-    auto grid = ClothGrid();
+    auto grid    = ClothGrid();
     grid.columns = grid.rows = 2;
-    grid.origin = {-1, -1, 0};
-    grid.span_u = {2, 0, 0};
-    grid.span_v = {0, 2, 0};
-    const auto frozen = ClothSimulation(grid).freeze();
-    const auto preset = make_cloth_preset("shot");
-    Material material;
-    material.id = "cloth";
-    material.kind = MaterialKind::cloth;
+    grid.origin              = {-1, -1, 0};
+    grid.span_u              = {2, 0, 0};
+    grid.span_v              = {0, 2, 0};
+    const auto frozen        = ClothSimulation(grid).freeze();
+    const auto preset        = make_cloth_preset("shot");
+    Material   material;
+    material.id         = "cloth";
+    material.kind       = MaterialKind::cloth;
     material.base_color = glm::vec3(1);
-    material.ior = static_cast<float>(preset.ior);
-    material.cloth = preset.appearance;
+    material.ior        = static_cast<float>(preset.ior);
+    material.cloth      = preset.appearance;
     SceneDocument scene;
-    scene.environment = glm::vec3(0);
+    scene.environment     = glm::vec3(0);
     scene.camera.position = {0, 0, 3};
-    scene.camera.target = {0, 0, 0};
+    scene.camera.target   = {0, 0, 0};
     scene.materials.push_back(material);
     scene.meshes.push_back({"quad", {}, frozen.mesh});
     scene.objects.push_back({"cloth", "Cloth", "quad", "cloth", frozen.transform});
@@ -70,10 +74,12 @@ class TemporaryDirectory final {
                 std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
         std::filesystem::create_directories(path);
     }
+
     ~TemporaryDirectory() {
         std::error_code error;
         std::filesystem::remove_all(path, error);
     }
+
     std::filesystem::path path;
 };
 } // namespace
@@ -81,10 +87,11 @@ class TemporaryDirectory final {
 TEST_CASE("Cloth appearance compiles length weighted tangent curves and presets", "[cloth-bsdf]") {
     ClothAppearanceSettings settings;
     settings.samples_per_thread = 4;
-    settings.threads[0].curve = {{-20, -20, 40, 40}, {1, 0, 3}};
+    settings.threads[0].curve   = {{-20, -20, 40, 40}, {1, 0, 3}};
     const ClothAppearance appearance(settings);
     REQUIRE(appearance.samples().size() == 8);
-    double mean = 0, weight = 0;
+    double mean   = 0;
+    double weight = 0;
     for (const auto& sample : appearance.samples()) {
         REQUIRE(sample.cosine * sample.cosine + sample.sine * sample.sine == Approx(1));
         weight += sample.weight;
@@ -108,13 +115,13 @@ TEST_CASE("Cloth appearance compiles length weighted tangent curves and presets"
 TEST_CASE("Cloth flat thread has a closed form normal response and untinted surface lobe",
           "[cloth-bsdf]") {
     ClothAppearanceSettings settings;
-    settings.coverage = {1, 0};
-    settings.threads[0] = {{.2, .1, .05}, 1, 10, 20, {{0, 0}, {1}}};
-    const auto appearance = std::make_shared<const ClothAppearance>(settings);
+    settings.coverage          = {1, 0};
+    settings.threads[0]        = {{.2, .1, .05}, 1, 10, 20, {{0, 0}, {1}}};
+    const auto      appearance = std::make_shared<const ClothAppearance>(settings);
     const ClothBsdf bsdf(appearance, 1.5);
-    const double f0 = .04;
-    const double surface = f0 / (std::sqrt(2 * pi) * (10 * pi / 180));
-    const auto expected =
+    const double    f0      = .04;
+    const double    surface = f0 / (std::sqrt(2 * pi) * (10 * pi / 180));
+    const auto      expected =
         glm::dvec3(surface) + .5 * (1 - f0) * (1 - f0) * settings.threads[0].albedo;
     REQUIRE(glm::length(bsdf.evaluate({0, 0, 1}, {0, 0, 1}) - expected) < 1e-13);
     const ClothBsdf black(appearance, 1.5, glm::dvec3(0));
@@ -129,12 +136,12 @@ TEST_CASE("Cloth flat thread has a closed form normal response and untinted surf
 
 TEST_CASE("Cloth response and density rotate with UV directions and preserve yarn ordering",
           "[cloth-bsdf]") {
-    const auto preset = make_cloth_preset("shot");
-    const auto wo = glm::normalize(glm::dvec3(.3, -.2, 1));
-    const auto wi = glm::normalize(glm::dvec3(-.1, .5, 1));
+    const auto      preset = make_cloth_preset("shot");
+    const auto      wo     = glm::normalize(glm::dvec3(.3, -.2, 1));
+    const auto      wi     = glm::normalize(glm::dvec3(-.1, .5, 1));
     const ClothAxes axes{{1, 0, 0}, {.6, .8, 0}};
     const ClothBsdf first(preset.appearance, preset.ior, glm::dvec3(1), axes);
-    const double angle = .73;
+    const double    angle = .73;
     const ClothBsdf rotated(preset.appearance, preset.ior, glm::dvec3(1),
                             {rotate(axes.u, angle), rotate(axes.v, angle)});
     REQUIRE(glm::length(first.evaluate(wo, wi) -
@@ -151,16 +158,16 @@ TEST_CASE("Cloth response and density rotate with UV directions and preserve yar
 
 TEST_CASE("Cloth mixed sampler matches analytic solid angle moments including null events",
           "[cloth-bsdf]") {
-    const auto preset = make_cloth_preset("silk");
-    const ClothBsdf bsdf(preset.appearance, preset.ior);
-    const auto wo = glm::normalize(glm::dvec3(.3, .15, 1));
-    constexpr int count = 120000;
+    const auto            preset = make_cloth_preset("silk");
+    const ClothBsdf       bsdf(preset.appearance, preset.ior);
+    const auto            wo    = glm::normalize(glm::dvec3(.3, .15, 1));
+    constexpr int         count = 120000;
     std::array<double, 4> sum{}, sum2{};
-    int alive = 0;
-    Sampler sampler(8471);
+    int                   alive = 0;
+    Sampler               sampler(8471);
     for (int i = 0; i < count; ++i) {
         const double component = sampler.next_1d();
-        const auto direction = bsdf.sample(wo, component, sampler.next_2d());
+        const auto   direction = bsdf.sample(wo, component, sampler.next_2d());
         if (!direction) {
             continue;
         }
@@ -177,7 +184,7 @@ TEST_CASE("Cloth mixed sampler matches analytic solid angle moments including nu
     }
     const std::array targets{2 * pi, 0.0, 0.0, pi};
     for (std::size_t j = 0; j < targets.size(); ++j) {
-        const double mean = sum[j] / count;
+        const double mean  = sum[j] / count;
         const double error = std::sqrt(std::max(0.0, sum2[j] / count - mean * mean) / count);
         INFO("moment=" << j << " mean=" << mean << " stderr=" << error);
         REQUIRE(std::abs(mean - targets[j]) < 5 * error + .005);
@@ -187,18 +194,19 @@ TEST_CASE("Cloth mixed sampler matches analytic solid angle moments including nu
 }
 
 TEST_CASE("Cloth BSDF sampling agrees with independent hemispherical integration", "[cloth-bsdf]") {
-    const auto preset = make_cloth_preset("linen");
+    const auto      preset = make_cloth_preset("linen");
     const ClothBsdf bsdf(preset.appearance, preset.ior);
-    const auto wo = glm::normalize(glm::dvec3(.4, -.15, 1));
-    const auto reference = integrate(bsdf, wo);
-    const auto refined = integrate(bsdf, wo, 256, 512);
+    const auto      wo        = glm::normalize(glm::dvec3(.4, -.15, 1));
+    const auto      reference = integrate(bsdf, wo);
+    const auto      refined   = integrate(bsdf, wo, 256, 512);
     REQUIRE(glm::length(reference - refined) < .001);
     for (std::uint64_t seed = 1; seed <= 3; ++seed) {
-        Sampler sampler(seed);
-        glm::dvec3 sum(0), sum2(0);
+        Sampler       sampler(seed);
+        glm::dvec3    sum(0);
+        glm::dvec3    sum2(0);
         constexpr int count = 50000;
         for (int i = 0; i < count; ++i) {
-            glm::dvec3 contribution(0);
+            glm::dvec3   contribution(0);
             const double component = sampler.next_1d();
             if (const auto direction = bsdf.sample(wo, component, sampler.next_2d())) {
                 contribution = bsdf.response(wo, *direction) / bsdf.pdf(wo, *direction);
@@ -218,13 +226,13 @@ TEST_CASE("Cloth BSDF sampling agrees with independent hemispherical integration
 
 TEST_CASE("UV directions preserve shear mirroring and coordinate scale", "[cloth-bsdf][uv]") {
     const std::array<glm::vec3, 3> positions{{{0, 0, 0}, {2, 0, 0}, {.4F, 1, 0}}};
-    std::array<glm::vec2, 3> uv{{{0, 0}, {1, 0}, {0, 1}}};
-    const auto first = uv_tangents(positions, uv);
+    std::array<glm::vec2, 3>       uv{{{0, 0}, {1, 0}, {0, 1}}};
+    const auto                     first = uv_tangents(positions, uv);
     REQUIRE(first.has_value());
     REQUIRE(glm::length(first->u - glm::dvec3(1, 0, 0)) < 1e-12);
     REQUIRE(glm::length(first->v - glm::normalize(glm::dvec3(.4F, 1, 0))) < 1e-12);
     REQUIRE(glm::dot(first->u, first->v) > .3);
-    uv[1].x = -1;
+    uv[1].x             = -1;
     const auto mirrored = uv_tangents(positions, uv);
     REQUIRE(mirrored.has_value());
     REQUIRE(mirrored->u == -first->u);
@@ -241,19 +249,20 @@ TEST_CASE("UV directions preserve shear mirroring and coordinate scale", "[cloth
 }
 
 TEST_CASE("Cloth thread importance sampling reduces satin variance", "[cloth-bsdf][sampling]") {
-    const auto preset = make_cloth_preset("satin");
+    const auto      preset = make_cloth_preset("satin");
     const ClothBsdf bsdf(preset.appearance, preset.ior);
-    const auto wo = glm::normalize(glm::dvec3(.15, .4, 1));
-    const auto estimate = [&](bool importance) {
-        Sampler sampler(2026);
-        double sum = 0, squared = 0;
-        constexpr int count = 60000;
+    const auto      wo       = glm::normalize(glm::dvec3(.15, .4, 1));
+    const auto      estimate = [&](bool importance) {
+        Sampler       sampler(2026);
+        double        sum     = 0;
+        double        squared = 0;
+        constexpr int count   = 60000;
         for (int i = 0; i < count; ++i) {
-            const double component = sampler.next_1d();
-            const auto u = sampler.next_2d();
-            const auto direction = importance ? bsdf.sample(wo, component, u)
-                                              : std::optional(sample_cosine_hemisphere(u));
-            double contribution = 0;
+            const double component    = sampler.next_1d();
+            const auto   u            = sampler.next_2d();
+            const auto   direction    = importance ? bsdf.sample(wo, component, u)
+                                                   : std::optional(sample_cosine_hemisphere(u));
+            double       contribution = 0;
             if (direction) {
                 const double density =
                     importance ? bsdf.pdf(wo, *direction) : cosine_hemisphere_pdf(*direction);
@@ -267,7 +276,7 @@ TEST_CASE("Cloth thread importance sampling reduces satin variance", "[cloth-bsd
         const double mean = sum / count;
         return std::pair{mean, squared / count - mean * mean};
     };
-    const auto [sampled, variance] = estimate(true);
+    const auto [sampled, variance]       = estimate(true);
     const auto [cosine, cosine_variance] = estimate(false);
     INFO("importance=" << sampled << " cosine=" << cosine
                        << " variance_ratio=" << variance / cosine_variance);
@@ -277,14 +286,14 @@ TEST_CASE("Cloth thread importance sampling reduces satin variance", "[cloth-bsd
 }
 
 TEST_CASE("Cloth material binds surface BSDF and scene UV orientation", "[cloth-bsdf][path]") {
-    auto scene = cloth_scene();
-    auto& material = scene.materials[0];
+    auto            scene    = cloth_scene();
+    auto&           material = scene.materials[0];
     const ClothBsdf reference(material.cloth, material.ior);
     const auto toward_light = -glm::normalize(glm::dvec3(scene.directional_lights[0].direction));
-    const auto expected = reference.response({0, 0, 1}, toward_light) * 2.0;
-    const auto ray = scene.camera.generate_ray({.5, .5}, 1);
-    const auto snapshot = make_snapshot(scene);
-    Sampler sampler(91);
+    const auto expected     = reference.response({0, 0, 1}, toward_light) * 2.0;
+    const auto ray          = scene.camera.generate_ray({.5, .5}, 1);
+    const auto snapshot     = make_snapshot(scene);
+    Sampler    sampler(91);
     const auto actual = PathTracer(snapshot, {.maximum_depth = 1}).trace(ray, sampler);
     REQUIRE(glm::length(actual - expected) < 1e-10);
     const Bsdf bound(material);
@@ -301,12 +310,12 @@ TEST_CASE("Cloth material binds surface BSDF and scene UV orientation", "[cloth-
                                 reference.response({0, 0, 1}, sample->direction)) < 1e-12);
         }
     }
-    auto settings = material.cloth->settings();
+    auto settings             = material.cloth->settings();
     settings.rotation_degrees = 90;
-    material.cloth = std::make_shared<const ClothAppearance>(settings);
+    material.cloth            = std::make_shared<const ClothAppearance>(settings);
     const ClothBsdf rotated(material.cloth, material.ior);
-    Sampler rotated_sampler(91);
-    const auto changed =
+    Sampler         rotated_sampler(91);
+    const auto      changed =
         PathTracer(make_snapshot(scene), {.maximum_depth = 1}).trace(ray, rotated_sampler);
     REQUIRE(glm::length(changed - rotated.response({0, 0, 1}, toward_light) * 2.0) < 1e-10);
     REQUIRE(glm::length(changed - actual) > .001);
@@ -316,12 +325,12 @@ TEST_CASE("Cloth material binds surface BSDF and scene UV orientation", "[cloth-
 
 TEST_CASE("Cloth scene files preserve curve precision and reject unusable UVs",
           "[cloth-bsdf][io]") {
-    auto scene = cloth_scene();
-    auto settings = scene.materials[0].cloth->settings();
+    auto scene                = cloth_scene();
+    auto settings             = scene.materials[0].cloth->settings();
     settings.rotation_degrees = 17.123456789;
-    scene.materials[0].cloth = std::make_shared<const ClothAppearance>(settings);
+    scene.materials[0].cloth  = std::make_shared<const ClothAppearance>(settings);
     TemporaryDirectory directory;
-    const auto file = directory.path / std::filesystem::path(u8"布料 材质.json");
+    const auto         file = directory.path / std::filesystem::path(u8"布料 材质.json");
     save_scene(scene, file);
     const auto reopened = load_scene(file);
     REQUIRE(reopened.materials[0].kind == MaterialKind::cloth);
@@ -329,7 +338,7 @@ TEST_CASE("Cloth scene files preserve curve precision and reject unusable UVs",
     REQUIRE(reopened.materials[0].cloth->settings().threads[0].curve.lengths ==
             settings.threads[0].curve.lengths);
     const auto ray = scene.camera.generate_ray({.5, .5}, 1);
-    Sampler a(12), b(12);
+    Sampler    a(12), b(12);
     REQUIRE(glm::length(PathTracer(make_snapshot(scene)).trace(ray, a) -
                         PathTracer(make_snapshot(reopened)).trace(ray, b)) < 1e-7);
     auto bad = std::make_shared<MeshData>(*scene.meshes[0].data);
@@ -344,7 +353,7 @@ TEST_CASE("Cloth scene files preserve curve precision and reject unusable UVs",
     scene.materials[0].kind = MaterialKind::diffuse;
     REQUIRE_NOTHROW(scene.validate(&cache));
     scene.materials[0].kind = MaterialKind::cloth;
-    scene.meshes[0].data = reopened.meshes[0].data;
+    scene.meshes[0].data    = reopened.meshes[0].data;
     REQUIRE_NOTHROW(scene.validate(&cache));
     MeshValidationCache merged;
     merged.merge_validated(cache);
@@ -354,16 +363,16 @@ TEST_CASE("Cloth scene files preserve curve precision and reject unusable UVs",
 TEST_CASE("Cloth sampling remains finite at component boundaries and grazing views",
           "[cloth-bsdf]") {
     for (const auto* name : {"linen", "satin"}) {
-        const auto preset = make_cloth_preset(name);
-        auto settings = preset.appearance->settings();
-        settings.coverage = {1, 0};
+        const auto preset   = make_cloth_preset(name);
+        auto       settings = preset.appearance->settings();
+        settings.coverage   = {1, 0};
         const ClothBsdf bsdf(std::make_shared<const ClothAppearance>(settings), preset.ior);
         for (const auto wo : {glm::dvec3(0, 0, 1), glm::normalize(glm::dvec3(1, 0, 1e-9))}) {
             for (const double component : {0.0, .2, .7, std::nextafter(1.0, 0.0)}) {
                 for (const auto u :
                      {glm::dvec2(0), glm::dvec2(.5), glm::dvec2(std::nextafter(1.0, 0.0))}) {
                     if (const auto direction = bsdf.sample(wo, component, u)) {
-                        const auto value = bsdf.response(wo, *direction);
+                        const auto value   = bsdf.response(wo, *direction);
                         const auto density = bsdf.pdf(wo, *direction);
                         REQUIRE(std::isfinite(density));
                         REQUIRE(density > 0);

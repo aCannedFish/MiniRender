@@ -1,3 +1,6 @@
+// 回归测试：Halfedge topology covers closed open and disconnected surfaces；Halfedge topology
+// rejects invalid data and nonmanifold fans。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/loop.hpp>
 #include <minirender/render/path_tracer.hpp>
@@ -20,7 +23,7 @@ using Catch::Matchers::ContainsSubstring;
 namespace {
 
 // 测试网格保留共享位置；面角 UV 默认取局部 XY，法线占位值满足资产契约。
-MeshData mesh_from(std::vector<glm::vec3> positions,
+MeshData mesh_from(std::vector<glm::vec3>                       positions,
                    const std::vector<std::array<MeshIndex, 3>>& indices) {
     MeshData result;
     result.positions = std::move(positions);
@@ -28,7 +31,7 @@ MeshData mesh_from(std::vector<glm::vec3> positions,
         MeshTriangle triangle;
         for (std::size_t corner = 0; corner < 3; ++corner) {
             triangle.corners[corner].position = face[corner];
-            triangle.corners[corner].uv = glm::vec2(result.positions[face[corner]]);
+            triangle.corners[corner].uv       = glm::vec2(result.positions[face[corner]]);
         }
         result.triangles.push_back(triangle);
     }
@@ -49,7 +52,7 @@ MeshData quad() {
 }
 
 MeshData fan(MeshIndex count) {
-    std::vector<glm::vec3> positions{{0.2F, -0.3F, 1.3F}};
+    std::vector<glm::vec3>                positions{{0.2F, -0.3F, 1.3F}};
     std::vector<std::array<MeshIndex, 3>> faces;
     for (MeshIndex i = 0; i < count; ++i) {
         const double angle = i * 2 * std::numbers::pi / count;
@@ -61,7 +64,7 @@ MeshData fan(MeshIndex count) {
 }
 
 MeshData grid(MeshIndex side) {
-    std::vector<glm::vec3> positions;
+    std::vector<glm::vec3>                positions;
     std::vector<std::array<MeshIndex, 3>> faces;
     for (MeshIndex y = 0; y <= side; ++y) {
         for (MeshIndex x = 0; x <= side; ++x) {
@@ -107,7 +110,7 @@ void topology_invariants(const HalfedgeMesh& mesh) {
             continue;
         }
         std::set<MeshIndex> neighbors;
-        auto current = v.halfedge;
+        auto                current = v.halfedge;
         for (MeshIndex i = 0; i < v.valence; ++i) {
             REQUIRE(hs[current].origin == hs[v.halfedge].origin);
             REQUIRE(neighbors.insert(mesh.destination(current)).second);
@@ -171,22 +174,22 @@ TEST_CASE("Halfedge topology covers closed open and disconnected surfaces",
         REQUIRE(mesh.statistics().euler_characteristic == 2);
     }
     SECTION("Annulus has two boundary loops") {
-        const auto data = mesh_from({{-2, -2, 0},
-                                     {2, -2, 0},
-                                     {2, 2, 0},
-                                     {-2, 2, 0},
-                                     {-1, -1, 0},
-                                     {1, -1, 0},
-                                     {1, 1, 0},
-                                     {-1, 1, 0}},
-                                    {{0, 1, 5},
-                                     {0, 5, 4},
-                                     {1, 2, 6},
-                                     {1, 6, 5},
-                                     {2, 3, 7},
-                                     {2, 7, 6},
-                                     {3, 0, 4},
-                                     {3, 4, 7}});
+        const auto data   = mesh_from({{-2, -2, 0},
+                                       {2, -2, 0},
+                                       {2, 2, 0},
+                                       {-2, 2, 0},
+                                       {-1, -1, 0},
+                                       {1, -1, 0},
+                                       {1, 1, 0},
+                                       {-1, 1, 0}},
+                                      {{0, 1, 5},
+                                       {0, 5, 4},
+                                       {1, 2, 6},
+                                       {1, 6, 5},
+                                       {2, 3, 7},
+                                       {2, 7, 6},
+                                       {3, 0, 4},
+                                       {3, 4, 7}});
         const auto result = subdivide_loop(immutable(data), {2});
         topology_invariants(HalfedgeMesh(*result.mesh));
         for (const auto& stats : result.levels) {
@@ -200,19 +203,19 @@ TEST_CASE("Halfedge topology covers closed open and disconnected surfaces",
 TEST_CASE("Halfedge topology rejects invalid data and nonmanifold fans", "[geometry][halfedge]") {
     SECTION("Invalid data") {
         REQUIRE_THROWS_AS(HalfedgeMesh(MeshData{}), std::invalid_argument);
-        auto mesh = triangle();
+        auto mesh           = triangle();
         mesh.positions[0].x = std::numeric_limits<float>::infinity();
         REQUIRE_THROWS_WITH(HalfedgeMesh(mesh), ContainsSubstring("not finite"));
-        mesh = triangle();
+        mesh                                  = triangle();
         mesh.triangles[0].corners[0].position = 9;
         REQUIRE_THROWS_WITH(HalfedgeMesh(mesh), ContainsSubstring("out of range"));
-        mesh = triangle();
+        mesh                                = triangle();
         mesh.triangles[0].corners[0].normal = glm::vec3(0);
         REQUIRE_THROWS_WITH(HalfedgeMesh(mesh), ContainsSubstring("normal or UV"));
-        mesh = triangle();
+        mesh                              = triangle();
         mesh.triangles[0].corners[0].uv.x = std::numeric_limits<float>::quiet_NaN();
         REQUIRE_THROWS_WITH(HalfedgeMesh(mesh), ContainsSubstring("normal or UV"));
-        mesh = triangle();
+        mesh              = triangle();
         mesh.positions[2] = mesh.positions[0];
         REQUIRE_THROWS_WITH(HalfedgeMesh(mesh), ContainsSubstring("degenerate"));
     }
@@ -224,7 +227,7 @@ TEST_CASE("Halfedge topology rejects invalid data and nonmanifold fans", "[geome
     SECTION("Three incident faces") {
         auto mesh = tetrahedron();
         mesh.positions.push_back({3, 3, 3});
-        auto extra = mesh.triangles[0];
+        auto extra                = mesh.triangles[0];
         extra.corners[2].position = 4;
         mesh.triangles.push_back(extra);
         REQUIRE_THROWS_WITH(HalfedgeMesh(mesh), ContainsSubstring("more than two"));
@@ -242,7 +245,7 @@ TEST_CASE("Halfedge topology rejects invalid data and nonmanifold fans", "[geome
         REQUIRE_THROWS_WITH(HalfedgeMesh(mesh), ContainsSubstring("multiple boundary fans"));
     }
     SECTION("Two closed shells share a vertex") {
-        auto mesh = tetrahedron();
+        auto       mesh  = tetrahedron();
         const auto other = tetrahedron();
         for (std::size_t i = 1; i < other.positions.size(); ++i) {
             mesh.positions.push_back(other.positions[i] + glm::vec3(5, 0, 0));
@@ -276,7 +279,7 @@ TEST_CASE("Loop uses cubic boundary masks and preserves child winding", "[geomet
         const auto a = result.mesh->positions[face.corners[0].position];
         const auto b = result.mesh->positions[face.corners[1].position];
         const auto c = result.mesh->positions[face.corners[2].position];
-        REQUIRE(glm::cross(b - a, c - a).z > 0);
+        REQUIRE(glm::cross(b - a, c - a).z > 0.0F);
         for (const auto& corner : face.corners) {
             close(corner.normal, {0, 0, 1});
         }
@@ -288,16 +291,16 @@ TEST_CASE("Loop uses cubic boundary masks and preserves child winding", "[geomet
 
 TEST_CASE("Loop original extraordinary masks agree with analytic coordinates", "[geometry][loop]") {
     for (const MeshIndex valence : {3U, 4U, 5U, 6U, 7U, 11U}) {
-        const auto data = immutable(fan(valence));
+        const auto data   = immutable(fan(valence));
         const auto result = subdivide_loop(data);
         glm::dvec3 sum(0);
         for (std::size_t i = 1; i < data->positions.size(); ++i) {
             sum += glm::dvec3(data->positions[i]);
         }
-        const double lambda = (3 + 2 * std::cos(2 * std::numbers::pi / valence)) / 8;
-        const double alpha = 3.0 / 8.0 + lambda * lambda;
-        const auto expected = alpha * glm::dvec3(data->positions[0]) +
-                              (1 - alpha) * sum / static_cast<double>(valence);
+        const double lambda   = (3 + 2 * std::cos(2 * std::numbers::pi / valence)) / 8;
+        const double alpha    = 3.0 / 8.0 + lambda * lambda;
+        const auto   expected = alpha * glm::dvec3(data->positions[0]) +
+                                (1 - alpha) * sum / static_cast<double>(valence);
         close(result.mesh->positions[0], expected);
         if (valence == 4) {
             // 原始 n=4 的中心权重为 33/64，区别于 3/(8n) 的简化权重。
@@ -315,8 +318,8 @@ TEST_CASE("Loop original extraordinary masks agree with analytic coordinates", "
                 continue;
             }
             const auto twin = topology.halfedges()[h].twin;
-            const auto c = topology.halfedges()[topology.halfedges()[h].previous].origin;
-            const auto d = topology.halfedges()[topology.halfedges()[twin].previous].origin;
+            const auto c    = topology.halfedges()[topology.halfedges()[h].previous].origin;
+            const auto d    = topology.halfedges()[topology.halfedges()[twin].previous].origin;
             close(result.mesh->positions[data->positions.size() + edge],
                   0.375 * (glm::dvec3(data->positions[a]) + glm::dvec3(data->positions[b])) +
                       0.125 * (glm::dvec3(data->positions[c]) + glm::dvec3(data->positions[d])));
@@ -325,8 +328,8 @@ TEST_CASE("Loop original extraordinary masks agree with analytic coordinates", "
 }
 
 TEST_CASE("Loop retains closed topology and affine invariance across levels", "[geometry][loop]") {
-    auto data = tetrahedron();
-    const auto result = subdivide_loop(immutable(data), {4});
+    auto        data           = tetrahedron();
+    const auto  result         = subdivide_loop(immutable(data), {4});
     std::size_t expected_faces = 4;
     for (const auto& stats : result.levels) {
         REQUIRE(stats.faces == expected_faces);
@@ -350,7 +353,7 @@ TEST_CASE("Loop retains closed topology and affine invariance across levels", "[
     }
     for (const auto& face : result.mesh->triangles) {
         for (const auto& corner : face.corners) {
-            REQUIRE(glm::dot(corner.normal, result.mesh->positions[corner.position]) > 0);
+            REQUIRE(glm::dot(corner.normal, result.mesh->positions[corner.position]) > 0.0F);
             REQUIRE(glm::length(corner.normal) == Approx(1).margin(1e-6));
         }
     }
@@ -375,8 +378,8 @@ TEST_CASE("Loop preserves face-varying UV seams on shared geometric edges", "[ge
     for (std::size_t face = 0; face < result.mesh->triangles.size(); ++face) {
         for (const auto& corner : result.mesh->triangles[face].corners) {
             (face < 16 ? first_positions : second_positions).insert(corner.position);
-            REQUIRE(corner.uv.x >= (face < 16 ? 0 : 10));
-            REQUIRE(corner.uv.x <= (face < 16 ? 2 : 12));
+            REQUIRE(corner.uv.x >= (face < 16 ? 0.0F : 10.0F));
+            REQUIRE(corner.uv.x <= (face < 16 ? 2.0F : 12.0F));
             close(corner.normal, {0, 0, 1});
         }
     }
@@ -401,7 +404,7 @@ TEST_CASE("Loop validates budgets keeps zero levels and reports actual work", "[
     auto data = quad();
     data.positions.push_back({8, 9, 10});
     const auto source = immutable(data);
-    const auto same = subdivide_loop(source, {0});
+    const auto same   = subdivide_loop(source, {0});
     REQUIRE(same.mesh == source);
     REQUIRE(same.levels.size() == 1);
     const auto result = subdivide_loop(source);
@@ -430,9 +433,9 @@ TEST_CASE("Loop validates budgets keeps zero levels and reports actual work", "[
 }
 
 TEST_CASE("Loop cancels stages without modifying input or prior results", "[geometry][loop]") {
-    const auto source = immutable(grid(32));
-    const auto previous = subdivide_loop(source);
-    const auto previous_position = previous.mesh->positions[100];
+    const auto         source            = immutable(grid(32));
+    const auto         previous          = subdivide_loop(source);
+    const auto         previous_position = previous.mesh->positions[100];
     CancellationSource early;
     early.request();
     REQUIRE_THROWS_AS(HalfedgeMesh(*source, early.token()), OperationCancelled);
@@ -441,9 +444,9 @@ TEST_CASE("Loop cancels stages without modifying input or prior results", "[geom
          {LoopStage::input_topology, LoopStage::vertices, LoopStage::edges, LoopStage::faces,
           LoopStage::normals, LoopStage::output_topology, LoopStage::complete}) {
         CancellationSource cancellation;
-        bool reached = false;
-        const bool scan = stage == LoopStage::vertices || stage == LoopStage::edges ||
-                          stage == LoopStage::faces || stage == LoopStage::normals;
+        bool               reached = false;
+        const bool         scan    = stage == LoopStage::vertices || stage == LoopStage::edges ||
+                                     stage == LoopStage::faces || stage == LoopStage::normals;
         REQUIRE_THROWS_AS(subdivide_loop(source, {}, cancellation.token(),
                                          [&](const LoopProgress& p) {
                                              if (p.stage == stage &&
@@ -489,15 +492,15 @@ TEST_CASE("Loop rejects degenerate reversed and undefined-normal results", "[geo
 }
 
 TEST_CASE("Loop output enters existing snapshots BVH and path tracing", "[geometry][loop]") {
-    const auto source = immutable(tetrahedron());
-    const auto result = subdivide_loop(source, {3});
+    const auto    source = immutable(tetrahedron());
+    const auto    result = subdivide_loop(source, {3});
     SceneDocument document;
     document.environment = glm::vec3(1);
     document.meshes.push_back({"shape", {}, result.mesh});
     document.materials.push_back({"mat", "mat"});
     document.materials[0].base_color = glm::vec3(0.6F);
     document.objects.push_back({"shape", "shape", "shape", "mat", {}, true});
-    const auto scene = make_snapshot(document);
+    const auto     scene = make_snapshot(document);
     const SceneBvh bvh(scene);
     REQUIRE(bvh.statistics().triangles == 256);
     const auto hit = bvh.intersect({{0, 0, 4}, {0, 0, -1}});
@@ -507,12 +510,12 @@ TEST_CASE("Loop output enters existing snapshots BVH and path tracing", "[geomet
     REQUIRE(hit->position.z > 0);
     REQUIRE(glm::length(hit->shading_normal) == Approx(1).margin(1e-6));
     IntegratorSettings settings;
-    settings.mode = SamplingMode::bsdf;
-    settings.maximum_depth = 2;
+    settings.mode             = SamplingMode::bsdf;
+    settings.maximum_depth    = 2;
     settings.russian_roulette = false;
     const PathTracer tracer(scene, settings);
-    Sampler random(71);
-    const auto radiance = tracer.trace({{0, 0, 4}, {0, 0, -1}}, random);
+    Sampler          random(71);
+    const auto       radiance = tracer.trace({{0, 0, 4}, {0, 0, -1}}, random);
     REQUIRE(glm::length(radiance - glm::dvec3(0.6)) < 1e-6);
     // 真实导入资产同样按原始共享索引处理，OBJ 的硬法线/UV 不拆开位置拓扑。
     const auto cube =

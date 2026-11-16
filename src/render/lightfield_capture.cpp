@@ -1,3 +1,6 @@
+// 光场逐视图后台采集、内存预算、进度和取消。
+// 公开接口与参数约定见 include/minirender/render/lightfield_capture.hpp。
+
 #include "../assets/lightfield_internal.hpp"
 #include <minirender/render/lightfield_capture.hpp>
 
@@ -16,6 +19,7 @@ using Clock = std::chrono::steady_clock;
 // 只清理自己成功创建的单文件存储，完整结果以共享所有权延长其生命周期。
 struct Storage {
     std::filesystem::path directory;
+
     Storage() {
         std::random_device random;
         for (int attempt = 0; attempt < 64; ++attempt) {
@@ -29,11 +33,13 @@ struct Storage {
         }
         throw std::runtime_error("Cannot reserve light field temporary storage");
     }
+
     ~Storage() {
         std::error_code error;
         std::filesystem::remove_all(directory, error);
     }
 };
+
 void add(PathStatistics& sum, const PathStatistics& value) {
     sum.paths += value.paths;
     sum.shadow_rays += value.shadow_rays;
@@ -45,31 +51,33 @@ void add(PathStatistics& sum, const PathStatistics& value) {
     sum.geometry.bounds_tests += value.geometry.bounds_tests;
     sum.geometry.triangle_tests += value.geometry.triangle_tests;
 }
+
 std::uint32_t worker_count(const LightFieldCaptureSettings& settings) {
-    const auto hardware = std::thread::hardware_concurrency();
+    const auto hardware  = std::thread::hardware_concurrency();
     const auto automatic = std::min(32U, hardware > 1 ? hardware - 1 : 1U);
-    const auto columns = (settings.render.width + settings.tile_size - 1) / settings.tile_size;
-    const auto rows = (settings.render.height + settings.tile_size - 1) / settings.tile_size;
+    const auto columns   = (settings.render.width + settings.tile_size - 1) / settings.tile_size;
+    const auto rows      = (settings.render.height + settings.tile_size - 1) / settings.tile_size;
     return std::uint32_t(
         std::min<std::size_t>(settings.threads ? settings.threads : automatic, columns * rows));
 }
 } // namespace
 
 struct LightFieldCaptureSession::Impl {
-    mutable std::mutex mutex;
-    mutable std::condition_variable changed;
-    LightFieldCaptureProgress status;
-    LightFieldCapturePreview preview;
+    mutable std::mutex                    mutex;
+    mutable std::condition_variable       changed;
+    LightFieldCaptureProgress             status;
+    LightFieldCapturePreview              preview;
     std::shared_ptr<const LightFieldFile> result;
-    std::thread controller;
-    CancellationSource cancellation;
-    std::atomic<bool> pause_fast{false};
-    std::atomic<std::uint64_t> recorded{0};
-    bool pause_requested = false;
-    bool controller_parked = false;
-    std::uint32_t live = 0, parked = 0;
-    std::uint64_t view_base = 0;
-    Clock::time_point started{}, finished{};
+    std::thread                           controller;
+    CancellationSource                    cancellation;
+    std::atomic<bool>                     pause_fast{false};
+    std::atomic<std::uint64_t>            recorded{0};
+    bool                                  pause_requested   = false;
+    bool                                  controller_parked = false;
+    std::uint32_t                         live              = 0;
+    std::uint32_t                         parked            = 0;
+    std::uint64_t                         view_base         = 0;
+    Clock::time_point                     started{}, finished{};
 
     void checkpoint(const CancellationToken& token, bool worker) {
         token.check();
@@ -97,6 +105,7 @@ struct LightFieldCaptureSession::Impl {
         }
         token.check();
     }
+
     void worker_finished() {
         std::lock_guard lock(mutex);
         --live;
@@ -105,6 +114,7 @@ struct LightFieldCaptureSession::Impl {
         }
         changed.notify_all();
     }
+
     void fail(const std::string& error) {
         std::lock_guard lock(mutex);
         if (status.error.empty()) {
@@ -115,6 +125,7 @@ struct LightFieldCaptureSession::Impl {
         pause_fast.store(false, std::memory_order_release);
         changed.notify_all();
     }
+
     void complete(RenderState state) {
         std::lock_guard lock(mutex);
         if (!status.error.empty()) {
@@ -123,7 +134,7 @@ struct LightFieldCaptureSession::Impl {
             state = RenderState::cancelled;
         }
         status.state = state;
-        live = parked = 0;
+        live = parked     = 0;
         controller_parked = false;
         if (state != RenderState::completed) {
             result.reset();
@@ -135,15 +146,17 @@ struct LightFieldCaptureSession::Impl {
     void render_view(const PathTracer& tracer, const LightFieldCalibration& c, std::size_t view,
                      Image& image, const LightFieldCaptureSettings& settings,
                      const CancellationToken& token) {
-        const auto count = status.workers;
-        const auto tile_size = settings.tile_size;
-        const auto columns = (c.render.width + tile_size - 1) / tile_size;
-        const auto rows = (c.render.height + tile_size - 1) / tile_size;
+        const auto               count     = status.workers;
+        const auto               tile_size = settings.tile_size;
+        const auto               columns   = (c.render.width + tile_size - 1) / tile_size;
+        const auto               rows      = (c.render.height + tile_size - 1) / tile_size;
         std::atomic<std::size_t> next_tile{0};
+
         struct alignas(128) Statistics {
             PathStatistics value;
         };
-        std::vector<Statistics> statistics(count);
+
+        std::vector<Statistics>  statistics(count);
         std::vector<std::thread> threads;
         threads.reserve(count);
         {
@@ -230,9 +243,9 @@ struct LightFieldCaptureSession::Impl {
              LightFieldCalibration c, CancellationToken token) noexcept {
         try {
             {
-                PathTracer tracer(std::move(scene), c.integrator, token);
-                auto storage = std::make_shared<Storage>();
-                LightFieldWriter writer(storage->directory / "capture.mrlf", c);
+                PathTracer               tracer(std::move(scene), c.integrator, token);
+                auto                     storage = std::make_shared<Storage>();
+                LightFieldWriter         writer(storage->directory / "capture.mrlf", c);
                 std::vector<std::size_t> order{c.center_view()};
                 for (std::size_t i = 0; i < c.view_count(); ++i) {
                     if (i != c.center_view()) {
@@ -250,18 +263,18 @@ struct LightFieldCaptureSession::Impl {
                     {
                         std::lock_guard lock(mutex);
                         status.current_view = view;
-                        status.phase = LightFieldPhase::rendering;
-                        view_base = recorded.load(std::memory_order_relaxed);
-                        status.work_total = std::uint64_t(c.render.width) * c.render.height *
-                                            c.render.samples_per_pixel;
+                        status.phase        = LightFieldPhase::rendering;
+                        view_base           = recorded.load(std::memory_order_relaxed);
+                        status.work_total   = std::uint64_t(c.render.width) * c.render.height *
+                                              c.render.samples_per_pixel;
                     }
                     auto image = std::make_shared<Image>(c.render.width, c.render.height);
                     render_view(tracer, c, view, *image, settings, token);
                     {
                         std::lock_guard lock(mutex);
-                        status.phase = LightFieldPhase::writing;
+                        status.phase          = LightFieldPhase::writing;
                         status.work_completed = 0;
-                        status.work_total = c.render.height;
+                        status.work_total     = c.render.height;
                     }
                     writer.write_view(view, *image, token, [&](LightFieldWork work) {
                         checkpoint(token, false);
@@ -303,13 +316,15 @@ struct LightFieldCaptureSession::Impl {
 };
 
 LightFieldCaptureSession::LightFieldCaptureSession() : impl_(std::make_unique<Impl>()) {}
+
 LightFieldCaptureSession::~LightFieldCaptureSession() {
     cancel();
     wait();
 }
+
 void LightFieldCaptureSession::start(std::shared_ptr<const SceneSnapshot> scene,
-                                     LightFieldCaptureSettings settings,
-                                     IntegratorSettings integrator) {
+                                     LightFieldCaptureSettings            settings,
+                                     IntegratorSettings                   integrator) {
     if (!scene) {
         throw std::invalid_argument("Light field capture requires a scene snapshot");
     }
@@ -348,25 +363,25 @@ void LightFieldCaptureSession::start(std::shared_ptr<const SceneSnapshot> scene,
     wait();
     {
         std::lock_guard lock(impl_->mutex);
-        const auto id = impl_->status.job_id + 1;
-        impl_->status = {};
-        impl_->status.job_id = id;
-        impl_->status.state = RenderState::preparing;
-        impl_->status.total_samples = c.total_paths();
-        impl_->status.total_views = c.view_count();
-        impl_->status.workers = workers;
+        const auto      id            = impl_->status.job_id + 1;
+        impl_->status                 = {};
+        impl_->status.job_id          = id;
+        impl_->status.state           = RenderState::preparing;
+        impl_->status.total_samples   = c.total_paths();
+        impl_->status.total_views     = c.view_count();
+        impl_->status.workers         = workers;
         impl_->status.estimated_bytes = estimated;
-        impl_->status.payload_bytes = c.view_bytes() * c.view_count();
+        impl_->status.payload_bytes   = c.view_bytes() * c.view_count();
         impl_->recorded.store(0);
         impl_->pause_fast.store(false);
         impl_->pause_requested = false;
-        impl_->preview = {};
+        impl_->preview         = {};
         impl_->result.reset();
         impl_->live = impl_->parked = 0;
-        impl_->controller_parked = false;
-        impl_->cancellation = CancellationSource();
-        impl_->started = Clock::now();
-        impl_->finished = {};
+        impl_->controller_parked    = false;
+        impl_->cancellation         = CancellationSource();
+        impl_->started              = Clock::now();
+        impl_->finished             = {};
     }
     try {
         impl_->controller = std::thread(&Impl::run, impl_.get(), std::move(scene), settings,
@@ -377,6 +392,7 @@ void LightFieldCaptureSession::start(std::shared_ptr<const SceneSnapshot> scene,
         throw;
     }
 }
+
 bool LightFieldCaptureSession::pause() {
     std::lock_guard lock(impl_->mutex);
     if (impl_->status.state != RenderState::running) {
@@ -390,6 +406,7 @@ bool LightFieldCaptureSession::pause() {
                               : RenderState::pausing;
     return true;
 }
+
 bool LightFieldCaptureSession::resume() {
     std::lock_guard lock(impl_->mutex);
     if (impl_->status.state != RenderState::paused && impl_->status.state != RenderState::pausing) {
@@ -401,6 +418,7 @@ bool LightFieldCaptureSession::resume() {
     impl_->changed.notify_all();
     return true;
 }
+
 void LightFieldCaptureSession::cancel() {
     std::lock_guard lock(impl_->mutex);
     if (render_terminal(impl_->status.state)) {
@@ -412,19 +430,22 @@ void LightFieldCaptureSession::cancel() {
     impl_->status.state = RenderState::cancelling;
     impl_->changed.notify_all();
 }
+
 void LightFieldCaptureSession::wait() {
     if (impl_->controller.joinable()) {
         impl_->controller.join();
     }
 }
+
 bool LightFieldCaptureSession::wait_for(std::chrono::milliseconds timeout) const {
     std::unique_lock lock(impl_->mutex);
     return impl_->changed.wait_for(lock, timeout,
                                    [&] { return render_terminal(impl_->status.state); });
 }
+
 LightFieldCaptureProgress LightFieldCaptureSession::progress() const {
     std::lock_guard lock(impl_->mutex);
-    auto result = impl_->status;
+    auto            result  = impl_->status;
     result.recorded_samples = impl_->recorded.load(std::memory_order_relaxed);
     if (result.phase == LightFieldPhase::rendering) {
         result.work_completed = result.recorded_samples - impl_->view_base;
@@ -435,10 +456,12 @@ LightFieldCaptureProgress LightFieldCaptureSession::progress() const {
     }
     return result;
 }
+
 LightFieldCapturePreview LightFieldCaptureSession::preview() const {
     std::lock_guard lock(impl_->mutex);
     return impl_->preview;
 }
+
 std::shared_ptr<const LightFieldFile> LightFieldCaptureSession::result() const {
     std::lock_guard lock(impl_->mutex);
     return impl_->status.state == RenderState::completed ? impl_->result : nullptr;

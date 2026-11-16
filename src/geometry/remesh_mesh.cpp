@@ -1,3 +1,6 @@
+// 可编辑网格邻接及局部拓扑修改，供重网格算法使用。
+// 本模块接口见 remesh_mesh.hpp。
+
 #include "remesh_mesh.hpp"
 #include <minirender/geometry/normals.hpp>
 
@@ -20,6 +23,7 @@ template <class T> void sort(std::vector<T>& values, const CancellationToken& to
     });
     token.check();
 }
+
 template <class T> void unique(std::vector<T>& values, const CancellationToken& token) {
     sort(values, token);
     values.erase(std::unique(values.begin(), values.end()), values.end());
@@ -48,6 +52,7 @@ double uv_area(const MeshTriangle& triangle) {
 RemeshEdge remesh_edge(MeshIndex a, MeshIndex b) noexcept {
     return (static_cast<std::uint64_t>(std::min(a, b)) << 32U) | std::max(a, b);
 }
+
 std::pair<MeshIndex, MeshIndex> remesh_endpoints(RemeshEdge edge) noexcept {
     return {static_cast<MeshIndex>(edge >> 32U), static_cast<MeshIndex>(edge)};
 }
@@ -65,8 +70,8 @@ RemeshMesh::RemeshMesh(const MeshData& input, const HalfedgeMesh& topology,
         vertices_[i].boundary = topology.vertices()[i].halfedge != invalid_mesh_index &&
                                 topology.is_boundary(topology.vertices()[i].halfedge);
     }
-    const auto hs = topology.halfedges();
-    std::vector<bool> seen(vertices_.size(), false);
+    const auto              hs = topology.halfedges();
+    std::vector<bool>       seen(vertices_.size(), false);
     std::vector<glm::dvec3> first_normal(vertices_.size());
     for (MeshIndex i = 0; i < faces_.size(); ++i) {
         if (i % 1024 == 0) {
@@ -87,8 +92,8 @@ RemeshMesh::RemeshMesh(const MeshData& input, const HalfedgeMesh& topology,
                                           (settings.preserve_uv_seams && uv_jump) ||
                                           (settings.preserve_hard_normals && normal_seam);
             } else {
-                seen[corner.position] = true;
-                vertex.uv = corner.uv;
+                seen[corner.position]         = true;
+                vertex.uv                     = corner.uv;
                 first_normal[corner.position] = n;
             }
         }
@@ -98,10 +103,10 @@ RemeshMesh::RemeshMesh(const MeshData& input, const HalfedgeMesh& topology,
         if (i % 1024 == 0) {
             token_.check();
         }
-        const auto h = topology.edges()[i].halfedge;
-        const auto twin = hs[h].twin;
-        const auto a = hs[h].origin;
-        const auto b = hs[twin].origin;
+        const auto   h       = topology.edges()[i].halfedge;
+        const auto   twin    = hs[h].twin;
+        const auto   a       = hs[h].origin;
+        const auto   b       = hs[twin].origin;
         std::uint8_t feature = 0;
         if (topology.is_boundary(twin)) {
             feature = settings.preserve_boundary ? boundary : 0;
@@ -149,7 +154,7 @@ RemeshMesh::RemeshMesh(const MeshData& input, const HalfedgeMesh& topology,
             const auto face = pending.back();
             pending.pop_back();
             for (MeshIndex corner = 0; corner < 3; ++corner) {
-                const auto h = face * 3 + corner;
+                const auto h        = face * 3 + corner;
                 const auto neighbor = hs[hs[h].twin].face;
                 if (neighbor != invalid_mesh_index && components[neighbor] == invalid_mesh_index &&
                     !protected_edge(remesh_edge(hs[h].origin, hs[hs[h].twin].origin))) {
@@ -174,12 +179,15 @@ RemeshMesh::RemeshMesh(const MeshData& input, const HalfedgeMesh& topology,
 std::span<const RemeshVertex> RemeshMesh::vertices() const noexcept {
     return vertices_;
 }
+
 std::span<const RemeshFace> RemeshMesh::faces() const noexcept {
     return faces_;
 }
+
 std::size_t RemeshMesh::triangle_count() const noexcept {
     return triangle_count_;
 }
+
 MeshIndex RemeshMesh::component_count() const noexcept {
     return component_count_;
 }
@@ -189,6 +197,7 @@ bool RemeshMesh::contains(MeshIndex face, MeshIndex vertex) const {
            std::any_of(faces_[face].triangle.corners.begin(), faces_[face].triangle.corners.end(),
                        [&](const auto& c) { return c.position == vertex; });
 }
+
 std::vector<RemeshEdge> RemeshMesh::edges() const {
     std::vector<RemeshEdge> result;
     result.reserve(triangle_count_ * 3);
@@ -208,9 +217,10 @@ std::vector<RemeshEdge> RemeshMesh::edges() const {
     token_.check();
     return result;
 }
+
 std::vector<MeshIndex> RemeshMesh::neighbors(MeshIndex vertex) const {
     std::vector<MeshIndex> result;
-    std::size_t visited = 0;
+    std::size_t            visited = 0;
     for (const auto face : vertices_[vertex].faces) {
         if (++visited % 1024 == 0) {
             token_.check();
@@ -224,9 +234,10 @@ std::vector<MeshIndex> RemeshMesh::neighbors(MeshIndex vertex) const {
     unique(result, token_);
     return result;
 }
+
 std::vector<MeshIndex> RemeshMesh::edge_faces(MeshIndex a, MeshIndex b) const {
     std::vector<MeshIndex> result;
-    std::size_t visited = 0;
+    std::size_t            visited = 0;
     for (const auto face : vertices_[a].faces) {
         if (++visited % 1024 == 0) {
             token_.check();
@@ -237,9 +248,11 @@ std::vector<MeshIndex> RemeshMesh::edge_faces(MeshIndex a, MeshIndex b) const {
     }
     return result;
 }
+
 bool RemeshMesh::has_edge(MeshIndex a, MeshIndex b) const {
     return vertices_[a].alive && vertices_[b].alive && !edge_faces(a, b).empty();
 }
+
 bool RemeshMesh::protected_edge(RemeshEdge edge) const {
     return features_.contains(edge);
 }
@@ -247,6 +260,7 @@ bool RemeshMesh::protected_edge(RemeshEdge edge) const {
 glm::dvec3 RemeshMesh::normal(const MeshTriangle& triangle) const {
     return normal_with(triangle, invalid_mesh_index, {});
 }
+
 glm::dvec3 RemeshMesh::normal_with(const MeshTriangle& triangle, MeshIndex vertex,
                                    glm::dvec3 position) const {
     std::array<glm::dvec3, 3> p;
@@ -257,9 +271,10 @@ glm::dvec3 RemeshMesh::normal_with(const MeshTriangle& triangle, MeshIndex verte
     }
     return glm::cross(p[1] - p[0], p[2] - p[0]);
 }
+
 glm::dvec3 RemeshMesh::vertex_normal(MeshIndex vertex) const {
-    glm::dvec3 sum(0);
-    double area = 0;
+    glm::dvec3  sum(0);
+    double      area    = 0;
     std::size_t visited = 0;
     for (const auto face : vertices_[vertex].faces) {
         if (++visited % 1024 == 0) {
@@ -277,11 +292,13 @@ glm::dvec3 RemeshMesh::vertex_normal(MeshIndex vertex) const {
     }
     return glm::normalize(sum);
 }
+
 bool RemeshMesh::valid_face(const MeshTriangle& candidate, glm::dvec3 before,
                             MeshIndex moved_vertex, glm::dvec3 position) const {
     const auto n = normal_with(candidate, moved_vertex, position);
     return finite(n) && glm::dot(n, n) > 1e-20 && glm::dot(n, before) > 0;
 }
+
 bool RemeshMesh::uv_orientation(const MeshTriangle& before, const MeshTriangle& after) const {
     if (!settings_.preserve_uv_seams) {
         return true;
@@ -298,6 +315,7 @@ void RemeshMesh::remove_face(MeshIndex face) {
     faces_[face].alive = false;
     --triangle_count_;
 }
+
 void RemeshMesh::replace_face(MeshIndex face, const MeshTriangle& triangle) {
     for (const auto& c : faces_[face].triangle.corners) {
         std::erase(vertices_[c.position].faces, face);
@@ -307,6 +325,7 @@ void RemeshMesh::replace_face(MeshIndex face, const MeshTriangle& triangle) {
         vertices_[c.position].faces.push_back(face);
     }
 }
+
 void RemeshMesh::add_face(const MeshTriangle& triangle, MeshIndex component) {
     if (faces_.size() >= invalid_mesh_index / 6) {
         throw std::length_error("Remeshing exceeds face index capacity");
@@ -318,6 +337,7 @@ void RemeshMesh::add_face(const MeshTriangle& triangle, MeshIndex component) {
     }
     ++triangle_count_;
 }
+
 void RemeshMesh::changed(std::vector<MeshIndex>& vertices) {
     unique(vertices, token_);
     for (const auto v : vertices) {
@@ -327,8 +347,8 @@ void RemeshMesh::changed(std::vector<MeshIndex>& vertices) {
 
 // link 条件检查共同一环，替换后的无序面键补充检查四面体产生的重复面。
 bool RemeshMesh::link_condition(MeshIndex a, MeshIndex b, std::vector<MeshIndex>& local) const {
-    const auto na = neighbors(a);
-    const auto nb = neighbors(b);
+    const auto             na = neighbors(a);
+    const auto             nb = neighbors(b);
     std::vector<MeshIndex> common;
     std::vector<MeshIndex> opposite;
     std::set_intersection(na.begin(), na.end(), nb.begin(), nb.end(), std::back_inserter(common));
@@ -357,7 +377,7 @@ bool RemeshMesh::link_condition(MeshIndex a, MeshIndex b, std::vector<MeshIndex>
         std::array<MeshIndex, 3> key;
         for (std::size_t i = 0; i < 3; ++i) {
             const auto vertex = faces_[face].triangle.corners[i].position;
-            key[i] = vertex == b ? a : vertex;
+            key[i]            = vertex == b ? a : vertex;
         }
         std::sort(key.begin(), key.end());
         keys.push_back(key);
@@ -380,8 +400,8 @@ RemeshEdit RemeshMesh::split(RemeshEdge edge, glm::dvec3 position,
     if (vertices_.size() >= invalid_mesh_index) {
         throw std::length_error("Remeshing exceeds vertex index capacity");
     }
-    const auto feature = features_.find(edge);
-    const std::uint8_t flags = feature == features_.end() ? 0 : feature->second;
+    const auto         feature = features_.find(edge);
+    const std::uint8_t flags   = feature == features_.end() ? 0 : feature->second;
     if (flags) {
         position = vertices_[a].position + (vertices_[b].position - vertices_[a].position) / 2.0;
         uv_value.reset();
@@ -391,13 +411,15 @@ RemeshEdit RemeshMesh::split(RemeshEdge edge, glm::dvec3 position,
         return {};
     }
     const auto midpoint = static_cast<MeshIndex>(vertices_.size());
+
     struct Children {
-        MeshIndex face;
+        MeshIndex    face;
         MeshTriangle first;
         MeshTriangle second;
     };
+
     std::vector<Children> children;
-    RemeshEdit edit;
+    RemeshEdit            edit;
     for (const auto face : adjacent) {
         const auto& parent = faces_[face].triangle;
         std::size_t corner = 0;
@@ -411,9 +433,9 @@ RemeshEdit RemeshMesh::split(RemeshEdge edge, glm::dvec3 position,
         if (corner == 3) {
             throw std::logic_error("Remeshing edge adjacency is inconsistent");
         }
-        const auto u = parent.corners[corner];
-        const auto v = parent.corners[(corner + 1) % 3];
-        const auto w = parent.corners[(corner + 2) % 3];
+        const auto       u = parent.corners[corner];
+        const auto       v = parent.corners[(corner + 1) % 3];
+        const auto       w = parent.corners[(corner + 2) % 3];
         const MeshCorner middle{
             midpoint, interpolated_normal(u.normal, v.normal),
             uv_value.value_or(glm::vec2((glm::dvec2(u.uv) + glm::dvec2(v.uv)) / 2.0))};
@@ -430,13 +452,13 @@ RemeshEdit RemeshMesh::split(RemeshEdge edge, glm::dvec3 position,
         }
     }
     RemeshVertex vertex;
-    vertex.position = position;
-    vertex.uv = children.front().first.corners[1].uv;
-    vertex.component = faces_[adjacent.front()].component;
-    vertex.boundary = adjacent.size() == 1;
-    vertex.fixed = flags != 0;
+    vertex.position         = position;
+    vertex.uv               = children.front().first.corners[1].uv;
+    vertex.component        = faces_[adjacent.front()].component;
+    vertex.boundary         = adjacent.size() == 1;
+    vertex.fixed            = flags != 0;
     vertex.attribute_locked = (flags & (uv | normal_jump)) != 0;
-    vertex.normal_seam = (flags & normal_jump) != 0;
+    vertex.normal_seam      = (flags & normal_jump) != 0;
     vertices_.push_back(std::move(vertex));
     for (const auto& child : children) {
         const auto component = faces_[child.face].component;
@@ -477,7 +499,7 @@ RemeshEdit RemeshMesh::collapse(RemeshEdge edge, glm::dvec3 position, double max
     if (!link_condition(a, b, local)) {
         return {};
     }
-    auto neighbors_a = neighbors(a);
+    auto       neighbors_a = neighbors(a);
     const auto neighbors_b = neighbors(b);
     neighbors_a.insert(neighbors_a.end(), neighbors_b.begin(), neighbors_b.end());
     unique(neighbors_a, token_);
@@ -487,7 +509,7 @@ RemeshEdit RemeshMesh::collapse(RemeshEdge edge, glm::dvec3 position, double max
             return {};
         }
     }
-    const auto direction = vertices_[b].position - vertices_[a].position;
+    const auto direction      = vertices_[b].position - vertices_[a].position;
     const auto length_squared = glm::dot(direction, direction);
     const auto t =
         length_squared > 0
@@ -498,7 +520,7 @@ RemeshEdit RemeshMesh::collapse(RemeshEdge edge, glm::dvec3 position, double max
         glm::vec2(glm::dvec2(vertices_[a].uv) +
                   t * (glm::dvec2(vertices_[b].uv) - glm::dvec2(vertices_[a].uv))));
     std::vector<std::pair<MeshIndex, MeshTriangle>> replacements;
-    std::vector<MeshIndex> removed;
+    std::vector<MeshIndex>                          removed;
     for (const auto face : local) {
         if (contains(face, a) && contains(face, b)) {
             removed.push_back(face);
@@ -508,7 +530,7 @@ RemeshEdit RemeshMesh::collapse(RemeshEdge edge, glm::dvec3 position, double max
         for (auto& c : candidate.corners) {
             if (c.position == a || c.position == b) {
                 c.position = a;
-                c.uv = uv_value;
+                c.uv       = uv_value;
             }
         }
         if (!valid_face(candidate, normal(faces_[face].triangle), a, position) ||
@@ -528,9 +550,9 @@ RemeshEdit RemeshMesh::collapse(RemeshEdge edge, glm::dvec3 position, double max
         replace_face(face, triangle);
     }
     vertices_[a].position = position;
-    vertices_[a].uv = uv_value;
+    vertices_[a].uv       = uv_value;
     vertices_[a].boundary = vertices_[a].boundary || vertices_[b].boundary;
-    vertices_[b].alive = false;
+    vertices_[b].alive    = false;
     changed(edit.affected);
     edit.applied = true;
     return edit;
@@ -563,30 +585,30 @@ RemeshEdit RemeshMesh::flip(RemeshEdge edge) {
     if (i == 3 || j == 3) {
         throw std::logic_error("Remeshing face orientation is inconsistent");
     }
-    const auto old_first = faces_[adjacent[0]].triangle;
+    const auto old_first  = faces_[adjacent[0]].triangle;
     const auto old_second = faces_[adjacent[1]].triangle;
-    const auto ac = old_first.corners[i];
-    const auto bc = old_first.corners[(i + 1) % 3];
-    const auto cc = old_first.corners[(i + 2) % 3];
-    const auto dc = old_second.corners[(j + 2) % 3];
-    const auto c = cc.position;
-    const auto d = dc.position;
+    const auto ac         = old_first.corners[i];
+    const auto bc         = old_first.corners[(i + 1) % 3];
+    const auto cc         = old_first.corners[(i + 2) % 3];
+    const auto dc         = old_second.corners[(j + 2) % 3];
+    const auto c          = cc.position;
+    const auto d          = dc.position;
     if (c == d || has_edge(c, d)) {
         return {};
     }
     const auto energy = [&](MeshIndex vertex, int delta) {
-        const int target = vertices_[vertex].boundary ? 4 : 6;
+        const int  target    = vertices_[vertex].boundary ? 4 : 6;
         const auto deviation = static_cast<std::int64_t>(neighbors(vertex).size()) + delta - target;
         return deviation * deviation;
     };
     const auto before = energy(a, 0) + energy(b, 0) + energy(c, 0) + energy(d, 0);
-    const auto after = energy(a, -1) + energy(b, -1) + energy(c, 1) + energy(d, 1);
+    const auto after  = energy(a, -1) + energy(b, -1) + energy(c, 1) + energy(d, 1);
     if (after >= before) {
         return {};
     }
     const MeshTriangle first{{cc, dc, bc}}, second{{dc, cc, ac}};
-    const auto n0 = normal(old_first);
-    const auto n1 = normal(old_second);
+    const auto         n0 = normal(old_first);
+    const auto         n1 = normal(old_second);
     if (!valid_face(first, n0, invalid_mesh_index, {}) ||
         !valid_face(first, n1, invalid_mesh_index, {}) ||
         !valid_face(second, n0, invalid_mesh_index, {}) ||
@@ -602,7 +624,7 @@ RemeshEdit RemeshMesh::flip(RemeshEdge edge) {
 }
 
 bool RemeshMesh::valid_positions(std::span<const glm::dvec3> positions,
-                                 std::span<const glm::vec2> uv_values) const {
+                                 std::span<const glm::vec2>  uv_values) const {
     if (positions.size() != vertices_.size() || uv_values.size() != vertices_.size()) {
         throw std::logic_error("Remeshing position count changed");
     }
@@ -624,9 +646,9 @@ bool RemeshMesh::valid_positions(std::span<const glm::dvec3> positions,
         if (!faces_[i].alive) {
             continue;
         }
-        const auto& c = faces_[i].triangle.corners;
-        const auto area = glm::cross(positions[c[1].position] - positions[c[0].position],
-                                     positions[c[2].position] - positions[c[0].position]);
+        const auto& c    = faces_[i].triangle.corners;
+        const auto  area = glm::cross(positions[c[1].position] - positions[c[0].position],
+                                      positions[c[2].position] - positions[c[0].position]);
         if (!finite(area) || glm::dot(area, area) <= 1e-20 ||
             glm::dot(area, normal(faces_[i].triangle)) <= 0) {
             return false;
@@ -645,8 +667,9 @@ bool RemeshMesh::valid_positions(std::span<const glm::dvec3> positions,
     }
     return true;
 }
+
 std::size_t RemeshMesh::relocate(std::span<const glm::dvec3> positions,
-                                 std::span<const glm::vec2> uv_values) {
+                                 std::span<const glm::vec2>  uv_values) {
     std::size_t moved = 0;
     for (std::size_t i = 0; i < vertices_.size(); ++i) {
         if (i % 1024 == 0) {
@@ -675,7 +698,7 @@ std::size_t RemeshMesh::relocate(std::span<const glm::dvec3> positions,
 // 重编号按旧数组顺序进行，哈希表只重建映射，不决定输出次序。
 void RemeshMesh::compact() {
     token_.check();
-    std::vector<MeshIndex> mapping(vertices_.size(), invalid_mesh_index);
+    std::vector<MeshIndex>    mapping(vertices_.size(), invalid_mesh_index);
     std::vector<RemeshVertex> vertices;
     vertices.reserve(vertices_.size());
     for (std::size_t i = 0; i < vertices_.size(); ++i) {
@@ -683,7 +706,7 @@ void RemeshMesh::compact() {
             token_.check();
         }
         if (vertices_[i].alive) {
-            mapping[i] = static_cast<MeshIndex>(vertices.size());
+            mapping[i]  = static_cast<MeshIndex>(vertices.size());
             auto vertex = vertices_[i];
             vertex.faces.clear();
             vertex.version = 0;
@@ -716,15 +739,15 @@ void RemeshMesh::compact() {
         features.emplace(remesh_edge(mapping[a], mapping[b]), flags);
     }
     vertices_ = std::move(vertices);
-    faces_ = std::move(faces);
+    faces_    = std::move(faces);
     features_ = std::move(features);
 }
 
 std::shared_ptr<const MeshData> RemeshMesh::publish(bool update_normals) const {
     token_.check();
-    auto result = std::make_shared<MeshData>();
+    auto                   result = std::make_shared<MeshData>();
     std::vector<MeshIndex> mapping(vertices_.size(), invalid_mesh_index);
-    std::vector<bool> normal_seams;
+    std::vector<bool>      normal_seams;
     result->positions.reserve(vertices_.size());
     for (std::size_t i = 0; i < vertices_.size(); ++i) {
         if (i % 1024 == 0) {

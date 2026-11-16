@@ -1,3 +1,6 @@
+// 布料粒子与平面、球体的连续碰撞及接触修正。
+// 本模块接口见 cloth_collision.hpp。
+
 #include "cloth_collision.hpp"
 
 #include <algorithm>
@@ -13,10 +16,10 @@ void respond(glm::dvec3& velocity, glm::dvec3 normal, double friction) {
     if (vn >= 0) {
         return;
     }
-    const auto tangent = velocity - vn * normal;
-    const double length = glm::length(tangent);
-    const double scale = length > 0 ? std::max(0.0, 1 + friction * vn / length) : 0;
-    velocity = tangent * scale;
+    const auto   tangent = velocity - vn * normal;
+    const double length  = glm::length(tangent);
+    const double scale   = length > 0 ? std::max(0.0, 1 + friction * vn / length) : 0;
+    velocity             = tangent * scale;
 }
 
 glm::dvec3 radial(glm::dvec3 delta, glm::dvec3 velocity) {
@@ -29,9 +32,9 @@ glm::dvec3 radial(glm::dvec3 delta, glm::dvec3 velocity) {
 }
 
 struct Contact {
-    double fraction = 2;
+    double     fraction = 2;
     glm::dvec3 normal{0};
-    double friction = 0;
+    double     friction = 0;
 };
 
 Contact first_contact(glm::dvec3 start, glm::dvec3 motion, double thickness,
@@ -39,7 +42,7 @@ Contact first_contact(glm::dvec3 start, glm::dvec3 motion, double thickness,
     Contact result;
     for (const auto& plane : environment.planes) {
         const double distance = glm::dot(start - plane.point, plane.normal) - thickness;
-        const double change = glm::dot(motion, plane.normal);
+        const double change   = glm::dot(motion, plane.normal);
         if (change < 0) {
             const double fraction = -distance / change;
             if (fraction >= 0 && fraction <= 1 && fraction < result.fraction) {
@@ -52,10 +55,10 @@ Contact first_contact(glm::dvec3 start, glm::dvec3 motion, double thickness,
         return result;
     }
     for (const auto& sphere : environment.spheres) {
-        const double radius = sphere.radius + thickness;
-        const auto delta = start - sphere.center;
-        const double b = glm::dot(delta, motion);
-        const double c = glm::dot(delta, delta) - radius * radius;
+        const double radius       = sphere.radius + thickness;
+        const auto   delta        = start - sphere.center;
+        const double b            = glm::dot(delta, motion);
+        const double c            = glm::dot(delta, delta) - radius * radius;
         const double discriminant = b * b - a * c;
         if (b < 0 && c >= 0 && discriminant >= 0) {
             // 入口根用乘积关系计算，避免接触起点附近相减丢失精度。
@@ -74,8 +77,8 @@ ClothContacts move_cloth_particle(glm::dvec3& position, glm::dvec3& velocity, do
                                   double thickness, const ClothEnvironment& environment,
                                   CancellationToken cancellation) {
     ClothContacts result;
-    const double offset = std::max(1e-9, thickness * 1e-5);
-    bool projected = false;
+    const double  offset    = std::max(1e-9, thickness * 1e-5);
+    bool          projected = false;
     for (int iteration = 0; iteration < 16; ++iteration) {
         cancellation.check();
         projected = false;
@@ -92,7 +95,7 @@ ClothContacts move_cloth_particle(glm::dvec3& position, glm::dvec3& velocity, do
             const double radius = sphere.radius + thickness;
             if (glm::length(position - sphere.center) < radius) {
                 const auto normal = radial(position - sphere.center, velocity);
-                position = sphere.center + normal * (radius + offset);
+                position          = sphere.center + normal * (radius + offset);
                 respond(velocity, normal, sphere.friction);
                 ++result.count;
                 projected = true;
@@ -116,7 +119,7 @@ ClothContacts move_cloth_particle(glm::dvec3& position, glm::dvec3& velocity, do
     }
     for (int iteration = 0; iteration < 8; ++iteration) {
         cancellation.check();
-        const auto motion = velocity * seconds;
+        const auto motion  = velocity * seconds;
         const auto contact = first_contact(position, motion, thickness, environment);
         if (contact.fraction > 1) {
             position += motion;
@@ -130,7 +133,7 @@ ClothContacts move_cloth_particle(glm::dvec3& position, glm::dvec3& velocity, do
             return result;
         }
     }
-    velocity = glm::dvec3(0);
+    velocity       = glm::dvec3(0);
     result.limited = true;
     return result;
 }

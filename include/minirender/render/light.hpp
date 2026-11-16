@@ -1,3 +1,5 @@
+// 场景发光三角形、方向光和环境光的统一采样。
+
 #pragma once
 
 #include <minirender/core/sampling.hpp>
@@ -11,7 +13,7 @@ namespace minirender {
 struct EnvironmentSample {
     glm::dvec3 direction{0};
     glm::dvec3 radiance{0};
-    double probability = 0; // sr^-1
+    double     probability = 0; // sr^-1
 };
 
 // Latlong 原点为图像左上，北极为 +Y，经度零为 +X，经度增加朝 +Z。
@@ -28,15 +30,15 @@ class EnvironmentLight {
   private:
     glm::dvec2 coordinates(glm::dvec3 direction) const;
     glm::dvec3 lookup(glm::dvec2 uv) const;
-    glm::dvec3 constant_;
+    glm::dvec3                     constant_;
     std::shared_ptr<const Texture> texture_;
-    double strength_ = 1;
-    double rotation_ = 0;
-    double integral_ = 0;
-    bool uniform_ = true;
-    std::size_t grid_level_ = 0;
-    std::vector<double> solid_angles_;
-    DiscreteDistribution pixels_;
+    double                         strength_   = 1;
+    double                         rotation_   = 0;
+    double                         integral_   = 0;
+    bool                           uniform_    = true;
+    std::size_t                    grid_level_ = 0;
+    std::vector<double>            solid_angles_;
+    DiscreteDistribution           pixels_;
 };
 
 enum class LightKind { area, directional, environment };
@@ -44,13 +46,13 @@ enum class LightKind { area, directional, environment };
 // direction 从参考点指向光源；distance 对无限光为正无穷。
 // probability 包含光源选择 PMF。方向光为离散事件，另外两类采用 sr^-1。
 struct LightSample {
-    glm::dvec3 direction{0};
-    glm::dvec3 radiance{0};
-    double distance = std::numeric_limits<double>::infinity();
-    double probability = 0;
-    SampleMeasure measure = SampleMeasure::solid_angle;
-    LightKind kind = LightKind::area;
-    std::size_t emitter_index = 0;
+    glm::dvec3    direction{0};
+    glm::dvec3    radiance{0};
+    double        distance      = std::numeric_limits<double>::infinity();
+    double        probability   = 0;
+    SampleMeasure measure       = SampleMeasure::solid_angle;
+    LightKind     kind          = LightKind::area;
+    std::size_t   emitter_index = 0;
     // 面积光终点及其误差，用于同时偏移阴影线段两端；无限光不使用这些字段。
     glm::dvec3 position{0};
     glm::dvec3 normal{0};
@@ -60,12 +62,12 @@ struct LightSample {
 // 发射光子携带已经除以选灯、位置及方向概率的功率；累计结果再除以发射试验总数。
 // 无限光的方向 PDF 对方向光为离散质量，对环境光为 sr^-1；位置 PDF 始终为 m^-2。
 struct PhotonEmission {
-    Ray ray;
+    Ray        ray;
     glm::dvec3 flux{0};
-    LightKind kind = LightKind::area;
-    double selection_pmf = 0;
-    double position_pdf = 0;
-    double direction_pdf = 0;
+    LightKind  kind          = LightKind::area;
+    double     selection_pmf = 0;
+    double     position_pdf  = 0;
+    double     direction_pdf = 0;
 };
 
 // 发光三角形按材质 double_sided 选择单/双面漫发射，与表面可见性一致。
@@ -74,7 +76,7 @@ struct PhotonEmission {
 class LightSampler {
   public:
     explicit LightSampler(std::shared_ptr<const SceneSnapshot> scene,
-                          CancellationToken cancellation = {});
+                          CancellationToken                    cancellation = {});
     std::optional<LightSample> sample(glm::dvec3 reference, double light_u,
                                       glm::dvec2 surface_u) const;
     std::optional<PhotonEmission> sample_emission(double light_u, glm::dvec2 position_u,
@@ -88,29 +90,32 @@ class LightSampler {
   private:
     struct Area {
         std::array<glm::dvec3, 3> vertices;
-        glm::dvec3 normal;
-        glm::dvec3 radiance;
-        double area;
-        bool double_sided;
+        glm::dvec3                normal;
+        glm::dvec3                radiance;
+        double                    area;
+        bool                      double_sided;
     };
+
     struct Directional {
         glm::dvec3 direction;
         glm::dvec3 radiance;
     };
+
     struct Choice {
-        LightKind kind;
+        LightKind   kind;
         std::size_t index;
     };
-    std::shared_ptr<const SceneSnapshot> scene_;
-    EnvironmentLight environment_;
-    std::vector<Area> areas_;
-    std::vector<Directional> directional_;
-    std::vector<Choice> choices_;
+
+    std::shared_ptr<const SceneSnapshot>                           scene_;
+    EnvironmentLight                                               environment_;
+    std::vector<Area>                                              areas_;
+    std::vector<Directional>                                       directional_;
+    std::vector<Choice>                                            choices_;
     std::map<std::pair<std::uint32_t, std::uint32_t>, std::size_t> area_choices_;
-    std::optional<std::size_t> environment_choice_;
-    DiscreteDistribution selection_;
-    glm::dvec3 emission_center_{0};
-    double emission_radius_ = 1;
+    std::optional<std::size_t>                                     environment_choice_;
+    DiscreteDistribution                                           selection_;
+    glm::dvec3                                                     emission_center_{0};
+    double                                                         emission_radius_ = 1;
 };
 
 } // namespace minirender

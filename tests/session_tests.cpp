@@ -1,3 +1,6 @@
+// 回归测试：PT and SPPM sessions retain paused state during rapid resume pause toggles；Render
+// sessions agree bitwise with serial kernels across thread and batch counts。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/render_session.hpp>
 
@@ -26,11 +29,13 @@ std::shared_ptr<const SceneSnapshot> studio() {
     return make_snapshot(
         load_scene(std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/studio.json"));
 }
+
 std::shared_ptr<const SceneSnapshot> sky() {
     SceneDocument scene;
     scene.environment = {0.2F, 0.4F, 0.6F};
     return make_snapshot(scene);
 }
+
 void equal_images(const Image& first, const Image& second) {
     REQUIRE(first.width() == second.width());
     REQUIRE(first.height() == second.height());
@@ -40,6 +45,7 @@ void equal_images(const Image& first, const Image& second) {
         }
     }
 }
+
 RenderPreview preview(RenderSession& session, std::size_t dimension) {
     RenderPreview result;
     wait_until([&] {
@@ -55,8 +61,8 @@ TEST_CASE("PT and SPPM sessions retain paused state during rapid resume pause to
           "[session]") {
     for (const auto kind : {IntegratorKind::path_tracing, IntegratorKind::sppm}) {
         IntegratorSettings integrator;
-        integrator.kind = kind;
-        integrator.maximum_depth = 1;
+        integrator.kind                       = kind;
+        integrator.maximum_depth              = 1;
         integrator.sppm.photons_per_iteration = 1000;
         RenderSession session;
         session.start(sky(), {8, 8, 1000000, 221}, integrator, {2, 4, 1});
@@ -80,11 +86,11 @@ TEST_CASE("PT and SPPM sessions retain paused state during rapid resume pause to
 
 TEST_CASE("Render sessions agree bitwise with serial kernels across thread and batch counts",
           "[session]") {
-    const auto scene = studio();
-    const RenderSettings render{17, 13, 9, 413};
+    const auto               scene = studio();
+    const RenderSettings     render{17, 13, 9, 413};
     const IntegratorSettings integrator{SamplingMode::mis, 4, false, 3};
-    const auto reference = PathTracer(scene, integrator).render(render);
-    RenderSession session;
+    const auto               reference = PathTracer(scene, integrator).render(render);
+    RenderSession            session;
     for (const auto settings :
          {SessionSettings{1, 7, 1}, SessionSettings{4, 3, 4}, SessionSettings{3, 8, 8}}) {
         session.start(scene, render, integrator, settings);
@@ -109,7 +115,7 @@ TEST_CASE("Render sessions agree bitwise with serial kernels across thread and b
     }
     REQUIRE(session.progress().job_id == 3);
     const auto frozen = session.result();
-    const auto pixel = frozen->at(8, 6);
+    const auto pixel  = frozen->at(8, 6);
     session.start(sky(), {4, 4, 1, 2});
     REQUIRE(session.wait_for(10s));
     session.wait();
@@ -118,7 +124,7 @@ TEST_CASE("Render sessions agree bitwise with serial kernels across thread and b
 
 TEST_CASE("Pause parks all workers and cancellation publishes only normalized recorded samples",
           "[session]") {
-    RenderSession session;
+    RenderSession        session;
     const RenderSettings render{64, 40, 1000000, 31};
     session.start(sky(), render, {}, {4, 8, 4});
     wait_until([&] { return session.progress().recorded_samples > 0; });
@@ -162,7 +168,7 @@ TEST_CASE("Pause parks all workers and cancellation publishes only normalized re
 
 TEST_CASE("Render preparation and queued tasks support cancellation and restart", "[session]") {
     CancellationSource source;
-    const auto token = source.token();
+    const auto         token = source.token();
     source.request();
     REQUIRE(token.requested());
     REQUIRE_THROWS_AS(SceneBvh(studio(), token), OperationCancelled);
@@ -170,8 +176,8 @@ TEST_CASE("Render preparation and queued tasks support cancellation and restart"
     REQUIRE_THROWS_AS(PathTracer(studio(), {}, token), OperationCancelled);
     REQUIRE_FALSE(CancellationSource().token().requested());
     CancellationSource query_source;
-    const SceneBvh prepared(studio());
-    const PathTracer tracer(sky(), {}, query_source.token());
+    const SceneBvh     prepared(studio());
+    const PathTracer   tracer(sky(), {}, query_source.token());
     query_source.request();
     Sampler random(3);
     REQUIRE_THROWS_AS(prepared.intersect({}, {}, nullptr, query_source.token()),
@@ -196,23 +202,23 @@ TEST_CASE("Render preparation and queued tasks support cancellation and restart"
 
 TEST_CASE("Worker failure does not publish a partially invalid tile", "[session]") {
     SceneDocument scene;
-    scene.environment = glm::vec3(2e38F);
+    scene.environment     = glm::vec3(2e38F);
     scene.camera.position = {0, -1, 0};
-    scene.camera.target = {0, 0, 0};
-    scene.camera.up = {0, 0, 1};
+    scene.camera.target   = {0, 0, 0};
+    scene.camera.up       = {0, 0, 1};
     scene.materials.push_back({"glass", "glass"});
-    scene.materials[0].kind = MaterialKind::dielectric;
+    scene.materials[0].kind       = MaterialKind::dielectric;
     scene.materials[0].base_color = glm::vec3(1);
     const auto file = std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/assets/plane.obj";
     scene.meshes.push_back({"plane", {}, std::make_shared<const MeshData>(load_obj(file))});
     scene.objects.push_back({"glass", "glass", "plane", "glass", {}, true});
-    const auto snapshot = make_snapshot(scene);
+    const auto               snapshot = make_snapshot(scene);
     const IntegratorSettings integrator{SamplingMode::mis, 2, false, 3};
-    const PathTracer tracer(snapshot, integrator);
-    RenderSettings render{4, 4, 1, 0};
+    const PathTracer         tracer(snapshot, integrator);
+    RenderSettings           render{4, 4, 1, 0};
     // 先记录一个可表达的反射样本，随后透射的 eta^2 使结果超出 float 图像范围。
     for (; render.seed < 512; ++render.seed) {
-        const auto first = tracer.sample_pixel(0, 0, 0, render).x;
+        const auto first  = tracer.sample_pixel(0, 0, 0, render).x;
         const auto second = tracer.sample_pixel(1, 0, 0, render).x;
         if (first <= std::numeric_limits<float>::max() &&
             second > std::numeric_limits<float>::max()) {
@@ -236,10 +242,10 @@ TEST_CASE("Worker failure does not publish a partially invalid tile", "[session]
 }
 
 TEST_CASE("Paused jobs resume without changing the serial image", "[session]") {
-    const auto scene = studio();
-    const RenderSettings render{32, 24, 32, 39};
+    const auto               scene = studio();
+    const RenderSettings     render{32, 24, 32, 39};
     const IntegratorSettings integrator{SamplingMode::mis, 4, false, 3};
-    RenderSession session;
+    RenderSession            session;
     session.start(scene, render, integrator, {2, 8, 4});
     wait_until([&] { return session.progress().state != RenderState::preparing; });
     if (session.pause()) {
@@ -265,7 +271,7 @@ TEST_CASE("Asynchronous failures stay distinct from cancellation and permit reco
     auto scene = load_scene(std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/studio.json");
     for (auto& object : scene.objects) {
         object.transform.translation = glm::vec3(1e10F);
-        object.transform.scale = glm::vec3(1e-4F);
+        object.transform.scale       = glm::vec3(1e-4F);
     }
     RenderSession session;
     session.start(make_snapshot(scene), {8, 8, 1, 1});
@@ -303,18 +309,18 @@ TEST_CASE("Session idle controls and destruction join paused workers", "[session
 TEST_CASE("Live previews stay immutable while worker threads keep committing", "[session]") {
     const auto scene = make_snapshot(
         load_scene(std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/path-room.json"));
-    RenderSession session;
+    RenderSession        session;
     const RenderSettings settings{48, 32, 10000, 73};
     session.start(scene, settings, {}, {4, 8, 1});
     wait_until([&] { return session.progress().recorded_samples > 0; });
-    const auto frozen = preview(session, 48);
+    const auto             frozen = preview(session, 48);
     std::vector<glm::vec3> pixels;
     for (std::size_t y = 0; y < frozen.image->height(); ++y) {
         for (std::size_t x = 0; x < frozen.image->width(); ++x) {
             pixels.push_back(frozen.image->at(x, y));
         }
     }
-    auto previous_samples = frozen.recorded_samples;
+    auto previous_samples  = frozen.recorded_samples;
     auto previous_revision = frozen.revision;
     for (int iteration = 0; iteration < 32; ++iteration) {
         const auto current = session.preview(24);
@@ -330,7 +336,7 @@ TEST_CASE("Live previews stay immutable while worker threads keep committing", "
                     REQUIRE(std::isfinite(value.z));
                 }
             }
-            previous_samples = current.recorded_samples;
+            previous_samples  = current.recorded_samples;
             previous_revision = current.revision;
         }
         const auto progress = session.progress();

@@ -1,3 +1,5 @@
+// macOS 隐藏窗口回归的进程活动生命周期。
+
 #include "regression_activity.hpp"
 
 #import <Foundation/Foundation.h>
@@ -7,7 +9,7 @@ RegressionActivity::RegressionActivity(bool enabled) {
         id token = [[NSProcessInfo processInfo]
             beginActivityWithOptions:NSActivityUserInitiatedAllowingIdleSystemSleep
                               reason:@"MiniRender automated regression"];
-        token_ = (__bridge_retained void*)token;
+        token_   = (__bridge_retained void*)token;
     }
 }
 

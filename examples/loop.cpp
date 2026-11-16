@@ -1,3 +1,5 @@
+// 可运行示例：均匀 Loop 细分、共享边顶点与面角属性插值。
+
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/loop.hpp>
 #include <minirender/render/path_tracer.hpp>
@@ -14,33 +16,33 @@ using namespace minirender;
 int main() {
     try {
         const auto source_directory = std::filesystem::path(MINIRENDER_SOURCE_DIR);
-        const auto original = load_scene(source_directory / "scenes/studio.json");
-        const auto output = std::filesystem::current_path() / "outputs/a4.1";
+        const auto original         = load_scene(source_directory / "scenes/studio.json");
+        const auto output           = std::filesystem::current_path() / "outputs/a4.1";
         std::filesystem::create_directories(output);
         RenderSettings render;
-        render.width = 128;
-        render.height = 128;
+        render.width             = 128;
+        render.height            = 128;
         render.samples_per_pixel = 32;
-        render.seed = 101;
+        render.seed              = 101;
         for (const std::uint32_t level : {0U, 1U, 3U}) {
-            auto scene = original;
+            auto       scene = original;
             const auto cube =
                 std::find_if(scene.meshes.begin(), scene.meshes.end(),
                              [](const MeshAsset& asset) { return asset.id == "cube"; });
             if (cube == scene.meshes.end()) {
                 throw std::runtime_error("Studio scene is missing the cube mesh");
             }
-            const auto start = std::chrono::steady_clock::now();
+            const auto start  = std::chrono::steady_clock::now();
             const auto result = subdivide_loop(cube->data, {level});
             const auto elapsed =
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start);
             cube->data = result.mesh;
             // 清除旧文件来源，明确当前资产已是生成结果；本示例不执行场景保存。
             cube->source.clear();
-            const auto snapshot = make_snapshot(scene);
+            const auto       snapshot = make_snapshot(scene);
             const PathTracer tracer(snapshot);
-            const auto image = tracer.render(render);
-            const auto filename = "loop-" + std::to_string(level);
+            const auto       image    = tracer.render(render);
+            const auto       filename = "loop-" + std::to_string(level);
             image.write_exr(output / (filename + ".exr"));
             display_image(image).write_png(output / (filename + ".png"));
             const auto& stats = result.levels.back();

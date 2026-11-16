@@ -1,3 +1,6 @@
+// 均匀 RGB 介质及射线在有界区域内的吸收、散射处理。
+// 公开接口与参数约定见 include/minirender/scene/medium.hpp。
+
 #include <minirender/scene/medium.hpp>
 
 #include <cmath>
@@ -15,6 +18,7 @@ bool finite(glm::dvec3 value) {
 glm::dvec3 HomogeneousMedium::extinction() const noexcept {
     return absorption + scattering;
 }
+
 void HomogeneousMedium::validate() const {
     if (!finite(absorption) || !finite(scattering) || !finite(extinction()) ||
         glm::any(glm::lessThan(absorption, glm::dvec3(0))) ||
@@ -23,6 +27,7 @@ void HomogeneousMedium::validate() const {
         throw std::invalid_argument("Medium coefficients must be finite/nonnegative and |g| < 1");
     }
 }
+
 void MediumRegion::validate() const {
     medium.validate();
     if (id.empty() || !finite(minimum) || !finite(maximum) || !finite(maximum - minimum) ||
@@ -30,8 +35,9 @@ void MediumRegion::validate() const {
         throw std::invalid_argument("Medium region requires an ID and a finite positive box");
     }
 }
+
 void validate_medium_regions(std::span<const MediumRegion> regions,
-                             CancellationToken cancellation) {
+                             CancellationToken             cancellation) {
     cancellation.check();
     if (regions.size() > maximum_medium_regions) {
         throw std::invalid_argument("Scene supports at most 32 medium regions");

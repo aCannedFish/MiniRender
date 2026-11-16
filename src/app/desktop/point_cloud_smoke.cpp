@@ -1,3 +1,6 @@
+// 隐藏窗口回归：point cloud 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 point_cloud_smoke.hpp。
+
 #include "point_cloud_smoke.hpp"
 #include "geometry_smoke.hpp"
 #include "point_cloud_editor_smoke.hpp"
@@ -20,6 +23,7 @@ void require(bool value, const char* message) {
         throw std::runtime_error(message);
     }
 }
+
 bool close(QColor color, glm::vec3 expected) {
     // 与主场景法线视图相同，诊断 RGB 写入 sRGB 附件后由硬件编码。
     const auto encoded = [](float value) {
@@ -29,49 +33,50 @@ bool close(QColor color, glm::vec3 expected) {
            std::abs(color.green() - encoded(expected.g)) <= 2 &&
            std::abs(color.blue() - encoded(expected.b)) <= 2;
 }
+
 glm::dvec3 project(const minirender::Camera& camera, glm::vec3 p, QSize extent) {
     const auto clip = glm::dmat4(camera.projection_matrix(static_cast<float>(extent.width()) /
                                                           static_cast<float>(extent.height()))) *
                       glm::dmat4(camera.view_matrix()) * glm::dvec4(p, 1);
-    const auto ndc = glm::dvec3(clip) / clip.w;
+    const auto ndc  = glm::dvec3(clip) / clip.w;
     return {(ndc.x * .5 + .5) * extent.width(), (ndc.y * .5 + .5) * extent.height(), ndc.z};
 }
 
 // 软件投影每个小圆片并逐像素选择最近深度，独立检查 GPU 的颜色、覆盖及遮挡。
 QImage verify_points(Workbench& window, const QString& directory, const QString& label) {
-    auto* viewport = window.viewport();
-    const auto image = viewport->grab();
+    auto*      viewport = window.viewport();
+    const auto image    = viewport->grab();
     require(!image.isNull(), "Point preview capture is empty");
     require(image.save(directory + "/" + label + ".png"), "Cannot save point preview capture");
-    const auto& data = *viewport->point_preview_data();
-    const auto& settings = viewport->point_preview_settings();
+    const auto&             data     = *viewport->point_preview_data();
+    const auto&             settings = viewport->point_preview_settings();
     std::vector<glm::dvec3> screen;
     for (const auto& point : data.points) {
         screen.push_back(project(viewport->camera(), point.position, image.size()));
     }
-    std::size_t samples = 0;
-    std::size_t matched = 0;
+    std::size_t samples       = 0;
+    std::size_t matched       = 0;
     std::size_t point_samples = 0;
     for (int y = 1; y < image.height(); y += 2) {
         for (int x = 1; x < image.width(); x += 2) {
-            double depth = 1;
-            bool edge = false;
+            double    depth = 1;
+            bool      edge  = false;
             glm::vec3 color{.08F, .09F, .11F};
-            bool covered = false;
+            bool      covered = false;
             for (std::size_t i = 0; i < screen.size(); ++i) {
                 const auto p = screen[i];
                 if (p.z < 0 || p.z > 1) {
                     continue;
                 }
-                const auto delta = glm::dvec2(x + .5, y + .5) - glm::dvec2(p);
+                const auto   delta    = glm::dvec2(x + .5, y + .5) - glm::dvec2(p);
                 const double distance = glm::length(delta);
-                edge = edge || std::abs(distance - settings.point_radius) < 1;
+                edge                  = edge || std::abs(distance - settings.point_radius) < 1;
                 if (distance < settings.point_radius && p.z <= depth) {
-                    depth = p.z;
+                    depth   = p.z;
                     covered = true;
-                    color = settings.normal_colors && data.has_normals
-                                ? data.points[i].normal * .5F + .5F
-                                : glm::vec3(.25F, .65F, .85F);
+                    color   = settings.normal_colors && data.has_normals
+                                  ? data.points[i].normal * .5F + .5F
+                                  : glm::vec3(.25F, .65F, .85F);
                 }
             }
             if (!edge) {
@@ -90,8 +95,8 @@ QImage verify_points(Workbench& window, const QString& directory, const QString&
 
 // 线段采用独立世界位置插值，在预期像素附近检查诊断色，允许单像素线栅格差异。
 void verify_lines(Workbench& window, glm::vec3 color, bool normals) {
-    const auto image = window.viewport()->grab();
-    const auto& data = *window.viewport()->point_preview_data();
+    const auto  image   = window.viewport()->grab();
+    const auto& data    = *window.viewport()->point_preview_data();
     std::size_t colored = 0;
     for (int y = 0; y < image.height(); ++y) {
         for (int x = 0; x < image.width(); ++x) {
@@ -99,9 +104,9 @@ void verify_lines(Workbench& window, glm::vec3 color, bool normals) {
         }
     }
     require(colored > 50, "Point preview diagnostic lines are missing");
-    std::size_t probes = 0;
+    std::size_t probes  = 0;
     std::size_t matched = 0;
-    const auto count = normals ? data.normal_samples.size() : data.boundary_vertices.size() / 2;
+    const auto  count   = normals ? data.normal_samples.size() : data.boundary_vertices.size() / 2;
     for (std::size_t i = 0; i < count; ++i) {
         const auto a =
             normals ? data.normal_samples[i].position : data.boundary_vertices[2 * i].position;
@@ -132,21 +137,21 @@ void verify_lines(Workbench& window, glm::vec3 color, bool normals) {
 }
 
 struct State {
-    int stage = 0;
-    int frame = 0;
-    int ticks = 0;
-    minirender::Camera camera;
+    int                    stage = 0;
+    int                    frame = 0;
+    int                    ticks = 0;
+    minirender::Camera     camera;
     minirender::PointCloud cloud;
-    std::uint64_t uploads = 0;
-    QImage first;
+    std::uint64_t          uploads = 0;
+    QImage                 first;
 };
 } // namespace
 
 void verify_point_cloud_probe(Workbench& window, const QString& directory, const QString& label) {
-    auto* viewport = window.viewport();
-    const auto image = viewport->grab();
+    auto*      viewport = window.viewport();
+    const auto image    = viewport->grab();
     require(image.save(directory + "/" + label + ".png"), "Cannot save point probe image");
-    const auto& data = *viewport->point_preview_data();
+    const auto& data     = *viewport->point_preview_data();
     const auto& settings = viewport->point_preview_settings();
     require(!settings.show_normals && !settings.show_boundaries,
             "Point probes require isolated points");
@@ -156,17 +161,17 @@ void verify_point_cloud_probe(Workbench& window, const QString& directory, const
     }
     std::size_t checked = 0;
     std::size_t matched = 0;
-    const auto probes = std::min<std::size_t>(96, screen.size());
+    const auto  probes  = std::min<std::size_t>(96, screen.size());
     for (std::size_t probe = 0; probe < probes; ++probe) {
         const auto center = screen[probe * screen.size() / probes];
-        const int x = static_cast<int>(std::floor(center.x));
-        const int y = static_cast<int>(std::floor(center.y));
+        const int  x      = static_cast<int>(std::floor(center.x));
+        const int  y      = static_cast<int>(std::floor(center.y));
         if (center.z < 0 || center.z > 1 || x < 0 || y < 0 || x >= image.width() ||
             y >= image.height()) {
             continue;
         }
-        double depth = 1;
-        bool stable = true;
+        double    depth  = 1;
+        bool      stable = true;
         glm::vec3 color{.08F, .09F, .11F};
         for (std::size_t i = 0; i < screen.size(); ++i) {
             const auto p = screen[i];
@@ -174,7 +179,7 @@ void verify_point_cloud_probe(Workbench& window, const QString& directory, const
                 continue;
             }
             const double distance = glm::length(glm::dvec2(x + .5, y + .5) - glm::dvec2(p));
-            stable = stable && std::abs(distance - settings.point_radius) > .75;
+            stable                = stable && std::abs(distance - settings.point_radius) > .75;
             if (distance < settings.point_radius && p.z <= depth) {
                 depth = p.z;
                 color = settings.normal_colors && data.has_normals
@@ -195,7 +200,7 @@ void start_point_cloud_smoke(Workbench& window, const QString& directory,
                              bool measure_responsiveness) {
     require(QDir().mkpath(directory), "Cannot create point test output directory");
     const auto state = std::make_shared<State>();
-    auto* timer = new QTimer(&window);
+    auto*      timer = new QTimer(&window);
     timer->setInterval(60);
     QObject::connect(
         timer, &QTimer::timeout, &window,
@@ -213,11 +218,11 @@ void start_point_cloud_smoke(Workbench& window, const QString& directory,
                 };
                 switch (state->stage) {
                 case 0: {
-                    state->camera = window.document().camera;
+                    state->camera          = window.document().camera;
                     state->cloud.positions = {{-.75F, -.65F, 0}, {.75F, -.65F, 0}, {0, 0, .25F},
                                               {0, 0, -.25F},     {-1, 1, 0},       {1, 1, 0}};
-                    state->cloud.normals = {{0, 0, 1}, {0, 1, 0},  {1, 0, 0},
-                                            {0, 1, 0}, {0, 0, -1}, {0, -1, 0}};
+                    state->cloud.normals   = {{0, 0, 1}, {0, 1, 0},  {1, 0, 0},
+                                              {0, 1, 0}, {0, 0, -1}, {0, -1, 0}};
                     minirender::MeshData mesh;
                     mesh.positions = state->cloud.positions;
                     minirender::MeshTriangle triangle;
@@ -228,8 +233,8 @@ void start_point_cloud_smoke(Workbench& window, const QString& directory,
                         minirender::prepare_point_preview(state->cloud, &mesh));
                     viewport->set_point_preview_settings({6, .25F, true, false, false});
                     viewport->set_point_preview_visible(true);
-                    auto camera = viewport->camera();
-                    camera.target = {0, -.175F, 0};
+                    auto camera     = viewport->camera();
+                    camera.target   = {0, -.175F, 0};
                     camera.position = {0, -.175F, 4};
                     viewport->set_camera(camera);
                     advance();
@@ -241,7 +246,7 @@ void start_point_cloud_smoke(Workbench& window, const QString& directory,
                                                           state->first.height() / 2),
                                   {1, .5F, .5F}),
                             "Far point overwrote the front point");
-                    state->uploads = viewport->point_uploads();
+                    state->uploads    = viewport->point_uploads();
                     const auto camera = viewport->camera();
                     viewport->set_scene(minirender::make_snapshot(window.document()));
                     require(viewport->camera().position == camera.position,
@@ -287,7 +292,7 @@ void start_point_cloud_smoke(Workbench& window, const QString& directory,
                     require(viewport->point_uploads() == state->uploads,
                             "Display switches reuploaded point buffers");
                     {
-                        auto camera = viewport->camera();
+                        auto camera       = viewport->camera();
                         camera.position.x = .3F;
                         viewport->set_camera(camera);
                     }

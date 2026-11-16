@@ -1,3 +1,5 @@
+// 次表面材质参数控件、状态刷新与用户操作回调。
+
 #pragma once
 
 #include <minirender/scene/scene.hpp>
@@ -19,9 +21,9 @@ class SubsurfaceMaterialPanel final : public QWidget {
     void set_material(const minirender::Material* material, std::uint64_t generation);
     std::function<void(std::shared_ptr<const minirender::SubsurfaceParameters>,
                        std::optional<double>)>
-        on_changed;
+                                    on_changed;
     std::function<void(bool start)> on_render;
-    std::function<bool()> render_active;
+    std::function<bool()>           render_active;
 
   private:
     QWidget* vector_field(const char* name, std::array<QDoubleSpinBox*, 3>& fields,
@@ -31,13 +33,13 @@ class SubsurfaceMaterialPanel final : public QWidget {
     void apply();
     bool dirty() const;
     std::optional<minirender::SubsurfaceParameters> source_, draft_;
-    std::string material_id_;
-    std::uint64_t generation_ = 0;
-    std::array<QDoubleSpinBox*, 3> absorption_{}, scattering_{};
-    QDoubleSpinBox* density_;
-    QComboBox* preset_;
-    QPushButton *apply_, *restore_, *render_;
-    QLabel* notice_;
-    QString error_;
-    bool viewing_task_ = false;
+    std::string                                     material_id_;
+    std::uint64_t                                   generation_ = 0;
+    std::array<QDoubleSpinBox*, 3>                  absorption_{}, scattering_{};
+    QDoubleSpinBox*                                 density_;
+    QComboBox*                                      preset_;
+    QPushButton *                                   apply_, *restore_, *render_;
+    QLabel*                                         notice_;
+    QString                                         error_;
+    bool                                            viewing_task_ = false;
 };

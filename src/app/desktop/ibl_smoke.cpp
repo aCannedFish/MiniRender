@@ -1,3 +1,6 @@
+// 隐藏窗口回归：ibl 的控件操作、渲染结果与资源生命周期检查。
+// 本模块接口见 ibl_smoke.hpp。
+
 #include "ibl_smoke.hpp"
 #include "ibl_controller.hpp"
 #include "workbench.hpp"
@@ -27,16 +30,18 @@ void require(bool value, const char* message) {
         throw std::runtime_error(message);
     }
 }
+
 std::filesystem::path path(const QString& value) {
     const auto bytes = value.toUtf8();
     return std::filesystem::path(std::u8string(bytes.begin(), bytes.end()));
 }
+
 void prepare(Workbench& window, const QString& directory) {
-    auto scene = window.document();
-    scene.camera.position = {3, 2.3F, 4.2F};
-    scene.camera.target = {0, 0.4F, 0};
+    auto scene                   = window.document();
+    scene.camera.position        = {3, 2.3F, 4.2F};
+    scene.camera.target          = {0, 0.4F, 0};
     scene.camera.aperture_radius = 0;
-    scene.environment = {0.1F, 0.2F, 0.3F};
+    scene.environment            = {0.1F, 0.2F, 0.3F};
     scene.directional_lights.clear();
     scene.materials.clear();
     scene.objects.clear();
@@ -45,8 +50,8 @@ void prepare(Workbench& window, const QString& directory) {
     scene.materials[0].base_color = {0.5F, 0.6F, 0.7F};
     scene.materials.push_back({"metal", "metal"});
     scene.materials[1].base_color = {0.8F, 0.3F, 0.1F};
-    scene.materials[1].kind = minirender::MaterialKind::conductor;
-    scene.materials[1].roughness = 0.4F;
+    scene.materials[1].kind       = minirender::MaterialKind::conductor;
+    scene.materials[1].roughness  = 0.4F;
     scene.objects.push_back({"floor", "floor", "plane", "floor", {}, true});
     scene.objects[0].transform.scale = {3, 1, 3};
     scene.objects.push_back({"metal", "metal", "cube", "metal", {}, true});
@@ -55,8 +60,8 @@ void prepare(Workbench& window, const QString& directory) {
         minirender::Image image(128, 64);
         for (std::size_t y = 0; y < 64; ++y) {
             for (std::size_t x = 0; x < 128; ++x) {
-                const double phi = 2 * std::numbers::pi * (static_cast<double>(x) + 0.5) / 128;
-                const double theta = std::numbers::pi * (static_cast<double>(y) + 0.5) / 64;
+                const double     phi = 2 * std::numbers::pi * (static_cast<double>(x) + 0.5) / 128;
+                const double     theta = std::numbers::pi * (static_cast<double>(y) + 0.5) / 64;
                 const glm::dvec3 d{std::sin(theta) * std::cos(phi), std::cos(theta),
                                    std::sin(theta) * std::sin(phi)};
                 image.at(x, y) = kind == 0 ? glm::vec3(2, 0.5F, 0.25F)
@@ -76,25 +81,25 @@ void prepare(Workbench& window, const QString& directory) {
     window.load_scene_file(directory + "/scene.json");
     window.viewport()->set_shadows_enabled(false);
     window.viewport()->set_fxaa_enabled(false);
-    auto ao = window.viewport()->ssao_settings();
+    auto ao    = window.viewport()->ssao_settings();
     ao.enabled = false;
     window.viewport()->set_ssao_settings(ao);
 }
 
 // 逐光线求几何交点，复用 CPU 数据查询；不从 shader 输出反推法线、反射或颜色。
 void verify(Workbench& window, const QString& directory, const char* label) {
-    auto* viewport = window.viewport();
-    const auto maps = viewport->ibl_maps();
-    const auto lut = viewport->ibl_lut();
+    auto*      viewport = window.viewport();
+    const auto maps     = viewport->ibl_maps();
+    const auto lut      = viewport->ibl_lut();
     require(maps && lut, "IBL data is not ready");
     const auto hdr = viewport->grab_hdr();
     minirender::display_image(hdr, viewport->exposure())
         .write_png(path(directory + "/" + label + ".png"));
     hdr.write_exr(path(directory + "/" + label + ".exr"));
-    const auto snapshot = minirender::make_snapshot(window.document());
+    const auto                 snapshot = minirender::make_snapshot(window.document());
     const minirender::SceneBvh bvh(snapshot);
-    std::array<int, 3> counts{};
-    double maximum = 0;
+    std::array<int, 3>         counts{};
+    double                     maximum = 0;
     for (int gy = 0; gy < 24; ++gy) {
         for (int gx = 0; gx < 32; ++gx) {
             const auto x =
@@ -105,10 +110,10 @@ void verify(Workbench& window, const QString& directory, const char* label) {
                 {(static_cast<double>(x) + 0.5) / static_cast<double>(hdr.width()),
                  (static_cast<double>(y) + 0.5) / static_cast<double>(hdr.height())},
                 static_cast<double>(hdr.width()) / static_cast<double>(hdr.height()));
-            const auto hit = bvh.intersect(ray);
+            const auto   hit      = bvh.intersect(ray);
             const double strength = snapshot->environment_strength,
                          rotation = snapshot->environment_rotation_degrees;
-            glm::dvec3 expected;
+            glm::dvec3   expected;
             if (!hit) {
                 ++counts[0];
                 expected = viewport->environment_background()
@@ -121,8 +126,8 @@ void verify(Workbench& window, const QString& directory, const char* label) {
                     continue;
                 }
                 const auto& material = snapshot->instances[hit->instance_index].material;
-                auto n = glm::normalize(glm::dvec3(hit->shading_normal));
-                const auto v =
+                auto        n        = glm::normalize(glm::dvec3(hit->shading_normal));
+                const auto  v =
                     glm::normalize(glm::dvec3(viewport->camera().position) - hit->position);
                 if (glm::dot(n, v) < 0) {
                     n = -n;
@@ -145,7 +150,7 @@ void verify(Workbench& window, const QString& directory, const char* label) {
                 expected += glm::dvec3(material.emission);
             }
             const double error = glm::length(glm::dvec3(hdr.at(x, y)) - expected);
-            maximum = std::max(maximum, error);
+            maximum            = std::max(maximum, error);
             if (error > 0.001 + 0.001 * glm::length(expected)) {
                 qInfo() << "IBL bad probe" << label << x << y << "expected" << expected.x
                         << expected.y << expected.z << "actual" << hdr.at(x, y).x << hdr.at(x, y).y
@@ -159,26 +164,28 @@ void verify(Workbench& window, const QString& directory, const char* label) {
     require(counts[0] > 10 && counts[1] > 100 && counts[2] > 10,
             "IBL scene did not cover all shading paths");
 }
+
 void verify_ao(Workbench& window, const QString& directory) {
-    auto* viewport = window.viewport();
-    const auto original = viewport->ssao_settings();
+    auto*      viewport  = window.viewport();
+    const auto original  = viewport->ssao_settings();
     const auto view_mode = viewport->view_mode();
-    const auto baseline = viewport->grab_hdr();
-    auto settings = original;
-    settings.enabled = true;
-    settings.filtered = true;
-    settings.radius = 0.9F;
-    settings.samples = 64;
+    const auto baseline  = viewport->grab_hdr();
+    auto       settings  = original;
+    settings.enabled     = true;
+    settings.filtered    = true;
+    settings.radius      = 0.9F;
+    settings.samples     = 64;
     viewport->set_ssao_settings(settings);
     const auto masked = viewport->grab_hdr();
     viewport->set_view_mode(5);
     const auto mask = viewport->grab();
     require(baseline.width() == masked.width() && baseline.height() == masked.height(),
             "IBL AO comparison dimensions changed");
-    const auto snapshot = minirender::make_snapshot(window.document());
+    const auto                 snapshot = minirender::make_snapshot(window.document());
     const minirender::SceneBvh bvh(snapshot);
-    double unchanged = 0, composition = 0;
-    int darkened = 0;
+    double                     unchanged   = 0;
+    double                     composition = 0;
+    int                        darkened    = 0;
     for (int gy = 0; gy < 24; ++gy) {
         for (int gx = 0; gx < 32; ++gx) {
             const auto x =
@@ -189,7 +196,7 @@ void verify_ao(Workbench& window, const QString& directory) {
                 {(static_cast<double>(x) + 0.5) / static_cast<double>(baseline.width()),
                  (static_cast<double>(y) + 0.5) / static_cast<double>(baseline.height())},
                 static_cast<double>(baseline.width()) / static_cast<double>(baseline.height()));
-            const auto hit = bvh.intersect(ray);
+            const auto hit     = bvh.intersect(ray);
             const bool diffuse = hit && snapshot->instances[hit->instance_index].material.kind ==
                                             minirender::MaterialKind::diffuse;
             const auto a = glm::dvec3(baseline.at(x, y)), b = glm::dvec3(masked.at(x, y));
@@ -218,7 +225,7 @@ void verify_panel(Workbench& window) {
     require(area && area->widget()->width() <= area->viewport()->width(),
             "Environment panel requires hidden horizontal scrolling");
     auto* panel = area->widget();
-    auto* form = qobject_cast<QFormLayout*>(panel->layout());
+    auto* form  = qobject_cast<QFormLayout*>(panel->layout());
     require(form != nullptr, "Environment form layout is missing");
     std::vector<QWidget*> fields;
     for (int i = 0; i < form->count(); ++i) {
@@ -246,24 +253,28 @@ void verify_panel(Workbench& window) {
 }
 
 struct State {
-    int step = 0, ticks = 0, hold = 0;
-    int maximum_ticks = 1500;
-    std::string source_a;
-    std::uint64_t environment_jobs = 0, hits = 0, gpu_updates = 0;
+    int                   step          = 0;
+    int                   ticks         = 0;
+    int                   hold          = 0;
+    int                   maximum_ticks = 1500;
+    std::string           source_a;
+    std::uint64_t         environment_jobs = 0;
+    std::uint64_t         hits             = 0;
+    std::uint64_t         gpu_updates      = 0;
     SceneUploadStatistics uploads;
-    qint64 last = 0, max_gap = 0;
-    bool monitor = false;
-    qint64 cancel_started = 0;
-    QSize extent;
-    int stable = 0;
-    QElapsedTimer clock;
+    qint64                last = 0, max_gap = 0;
+    bool                  monitor        = false;
+    qint64                cancel_started = 0;
+    QSize                 extent;
+    int                   stable = 0;
+    QElapsedTimer         clock;
 };
 } // namespace
 
 void start_ibl_smoke(Workbench& window, const QString& directory) {
     require(QDir().mkpath(directory), "Cannot create IBL output directory");
-    auto state = std::make_shared<State>();
-    bool valid_budget = false;
+    auto      state        = std::make_shared<State>();
+    bool      valid_budget = false;
     const int configured = qEnvironmentVariableIntValue("MINIRENDER_IBL_TEST_TICKS", &valid_budget);
     if (valid_budget && configured > 0 && configured <= 12000) {
         state->maximum_ticks = configured;
@@ -288,7 +299,7 @@ void start_ibl_smoke(Workbench& window, const QString& directory) {
     QObject::connect(
         timer, &QTimer::timeout, &window, [state, timer, heartbeat, &window, directory] {
             try {
-                auto* viewport = window.viewport();
+                auto* viewport   = window.viewport();
                 auto* controller = window.ibl_controller();
                 require(++state->ticks < state->maximum_ticks && viewport->failure().isEmpty(),
                         "IBL test timed out or GPU failed");
@@ -297,8 +308,8 @@ void start_ibl_smoke(Workbench& window, const QString& directory) {
                 }
                 const auto status = controller->status();
                 require(status.state != IblTaskState::failed, "IBL worker failed");
-                auto* texture = window.findChild<QComboBox*>("environment_texture");
-                const auto select = [&](const std::string& id) {
+                auto*      texture = window.findChild<QComboBox*>("environment_texture");
+                const auto select  = [&](const std::string& id) {
                     texture->setCurrentIndex(texture->findData(QString::fromStdString(id)));
                 };
                 const auto verify_frame = [&](const char* label) {
@@ -310,7 +321,7 @@ void start_ibl_smoke(Workbench& window, const QString& directory) {
                 case 0:
                     prepare(window, directory);
                     window.panels()->setCurrentIndex(5);
-                    state->last = state->clock.elapsed();
+                    state->last    = state->clock.elapsed();
                     state->monitor = true;
                     ++state->step;
                     break;
@@ -334,8 +345,8 @@ void start_ibl_smoke(Workbench& window, const QString& directory) {
                     }
                     verify_frame("constant");
                     state->environment_jobs = status.environment_started;
-                    state->gpu_updates = viewport->ibl_texture_updates();
-                    state->uploads = viewport->upload_statistics();
+                    state->gpu_updates      = viewport->ibl_texture_updates();
+                    state->uploads          = viewport->upload_statistics();
                     window.findChild<QDoubleSpinBox*>("environment_strength")->setValue(0.7);
                     window.select_object("metal");
                     window.findChild<QDoubleSpinBox*>("roughness")->setValue(1);
@@ -397,7 +408,7 @@ void start_ibl_smoke(Workbench& window, const QString& directory) {
                 case 7:
                     verify_frame("rotated");
                     state->environment_jobs = status.environment_started;
-                    state->gpu_updates = viewport->ibl_texture_updates();
+                    state->gpu_updates      = viewport->ibl_texture_updates();
                     window.findChild<QAction*>("undo")->trigger();
                     ++state->step;
                     break;
@@ -456,15 +467,15 @@ void start_ibl_smoke(Workbench& window, const QString& directory) {
                             "Environment persistence failed");
                     verify_frame("reopened");
                     state->environment_jobs = status.environment_started;
-                    state->gpu_updates = viewport->ibl_texture_updates();
-                    state->extent = viewport->swapChainImageSize();
+                    state->gpu_updates      = viewport->ibl_texture_updates();
+                    state->extent           = viewport->swapChainImageSize();
                     viewport->set_camera(
                         minirender::rotate_camera(viewport->camera(), 0.25F, -0.05F, true));
                     window.resize(1000, 600);
                     ++state->step;
                     break;
                 case 14: {
-                    const auto current = viewport->swapChainImageSize();
+                    const auto  current = viewport->swapChainImageSize();
                     const QSize wanted(
                         static_cast<int>(viewport->width() * viewport->devicePixelRatio()),
                         static_cast<int>(viewport->height() * viewport->devicePixelRatio()));

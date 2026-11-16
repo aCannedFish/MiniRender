@@ -1,3 +1,6 @@
+// 命令行光场采集、文件重开与重聚焦。
+// 本模块接口见 lightfield_cli.hpp。
+
 #include "lightfield_cli.hpp"
 
 #include <minirender/assets/scene_io.hpp>
@@ -29,6 +32,7 @@ template <class T> T number(std::string_view text) {
     }
     return result;
 }
+
 std::filesystem::path path(std::string_view text) {
     return std::filesystem::path(std::u8string(text.begin(), text.end()));
 }
@@ -44,16 +48,17 @@ int run_lightfield_cli(int argc, char** argv, bool capture) {
                     : "Usage: --refocus input.mrlf output-prefix [--focus M --aperture M "
                       "--memory-mb N --cache-mb N --exposure EV]");
     }
-    LightFieldCaptureSettings settings;
-    IntegratorSettings integrator;
-    LightFieldRefocusSettings refocus;
-    double exposure = 0;
-    std::uint64_t cache = 128ULL * 1024 * 1024;
+    LightFieldCaptureSettings             settings;
+    IntegratorSettings                    integrator;
+    LightFieldRefocusSettings             refocus;
+    double                                exposure = 0;
+    std::uint64_t                         cache    = 128ULL * 1024 * 1024;
     std::shared_ptr<const LightFieldFile> file;
-    bool reference_set = false, radius_set = false;
+    bool                                  reference_set = false;
+    bool                                  radius_set    = false;
     if (!capture) {
-        file = LightFieldFile::open(path(argv[0]));
-        refocus.focus_distance = file->calibration().reference_focus;
+        file                    = LightFieldFile::open(path(argv[0]));
+        refocus.focus_distance  = file->calibration().reference_focus;
         refocus.aperture_radius = file->calibration().pupil_radius;
     }
     for (int i = 2; i < argc; ++i) {
@@ -67,7 +72,7 @@ int run_lightfield_cli(int argc, char** argv, bool capture) {
         }
         const std::string_view value(argv[++i]);
         if (option == "--memory-mb") {
-            const auto bytes = number<std::uint32_t>(value) * 1024ULL * 1024;
+            const auto bytes             = number<std::uint32_t>(value) * 1024ULL * 1024;
             settings.memory_budget_bytes = refocus.memory_budget_bytes = bytes;
         } else if (capture) {
             if (option == "--width") {
@@ -86,10 +91,10 @@ int run_lightfield_cli(int argc, char** argv, bool capture) {
                 settings.threads = number<std::uint32_t>(value);
             } else if (option == "--radius") {
                 settings.aperture_radius = number<double>(value);
-                radius_set = true;
+                radius_set               = true;
             } else if (option == "--reference-focus") {
                 settings.reference_focus = number<double>(value);
-                reference_set = true;
+                reference_set            = true;
             } else if (option == "--tile") {
                 settings.tile_size = number<std::uint32_t>(value);
             } else if (option == "--depth") {
@@ -144,7 +149,7 @@ int run_lightfield_cli(int argc, char** argv, bool capture) {
                   << "\nPayload bytes: " << progress.payload_bytes << "\nLight field saved.\n";
     } else {
         LightFieldReader reader(file, cache);
-        const auto image = refocus_lightfield(reader, refocus);
+        const auto       image = refocus_lightfield(reader, refocus);
         image.image.write_exr(path(std::string(argv[1]) + ".exr"));
         display_image(image.image, exposure).write_png(path(std::string(argv[1]) + ".png"));
         std::cout << "Stored capture paths: " << file->traced_paths()
