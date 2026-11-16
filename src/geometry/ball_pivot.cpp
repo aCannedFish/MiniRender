@@ -16,13 +16,16 @@ namespace minirender {
 namespace {
 
 using Face = std::array<std::uint32_t, 3>;
+
 std::uint64_t edge_key(std::uint32_t a, std::uint32_t b) {
     return (static_cast<std::uint64_t>(std::min(a, b)) << 32U) | std::max(a, b);
 }
+
 Face face_key(Face face) {
     std::sort(face.begin(), face.end());
     return face;
 }
+
 struct FaceHash {
     std::size_t operator()(const Face& face) const noexcept {
         std::size_t hash = 0;
@@ -39,16 +42,17 @@ struct FrontEdge {
     std::uint32_t a;
     std::uint32_t b;
     std::uint32_t opposite;
-    glm::dvec3 center;
-    bool interior = false;
-    bool active = true;
+    glm::dvec3    center;
+    bool          interior = false;
+    bool          active   = true;
 };
+
 struct Contact {
     std::uint32_t point;
-    glm::dvec3 center;
-    glm::dvec3 normal;
-    glm::dvec3 circumcenter;
-    double angle;
+    glm::dvec3    center;
+    glm::dvec3    normal;
+    glm::dvec3    circumcenter;
+    double        angle;
 };
 
 // 共享边表与顶点面扇执行 join/glue，哈希表只查询，输出顺序由前沿队列确定。
@@ -63,14 +67,14 @@ class BallPivot final {
 
     void run(const std::vector<std::uint32_t>& sources) {
         for (pass_ = 0; pass_ < settings_.radii.size(); ++pass_) {
-            radius_ = settings_.radii[pass_];
-            const auto before = faces_.size();
+            radius_              = settings_.radii[pass_];
+            const auto    before = faces_.size();
             BallPivotPass pass;
             pass.radius = radius_;
             report(BallPivotStage::reactivation, 0, edges_.size());
             for (std::size_t i = 0; i < edges_.size(); ++i) {
                 if (!edges_[i].interior) {
-                    auto& edge = edges_[i];
+                    auto&      edge = edges_[i];
                     const Face face{edge.a, edge.b, edge.opposite};
                     const auto balls = geometry(face);
                     if (balls && empty_ball(face, balls->outward)) {
@@ -92,9 +96,9 @@ class BallPivot final {
                     drain();
                 }
             }
-            pass.new_triangles = faces_.size() - before;
+            pass.new_triangles   = faces_.size() - before;
             pass.total_triangles = faces_.size();
-            pass.boundary_edges = static_cast<std::size_t>(std::count_if(
+            pass.boundary_edges  = static_cast<std::size_t>(std::count_if(
                 edges_.begin(), edges_.end(), [](const auto& edge) { return !edge.interior; }));
             result_.passes.push_back(pass);
         }
@@ -104,9 +108,9 @@ class BallPivot final {
 
   private:
     void report(BallPivotStage stage, std::size_t done, std::size_t total) {
-        stage_ = stage;
+        stage_     = stage;
         completed_ = done;
-        total_ = total;
+        total_     = total;
         cancellation_.check();
         if (progress_) {
             progress_({stage, done, total, pass_, settings_.radii.size(), faces_.size(),
@@ -114,6 +118,7 @@ class BallPivot final {
         }
         cancellation_.check();
     }
+
     void work() {
         if (++result_.candidate_tests > settings_.maximum_candidate_tests) {
             throw std::length_error("Ball pivoting exceeds its candidate work budget");
@@ -122,12 +127,15 @@ class BallPivot final {
             report(stage_, completed_, total_);
         }
     }
+
     glm::dvec3 point(std::uint32_t index) const {
         return glm::dvec3(cloud_->positions[index]);
     }
+
     std::optional<detail::ContactBalls> geometry(const Face& face) const {
         return detail::contact_balls(point(face[0]), point(face[1]), point(face[2]), radius_);
     }
+
     bool compatible(const Face& face, glm::dvec3 normal) {
         for (const auto vertex : face) {
             // 切向或反向法线无法支持该表面面片，避免跨越缺口连接到另一侧。
@@ -138,9 +146,10 @@ class BallPivot final {
         }
         return true;
     }
+
     bool empty_ball(const Face& face, glm::dvec3 center) {
-        const auto neighbors = index_.radius(center, radius_, settings_.maximum_neighbors);
-        const double interior = radius_ * radius_ * (1 - 1e-8);
+        const auto   neighbors = index_.radius(center, radius_, settings_.maximum_neighbors);
+        const double interior  = radius_ * radius_ * (1 - 1e-8);
         for (const auto& neighbor : neighbors) {
             work();
             if (neighbor.index != face[0] && neighbor.index != face[1] &&
@@ -150,12 +159,13 @@ class BallPivot final {
         }
         return true;
     }
+
     // 前沿在同一点可暂时包含多条链，随后 join/glue 将它们连接。
     // link 入/出度保持唯一；已有点须仍在前沿上，全部面扇已闭合的点不再复用。
     bool valid_fan(std::uint32_t vertex, const Face& proposed) {
         std::unordered_map<std::uint32_t, std::uint32_t> next;
-        std::unordered_set<std::uint32_t> previous;
-        const auto add = [&](const Face& face) {
+        std::unordered_set<std::uint32_t>                previous;
+        const auto                                       add = [&](const Face& face) {
             const auto corner = static_cast<std::size_t>(
                 std::find(face.begin(), face.end(), vertex) - face.begin());
             const auto a = face[(corner + 1) % 3];
@@ -177,14 +187,15 @@ class BallPivot final {
         }
         return add(proposed);
     }
+
     bool valid_add(const Face& face) {
         if (face_lookup_.contains(face_key(face))) {
             ++result_.rejected_topology;
             return false;
         }
         for (std::size_t corner = 0; corner < 3; ++corner) {
-            const auto a = face[corner];
-            const auto b = face[(corner + 1) % 3];
+            const auto a     = face[corner];
+            const auto b     = face[(corner + 1) % 3];
             const auto found = edge_lookup_.find(edge_key(a, b));
             if (found != edge_lookup_.end()) {
                 const auto& edge = edges_[found->second];
@@ -202,6 +213,7 @@ class BallPivot final {
         }
         return true;
     }
+
     void add_face(const Face& face, glm::dvec3 center) {
         cancellation_.check();
         if (faces_.size() == settings_.maximum_triangles) {
@@ -214,9 +226,9 @@ class BallPivot final {
             incident_[vertex].push_back(index);
         }
         for (std::size_t corner = 0; corner < 3; ++corner) {
-            const auto a = face[corner];
-            const auto b = face[(corner + 1) % 3];
-            const auto key = edge_key(a, b);
+            const auto a        = face[corner];
+            const auto b        = face[(corner + 1) % 3];
+            const auto key      = edge_key(a, b);
             const auto existing = edge_lookup_.find(key);
             if (existing == edge_lookup_.end()) {
                 const auto edge = static_cast<std::uint32_t>(edges_.size());
@@ -224,12 +236,13 @@ class BallPivot final {
                 edge_lookup_.emplace(key, edge);
                 pending_.push_back(edge);
             } else {
-                auto& edge = edges_[existing->second];
+                auto& edge    = edges_[existing->second];
                 edge.interior = true;
-                edge.active = false;
+                edge.active   = false;
             }
         }
     }
+
     void seed(std::uint32_t first) {
         const auto neighbors =
             index_.radius(point(first), 2 * radius_, settings_.maximum_neighbors);
@@ -265,12 +278,13 @@ class BallPivot final {
             }
         }
     }
+
     void pivot(const FrontEdge& edge) {
-        const auto a = point(edge.a);
-        const auto b = point(edge.b);
-        const auto middle = a + (b - a) * .5;
-        const auto axis = glm::normalize(b - a);
-        const auto start = edge.center - middle;
+        const auto a         = point(edge.a);
+        const auto b         = point(edge.b);
+        const auto middle    = a + (b - a) * .5;
+        const auto axis      = glm::normalize(b - a);
+        const auto start     = edge.center - middle;
         const auto neighbors = index_.radius(middle, 2 * radius_, settings_.maximum_neighbors);
         std::vector<Contact> contacts;
         for (const auto& neighbor : neighbors) {
@@ -294,7 +308,7 @@ class BallPivot final {
                 double angle = detail::contact_angle(axis, start, center - middle);
                 if (std::abs(angle) <= 1e-10) {
                     // 共圆的平面四点可在零角度接触，候选须位于原三角形的另一侧。
-                    const auto original = glm::cross(b - a, point(edge.opposite) - a);
+                    const auto original  = glm::cross(b - a, point(edge.opposite) - a);
                     const auto candidate = glm::cross(b - a, point(next) - a);
                     if (glm::dot(original, candidate) >= 0) {
                         continue;
@@ -331,6 +345,7 @@ class BallPivot final {
             }
         }
     }
+
     void drain() {
         std::size_t processed = 0;
         report(BallPivotStage::pivoting, 0, pending_.size());
@@ -349,13 +364,14 @@ class BallPivot final {
         }
         report(BallPivotStage::pivoting, processed, processed);
     }
+
     void publish(const std::vector<std::uint32_t>& sources) {
         report(BallPivotStage::output, 0, faces_.size());
         if (faces_.empty()) {
             result_.unused_points = cloud_->positions.size();
             return;
         }
-        auto mesh = std::make_shared<MeshData>();
+        auto              mesh = std::make_shared<MeshData>();
         std::vector<Face> output_faces(faces_.size());
         // 前沿终止后按共享边连接每个输入点的面扇。剩余开放分支分别输出，
         // 保留原始位置及法线，并在统计中报告副本，保证后续半边工具可直接使用。
@@ -374,7 +390,7 @@ class BallPivot final {
             const auto root = [&](std::size_t point) {
                 while (parents[point] != point) {
                     parents[point] = parents[parents[point]];
-                    point = parents[point];
+                    point          = parents[point];
                 }
                 return point;
             };
@@ -394,7 +410,7 @@ class BallPivot final {
                 }
             }
             std::vector<std::uint32_t> mapping(incident.size(), detail::no_point);
-            bool first = true;
+            bool                       first = true;
             for (std::size_t i = 0; i < incident.size(); ++i) {
                 if (i % 1024 == 0) {
                     cancellation_.check();
@@ -407,7 +423,7 @@ class BallPivot final {
                     result_.split_vertices += first ? 0 : 1;
                     first = false;
                 }
-                const auto face = incident[i];
+                const auto face   = incident[i];
                 const auto corner = static_cast<std::size_t>(
                     std::find(faces_[face].begin(), faces_[face].end(), vertex) -
                     faces_[face].begin());
@@ -417,7 +433,7 @@ class BallPivot final {
         for (std::size_t i = 0; i < faces_.size(); ++i) {
             MeshTriangle triangle;
             for (std::size_t corner = 0; corner < 3; ++corner) {
-                const auto source = faces_[i][corner];
+                const auto source        = faces_[i][corner];
                 triangle.corners[corner] = {
                     output_faces[i][corner], cloud_->normals[source], {0, 0}};
             }
@@ -428,26 +444,27 @@ class BallPivot final {
         }
         const HalfedgeMesh topology(*mesh, cancellation_);
         result_.topology = topology.statistics();
-        result_.mesh = std::move(mesh);
+        result_.mesh     = std::move(mesh);
         report(BallPivotStage::output, faces_.size(), faces_.size());
     }
-    std::shared_ptr<const PointCloud> cloud_;
-    BallPivotSettings settings_;
-    CancellationToken cancellation_;
-    BallPivotCallback progress_;
-    BallPivotResult& result_;
-    detail::PointIndex index_;
-    std::vector<std::vector<std::uint32_t>> incident_;
-    std::vector<Face> faces_;
-    std::unordered_set<Face, FaceHash> face_lookup_;
-    std::vector<FrontEdge> edges_;
+
+    std::shared_ptr<const PointCloud>                cloud_;
+    BallPivotSettings                                settings_;
+    CancellationToken                                cancellation_;
+    BallPivotCallback                                progress_;
+    BallPivotResult&                                 result_;
+    detail::PointIndex                               index_;
+    std::vector<std::vector<std::uint32_t>>          incident_;
+    std::vector<Face>                                faces_;
+    std::unordered_set<Face, FaceHash>               face_lookup_;
+    std::vector<FrontEdge>                           edges_;
     std::unordered_map<std::uint64_t, std::uint32_t> edge_lookup_;
-    std::deque<std::uint32_t> pending_;
-    std::size_t pass_ = 0;
-    double radius_ = 0;
-    BallPivotStage stage_ = BallPivotStage::validation;
-    std::size_t completed_ = 0;
-    std::size_t total_ = 1;
+    std::deque<std::uint32_t>                        pending_;
+    std::size_t                                      pass_      = 0;
+    double                                           radius_    = 0;
+    BallPivotStage                                   stage_     = BallPivotStage::validation;
+    std::size_t                                      completed_ = 0;
+    std::size_t                                      total_     = 1;
 };
 
 } // namespace
@@ -478,7 +495,7 @@ BallPivotResult reconstruct_ball_pivot(std::shared_ptr<const PointCloud> input,
         throw std::invalid_argument("Ball pivot input is missing or exceeds two million points");
     }
     BallPivotResult result;
-    const auto report = [&](BallPivotStage stage, std::size_t done, std::size_t total) {
+    const auto      report = [&](BallPivotStage stage, std::size_t done, std::size_t total) {
         cancellation.check();
         if (progress) {
             progress({stage, done, total,
@@ -494,10 +511,10 @@ BallPivotResult reconstruct_ball_pivot(std::shared_ptr<const PointCloud> input,
         throw std::invalid_argument("Ball pivoting requires point normals");
     }
     report(BallPivotStage::validation, 1, 1);
-    auto unique = detail::unique_points(*input, cancellation, [&](auto done, auto total) {
+    auto unique          = detail::unique_points(*input, cancellation, [&](auto done, auto total) {
         report(BallPivotStage::duplicates, done, total);
     });
-    result.input_points = input->positions.size();
+    result.input_points  = input->positions.size();
     result.unique_points = unique.cloud.positions.size();
     result.duplicate_points = result.input_points - result.unique_points;
     for (std::size_t i = 0; i < unique.cloud.normals.size(); ++i) {

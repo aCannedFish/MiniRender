@@ -21,49 +21,49 @@ namespace {
 minirender::SceneDocument demo_scene(int kind) {
     using namespace minirender;
     const auto source = std::filesystem::path(builtin_scene_directory().toStdU16String());
-    auto scene = load_scene(source / "studio.json");
+    auto       scene  = load_scene(source / "studio.json");
     std::erase_if(scene.objects, [](const auto& object) { return object.id != "ground"; });
     std::erase_if(scene.meshes, [](const auto& mesh) { return mesh.id != "plane"; });
     std::erase_if(scene.materials, [](const auto& material) { return material.id != "floor"; });
     scene.objects[0].cloth_collider = ClothCollider{ClothColliderKind::plane};
     ClothDefinition definition;
-    Transform transform;
+    Transform       transform;
     if (kind == 0) {
         definition.grid.origin = {-1, 0, 1};
-        transform.translation = {0, 1.7F, 0};
+        transform.translation  = {0, 1.7F, 0};
         auto sphere = std::make_shared<const MeshData>(load_obj(source / "assets/demo-sphere.obj"));
         scene.meshes.push_back({"support", "assets/demo-sphere.obj", sphere});
         Material support;
-        support.id = "support";
+        support.id         = "support";
         support.base_color = {.6F, .65F, .7F};
         scene.materials.push_back(support);
         SceneObject object{"support", "碰撞球", "support", "support", {}};
         object.transform.translation = {0, .65F, 0};
-        object.transform.scale = glm::vec3(.65F);
-        object.cloth_collider = ClothCollider{};
+        object.transform.scale       = glm::vec3(.65F);
+        object.cloth_collider        = ClothCollider{};
         scene.objects.push_back(object);
     } else {
-        definition.grid.origin = {-1, .85, 0};
-        definition.grid.span_v = {0, -1.7, 0};
-        definition.grid.pinned = {0, 24};
+        definition.grid.origin               = {-1, .85, 0};
+        definition.grid.span_v               = {0, -1.7, 0};
+        definition.grid.pinned               = {0, 24};
         definition.environment.wind_velocity = {0, 0, 1.5};
-        transform.translation = {0, 1.3F, 0};
+        transform.translation                = {0, 1.3F, 0};
     }
     const auto component = make_cloth_component(definition);
-    const auto preset = make_cloth_preset("silk");
-    Material material;
-    material.id = "fabric";
-    material.kind = MaterialKind::cloth;
+    const auto preset    = make_cloth_preset("silk");
+    Material   material;
+    material.id         = "fabric";
+    material.kind       = MaterialKind::cloth;
     material.base_color = glm::vec3(1);
-    material.ior = static_cast<float>(preset.ior);
-    material.cloth = preset.appearance;
+    material.ior        = static_cast<float>(preset.ior);
+    material.cloth      = preset.appearance;
     scene.materials.push_back(material);
     scene.meshes.push_back({"fabric", {}, component->mesh()});
     SceneObject object{"cloth", "布料", "fabric", "fabric", transform};
     object.cloth = component;
     scene.objects.push_back(object);
     scene.camera.position = {3, 2.4F, 3.8F};
-    scene.camera.target = {0, kind == 0 ? .8F : 1.3F, 0};
+    scene.camera.target   = {0, kind == 0 ? .8F : 1.3F, 0};
     scene.validate();
     return scene;
 }
@@ -87,7 +87,7 @@ void Workbench::create_cloth_demo(int kind) {
     editor_.edit([&](auto& document) { document = std::move(scene); });
     scene_path_.clear();
     cloth_target_ = "cloth";
-    selected_id_ = "cloth";
+    selected_id_  = "cloth";
     refresh();
     show_cloth_preview();
     setWindowTitle("MiniRender — 布料示例");

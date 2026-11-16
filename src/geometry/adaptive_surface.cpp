@@ -8,8 +8,8 @@
 namespace minirender::detail {
 
 AdaptiveSurface::AdaptiveSurface(std::shared_ptr<const MeshData> input,
-                                 const HalfedgeMesh& topology,
-                                 std::shared_ptr<const Texture> height,
+                                 const HalfedgeMesh&             topology,
+                                 std::shared_ptr<const Texture>  height,
                                  const AdaptiveSettings& settings, CancellationToken cancellation)
     : input_(std::move(input)), height_(std::move(height)), settings_(settings),
       cancellation_(std::move(cancellation)),
@@ -30,7 +30,7 @@ AdaptiveFace AdaptiveSurface::root_face(MeshIndex root) const {
 
 std::array<AdaptiveFace, 4> AdaptiveSurface::children(const AdaptiveFace& parent) {
     cancellation_.check();
-    const auto& c = parent.corners;
+    const auto&          c = parent.corners;
     const AdaptiveCorner ab{hierarchy_.midpoint(c[0].point, c[1].point, parent.level),
                             (c[0].barycentric + c[1].barycentric) / 2.0};
     const AdaptiveCorner bc{hierarchy_.midpoint(c[1].point, c[2].point, parent.level),
@@ -48,6 +48,7 @@ glm::dvec2 AdaptiveSurface::parameter_uv(MeshIndex root, glm::dvec3 barycentric)
     return barycentric.x * glm::dvec2(c[0].uv) + barycentric.y * glm::dvec2(c[1].uv) +
            barycentric.z * glm::dvec2(c[2].uv);
 }
+
 glm::vec2 AdaptiveSurface::uv(MeshIndex root, glm::dvec3 barycentric) const {
     return glm::vec2(parameter_uv(root, barycentric));
 }
@@ -55,7 +56,7 @@ glm::vec2 AdaptiveSurface::uv(MeshIndex root, glm::dvec3 barycentric) const {
 glm::dvec3 AdaptiveSurface::position(const AdaptiveCorner& corner, MeshIndex root) {
     cancellation_.check();
     const auto id = corner.point;
-    auto candidate =
+    auto       candidate =
         glm::dvec3(glm::vec3(hierarchy_.control_position(id, settings_.maximum_level)));
     const bool displaced = settings_.displacement && settings_.displacement->scale != 0;
     if (displaced) {
@@ -64,12 +65,12 @@ glm::dvec3 AdaptiveSurface::position(const AdaptiveCorner& corner, MeshIndex roo
             found =
                 normals_.emplace(id, hierarchy_.smooth_normal(id, settings_.maximum_level)).first;
         }
-        const auto& settings = *settings_.displacement;
+        const auto&  settings = *settings_.displacement;
         const double value =
             height_value(height_->level(0), parameter_uv(root, corner.barycentric));
-        const auto offset = found->second * settings.scale * (value - settings.midlevel);
+        const auto offset     = found->second * settings.scale * (value - settings.midlevel);
         maximum_displacement_ = std::max(maximum_displacement_, glm::length(offset));
-        candidate = glm::dvec3(glm::vec3(candidate + offset));
+        candidate             = glm::dvec3(glm::vec3(candidate + offset));
     }
     for (int axis = 0; axis < 3; ++axis) {
         if (!std::isfinite(candidate[axis])) {
@@ -78,7 +79,7 @@ glm::dvec3 AdaptiveSurface::position(const AdaptiveCorner& corner, MeshIndex roo
     }
     const auto [entry, inserted] = positions_.emplace(id, candidate);
     if (!inserted && displaced) {
-        const double difference = glm::length(candidate - entry->second);
+        const double difference  = glm::length(candidate - entry->second);
         maximum_seam_difference_ = std::max(maximum_seam_difference_, difference);
         if (difference > settings_.displacement->seam_tolerance) {
             throw std::invalid_argument("Adaptive displacement is discontinuous across a UV seam");
@@ -90,7 +91,7 @@ glm::dvec3 AdaptiveSurface::position(const AdaptiveCorner& corner, MeshIndex roo
 AdaptiveSample AdaptiveSurface::sample(MeshIndex root, glm::dvec3 barycentric) {
     cancellation_.check();
     ++queries_;
-    auto face = root_face(root);
+    auto face  = root_face(root);
     auto local = barycentric;
     // 二进制参数点尽早命中层级顶点；其他点仅定位到参照层的一个三角形。
     while (face.level < settings_.maximum_level) {
@@ -104,22 +105,22 @@ AdaptiveSample AdaptiveSurface::sample(MeshIndex root, glm::dvec3 barycentric) {
         }
         const auto children_faces = children(face);
         if (local.x >= 0.5) {
-            face = children_faces[0];
+            face  = children_faces[0];
             local = {2 * local.x - 1, 2 * local.y, 2 * local.z};
         } else if (local.y >= 0.5) {
-            face = children_faces[1];
+            face  = children_faces[1];
             local = {2 * local.y - 1, 2 * local.z, 2 * local.x};
         } else if (local.z >= 0.5) {
-            face = children_faces[2];
+            face  = children_faces[2];
             local = {2 * local.z - 1, 2 * local.x, 2 * local.y};
         } else {
-            face = children_faces[3];
+            face  = children_faces[3];
             local = {1 - 2 * local.z, 1 - 2 * local.x, 1 - 2 * local.y};
         }
     }
-    const auto a = position(face.corners[0], root);
-    const auto b = position(face.corners[1], root);
-    const auto c = position(face.corners[2], root);
+    const auto a      = position(face.corners[0], root);
+    const auto b      = position(face.corners[1], root);
+    const auto c      = position(face.corners[2], root);
     const auto normal = glm::cross(b - a, c - a);
     const auto length = glm::length(normal);
     if (!std::isfinite(length) || length <= 1e-10) {
@@ -145,8 +146,8 @@ AdaptiveSample AdaptiveSurface::sample(MeshIndex root, glm::dvec3 barycentric) {
             direction += local[i] * hierarchy_.smooth_normal(id, face.level);
         }
         const auto& displacement = *settings_.displacement;
-        const auto value = height_value(height_->level(0), parameter_uv(root, barycentric));
-        const auto direction_length = glm::length(direction);
+        const auto  value        = height_value(height_->level(0), parameter_uv(root, barycentric));
+        const auto  direction_length = glm::length(direction);
         if (!std::isfinite(direction_length) || direction_length <= 1e-12) {
             throw std::invalid_argument("Adaptive reference has no interpolated smooth normal");
         }
@@ -161,23 +162,23 @@ void AdaptiveSurface::visit_height_features(const AdaptiveFace& face, double thr
     if (!settings_.displacement || settings_.displacement->scale == 0) {
         return;
     }
-    const auto a = parameter_uv(face.root, face.corners[0].barycentric);
-    const auto b = parameter_uv(face.root, face.corners[1].barycentric);
-    const auto c = parameter_uv(face.root, face.corners[2].barycentric);
-    const auto ab = b - a;
-    const auto ac = c - a;
+    const auto   a           = parameter_uv(face.root, face.corners[0].barycentric);
+    const auto   b           = parameter_uv(face.root, face.corners[1].barycentric);
+    const auto   c           = parameter_uv(face.root, face.corners[2].barycentric);
+    const auto   ab          = b - a;
+    const auto   ac          = c - a;
     const double determinant = ab.x * ac.y - ab.y * ac.x;
     if (std::abs(determinant) < 1e-20) {
         return;
     }
-    const auto& image = height_->level(0);
+    const auto&      image = height_->level(0);
     const glm::dvec2 extent{image.width(), image.height()};
-    const auto low = glm::ceil(glm::min(a, glm::min(b, c)) * extent - 0.5);
-    const auto high = glm::floor(glm::max(a, glm::max(b, c)) * extent - 0.5);
+    const auto       low  = glm::ceil(glm::min(a, glm::min(b, c)) * extent - 0.5);
+    const auto       high = glm::floor(glm::max(a, glm::max(b, c)) * extent - 0.5);
     if (glm::any(glm::lessThan(high, low))) {
         return;
     }
-    const auto count = (high.x - low.x + 1) * (high.y - low.y + 1);
+    const auto count  = (high.x - low.x + 1) * (high.y - low.y + 1);
     const auto budget = settings_.maximum_evaluation_points * 16;
     if (!std::isfinite(count) || count > static_cast<double>(budget - texture_tests_)) {
         throw std::length_error("Adaptive height inspection exceeds its work budget");
@@ -192,13 +193,13 @@ void AdaptiveSurface::visit_height_features(const AdaptiveFace& face, double thr
             }
             const glm::dvec2 uv_point{(static_cast<double>(x) + 0.5) / extent.x,
                                       (static_cast<double>(y) + 0.5) / extent.y};
-            const auto relative = uv_point - a;
-            const double u = (relative.x * ac.y - relative.y * ac.x) / determinant;
-            const double v = (ab.x * relative.y - ab.y * relative.x) / determinant;
+            const auto       relative = uv_point - a;
+            const double     u        = (relative.x * ac.y - relative.y * ac.x) / determinant;
+            const double     v        = (ab.x * relative.y - ab.y * relative.x) / determinant;
             if (u < 0 || v < 0 || u + v > 1) {
                 continue;
             }
-            const double value = height_value(image, uv_point);
+            const double value  = height_value(image, uv_point);
             const double linear = (1 - u - v) * heights[0] + u * heights[1] + v * heights[2];
             if (std::abs((value - linear) * settings_.displacement->scale) > threshold) {
                 visit((1 - u - v) * face.corners[0].barycentric + u * face.corners[1].barycentric +
@@ -211,12 +212,15 @@ void AdaptiveSurface::visit_height_features(const AdaptiveFace& face, double thr
 LoopHierarchy& AdaptiveSurface::hierarchy() noexcept {
     return hierarchy_;
 }
+
 std::size_t AdaptiveSurface::queries() const noexcept {
     return queries_;
 }
+
 double AdaptiveSurface::maximum_displacement() const noexcept {
     return maximum_displacement_;
 }
+
 double AdaptiveSurface::maximum_seam_difference() const noexcept {
     return maximum_seam_difference_;
 }

@@ -28,7 +28,7 @@ std::shared_ptr<const MeshData> control_grid(MeshIndex side) {
                  {std::array{a, a + side + 2, a + 1}, std::array{a, a + side + 1, a + side + 2}}) {
                 MeshTriangle face;
                 for (std::size_t i = 0; i < 3; ++i) {
-                    const auto p = mesh->positions[ids[i]];
+                    const auto p    = mesh->positions[ids[i]];
                     face.corners[i] = {ids[i], {0, 1, 0}, {(p.x + 1) / 2, (p.z + 1) / 2}};
                 }
                 mesh->triangles.push_back(face);
@@ -54,16 +54,16 @@ int main() {
                     .5 + .8 * std::exp(-((u - .68) * (u - .68) + (v - .62) * (v - .62)) / .008)));
             }
         }
-        const auto height = std::make_shared<const Texture>(image);
-        const auto input = control_grid(3);
+        const auto       height = std::make_shared<const Texture>(image);
+        const auto       input  = control_grid(3);
         AdaptiveSettings settings;
         settings.maximum_level = 6;
-        settings.tolerance = .008;
-        settings.displacement = DisplacementSettings{.scale = .5};
-        const auto adaptive = subdivide_adaptive(input, height, settings);
-        const auto refined = subdivide_loop(input, {.levels = settings.maximum_level}).mesh;
-        const auto uniform = displace_mesh(refined, height, *settings.displacement).mesh;
-        const auto comparison = compare_surfaces(uniform, adaptive.mesh);
+        settings.tolerance     = .008;
+        settings.displacement  = DisplacementSettings{.scale = .5};
+        const auto adaptive    = subdivide_adaptive(input, height, settings);
+        const auto refined     = subdivide_loop(input, {.levels = settings.maximum_level}).mesh;
+        const auto uniform     = displace_mesh(refined, height, *settings.displacement).mesh;
+        const auto comparison  = compare_surfaces(uniform, adaptive.mesh);
         std::cout << "faces=" << input->triangles.size() << " -> "
                   << adaptive.mesh->triangles.size() << " uniform=" << uniform->triangles.size()
                   << " eval_points=" << adaptive.evaluation_points
@@ -82,23 +82,23 @@ int main() {
         scene.meshes.push_back({"terrain", {}, adaptive.mesh});
         for (auto& object : scene.objects) {
             if (object.id == "blue_cube") {
-                object.mesh_id = "terrain";
-                object.transform.translation = {0, .05F, 0};
+                object.mesh_id                    = "terrain";
+                object.transform.translation      = {0, .05F, 0};
                 object.transform.rotation_degrees = {0, 0, 0};
             } else if (object.id == "metal_cube") {
                 object.transform.translation = {1.4F, .35F, .4F};
             }
         }
         scene.camera.position = {3, 2.3F, 3.4F};
-        scene.camera.target = {0, .2F, 0};
+        scene.camera.target   = {0, .2F, 0};
         const RenderSettings render{128, 128, 32, 101};
-        const auto actual = PathTracer(make_snapshot(scene)).render(render);
+        const auto           actual = PathTracer(make_snapshot(scene)).render(render);
         actual.write_exr(output / "adaptive.exr");
         display_image(actual).write_png(output / "adaptive.png");
         save_scene(scene, output / "adaptive.json");
-        const auto reopened = load_scene(output / "adaptive.json");
+        const auto reopened  = load_scene(output / "adaptive.json");
         const auto roundtrip = PathTracer(make_snapshot(reopened)).render(render);
-        double maximum = 0;
+        double     maximum   = 0;
         for (std::size_t y = 0; y < render.height; ++y) {
             for (std::size_t x = 0; x < render.width; ++x) {
                 maximum = std::max(maximum, static_cast<double>(
@@ -106,7 +106,7 @@ int main() {
             }
         }
         scene.meshes.back().data = uniform;
-        const auto reference = PathTracer(make_snapshot(scene)).render(render);
+        const auto reference     = PathTracer(make_snapshot(scene)).render(render);
         display_image(reference).write_png(output / "uniform.png");
         std::cout << "roundtrip_rgb_max=" << maximum << '\n';
         return maximum < 2e-6 ? 0 : 1;

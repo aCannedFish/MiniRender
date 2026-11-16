@@ -18,7 +18,7 @@ void DisplacementSettings::validate() const {
 }
 
 DisplacementResult displace_mesh(std::shared_ptr<const MeshData> input,
-                                 std::shared_ptr<const Texture> height,
+                                 std::shared_ptr<const Texture>  height,
                                  DisplacementSettings settings, CancellationToken cancellation,
                                  DisplacementProgressCallback progress) {
     cancellation.check();
@@ -46,12 +46,12 @@ DisplacementResult displace_mesh(std::shared_ptr<const MeshData> input,
     const auto directions = smooth_vertex_normals(*input, cancellation, [&](auto done, auto total) {
         report(DisplacementStage::directions, done, total);
     });
-    const auto sampled = detail::inspect_height_field(*input, topology, height->level(0), settings,
-                                                      cancellation, progress);
+    const auto sampled  = detail::inspect_height_field(*input, topology, height->level(0), settings,
+                                                       cancellation, progress);
     const auto& offsets = sampled.offsets;
-    result.sampled_corners = sampled.sampled_corners;
-    result.seam_edges = sampled.seam_edges;
-    result.seam_segments = sampled.seam_segments;
+    result.sampled_corners         = sampled.sampled_corners;
+    result.seam_edges              = sampled.seam_edges;
+    result.seam_segments           = sampled.seam_segments;
     result.maximum_seam_difference = sampled.maximum_seam_difference;
 
     // 分块复制与移动，使大网格的复制同样可取消，不执行不可中断的整体 MeshData 拷贝。
@@ -68,7 +68,7 @@ DisplacementResult displace_mesh(std::shared_ptr<const MeshData> input,
                 glm::greaterThan(glm::abs(p), glm::dvec3(std::numeric_limits<float>::max())))) {
             throw std::invalid_argument("Displaced position exceeds finite float coordinates");
         }
-        output->positions[vertex] = glm::vec3(p);
+        output->positions[vertex]   = glm::vec3(p);
         result.maximum_displacement = std::max(result.maximum_displacement,
                                                glm::length(glm::dvec3(output->positions[vertex]) -
                                                            glm::dvec3(input->positions[vertex])));
@@ -81,10 +81,10 @@ DisplacementResult displace_mesh(std::shared_ptr<const MeshData> input,
         std::array<glm::dvec3, 3> before, after;
         for (std::size_t corner = 0; corner < 3; ++corner) {
             const auto index = input->triangles[face].corners[corner].position;
-            before[corner] = input->positions[index];
-            after[corner] = output->positions[index];
+            before[corner]   = input->positions[index];
+            after[corner]    = output->positions[index];
         }
-        const auto original = glm::cross(before[1] - before[0], before[2] - before[0]);
+        const auto original  = glm::cross(before[1] - before[0], before[2] - before[0]);
         const auto displaced = glm::cross(after[1] - after[0], after[2] - after[0]);
         if (glm::dot(original, displaced) <= 0) {
             throw std::invalid_argument("Displacement reverses face " + std::to_string(face));

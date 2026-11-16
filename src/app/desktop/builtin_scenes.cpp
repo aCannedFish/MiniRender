@@ -60,8 +60,8 @@ const std::array<BuiltinScene, 14>& builtin_scenes() {
           "glass_ball",
           {320, 320, 128, 101},
           {.maximum_depth = 8,
-           .kind = minirender::IntegratorKind::sppm,
-           .sppm = {.photons_per_iteration = 40000, .initial_radius = .12}}},
+           .kind          = minirender::IntegratorKind::sppm,
+           .sppm          = {.photons_per_iteration = 40000, .initial_radius = .12}}},
          {"mirror_caustic",
           "SPPM · 镜中焦散",
           "sppm-mirror.json",
@@ -69,8 +69,8 @@ const std::array<BuiltinScene, 14>& builtin_scenes() {
           "glass_ball",
           {320, 320, 128, 101},
           {.maximum_depth = 8,
-           .kind = minirender::IntegratorKind::sppm,
-           .sppm = {.photons_per_iteration = 40000, .initial_radius = .12}}},
+           .kind          = minirender::IntegratorKind::sppm,
+           .sppm          = {.photons_per_iteration = 40000, .initial_radius = .12}}},
          {"sss_marble",
           "SSS · 大理石球",
           "sss-marble.json",
@@ -108,6 +108,7 @@ const std::array<BuiltinScene, 14>& builtin_scenes() {
           {.maximum_depth = 1}}}};
     return scenes;
 }
+
 QString builtin_scene_directory() {
 #ifdef Q_OS_MACOS
     return QCoreApplication::applicationDirPath() + "/../Resources/scenes";

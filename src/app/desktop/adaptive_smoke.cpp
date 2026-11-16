@@ -28,6 +28,7 @@ void require(bool condition, const char* message) {
         throw std::runtime_error(message);
     }
 }
+
 template <class T> T* control(Workbench& window, const char* name) {
     auto* value = window.findChild<T*>(name);
     require(value, "Adaptive control missing");
@@ -35,7 +36,7 @@ template <class T> T* control(Workbench& window, const char* name) {
 }
 
 std::shared_ptr<const minirender::MeshData> mesh_for(const minirender::SceneDocument& scene,
-                                                     const std::string& id) {
+                                                     const std::string&               id) {
     const auto object = std::find_if(scene.objects.begin(), scene.objects.end(),
                                      [&](const auto& o) { return o.id == id; });
     require(object != scene.objects.end(), "Adaptive object missing");
@@ -44,20 +45,22 @@ std::shared_ptr<const minirender::MeshData> mesh_for(const minirender::SceneDocu
     require(mesh != scene.meshes.end(), "Adaptive mesh missing");
     return mesh->data;
 }
+
 struct State {
-    int stage = 0;
-    int ticks = 0;
-    int frame = 0;
-    std::shared_ptr<const minirender::MeshData> original;
-    std::shared_ptr<const minirender::MeshData> generated;
+    int                                              stage = 0;
+    int                                              ticks = 0;
+    int                                              frame = 0;
+    std::shared_ptr<const minirender::MeshData>      original;
+    std::shared_ptr<const minirender::MeshData>      generated;
     std::shared_ptr<const minirender::SceneSnapshot> snapshot;
-    minirender::AdaptiveSettings settings;
-    std::shared_ptr<const minirender::Texture> height;
-    QElapsedTimer cancellation_timer;
-    QImage before;
-    QImage after;
+    minirender::AdaptiveSettings                     settings;
+    std::shared_ptr<const minirender::Texture>       height;
+    QElapsedTimer                                    cancellation_timer;
+    QImage                                           before;
+    QImage                                           after;
 };
-void verify_offline(Workbench& window,
+
+void verify_offline(Workbench&                                              window,
                     const std::shared_ptr<const minirender::SceneSnapshot>& scene) {
     require(window.offline_panel()->session().progress().state ==
                 minirender::RenderState::completed,
@@ -88,7 +91,7 @@ void start_adaptive_smoke(Workbench& window, const QString& directory,
     minirender::save_scene(window.document(),
                            std::filesystem::path((directory + "/start.json").toStdU16String()));
     const auto state = std::make_shared<State>();
-    state->original = mesh_for(window.document(), "blue_cube");
+    state->original  = mesh_for(window.document(), "blue_cube");
     window.select_object("blue_cube");
     window.panels()->setCurrentIndex(6);
     auto* timer = new QTimer(&window);
@@ -98,16 +101,16 @@ void start_adaptive_smoke(Workbench& window, const QString& directory,
         timer, &QTimer::timeout, &window,
         [state, timer, probe, &window, directory, measure_responsiveness] {
             try {
-                auto* viewport = window.viewport();
+                auto* viewport   = window.viewport();
                 auto* controller = window.geometry_controller();
                 require(++state->ticks < 2000 && viewport->failure().isEmpty(),
                         "Adaptive GUI timed out or Vulkan failed");
                 if (!viewport->isValid() || viewport->rendered_frames() < 5) {
                     return;
                 }
-                const bool ready = !controller->busy() && !window.asset_loading() &&
-                                   viewport->rendered_frames() > state->frame + 2 &&
-                                   viewport->preview_wait_ms() == 0;
+                const bool ready   = !controller->busy() && !window.asset_loading() &&
+                                     viewport->rendered_frames() > state->frame + 2 &&
+                                     viewport->preview_wait_ms() == 0;
                 const auto advance = [&](int stage) {
                     state->stage = stage;
                     state->frame = viewport->rendered_frames();
@@ -249,9 +252,9 @@ void start_adaptive_smoke(Workbench& window, const QString& directory,
                     control<QDoubleSpinBox>(window, "geometry_adaptive_error")->setValue(2);
                     state->settings = *window.geometry_panel()->parameters().adaptive;
                     {
-                        const auto extent = viewport->swapChainImageSize();
+                        const auto  extent = viewport->swapChainImageSize();
                         const auto& camera = viewport->camera();
-                        const auto object = std::find_if(
+                        const auto  object = std::find_if(
                             window.document().objects.begin(), window.document().objects.end(),
                             [](const auto& o) { return o.id == "blue_cube"; });
                         state->settings.projection = minirender::AdaptiveProjection{
@@ -301,8 +304,8 @@ void start_adaptive_smoke(Workbench& window, const QString& directory,
                     control<QDoubleSpinBox>(window, "geometry_scale")->setValue(.08);
                     {
                         const auto parameters = window.geometry_panel()->parameters();
-                        state->settings = *parameters.adaptive;
-                        const auto texture = std::find_if(
+                        state->settings       = *parameters.adaptive;
+                        const auto texture    = std::find_if(
                             window.document().textures.begin(), window.document().textures.end(),
                             [&](const auto& t) { return t.id == parameters.height_id; });
                         require(texture != window.document().textures.end(),

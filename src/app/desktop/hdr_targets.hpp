@@ -13,7 +13,7 @@ class HdrTargets {
   public:
     HdrTargets() = default;
     ~HdrTargets();
-    HdrTargets(const HdrTargets&) = delete;
+    HdrTargets(const HdrTargets&)            = delete;
     HdrTargets& operator=(const HdrTargets&) = delete;
     void create(VulkanViewport& viewport);
     void release();
@@ -33,19 +33,19 @@ class HdrTargets {
     minirender::Image readback(); // 调用方先等当前提交 fence。
 
   private:
-    VkDevice device_ = VK_NULL_HANDLE;
+    VkDevice         device_   = VK_NULL_HANDLE;
     VkPhysicalDevice physical_ = VK_NULL_HANDLE;
-    VkExtent2D extent_{};
-    GpuImage color_;
-    GpuImage ambient_;
-    GpuImage normal_;
-    GpuImage depth_;
-    GpuImage wire_;
-    VkRenderPass wire_pass_ = VK_NULL_HANDLE;
-    VkFramebuffer wire_framebuffer_ = VK_NULL_HANDLE;
-    bool wire_initialized_ = false;
-    GpuBuffer readback_;
-    VkRenderPass pass_ = VK_NULL_HANDLE;
-    VkFramebuffer framebuffer_ = VK_NULL_HANDLE;
-    bool captured_ = false;
+    VkExtent2D       extent_{};
+    GpuImage         color_;
+    GpuImage         ambient_;
+    GpuImage         normal_;
+    GpuImage         depth_;
+    GpuImage         wire_;
+    VkRenderPass     wire_pass_        = VK_NULL_HANDLE;
+    VkFramebuffer    wire_framebuffer_ = VK_NULL_HANDLE;
+    bool             wire_initialized_ = false;
+    GpuBuffer        readback_;
+    VkRenderPass     pass_        = VK_NULL_HANDLE;
+    VkFramebuffer    framebuffer_ = VK_NULL_HANDLE;
+    bool             captured_    = false;
 };

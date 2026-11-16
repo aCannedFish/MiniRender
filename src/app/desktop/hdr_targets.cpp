@@ -9,8 +9,8 @@ HdrTargets::~HdrTargets() {
 }
 
 void HdrTargets::create(VulkanViewport& viewport) {
-    device_ = viewport.device();
-    physical_ = viewport.physicalDevice();
+    device_         = viewport.device();
+    physical_       = viewport.physicalDevice();
     const auto size = viewport.swapChainImageSize();
     extent_ = {static_cast<std::uint32_t>(size.width()), static_cast<std::uint32_t>(size.height())};
     color_.create(device_, physical_, extent_, VK_FORMAT_R32G32B32A32_SFLOAT,
@@ -28,84 +28,84 @@ void HdrTargets::create(VulkanViewport& viewport) {
                     VK_IMAGE_ASPECT_COLOR_BIT);
     std::array<VkAttachmentDescription, 4> attachments{};
     for (auto& attachment : attachments) {
-        attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-        attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachment.samples        = VK_SAMPLE_COUNT_1_BIT;
+        attachment.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachment.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
+        attachment.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        attachment.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachment.finalLayout    = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     }
-    attachments[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-    attachments[1].format = VK_FORMAT_R16G16B16A16_SFLOAT;
-    attachments[2].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-    attachments[3].format = VK_FORMAT_D32_SFLOAT;
+    attachments[0].format      = VK_FORMAT_R32G32B32A32_SFLOAT;
+    attachments[1].format      = VK_FORMAT_R16G16B16A16_SFLOAT;
+    attachments[2].format      = VK_FORMAT_R32G32B32A32_SFLOAT;
+    attachments[3].format      = VK_FORMAT_D32_SFLOAT;
     attachments[3].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
     const std::array<VkAttachmentReference, 3> colors{
         {{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
          {1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
          {2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL}}};
     const VkAttachmentReference depth{3, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = static_cast<std::uint32_t>(colors.size());
-    subpass.pColorAttachments = colors.data();
+    VkSubpassDescription        subpass{};
+    subpass.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount    = static_cast<std::uint32_t>(colors.size());
+    subpass.pColorAttachments       = colors.data();
     subpass.pDepthStencilAttachment = &depth;
     std::array<VkSubpassDependency, 2> dependencies{};
-    dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependencies[0].dstSubpass = 0;
-    dependencies[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-                                   VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
-                                   VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    dependencies[0].srcSubpass    = VK_SUBPASS_EXTERNAL;
+    dependencies[0].dstSubpass    = 0;
+    dependencies[0].srcStageMask  = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    dependencies[0].dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                                    VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                                    VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
     dependencies[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
     dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
                                     VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
                                     VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    dependencies[1].srcSubpass = 0;
-    dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-    dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-                                   VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
-                                   VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-    dependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    dependencies[1].srcSubpass    = 0;
+    dependencies[1].dstSubpass    = VK_SUBPASS_EXTERNAL;
+    dependencies[1].srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                                    VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                                    VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    dependencies[1].dstStageMask  = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     dependencies[1].srcAccessMask =
         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
     dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     VkRenderPassCreateInfo pass{};
-    pass.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    pass.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     pass.attachmentCount = static_cast<std::uint32_t>(attachments.size());
-    pass.pAttachments = attachments.data();
-    pass.subpassCount = 1;
-    pass.pSubpasses = &subpass;
+    pass.pAttachments    = attachments.data();
+    pass.subpassCount    = 1;
+    pass.pSubpasses      = &subpass;
     pass.dependencyCount = static_cast<std::uint32_t>(dependencies.size());
-    pass.pDependencies = dependencies.data();
+    pass.pDependencies   = dependencies.data();
     check_vk(vkCreateRenderPass(device_, &pass, nullptr, &pass_), "create HDR pass");
     const std::array<VkImageView, 4> views{color_.view(), normal_.view(), ambient_.view(),
                                            depth_.view()};
-    VkFramebufferCreateInfo framebuffer{};
-    framebuffer.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    framebuffer.renderPass = pass_;
+    VkFramebufferCreateInfo          framebuffer{};
+    framebuffer.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    framebuffer.renderPass      = pass_;
     framebuffer.attachmentCount = static_cast<std::uint32_t>(views.size());
-    framebuffer.pAttachments = views.data();
-    framebuffer.width = extent_.width;
-    framebuffer.height = extent_.height;
-    framebuffer.layers = 1;
+    framebuffer.pAttachments    = views.data();
+    framebuffer.width           = extent_.width;
+    framebuffer.height          = extent_.height;
+    framebuffer.layers          = 1;
     check_vk(vkCreateFramebuffer(device_, &framebuffer, nullptr, &framebuffer_),
              "create HDR framebuffer");
     wire_.create(device_, physical_, extent_, VK_FORMAT_R8G8B8A8_UNORM,
                  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                  VK_IMAGE_ASPECT_COLOR_BIT);
     std::array<VkAttachmentDescription, 2> wire_attachments{};
-    wire_attachments[0] = attachments[0];
+    wire_attachments[0]        = attachments[0];
     wire_attachments[0].format = VK_FORMAT_R8G8B8A8_UNORM;
-    wire_attachments[1] = attachments[3];
+    wire_attachments[1]        = attachments[3];
     wire_attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     // 保留表面深度和 read-only 布局，使背面的边线受已绘制表面遮挡。
     wire_attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
     const VkAttachmentReference wire_color{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
     const VkAttachmentReference wire_depth{1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL};
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &wire_color;
+    subpass.colorAttachmentCount    = 1;
+    subpass.pColorAttachments       = &wire_color;
     subpass.pDepthStencilAttachment = &wire_depth;
     dependencies[0].srcStageMask |=
         VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
@@ -117,30 +117,30 @@ void HdrTargets::create(VulkanViewport& viewport) {
     dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
                                     VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
                                     VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    pass.attachmentCount = static_cast<std::uint32_t>(wire_attachments.size());
-    pass.pAttachments = wire_attachments.data();
+    pass.attachmentCount          = static_cast<std::uint32_t>(wire_attachments.size());
+    pass.pAttachments             = wire_attachments.data();
     check_vk(vkCreateRenderPass(device_, &pass, nullptr, &wire_pass_), "create wire pass");
     const std::array<VkImageView, 2> wire_views{wire_.view(), depth_.view()};
-    framebuffer.renderPass = wire_pass_;
+    framebuffer.renderPass      = wire_pass_;
     framebuffer.attachmentCount = static_cast<std::uint32_t>(wire_views.size());
-    framebuffer.pAttachments = wire_views.data();
+    framebuffer.pAttachments    = wire_views.data();
     check_vk(vkCreateFramebuffer(device_, &framebuffer, nullptr, &wire_framebuffer_),
              "create wire framebuffer");
 }
 
 void HdrTargets::begin(VkCommandBuffer command) {
     std::array<VkClearValue, 4> clear{};
-    clear[0].color = {{0.012F, 0.018F, 0.028F, 1}};
-    clear[1].color = {{0, 0, 0, 0}};
-    clear[2].color = {{0, 0, 0, 0}};
+    clear[0].color        = {{0.012F, 0.018F, 0.028F, 1}};
+    clear[1].color        = {{0, 0, 0, 0}};
+    clear[2].color        = {{0, 0, 0, 0}};
     clear[3].depthStencil = {1, 0};
     VkRenderPassBeginInfo begin{};
-    begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    begin.renderPass = pass_;
-    begin.framebuffer = framebuffer_;
+    begin.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    begin.renderPass        = pass_;
+    begin.framebuffer       = framebuffer_;
     begin.renderArea.extent = extent_;
-    begin.clearValueCount = static_cast<std::uint32_t>(clear.size());
-    begin.pClearValues = clear.data();
+    begin.clearValueCount   = static_cast<std::uint32_t>(clear.size());
+    begin.pClearValues      = clear.data();
     vkCmdBeginRenderPass(command, &begin, VK_SUBPASS_CONTENTS_INLINE);
 }
 
@@ -148,50 +148,53 @@ void HdrTargets::begin_wire(VkCommandBuffer command) {
     std::array<VkClearValue, 2> clear{};
     clear[0].color = {{0.012F, 0.018F, 0.028F, 1}};
     VkRenderPassBeginInfo begin{};
-    begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    begin.renderPass = wire_pass_;
-    begin.framebuffer = wire_framebuffer_;
+    begin.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    begin.renderPass        = wire_pass_;
+    begin.framebuffer       = wire_framebuffer_;
     begin.renderArea.extent = extent_;
-    begin.clearValueCount = static_cast<std::uint32_t>(clear.size());
-    begin.pClearValues = clear.data();
+    begin.clearValueCount   = static_cast<std::uint32_t>(clear.size());
+    begin.pClearValues      = clear.data();
     vkCmdBeginRenderPass(command, &begin, VK_SUBPASS_CONTENTS_INLINE);
     wire_initialized_ = true;
 }
+
 bool HdrTargets::wire_initialized() const noexcept {
     return wire_initialized_;
 }
+
 VkRenderPass HdrTargets::wire_pass() const noexcept {
     return wire_pass_;
 }
+
 VkImageView HdrTargets::wire_view() const noexcept {
     return wire_.view();
 }
 
 void HdrTargets::record_readback(VkCommandBuffer command, VkImage source) {
-    const auto image = source == VK_NULL_HANDLE ? color_.image() : source;
+    const auto         image = source == VK_NULL_HANDLE ? color_.image() : source;
     const VkDeviceSize bytes = VkDeviceSize(extent_.width) * extent_.height * 4 * sizeof(float);
     readback_.create(device_, physical_, bytes, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     VkImageMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    barrier.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.srcAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    barrier.dstAccessMask       = VK_ACCESS_TRANSFER_READ_BIT;
+    barrier.oldLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.newLayout           = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = image;
-    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    barrier.image               = image;
+    barrier.subresourceRange    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                          VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
     VkBufferImageCopy copy{};
     copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    copy.imageExtent = {extent_.width, extent_.height, 1};
+    copy.imageExtent      = {extent_.width, extent_.height, 1};
     vkCmdCopyImageToBuffer(command, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readback_.handle(),
                            1, &copy);
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.oldLayout     = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    barrier.newLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TRANSFER_BIT,
                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1,
                          &barrier);
@@ -208,7 +211,7 @@ minirender::Image HdrTargets::readback() {
     for (std::size_t y = 0; y < extent_.height; ++y) {
         for (std::size_t x = 0; x < extent_.width; ++x) {
             const auto index = (y * extent_.width + x) * 4;
-            image.at(x, y) = {rgba[index], rgba[index + 1], rgba[index + 2]};
+            image.at(x, y)   = {rgba[index], rgba[index + 1], rgba[index + 2]};
         }
     }
     return image;
@@ -222,31 +225,36 @@ void HdrTargets::release() {
         vkDestroyRenderPass(device_, pass_, nullptr);
     }
     wire_framebuffer_ = VK_NULL_HANDLE;
-    wire_pass_ = VK_NULL_HANDLE;
+    wire_pass_        = VK_NULL_HANDLE;
     wire_initialized_ = false;
-    framebuffer_ = VK_NULL_HANDLE;
-    pass_ = VK_NULL_HANDLE;
+    framebuffer_      = VK_NULL_HANDLE;
+    pass_             = VK_NULL_HANDLE;
     readback_.release();
     color_.release();
     ambient_.release();
     normal_.release();
     wire_.release();
     depth_.release();
-    device_ = VK_NULL_HANDLE;
+    device_   = VK_NULL_HANDLE;
     captured_ = false;
 }
+
 VkRenderPass HdrTargets::render_pass() const noexcept {
     return pass_;
 }
+
 VkImageView HdrTargets::color_view() const noexcept {
     return color_.view();
 }
+
 VkImageView HdrTargets::ambient_view() const noexcept {
     return ambient_.view();
 }
+
 VkImageView HdrTargets::normal_view() const noexcept {
     return normal_.view();
 }
+
 VkImageView HdrTargets::depth_view() const noexcept {
     return depth_.view();
 }

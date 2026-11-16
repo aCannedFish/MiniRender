@@ -15,22 +15,26 @@ namespace {
 bool finite(glm::vec3 value) {
     return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
 }
+
 bool primitive(SdfKind kind) {
     return kind == SdfKind::sphere || kind == SdfKind::box || kind == SdfKind::torus;
 }
+
 void require(bool value, const char* message) {
     if (!value) {
         throw std::invalid_argument(message);
     }
 }
+
 glm::dmat4 object_to_world(const SdfNode& node) {
-    auto matrix = glm::translate(glm::dmat4(1), glm::dvec3(node.translation));
-    const auto angle = glm::radians(glm::dvec3(node.rotation_degrees));
-    matrix = glm::rotate(matrix, angle.z, glm::dvec3(0, 0, 1));
-    matrix = glm::rotate(matrix, angle.y, glm::dvec3(0, 1, 0));
-    matrix = glm::rotate(matrix, angle.x, glm::dvec3(1, 0, 0));
+    auto       matrix = glm::translate(glm::dmat4(1), glm::dvec3(node.translation));
+    const auto angle  = glm::radians(glm::dvec3(node.rotation_degrees));
+    matrix            = glm::rotate(matrix, angle.z, glm::dvec3(0, 0, 1));
+    matrix            = glm::rotate(matrix, angle.y, glm::dvec3(0, 1, 0));
+    matrix            = glm::rotate(matrix, angle.x, glm::dvec3(1, 0, 0));
     return glm::scale(matrix, glm::dvec3(node.scale));
 }
+
 SdfBounds primitive_bounds(const SdfNode& node, const glm::dmat4& matrix) {
     glm::dvec3 half(node.parameters.x);
     if (node.kind == SdfKind::box) {
@@ -47,6 +51,7 @@ SdfBounds primitive_bounds(const SdfNode& node, const glm::dmat4& matrix) {
     }
     return {center - extent, center + extent, false};
 }
+
 SdfBounds combine_bounds(SdfKind kind, const SdfBounds& a, const SdfBounds& b) {
     if (kind == SdfKind::subtract) {
         return a;
@@ -138,7 +143,7 @@ void SdfDocument::validate(CancellationToken cancellation) const {
         }
     }
     std::vector<int> colors(nodes.size(), 0);
-    const auto visit = [&](auto&& self, std::uint32_t index) -> void {
+    const auto       visit = [&](auto&& self, std::uint32_t index) -> void {
         cancellation.check();
         require(colors[index] != 1, "SDF graph contains a cycle");
         if (colors[index] == 2) {
@@ -159,24 +164,24 @@ void SdfDocument::validate(CancellationToken cancellation) const {
 SdfField::SdfField(const SdfDocument& document, CancellationToken cancellation) {
     document.validate(cancellation);
     std::vector<std::uint32_t> mapping(document.nodes.size(), invalid_sdf_node);
-    const auto compile = [&](auto&& self, std::uint32_t index) -> std::uint32_t {
+    const auto                 compile = [&](auto&& self, std::uint32_t index) -> std::uint32_t {
         cancellation.check();
         if (mapping[index] != invalid_sdf_node) {
             return mapping[index];
         }
-        const auto& source = document.nodes[index];
+        const auto&     source = document.nodes[index];
         CompiledSdfNode node;
-        node.kind = source.kind;
-        node.parameters = source.parameters;
-        node.color = source.color;
-        node.scale = source.scale;
+        node.kind         = source.kind;
+        node.parameters   = source.parameters;
+        node.color        = source.color;
+        node.scale        = source.scale;
         node.source_index = index;
         if (primitive(source.kind)) {
-            const auto matrix = object_to_world(source);
+            const auto matrix   = object_to_world(source);
             node.world_to_local = glm::inverse(matrix);
-            node.bounds = primitive_bounds(source, matrix);
+            node.bounds         = primitive_bounds(source, matrix);
         } else {
-            node.left = self(self, source.left);
+            node.left  = self(self, source.left);
             node.right = self(self, source.right);
             node.bounds =
                 combine_bounds(source.kind, nodes_[node.left].bounds, nodes_[node.right].bounds);
@@ -195,14 +200,14 @@ SdfSample SdfField::sample(glm::dvec3 point) const {
     for (std::uint32_t i = 0; i < nodes_.size(); ++i) {
         const auto& node = nodes_[i];
         if (primitive(node.kind)) {
-            const auto p = glm::dvec3(node.world_to_local * glm::dvec4(point, 1));
-            double distance = 0;
+            const auto p        = glm::dvec3(node.world_to_local * glm::dvec4(point, 1));
+            double     distance = 0;
             if (node.kind == SdfKind::sphere) {
                 distance = glm::length(p) - node.parameters.x;
             } else if (node.kind == SdfKind::box) {
                 const auto q = glm::abs(p) - node.parameters;
-                distance = glm::length(glm::max(q, glm::dvec3(0))) +
-                           std::min(std::max({q.x, q.y, q.z}), 0.0);
+                distance     = glm::length(glm::max(q, glm::dvec3(0))) +
+                               std::min(std::max({q.x, q.y, q.z}), 0.0);
             } else {
                 distance = glm::length(glm::dvec2(
                                glm::length(glm::dvec2(p.x, p.z)) - node.parameters.x, p.y)) -
@@ -211,7 +216,7 @@ SdfSample SdfField::sample(glm::dvec3 point) const {
             samples[i] = {distance * node.scale, i};
         } else {
             const auto a = samples[node.left];
-            auto b = samples[node.right];
+            auto       b = samples[node.right];
             if (node.kind == SdfKind::subtract) {
                 b.distance = -b.distance;
             }
@@ -227,7 +232,7 @@ glm::dvec3 SdfField::normal(glm::dvec3 point, double step) const {
     glm::dvec3 gradient;
     for (int axis = 0; axis < 3; ++axis) {
         glm::dvec3 offset(0);
-        offset[axis] = step;
+        offset[axis]   = step;
         gradient[axis] = sample(point + offset).distance - sample(point - offset).distance;
     }
     const double length = glm::length(gradient);
@@ -236,12 +241,15 @@ glm::dvec3 SdfField::normal(glm::dvec3 point, double step) const {
     }
     return gradient / length;
 }
+
 const SdfBounds& SdfField::bounds() const noexcept {
     return nodes_[root_].bounds;
 }
+
 std::span<const CompiledSdfNode> SdfField::nodes() const noexcept {
     return nodes_;
 }
+
 std::uint32_t SdfField::root() const noexcept {
     return root_;
 }
@@ -260,14 +268,14 @@ SdfTraceResult trace_sdf(const SdfField& field, const Ray& ray, SdfTraceSettings
                 !std::isnan(maximum_distance) && maximum_distance >= minimum_distance,
             "SDF ray interval is invalid");
     SdfTraceResult result;
-    double first = minimum_distance;
-    double last = std::min(maximum_distance, settings.maximum_distance);
+    double         first = minimum_distance;
+    double         last  = std::min(maximum_distance, settings.maximum_distance);
     if (field.bounds().empty || first > last) {
         return result;
     }
     const double padding = 4 * (settings.epsilon + settings.relative_epsilon * last);
     for (int axis = 0; axis < 3; ++axis) {
-        const double low = field.bounds().minimum[axis] - padding;
+        const double low  = field.bounds().minimum[axis] - padding;
         const double high = field.bounds().maximum[axis] + padding;
         if (ray.direction[axis] == 0) {
             if (ray.origin[axis] < low || ray.origin[axis] > high) {
@@ -280,7 +288,7 @@ SdfTraceResult trace_sdf(const SdfField& field, const Ray& ray, SdfTraceSettings
                 std::swap(a, b);
             }
             first = std::max(first, a);
-            last = std::min(last, b);
+            last  = std::min(last, b);
             if (first > last) {
                 return result;
             }
@@ -289,12 +297,12 @@ SdfTraceResult trace_sdf(const SdfField& field, const Ray& ray, SdfTraceSettings
     double t = first;
     for (std::uint32_t step = 0; step < settings.maximum_steps; ++step) {
         cancellation.check();
-        result.position = ray.origin + ray.direction * t;
-        const auto sample = field.sample(result.position);
-        result.distance = t;
-        result.residual = std::abs(sample.distance);
-        result.material = sample.material;
-        result.steps = step + 1;
+        result.position      = ray.origin + ray.direction * t;
+        const auto sample    = field.sample(result.position);
+        result.distance      = t;
+        result.residual      = std::abs(sample.distance);
+        result.material      = sample.material;
+        result.steps         = step + 1;
         const double epsilon = settings.epsilon + settings.relative_epsilon * t;
         if (result.residual <= epsilon) {
             result.state = SdfTraceState::hit;
@@ -330,6 +338,7 @@ std::string sdf_kind_name(SdfKind kind) {
     }
     throw std::invalid_argument("Unknown SDF kind");
 }
+
 SdfKind parse_sdf_kind(const std::string& text) {
     for (const auto kind : {SdfKind::sphere, SdfKind::box, SdfKind::torus, SdfKind::unite,
                             SdfKind::intersect, SdfKind::subtract}) {
@@ -364,9 +373,9 @@ SdfDocument make_sdf_example() {
         {"models", "模型并集", SdfKind::unite, {}, {}, {}, 1, {}, 2, 3},
         {"ground", "地面盒", SdfKind::box, {3, .05F, 3}, {0, -.05F, 0}, {}, 1, {.55F, .57F, .6F}},
         {"root", "场景", SdfKind::unite, {}, {}, {}, 1, {}, 4, 5}};
-    scene.root = 6;
+    scene.root            = 6;
     scene.camera.position = {4, 2.8F, 4.8F};
-    scene.camera.target = {0, .7F, 0};
+    scene.camera.target   = {0, .7F, 0};
     scene.light.direction = {-1, -2, -1};
     scene.light.intensity = 3;
     // 默认视角含贴近地面轮廓的射线，为掠射留出更大的迭代预算。

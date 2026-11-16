@@ -1,0 +1,3 @@
+BasedOnStyle: InheritParentConfig
+# GLSL includes share declarations in source order; sorting can move users before definitions.
+SortIncludes: Never

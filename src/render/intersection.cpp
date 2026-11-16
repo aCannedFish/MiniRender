@@ -9,7 +9,7 @@ namespace {
 
 // 用 FMA 补偿第二个乘积的舍入，减少细长三角形边函数相减时的消去误差。
 double difference_of_products(double a, double b, double c, double d) {
-    const double cd = c * d;
+    const double cd         = c * d;
     const double correction = std::fma(-c, d, cd);
     return std::fma(a, b, -cd) + correction;
 }
@@ -25,16 +25,19 @@ void RayInterval::validate() const {
 bool Bounds3::empty() const noexcept {
     return glm::any(glm::greaterThan(minimum, maximum));
 }
+
 void Bounds3::expand(glm::vec3 point) {
     minimum = glm::min(minimum, point);
     maximum = glm::max(maximum, point);
 }
+
 void Bounds3::expand(const Bounds3& bounds) {
     if (!bounds.empty()) {
         expand(bounds.minimum);
         expand(bounds.maximum);
     }
 }
+
 double Bounds3::surface_area() const noexcept {
     if (empty()) {
         return 0;
@@ -54,7 +57,7 @@ RayQuery::RayQuery(const Ray& ray) : origin_(ray.origin), direction_(ray.directi
         throw std::invalid_argument("Ray direction must have unit length");
     }
     const auto absolute = glm::abs(direction_);
-    z_ = absolute.x > absolute.y ? 0 : 1;
+    z_                  = absolute.x > absolute.y ? 0 : 1;
     if (absolute.z > absolute[z_]) {
         z_ = 2;
     }
@@ -83,13 +86,13 @@ std::optional<double> RayQuery::intersect(const Bounds3& bounds, RayInterval int
             continue;
         }
         double near = (static_cast<double>(bounds.minimum[axis]) - origin_[axis]) * inverse_[axis];
-        double far = (static_cast<double>(bounds.maximum[axis]) - origin_[axis]) * inverse_[axis];
+        double far  = (static_cast<double>(bounds.maximum[axis]) - origin_[axis]) * inverse_[axis];
         if (near > far) {
             std::swap(near, far);
         }
         // 向外舍入 slab 距离，保留恰好接触盒面的射线。
-        near = std::nextafter(near, -std::numeric_limits<double>::infinity());
-        far = std::nextafter(far, std::numeric_limits<double>::infinity());
+        near  = std::nextafter(near, -std::numeric_limits<double>::infinity());
+        far   = std::nextafter(far, std::numeric_limits<double>::infinity());
         enter = std::max(enter, near);
         leave = std::min(leave, far);
         if (enter > leave) {
@@ -100,7 +103,7 @@ std::optional<double> RayQuery::intersect(const Bounds3& bounds, RayInterval int
 }
 
 std::optional<TriangleHit> RayQuery::intersect(const std::array<glm::vec3, 3>& vertices,
-                                               RayInterval interval) const {
+                                               RayInterval                     interval) const {
     interval.validate();
     std::array<glm::dvec3, 3> p;
     for (std::size_t index = 0; index < 3; ++index) {
@@ -130,12 +133,12 @@ std::optional<TriangleHit> RayQuery::intersect(const std::array<glm::vec3, 3>& v
         const double error = operations * (std::numeric_limits<double>::epsilon() * 0.5);
         return error / (1 - error);
     };
-    const double x = std::max({std::abs(p[0].x), std::abs(p[1].x), std::abs(p[2].x)});
-    const double y = std::max({std::abs(p[0].y), std::abs(p[1].y), std::abs(p[2].y)});
-    const double z = std::max({std::abs(p[0].z), std::abs(p[1].z), std::abs(p[2].z)});
+    const double x       = std::max({std::abs(p[0].x), std::abs(p[1].x), std::abs(p[2].x)});
+    const double y       = std::max({std::abs(p[0].y), std::abs(p[1].y), std::abs(p[2].y)});
+    const double z       = std::max({std::abs(p[0].z), std::abs(p[1].z), std::abs(p[2].z)});
     const double error_x = gamma(5) * (x + z), error_y = gamma(5) * (y + z);
     const double error_edge = 2 * (gamma(2) * x * y + error_y * x + error_x * y);
-    const double edge = std::max({std::abs(a), std::abs(b), std::abs(c)});
+    const double edge       = std::max({std::abs(a), std::abs(b), std::abs(c)});
     const double error_distance =
         3 * (gamma(3) * edge * z + error_edge * z + gamma(3) * z * edge) / std::abs(determinant);
     if (distance <= error_distance) {

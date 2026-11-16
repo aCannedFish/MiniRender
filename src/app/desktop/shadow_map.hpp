@@ -11,10 +11,10 @@ class ShadowMap {
   public:
     ShadowMap() = default;
     ~ShadowMap();
-    ShadowMap(const ShadowMap&) = delete;
-    ShadowMap& operator=(const ShadowMap&) = delete;
+    ShadowMap(const ShadowMap&)               = delete;
+    ShadowMap& operator=(const ShadowMap&)    = delete;
     static constexpr std::uint32_t resolution = 1024;
-    static constexpr std::uint32_t layers = 8;
+    static constexpr std::uint32_t layers     = 8;
     void create(VulkanViewport& viewport);
     void release();
     void prepare(VkCommandBuffer command);
@@ -23,13 +23,13 @@ class ShadowMap {
     VkDescriptorImageInfo descriptor() const noexcept;
 
   private:
-    VkDevice device_ = VK_NULL_HANDLE;
-    VkImage image_ = VK_NULL_HANDLE;
-    VkDeviceMemory memory_ = VK_NULL_HANDLE;
-    VkImageView array_view_ = VK_NULL_HANDLE;
-    VkSampler sampler_ = VK_NULL_HANDLE;
-    VkRenderPass pass_ = VK_NULL_HANDLE;
-    std::array<VkImageView, layers> views_{};
+    VkDevice                          device_     = VK_NULL_HANDLE;
+    VkImage                           image_      = VK_NULL_HANDLE;
+    VkDeviceMemory                    memory_     = VK_NULL_HANDLE;
+    VkImageView                       array_view_ = VK_NULL_HANDLE;
+    VkSampler                         sampler_    = VK_NULL_HANDLE;
+    VkRenderPass                      pass_       = VK_NULL_HANDLE;
+    std::array<VkImageView, layers>   views_{};
     std::array<VkFramebuffer, layers> framebuffers_{};
-    bool initialized_ = false;
+    bool                              initialized_ = false;
 };

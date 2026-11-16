@@ -21,13 +21,15 @@ void save_obj(const MeshData& mesh, const std::filesystem::path& path,
               CancellationToken cancellation = {}, MeshWriteProgress progress = {});
 
 enum class SceneSaveStage { validation, mesh, hash, compare, copy, metadata, commit };
+
 struct SceneSaveProgress {
-    SceneSaveStage stage = SceneSaveStage::validation;
-    std::size_t asset_index = 0;
-    std::size_t asset_count = 0;
-    std::size_t completed = 0;
-    std::size_t total = 1;
+    SceneSaveStage stage       = SceneSaveStage::validation;
+    std::size_t    asset_index = 0;
+    std::size_t    asset_count = 0;
+    std::size_t    completed   = 0;
+    std::size_t    total       = 1;
 };
+
 using SceneSaveCallback = std::function<void(const SceneSaveProgress&)>;
 
 // 拒绝目标与任一输入网格/纹理路径相同或等价的情况，供导出与保存共用。

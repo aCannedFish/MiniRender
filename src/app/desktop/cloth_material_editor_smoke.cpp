@@ -28,20 +28,25 @@ void require(bool condition, const char* message) {
         throw std::runtime_error(message);
     }
 }
+
 template <class T> T* control(Workbench& window, const char* name) {
     auto* result = window.findChild<T*>(name);
     require(result != nullptr, "Cloth material control is missing");
     return result;
 }
+
 const minirender::Material& material(Workbench& window) {
     return window.document().materials[0];
 }
+
 void number(Workbench& window, const char* name, double value) {
     control<QDoubleSpinBox>(window, name)->setValue(value);
 }
+
 void click(Workbench& window, const char* name) {
     control<QPushButton>(window, name)->click();
 }
+
 void text(Workbench& window, const char* name, const QString& value) {
     auto* field = control<QLineEdit>(window, name);
     field->setText(value);
@@ -56,8 +61,8 @@ void verify_layout(Workbench& window, const QString& directory, const QString& l
     auto* page = area->widget();
     require(page->width() <= area->viewport()->width(), "Cloth editor needs horizontal scrolling");
     std::vector<std::pair<QWidget*, QRect>> fields;
-    QWidget* bottom = nullptr;
-    int last = 0;
+    QWidget*                                bottom = nullptr;
+    int                                     last   = 0;
     for (auto* field : page->findChildren<QWidget*>()) {
         if (!field->objectName().startsWith("cloth_") ||
             field->objectName() == "cloth_material_panel" || !field->isVisibleTo(page)) {
@@ -76,7 +81,7 @@ void verify_layout(Workbench& window, const QString& directory, const QString& l
         }
         fields.emplace_back(field, rect);
         if (rect.bottom() > last) {
-            last = rect.bottom();
+            last   = rect.bottom();
             bottom = field;
         }
     }
@@ -92,12 +97,12 @@ void verify_layout(Workbench& window, const QString& directory, const QString& l
 }
 
 struct State {
-    int stage = 0, frame = 0, ticks = 0, edits = 0;
-    UiResponseProbe* probe = nullptr;
-    std::uint64_t meshes = 0, descriptors = 0;
+    int                                                stage = 0, frame = 0, ticks = 0, edits = 0;
+    UiResponseProbe*                                   probe  = nullptr;
+    std::uint64_t                                      meshes = 0, descriptors = 0;
     std::shared_ptr<const minirender::ClothAppearance> before_curve, before_preset;
-    std::shared_ptr<const minirender::SceneSnapshot> frozen_snapshot;
-    minirender::Image reference{12, 12};
+    std::shared_ptr<const minirender::SceneSnapshot>   frozen_snapshot;
+    minirender::Image                                  reference{12, 12};
 };
 
 } // namespace
@@ -110,9 +115,9 @@ void start_cloth_material_editor_smoke(Workbench& window, const QString& directo
     window.select_object("cloth");
     window.panels()->setCurrentIndex(0);
     window.resize(1200, 800);
-    auto state = std::make_shared<State>();
+    auto state   = std::make_shared<State>();
     state->probe = new UiResponseProbe(&window, "Cloth");
-    auto* timer = new QTimer(&window);
+    auto* timer  = new QTimer(&window);
     timer->setInterval(70);
     QObject::connect(
         timer, &QTimer::timeout, &window,
@@ -134,8 +139,8 @@ void start_cloth_material_editor_smoke(Workbench& window, const QString& directo
                             "Cloth material kind is not displayed");
                     require(!control<QDoubleSpinBox>(window, "roughness")->isEnabled(),
                             "Cloth roughness should use thread widths");
-                    state->meshes = viewport->upload_statistics().mesh_uploads;
-                    state->descriptors = viewport->upload_statistics().descriptor_rebuilds;
+                    state->meshes          = viewport->upload_statistics().mesh_uploads;
+                    state->descriptors     = viewport->upload_statistics().descriptor_rebuilds;
                     state->frozen_snapshot = minirender::make_snapshot(window.document());
                     state->probe->verify([&] {
                         state->reference =
@@ -223,7 +228,7 @@ void start_cloth_material_editor_smoke(Workbench& window, const QString& directo
                 case 4:
                     state->probe->verify(
                         [&] { verify_layout(window, directory, "cloth-layout-960"); });
-                    state->meshes = viewport->upload_statistics().mesh_uploads;
+                    state->meshes      = viewport->upload_statistics().mesh_uploads;
                     state->descriptors = viewport->upload_statistics().descriptor_rebuilds;
                     advance();
                     return;

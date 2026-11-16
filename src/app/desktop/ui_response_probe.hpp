@@ -19,22 +19,24 @@ class UiResponseProbe final : public QObject {
     explicit UiResponseProbe(QObject* parent, std::string label)
         : QObject(parent), label_(std::move(label)) {
         event_type_ = QEvent::registerEventType();
-        worker_ = std::jthread([this](std::stop_token stop) {
+        worker_     = std::jthread([this](std::stop_token stop) {
             while (!stop.stop_requested()) {
-                auto* event = new Event(event_type_);
+                auto* event  = new Event(event_type_);
                 event->epoch = epoch_.load(std::memory_order_relaxed);
-                event->sent = std::chrono::steady_clock::now();
+                event->sent  = std::chrono::steady_clock::now();
                 QCoreApplication::postEvent(this, event);
                 std::this_thread::sleep_for(std::chrono::milliseconds(20));
             }
         });
     }
+
     template <class Work> void verify(Work work) {
         QCoreApplication::sendPostedEvents(this, event_type_);
         epoch_.fetch_add(1, std::memory_order_relaxed);
         work();
         epoch_.fetch_add(1, std::memory_order_relaxed);
     }
+
     void report(bool enforce) {
         QCoreApplication::sendPostedEvents(this, event_type_);
         qInfo() << label_.c_str() << "response samples" << samples_ << "maximum ms" << maximum_ms_;
@@ -53,7 +55,7 @@ class UiResponseProbe final : public QObject {
             const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                                      std::chrono::steady_clock::now() - probe.sent)
                                      .count();
-            maximum_ms_ = std::max(maximum_ms_, elapsed);
+            maximum_ms_        = std::max(maximum_ms_, elapsed);
             ++samples_;
         }
         return true;
@@ -62,14 +64,16 @@ class UiResponseProbe final : public QObject {
   private:
     struct Event final : QEvent {
         explicit Event(int type) : QEvent(static_cast<QEvent::Type>(type)) {}
+
         std::chrono::steady_clock::time_point sent;
-        std::uint64_t epoch = 0;
+        std::uint64_t                         epoch = 0;
     };
-    std::string label_;
-    int event_type_ = 0;
-    std::atomic<std::uint64_t> epoch_{0};
+
+    std::string                    label_;
+    int                            event_type_ = 0;
+    std::atomic<std::uint64_t>     epoch_{0};
     std::chrono::milliseconds::rep maximum_ms_ = 0;
-    std::size_t samples_ = 0;
+    std::size_t                    samples_    = 0;
     // worker 最先销毁，QObject 清理前停止投递。
     std::jthread worker_;
 };

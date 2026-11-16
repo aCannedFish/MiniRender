@@ -25,11 +25,13 @@
 namespace {
 using namespace minirender;
 using Job = LightFieldController::Job;
+
 void require(bool value, const char* msg) {
     if (!value) {
         throw std::runtime_error(msg);
     }
 }
+
 template <class T> T* get(Workbench& w, const char* name) {
     auto* c = w.findChild<T*>(name);
     if (!c) {
@@ -37,6 +39,7 @@ template <class T> T* get(Workbench& w, const char* name) {
     }
     return c;
 }
+
 void click(Workbench& w, const char* name) {
     auto* c = get<QPushButton>(w, name);
     if (!c->isEnabled()) {
@@ -44,9 +47,11 @@ void click(Workbench& w, const char* name) {
     }
     c->click();
 }
+
 auto path(const QString& text) {
     return std::filesystem::path(text.toStdU16String());
 }
+
 void compare(const Image& a, const Image& b) {
     require(a.width() == b.width() && a.height() == b.height(), "LF image dimensions differ");
     for (std::size_t y = 0; y < a.height(); ++y) {
@@ -55,27 +60,29 @@ void compare(const Image& a, const Image& b) {
         }
     }
 }
+
 double contrast(const Image& image, int x0, int x1, int channel) {
     double total = 0;
     for (int y = 20; y < 44; ++y) {
         for (int x = x0; x < x1; ++x) {
             const auto px = std::size_t(x), py = std::size_t(y);
-            auto v = image.at(px, py)[channel];
+            auto       v = image.at(px, py)[channel];
             total += std::abs(v - image.at(px + 1, py)[channel]) +
                      std::abs(v - image.at(px, py + 1)[channel]);
         }
     }
     return total;
 }
+
 // 从视口回读显示像素，检查正确的来源、曝光及 letterbox 几何。
 void display(Workbench& w, const Image& source) {
-    auto* vp = w.viewport();
-    auto target = vp->grab();
-    auto expected = display_image(source, vp->exposure());
-    const double scale = std::min(double(target.width()) / double(source.width()),
-                                  double(target.height()) / double(source.height()));
-    const int width = int(std::floor(double(source.width()) * scale)),
-              height = int(std::floor(double(source.height()) * scale));
+    auto*        vp       = w.viewport();
+    auto         target   = vp->grab();
+    auto         expected = display_image(source, vp->exposure());
+    const double scale    = std::min(double(target.width()) / double(source.width()),
+                                     double(target.height()) / double(source.height()));
+    const int    width    = int(std::floor(double(source.width()) * scale)),
+                 height   = int(std::floor(double(source.height()) * scale));
     for (std::size_t y = 0; y < source.height(); ++y) {
         for (std::size_t x = 0; x < source.width(); ++x) {
             const auto q =
@@ -92,6 +99,7 @@ void display(Workbench& w, const Image& source) {
         }
     }
 }
+
 void layout(Workbench& w, const QString& dir) {
     auto* area = qobject_cast<QScrollArea*>(w.panels()->currentWidget());
     auto* page = w.lightfield_panel();
@@ -152,40 +160,42 @@ enum class Stage {
     cancelled,
     exit_active
 };
+
 struct State {
-    Stage stage = Stage::import;
-    int ticks = 0, frame = 0, settle = 0;
-    std::uint64_t samples = 0, job = 0, revision = 0;
-    LightFieldCaptureSettings settings;
-    std::shared_ptr<const SceneSnapshot> original;
-    SceneUploadStatistics uploads;
-    std::shared_ptr<const Image> near;
+    Stage                                 stage = Stage::import;
+    int                                   ticks = 0, frame = 0, settle = 0;
+    std::uint64_t                         samples = 0, job = 0, revision = 0;
+    LightFieldCaptureSettings             settings;
+    std::shared_ptr<const SceneSnapshot>  original;
+    SceneUploadStatistics                 uploads;
+    std::shared_ptr<const Image>          near;
     std::shared_ptr<const LightFieldFile> file;
-    UiResponseProbe* probe = nullptr;
-    QElapsedTimer cancellation;
+    UiResponseProbe*                      probe = nullptr;
+    QElapsedTimer                         cancellation;
 };
 } // namespace
+
 void start_lightfield_smoke(Workbench& w, const QString& dir, bool enforce) {
     require(QDir().mkpath(dir), "Cannot create LF test directory");
-    auto s = std::make_shared<State>();
-    s->probe = new UiResponseProbe(&w, "Lightfield");
+    auto s      = std::make_shared<State>();
+    s->probe    = new UiResponseProbe(&w, "Lightfield");
     auto* timer = new QTimer(&w);
     timer->setInterval(40);
     QObject::connect(timer, &QTimer::timeout, &w, [s, timer, &w, dir, enforce] {
         try {
-            auto* lf = w.lightfield_controller();
+            auto* lf    = w.lightfield_controller();
             auto* panel = w.lightfield_panel();
-            auto* vp = w.viewport();
-            auto* pt = w.offline_panel();
-            auto p = lf->capture().progress();
-            auto ready = [&] { return !lf->acquiring() && lf->job() == Job::idle; };
+            auto* vp    = w.viewport();
+            auto* pt    = w.offline_panel();
+            auto  p     = lf->capture().progress();
+            auto  ready = [&] { return !lf->acquiring() && lf->job() == Job::idle; };
             require(++s->ticks < 5000 && vp->failure().isEmpty(), "LF regression timed out");
             if (!vp->can_render() || vp->rendered_frames() < s->frame + 2) {
                 return;
             }
             auto next = [&] {
-                s->stage = static_cast<Stage>(int(s->stage) + 1);
-                s->frame = vp->rendered_frames();
+                s->stage  = static_cast<Stage>(int(s->stage) + 1);
+                s->frame  = vp->rendered_frames();
                 s->settle = 0;
                 qInfo() << "Lightfield stage" << int(s->stage);
             };
@@ -206,7 +216,7 @@ void start_lightfield_smoke(Workbench& w, const QString& dir, bool enforce) {
                 click(w, "lf_start");
                 require(!get<QLabel>(w, "lf_notice")->text().isEmpty() && !lf->acquiring(),
                         "Invalid LF grid was accepted");
-                s->settings.render = {64, 64, 32, 101};
+                s->settings.render  = {64, 64, 32, 101};
                 s->settings.threads = 2;
                 panel->set_capture_settings(s->settings);
                 s->original = make_snapshot(w.document());
@@ -250,14 +260,14 @@ void start_lightfield_smoke(Workbench& w, const QString& dir, bool enforce) {
                 }
                 require(lf->file() && lf->stale() && p.state == RenderState::completed,
                         "LF acquisition did not publish its snapshot");
-                s->file = lf->file();
+                s->file    = lf->file();
                 s->samples = p.recorded_samples;
                 require(s->samples == 64ULL * 64 * 32 * 25 && s->file->traced_paths() == s->samples,
                         "LF capture path count differs");
                 s->probe->verify([&] {
                     LightFieldReader r(s->file);
-                    auto center = r.view(12);
-                    auto pin = std::make_shared<SceneSnapshot>(*s->original);
+                    auto             center     = r.view(12);
+                    auto             pin        = std::make_shared<SceneSnapshot>(*s->original);
                     pin->camera.aperture_radius = 0;
                     compare(*center, PathTracer(pin, s->file->calibration().integrator)
                                          .render(s->settings.render));
@@ -274,7 +284,7 @@ void start_lightfield_smoke(Workbench& w, const QString& dir, bool enforce) {
                     return;
                 }
                 s->uploads = vp->upload_statistics();
-                s->near = lf->image();
+                s->near    = lf->image();
                 require(bool(s->near), "Missing near focus");
                 s->probe->verify([&] {
                     LightFieldReader r(s->file);

@@ -18,6 +18,6 @@ class SsaoPass {
 
   private:
     ScreenPass raw_, horizontal_, filtered_, composite_;
-    bool initialized_ = false;
-    bool was_enabled_ = false;
+    bool       initialized_ = false;
+    bool       was_enabled_ = false;
 };

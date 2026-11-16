@@ -21,18 +21,20 @@ SceneDocument dark_scene() {
     scene.environment = glm::vec3(0);
     return scene;
 }
+
 void set_map(SceneDocument& scene, Image image) {
     scene.textures.push_back(
         {"sky", {}, ColorEncoding::linear, std::make_shared<const Texture>(std::move(image))});
     scene.environment_map.texture_id = "sky";
 }
+
 glm::dvec3 latlong(double u, double v) {
     return {std::sin(v * pi) * std::cos(u * 2 * pi), std::cos(v * pi),
             std::sin(v * pi) * std::sin(u * 2 * pi)};
 }
 
 SceneDocument area_scene() {
-    auto scene = dark_scene();
+    auto     scene = dark_scene();
     MeshData mesh;
     mesh.positions = {{-1, -1, 0}, {1, -1, 0}, {-1, 1, 0}};
     mesh.triangles.push_back({{{{0, {0, 0, 1}, {}}, {1, {0, 0, 1}, {}}, {2, {0, 0, 1}, {}}}}});
@@ -52,18 +54,20 @@ class TemporaryDirectory {
             std::filesystem::temp_directory_path() / ("minirender-light-" + std::to_string(stamp));
         std::filesystem::create_directories(root);
     }
+
     ~TemporaryDirectory() {
         std::error_code error;
         std::filesystem::remove_all(root, error);
     }
+
     std::filesystem::path root;
 };
 
 } // namespace
 
 TEST_CASE("Constant environment maps sample uniform solid angle including pole limits", "[light]") {
-    auto scene = dark_scene();
-    scene.environment = glm::vec3(0.1F);
+    auto scene                     = dark_scene();
+    scene.environment              = glm::vec3(0.1F);
     scene.environment_map.strength = 2;
     Image image(8, 4);
     for (std::size_t y = 0; y < image.height(); ++y) {
@@ -73,8 +77,8 @@ TEST_CASE("Constant environment maps sample uniform solid angle including pole l
     }
     set_map(scene, std::move(image));
     const EnvironmentLight environment(*make_snapshot(scene));
-    const glm::dvec3 expected = glm::dvec3(scene.environment) + glm::dvec3(4, 2, 1);
-    const double power = glm::dot(expected, glm::dvec3(0.2126, 0.7152, 0.0722)) * 4 * pi;
+    const glm::dvec3       expected = glm::dvec3(scene.environment) + glm::dvec3(4, 2, 1);
+    const double           power = glm::dot(expected, glm::dvec3(0.2126, 0.7152, 0.0722)) * 4 * pi;
     REQUIRE(environment.luminance_integral() == Approx(power).epsilon(1e-12));
     for (const auto direction : {glm::dvec3(0, 1, 0), glm::dvec3(0, -1, 0), latlong(0.37, 0.2)}) {
         REQUIRE(glm::length(environment.evaluate(direction) - expected) < 1e-12);
@@ -87,7 +91,7 @@ TEST_CASE("Constant environment maps sample uniform solid angle including pole l
         REQUIRE(std::isfinite(sample.probability));
         REQUIRE(sample.probability > 0);
     }
-    Sampler sampler(43);
+    Sampler    sampler(43);
     glm::dvec3 average(0);
     for (int index = 0; index < 10000; ++index) {
         const auto sample = environment.sample(sampler.next_2d());
@@ -99,12 +103,12 @@ TEST_CASE("Constant environment maps sample uniform solid angle including pole l
 }
 
 TEST_CASE("Environment importance PDFs normalize and retain bilinear support", "[light]") {
-    auto scene = dark_scene();
+    auto  scene = dark_scene();
     Image image(8, 4);
     image.at(3, 1) = glm::vec3(100);
     set_map(scene, std::move(image));
     const EnvironmentLight environment(*make_snapshot(scene));
-    double integral = 0;
+    double                 integral = 0;
     for (int y = 0; y < 4; ++y) {
         const double angle = (2 * pi / 8) * (std::cos(y * pi / 4) - std::cos((y + 1) * pi / 4));
         for (int x = 0; x < 8; ++x) {
@@ -115,7 +119,7 @@ TEST_CASE("Environment importance PDFs normalize and retain bilinear support", "
     const auto neighbor = latlong(4.1 / 8, 1.5 / 4);
     REQUIRE(environment.evaluate(neighbor).x == Approx(40).margin(1e-10));
     REQUIRE(environment.pdf(neighbor) == Approx(0.05 / (4 * pi)).epsilon(1e-12));
-    Sampler sampler(78);
+    Sampler     sampler(78);
     std::size_t bright_cell = 0;
     for (int index = 0; index < 20000; ++index) {
         const auto sample = environment.sample(sampler.next_2d());
@@ -127,21 +131,21 @@ TEST_CASE("Environment importance PDFs normalize and retain bilinear support", "
             std::atan2(std::hypot(sample.direction.x, sample.direction.z), sample.direction.y) / pi;
         bright_cell += static_cast<int>(u * 8) == 3 && static_cast<int>(v * 4) == 1;
     }
-    const double solid_angle = (2 * pi / 8) * (std::cos(pi / 4) - std::cos(pi / 2));
+    const double solid_angle   = (2 * pi / 8) * (std::cos(pi / 4) - std::cos(pi / 2));
     const double expected_mass = 0.95 + 0.05 * solid_angle / (4 * pi);
-    const double tolerance = 5 * std::sqrt(20000 * expected_mass * (1 - expected_mass));
+    const double tolerance     = 5 * std::sqrt(20000 * expected_mass * (1 - expected_mass));
     REQUIRE(std::abs(static_cast<double>(bright_cell) - 20000 * expected_mass) < tolerance);
     scene.environment_map.rotation_degrees = 90;
     const EnvironmentLight rotated(*make_snapshot(scene));
-    const auto local = latlong(3.5 / 8, 1.5 / 4);
-    const glm::dvec3 world{local.z, local.y, -local.x};
+    const auto             local = latlong(3.5 / 8, 1.5 / 4);
+    const glm::dvec3       world{local.z, local.y, -local.x};
     REQUIRE(glm::length(rotated.evaluate(world) - environment.evaluate(local)) < 1e-10);
     REQUIRE(rotated.pdf(world) == Approx(environment.pdf(local)).epsilon(1e-12));
 }
 
 TEST_CASE("Negative HDR samples cannot erase a still-emitting environment during mip selection",
           "[light]") {
-    auto scene = dark_scene();
+    auto  scene = dark_scene();
     Image image(2048, 1);
     for (std::size_t x = 0; x < image.width(); ++x) {
         image.at(x, 0) = glm::vec3(x % 2 == 0 ? 1 : -1);
@@ -156,12 +160,12 @@ TEST_CASE("Negative HDR samples cannot erase a still-emitting environment during
 }
 
 TEST_CASE("Area-light sampling uses transformed area and the solid-angle Jacobian", "[light]") {
-    const auto snapshot = make_snapshot(area_scene());
+    const auto         snapshot = make_snapshot(area_scene());
     const LightSampler lights(snapshot);
-    const SceneBvh bvh(snapshot);
+    const SceneBvh     bvh(snapshot);
     REQUIRE(lights.size() == 1);
     const glm::dvec3 reference{0, 0, 2};
-    const auto sample = lights.sample(reference, 0.5, {0.25, 0.5});
+    const auto       sample = lights.sample(reference, 0.5, {0.25, 0.5});
     REQUIRE(sample);
     REQUIRE(sample->kind == LightKind::area);
     REQUIRE(sample->measure == SampleMeasure::solid_angle);
@@ -173,9 +177,9 @@ TEST_CASE("Area-light sampling uses transformed area and the solid-angle Jacobia
     REQUIRE(below->probability == Approx(sample->probability));
     Sampler random(4);
     for (int index = 0; index < 1000; ++index) {
-        const double light_u = random.next_1d();
-        const auto surface_u = random.next_2d();
-        const auto selected = lights.sample(reference, light_u, surface_u);
+        const double light_u   = random.next_1d();
+        const auto   surface_u = random.next_2d();
+        const auto   selected  = lights.sample(reference, light_u, surface_u);
         REQUIRE(selected);
         const auto hit = bvh.intersect({glm::vec3(reference), glm::vec3(selected->direction)});
         REQUIRE(hit);
@@ -184,18 +188,18 @@ TEST_CASE("Area-light sampling uses transformed area and the solid-angle Jacobia
 }
 
 TEST_CASE("Light selection includes area, directional and environment probabilities", "[light]") {
-    auto scene = area_scene();
-    auto second = scene.objects[0];
-    second.id = "second";
+    auto scene                     = area_scene();
+    auto second                    = scene.objects[0];
+    second.id                      = "second";
     second.transform.translation.x = 3;
-    second.transform.scale = {2, 2, 1};
+    second.transform.scale         = {2, 2, 1};
     scene.objects.push_back(second);
     scene.directional_lights.push_back({"sun", {0, -2, 0}, {1, 1, 1}, 2});
     scene.environment = glm::vec3(0.25F);
     const LightSampler lights(make_snapshot(scene));
-    const double le = glm::dot(glm::dvec3(4, 2, 1), glm::dvec3(0.2126, 0.7152, 0.0722));
-    const std::array powers{4 * pi * le, 16 * pi * le, 26 * pi, 13 * pi * pi};
-    double total = 0;
+    const double       le = glm::dot(glm::dvec3(4, 2, 1), glm::dvec3(0.2126, 0.7152, 0.0722));
+    const std::array   powers{4 * pi * le, 16 * pi * le, 26 * pi, 13 * pi * pi};
+    double             total = 0;
     for (const auto power : powers) {
         total += power;
     }
@@ -230,14 +234,14 @@ TEST_CASE("Light selection includes area, directional and environment probabilit
 TEST_CASE("Environment asset references round trip and freeze with scene snapshots",
           "[light][scene]") {
     TemporaryDirectory directory;
-    auto scene = dark_scene();
-    const auto source =
+    auto               scene = dark_scene();
+    const auto         source =
         std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/assets/textures/radiance.hdr";
     scene.textures.push_back(
         {"sky", source, ColorEncoding::linear,
          std::make_shared<const Texture>(Image::read(source, ColorEncoding::linear))});
     scene.environment_map = {"sky", 2, 90};
-    const auto snapshot = make_snapshot(scene);
+    const auto snapshot   = make_snapshot(scene);
     const auto file = directory.root / std::filesystem::path(std::u8string(u8"环境 空格.json"));
     save_scene(scene, file);
     const auto reloaded = load_scene(file);
@@ -251,6 +255,6 @@ TEST_CASE("Environment asset references round trip and freeze with scene snapsho
     scene.environment_map.texture_id = "missing";
     REQUIRE_THROWS(make_snapshot(scene));
     scene.environment_map.texture_id = "sky";
-    scene.environment_map.strength = -1;
+    scene.environment_map.strength   = -1;
     REQUIRE_THROWS(make_snapshot(scene));
 }

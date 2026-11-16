@@ -21,9 +21,10 @@ constexpr std::size_t absent = std::numeric_limits<std::size_t>::max();
 // 面键用于匹配虚拟均匀拓扑，实际输出保留 AdaptiveFace 中的有向角点次序。
 struct FaceKey {
     std::array<MeshIndex, 3> vertices;
-    std::uint32_t level;
+    std::uint32_t            level;
     bool operator==(const FaceKey&) const = default;
 };
+
 struct FaceHash {
     std::size_t operator()(const FaceKey& key) const noexcept {
         std::size_t result = key.level;
@@ -34,10 +35,12 @@ struct FaceHash {
         return result;
     }
 };
+
 FaceKey face_key(std::array<MeshIndex, 3> vertices, std::uint32_t level) {
     std::sort(vertices.begin(), vertices.end());
     return {vertices, level};
 }
+
 FaceKey face_key(const AdaptiveFace& face) {
     return face_key({face.corners[0].point, face.corners[1].point, face.corners[2].point},
                     face.level);
@@ -45,20 +48,23 @@ FaceKey face_key(const AdaptiveFace& face) {
 
 // red 结点始终对应虚拟均匀三角形，过渡三角形仅在最终提取时创建。
 struct Node {
-    AdaptiveFace face;
+    AdaptiveFace               face;
     std::array<std::size_t, 4> children{absent, absent, absent, absent};
 };
+
 struct Candidate {
-    double error;
+    double      error;
     std::size_t node;
+
     bool operator<(const Candidate& other) const {
         return error == other.error ? node > other.node : error < other.error;
     }
 };
+
 struct Terminal {
     AdaptiveFace face;
-    std::size_t owner;
-    bool transition;
+    std::size_t  owner;
+    bool         transition;
 };
 
 // 误差队列驱动 red 分裂，邻接闭合维持 1-irregular，再提取共享中点的终端模板。
@@ -109,7 +115,7 @@ class Refiner final {
                 }
                 auto triangles = transitions(i);
                 for (const auto& triangle : triangles) {
-                    const auto error = measure(triangle.face);
+                    const auto error              = measure(triangle.face);
                     result_.maximum_sampled_error = std::max(result_.maximum_sampled_error, error);
                     if (error > settings_.tolerance) {
                         if (nodes_[i].face.level < settings_.maximum_level) {
@@ -143,9 +149,11 @@ class Refiner final {
         }
         cancellation_.check();
     }
+
     bool leaf(std::size_t index) const {
         return nodes_[index].children[0] == absent;
     }
+
     std::size_t add_node(const AdaptiveFace& face) {
         const auto index = nodes_.size();
         nodes_.push_back({face});
@@ -154,6 +162,7 @@ class Refiner final {
         }
         return index;
     }
+
     double distance(glm::dvec3 exact, glm::dvec3 approximation) const {
         if (settings_.metric == AdaptiveMetric::local_distance) {
             return glm::length(exact - approximation);
@@ -162,25 +171,26 @@ class Refiner final {
             return 0;
         }
         const auto& projection = *settings_.projection;
-        const auto a = projection.clip_from_object * glm::dvec4(exact, 1);
-        const auto b = projection.clip_from_object * glm::dvec4(approximation, 1);
+        const auto  a          = projection.clip_from_object * glm::dvec4(exact, 1);
+        const auto  b          = projection.clip_from_object * glm::dvec4(approximation, 1);
         if (a.w <= 1e-12 || b.w <= 1e-12) {
             return std::numeric_limits<double>::infinity();
         }
         return glm::length((glm::dvec2(a) / a.w - glm::dvec2(b) / b.w) *
                            projection.viewport_pixels * 0.5);
     }
+
     double measure(const AdaptiveFace& face) {
         std::array<glm::dvec3, 3> positions;
         for (std::size_t i = 0; i < 3; ++i) {
             positions[i] = surface_.position(face.corners[i], face.root);
         }
-        double maximum = 0;
-        const auto query = [&](glm::dvec3 weights) {
+        double     maximum = 0;
+        const auto query   = [&](glm::dvec3 weights) {
             const auto parameter = weights.x * face.corners[0].barycentric +
                                    weights.y * face.corners[1].barycentric +
                                    weights.z * face.corners[2].barycentric;
-            const auto target = surface_.sample(face.root, parameter);
+            const auto target    = surface_.sample(face.root, parameter);
             const auto linear =
                 weights.x * positions[0] + weights.y * positions[1] + weights.z * positions[2];
             maximum = std::max(maximum, distance(target.position, linear));
@@ -195,17 +205,17 @@ class Refiner final {
             query(weights);
         }
         // visitor 返回根参数，转换回当前终端三角形的仿射权重。
-        const auto p0 = face.corners[0].barycentric;
-        const auto e1 = face.corners[1].barycentric - p0;
-        const auto e2 = face.corners[2].barycentric - p0;
-        const double d11 = glm::dot(e1, e1);
-        const double d12 = glm::dot(e1, e2);
-        const double d22 = glm::dot(e2, e2);
+        const auto   p0          = face.corners[0].barycentric;
+        const auto   e1          = face.corners[1].barycentric - p0;
+        const auto   e2          = face.corners[2].barycentric - p0;
+        const double d11         = glm::dot(e1, e1);
+        const double d12         = glm::dot(e1, e2);
+        const double d22         = glm::dot(e2, e2);
         const double determinant = d11 * d22 - d12 * d12;
         surface_.visit_height_features(
             face, settings_.metric == AdaptiveMetric::local_distance ? settings_.tolerance : 0,
             [&](glm::dvec3 parameter) {
-                const auto r = parameter - p0;
+                const auto   r = parameter - p0;
                 const double a = (glm::dot(r, e1) * d22 - glm::dot(r, e2) * d12) / determinant;
                 const double b = (glm::dot(r, e2) * d11 - glm::dot(r, e1) * d12) / determinant;
                 query({1 - a - b, a, b});
@@ -220,6 +230,7 @@ class Refiner final {
         }
         return maximum;
     }
+
     void evaluate(std::size_t index) {
         if (nodes_[index].face.level == settings_.maximum_level) {
             return;
@@ -231,6 +242,7 @@ class Refiner final {
             pending_.push({error, index});
         }
     }
+
     // 逆向归并虚拟子面的父点集合，在已生成的 red 树中查找覆盖邻域的结点。
     std::size_t covering(FaceKey key) {
         auto& hierarchy = surface_.hierarchy();
@@ -259,9 +271,10 @@ class Refiner final {
             key = face_key({parents[0], parents[1], parents[2]}, key.level - 1);
         }
     }
+
     std::size_t neighbor(const AdaptiveFace& face, std::size_t edge) {
-        const auto a = face.corners[edge].point;
-        const auto b = face.corners[(edge + 1) % 3].point;
+        const auto a        = face.corners[edge].point;
+        const auto b        = face.corners[(edge + 1) % 3].point;
         const auto opposite = surface_.hierarchy().opposites(a, b, face.level);
         if (opposite[0] != face.corners[(edge + 2) % 3].point) {
             throw std::logic_error("Adaptive face winding differs from virtual Loop topology");
@@ -270,6 +283,7 @@ class Refiner final {
                    ? absent
                    : covering(face_key({b, a, opposite[1]}, face.level));
     }
+
     void split(std::size_t index, bool balancing, std::deque<std::size_t>& checks) {
         if (!leaf(index)) {
             return;
@@ -282,7 +296,7 @@ class Refiner final {
         }
         const auto children = surface_.children(nodes_[index].face);
         for (std::size_t i = 0; i < 4; ++i) {
-            const auto child = add_node(children[i]);
+            const auto child          = add_node(children[i]);
             nodes_[index].children[i] = child;
             checks.push_back(child);
             evaluate(child);
@@ -291,6 +305,7 @@ class Refiner final {
         ++result_.red_refinements;
         result_.balancing_refinements += balancing ? 1 : 0;
     }
+
     void refine_balanced(std::size_t index) {
         std::deque<std::size_t> checks;
         split(index, false, checks);
@@ -312,22 +327,23 @@ class Refiner final {
             report(AdaptiveStage::balance, completed, completed + checks.size());
         }
     }
+
     std::vector<Terminal> transitions(std::size_t owner) {
-        const auto face = nodes_[owner].face;
+        const auto          face = nodes_[owner].face;
         std::array<bool, 3> divided{};
-        std::size_t count = 0;
+        std::size_t         count = 0;
         for (std::size_t edge = 0; edge < 3; ++edge) {
             const auto other = neighbor(face, edge);
-            divided[edge] = other != absent && !leaf(other);
+            divided[edge]    = other != absent && !leaf(other);
             count += divided[edge] ? 1 : 0;
         }
         if (count == 0) {
             return {{face, owner, false}};
         }
-        const auto children = surface_.children(face);
+        const auto                          children = surface_.children(face);
         const std::array<AdaptiveCorner, 3> middles{children[0].corners[1], children[1].corners[1],
                                                     children[2].corners[1]};
-        std::vector<Terminal> result;
+        std::vector<Terminal>               result;
         const auto add = [&](std::array<AdaptiveCorner, 3> c, bool transition = true) {
             result.push_back({{c, face.root, face.level}, owner, transition});
         };
@@ -343,9 +359,9 @@ class Refiner final {
         } else {
             const auto e = static_cast<std::size_t>(
                 std::find(divided.begin(), divided.end(), false) - divided.begin());
-            const auto a = face.corners[e];
-            const auto b = face.corners[(e + 1) % 3];
-            const auto c = face.corners[(e + 2) % 3];
+            const auto a  = face.corners[e];
+            const auto b  = face.corners[(e + 1) % 3];
+            const auto c  = face.corners[(e + 2) % 3];
             const auto bc = middles[(e + 1) % 3];
             const auto ca = middles[(e + 2) % 3];
             add({c, ca, bc});
@@ -363,10 +379,11 @@ class Refiner final {
         }
         return result;
     }
+
     std::shared_ptr<const MeshData> publish(const std::vector<Terminal>& terminal) {
-        auto mesh = std::make_shared<MeshData>();
+        auto                                     mesh = std::make_shared<MeshData>();
         std::unordered_map<MeshIndex, MeshIndex> mapping;
-        std::vector<bool> referenced(input_->positions.size(), false);
+        std::vector<bool>                        referenced(input_->positions.size(), false);
         for (const auto& face : input_->triangles) {
             for (const auto& c : face.corners) {
                 referenced[c.position] = true;
@@ -381,11 +398,11 @@ class Refiner final {
         result_.triangle_levels.reserve(terminal.size());
         report(AdaptiveStage::output, 0, terminal.size());
         for (std::size_t i = 0; i < terminal.size(); ++i) {
-            const auto& item = terminal[i];
+            const auto&  item = terminal[i];
             MeshTriangle triangle;
             for (std::size_t corner = 0; corner < 3; ++corner) {
-                const auto& c = item.face.corners[corner];
-                const auto point = surface_.position(c, item.face.root);
+                const auto& c     = item.face.corners[corner];
+                const auto  point = surface_.position(c, item.face.root);
                 const auto [entry, inserted] =
                     mapping.emplace(c.point, static_cast<MeshIndex>(mesh->positions.size()));
                 if (inserted) {
@@ -406,23 +423,24 @@ class Refiner final {
         recompute_smooth_normals(*mesh, cancellation_, [&](auto done, auto total) {
             report(AdaptiveStage::normals, done, total);
         });
-        result_.evaluation_points = surface_.hierarchy().point_count();
-        result_.reference_queries = surface_.queries();
+        result_.evaluation_points    = surface_.hierarchy().point_count();
+        result_.reference_queries    = surface_.queries();
         result_.maximum_displacement = surface_.maximum_displacement();
         result_.maximum_seam_difference =
             std::max(result_.maximum_seam_difference, surface_.maximum_seam_difference());
         return mesh;
     }
-    std::shared_ptr<const MeshData> input_;
-    AdaptiveSettings settings_;
-    CancellationToken cancellation_;
-    AdaptiveProgressCallback progress_;
-    AdaptiveResult& result_;
-    AdaptiveSurface surface_;
-    std::deque<Node> nodes_;
+
+    std::shared_ptr<const MeshData>                    input_;
+    AdaptiveSettings                                   settings_;
+    CancellationToken                                  cancellation_;
+    AdaptiveProgressCallback                           progress_;
+    AdaptiveResult&                                    result_;
+    AdaptiveSurface                                    surface_;
+    std::deque<Node>                                   nodes_;
     std::unordered_map<FaceKey, std::size_t, FaceHash> lookup_;
-    std::priority_queue<Candidate> pending_;
-    std::size_t leaves_ = 0;
+    std::priority_queue<Candidate>                     pending_;
+    std::size_t                                        leaves_ = 0;
 };
 
 } // namespace
@@ -440,6 +458,7 @@ void AdaptiveProjection::validate() const {
         }
     }
 }
+
 void AdaptiveSettings::validate() const {
     if (maximum_level > 8 || minimum_level > maximum_level || !std::isfinite(tolerance) ||
         tolerance <= 0 || maximum_triangles == 0 || maximum_triangles > 16000000 ||
@@ -460,9 +479,10 @@ void AdaptiveSettings::validate() const {
         displacement->validate();
     }
 }
+
 AdaptiveResult subdivide_adaptive(std::shared_ptr<const MeshData> input,
                                   std::shared_ptr<const Texture> height, AdaptiveSettings settings,
-                                  CancellationToken cancellation,
+                                  CancellationToken        cancellation,
                                   AdaptiveProgressCallback progress) {
     cancellation.check();
     settings.validate();
@@ -473,7 +493,7 @@ AdaptiveResult subdivide_adaptive(std::shared_ptr<const MeshData> input,
         throw std::length_error("Adaptive input exceeds the triangle budget");
     }
     AdaptiveResult result;
-    const auto report = [&](AdaptiveStage stage, std::size_t done, std::size_t total) {
+    const auto     report = [&](AdaptiveStage stage, std::size_t done, std::size_t total) {
         cancellation.check();
         if (progress) {
             progress({stage, done, total,
@@ -482,7 +502,7 @@ AdaptiveResult subdivide_adaptive(std::shared_ptr<const MeshData> input,
         }
         cancellation.check();
     };
-    result.metric = settings.metric;
+    result.metric            = settings.metric;
     result.applied_tolerance = settings.tolerance;
     report(AdaptiveStage::topology, 0, 1);
     const HalfedgeMesh topology(*input, cancellation);
@@ -499,7 +519,7 @@ AdaptiveResult subdivide_adaptive(std::shared_ptr<const MeshData> input,
     }
     if (settings.maximum_level == 0 &&
         (!settings.displacement || settings.displacement->scale == 0)) {
-        result.mesh = input;
+        result.mesh                   = input;
         result.triangles_per_level[0] = input->triangles.size();
         result.triangle_levels.resize(input->triangles.size(), 0);
     } else {

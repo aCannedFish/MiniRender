@@ -28,13 +28,14 @@ void require(bool condition, const char* message) {
 // 所有场景保留接触面的 y=0。发光颜色用于独立核对实际可见物体，隔离光照误差。
 struct Scenario {
     const char* name;
-    glm::vec3 position;
-    bool plane_only = false;
-    bool double_sided = false;
-    bool mirror_x = false;
-    bool mirror_y = false;
-    bool expect_both = true;
+    glm::vec3   position;
+    bool        plane_only   = false;
+    bool        double_sided = false;
+    bool        mirror_x     = false;
+    bool        mirror_y     = false;
+    bool        expect_both  = true;
 };
+
 const std::array scenarios{Scenario{"above", {3, 2.2F, 4.5F}},
                            Scenario{"below", {3, -2, 4.5F}},
                            Scenario{"below-moved", {-3, -1, 3}},
@@ -48,20 +49,20 @@ const std::array scenarios{Scenario{"above", {3, 2.2F, 4.5F}},
 
 void install(Workbench& window, const minirender::SceneDocument& source, const QString& directory,
              const Scenario& scenario) {
-    auto scene = source;
-    scene.environment = glm::vec3(0);
+    auto scene            = source;
+    scene.environment     = glm::vec3(0);
     scene.environment_map = {};
     scene.directional_lights.clear();
     scene.camera.position = scenario.position;
-    scene.camera.target = {0, 0.3F, 0};
+    scene.camera.target   = {0, 0.3F, 0};
     for (auto& material : scene.materials) {
         material.base_color = glm::vec3(0);
         material.base_color_texture.clear();
         material.double_sided = false;
-        material.emission = material.id == "floor"
-                                ? glm::vec3(0.4F)
-                                : (material.id == "blue" ? glm::vec3(0.02F, 0.25F, 0.8F)
-                                                         : glm::vec3(0.8F, 0.4F, 0.02F));
+        material.emission     = material.id == "floor"
+                                    ? glm::vec3(0.4F)
+                                    : (material.id == "blue" ? glm::vec3(0.02F, 0.25F, 0.8F)
+                                                             : glm::vec3(0.8F, 0.4F, 0.02F));
     }
     for (auto& object : scene.objects) {
         object.visible = !scenario.plane_only || object.id == "ground";
@@ -95,26 +96,26 @@ void install(Workbench& window, const minirender::SceneDocument& source, const Q
 // 使用 BVH 查询检查像素中央的可见物体，再核对显示编码。跳过轮廓附近的样本。
 // CPU 核心另有解析朝向用例，因此此处可用于验证 Vulkan 的绕序和数据传递。
 void verify(Workbench& window, const Scenario& scenario, int mode, const QImage& image) {
-    const auto snapshot = window.viewport()->scene();
-    const minirender::SceneBvh bvh(snapshot);
+    const auto                   snapshot = window.viewport()->scene();
+    const minirender::SceneBvh   bvh(snapshot);
     const minirender::PathTracer tracer(snapshot, {.maximum_depth = 0});
-    const auto& camera = window.viewport()->camera();
-    const double aspect = static_cast<double>(image.width()) / image.height();
-    const auto trace = [&](int x, int y) {
+    const auto&                  camera = window.viewport()->camera();
+    const double                 aspect = static_cast<double>(image.width()) / image.height();
+    const auto                   trace  = [&](int x, int y) {
         return bvh.intersect(
             camera.generate_ray({(x + 0.5) / image.width(), (y + 0.5) / image.height()}, aspect));
     };
-    int matched = 0;
-    int checked = 0;
+    int                matched = 0;
+    int                checked = 0;
     std::array<int, 3> object_samples{};
     const auto hdr = mode == 0 ? std::optional(window.viewport()->grab_hdr()) : std::nullopt;
     for (int y = 5; y + 5 < image.height(); y += 23) {
         for (int x = 5; x + 5 < image.width(); x += 23) {
-            const auto hit = trace(x, y);
-            bool stable = true;
+            const auto hit    = trace(x, y);
+            bool       stable = true;
             for (const auto offset : {QPoint(-3, 0), QPoint(3, 0), QPoint(0, -3), QPoint(0, 3)}) {
                 const auto nearby = trace(x + offset.x(), y + offset.y());
-                stable = stable && nearby.has_value() == hit.has_value();
+                stable            = stable && nearby.has_value() == hit.has_value();
                 if (hit && nearby) {
                     stable = stable && nearby->instance_index == hit->instance_index &&
                              nearby->triangle_index == hit->triangle_index;
@@ -136,7 +137,7 @@ void verify(Workbench& window, const Scenario& scenario, int mode, const QImage&
                                                : (instance.object_id == "blue_cube" ? 1 : 2);
                 ++object_samples[object];
                 if (mode == 0) {
-                    const auto emission = instance.material.emission;
+                    const auto          emission = instance.material.emission;
                     minirender::Sampler sampler(101);
                     require(glm::length(tracer.trace(ray, sampler) - glm::dvec3(emission)) < 1e-6,
                             "CPU path emission disagrees with visible material");
@@ -153,15 +154,15 @@ void verify(Workbench& window, const Scenario& scenario, int mode, const QImage&
                     expected = normal * 0.5F + 0.5F;
                 } else {
                     const auto point = glm::vec4(glm::vec3(hit->position), 1);
-                    expected = glm::vec3(1 / (1 - (camera.view_matrix() * point).z));
+                    expected         = glm::vec3(1 / (1 - (camera.view_matrix() * point).z));
                 }
             } else if (mode == 0) {
                 const glm::vec3 background{0.012F, 0.018F, 0.028F};
                 expected = background / (glm::vec3(1) + background);
             }
-            const auto actual = image.pixelColor(x, y);
+            const auto       actual = image.pixelColor(x, y);
             const std::array channels{actual.red(), actual.green(), actual.blue()};
-            bool equal = true;
+            bool             equal = true;
             for (int channel = 0; channel < 3; ++channel) {
                 const int encoded =
                     minirender::encode_unorm8(minirender::linear_to_srgb(expected[channel]));
@@ -187,10 +188,10 @@ void verify(Workbench& window, const Scenario& scenario, int mode, const QImage&
 
 struct State {
     minirender::SceneDocument source;
-    std::size_t scenario = 0;
-    int mode = 0;
-    int ticks = 0;
-    int motion = -1;
+    std::size_t               scenario = 0;
+    int                       mode     = 0;
+    int                       ticks    = 0;
+    int                       motion   = -1;
 };
 
 } // namespace
@@ -198,7 +199,7 @@ struct State {
 void start_sides_smoke(Workbench& window, const QString& directory) {
     require(QDir().mkpath(directory), "Cannot create sidedness output directory");
     const auto state = std::make_shared<State>();
-    state->source = window.document();
+    state->source    = window.document();
     install(window, state->source, directory, scenarios.front());
     auto* timer = new QTimer(&window);
     timer->setInterval(150);
@@ -222,17 +223,17 @@ void start_sides_smoke(Workbench& window, const QString& directory) {
                     QApplication::exit(0);
                     return;
                 }
-                auto camera = viewport->camera();
-                const float angle = static_cast<float>(state->motion) * 0.27F;
-                camera.position = {3.5F * std::sin(angle), -0.5F - 0.4F * std::sin(angle),
-                                   3.5F * std::cos(angle)};
+                auto        camera = viewport->camera();
+                const float angle  = static_cast<float>(state->motion) * 0.27F;
+                camera.position    = {3.5F * std::sin(angle), -0.5F - 0.4F * std::sin(angle),
+                                      3.5F * std::cos(angle)};
                 viewport->set_camera(camera);
                 state->mode = state->motion % 3;
                 window.findChild<QComboBox*>("view_mode")->setCurrentIndex(state->mode);
                 return;
             }
             const auto& scenario = scenarios[state->scenario];
-            const auto image = viewport->grab();
+            const auto  image    = viewport->grab();
             require(!image.isNull(), "Sidedness readback is empty");
             const auto name = QString::fromUtf8(scenario.name) + "-" + QString::number(state->mode);
             require(image.save(directory + "/" + name + ".png"), "Cannot save sidedness image");

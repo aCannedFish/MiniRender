@@ -16,16 +16,19 @@ class TemporaryDirectory {
   public:
     TemporaryDirectory() {
         const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-        root = std::filesystem::temp_directory_path() /
-               ("minirender-texture-" + std::to_string(stamp));
+        root             = std::filesystem::temp_directory_path() /
+                           ("minirender-texture-" + std::to_string(stamp));
         std::filesystem::create_directories(root);
     }
+
     ~TemporaryDirectory() {
         std::error_code error;
         std::filesystem::remove_all(root, error);
     }
+
     std::filesystem::path root;
 };
+
 std::filesystem::path assets() {
     return std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/assets/textures";
 }
@@ -64,7 +67,7 @@ TEST_CASE("Odd mip dimensions retain the last row and column", "[texture]") {
                               x == 2 || y == 4 ? 1.0F : 0.0F};
         }
     }
-    Texture texture(std::move(image));
+    Texture    texture(std::move(image));
     const auto average = texture.level(texture.level_count() - 1).at(0, 0);
     REQUIRE(average.r == Approx(1));
     REQUIRE(average.g == Approx(2));
@@ -74,7 +77,7 @@ TEST_CASE("Odd mip dimensions retain the last row and column", "[texture]") {
 TEST_CASE("Texture scene round trip preserves bindings and snapshots", "[texture][scene]") {
     const auto source =
         std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/studio-textured.json";
-    auto scene = load_scene(source);
+    auto       scene    = load_scene(source);
     const auto snapshot = make_snapshot(scene);
     REQUIRE(snapshot->instances[1].base_color_texture != nullptr);
     const auto pointer = snapshot->instances[1].base_color_texture;
@@ -83,7 +86,7 @@ TEST_CASE("Texture scene round trip preserves bindings and snapshots", "[texture
     REQUIRE(make_snapshot(scene)->instances[1].base_color_texture == nullptr);
     scene.materials[1].base_color_texture = "checker";
     TemporaryDirectory temporary;
-    const auto path = temporary.root / "scene.json";
+    const auto         path = temporary.root / "scene.json";
     save_scene(scene, path);
     const auto reloaded = load_scene(path);
     std::filesystem::remove(path);
@@ -96,7 +99,7 @@ TEST_CASE("Texture scene round trip preserves bindings and snapshots", "[texture
 TEST_CASE("PNG output round trips linear colors through Unicode paths", "[texture][io]") {
     const auto path = std::filesystem::temp_directory_path() /
                       std::filesystem::path(std::u8string(u8"minirender_纹理 空格.png"));
-    Image image(2, 1);
+    Image      image(2, 1);
     image.at(0, 0) = glm::vec3(0.18F);
     image.at(1, 0) = {1, 0, 0};
     image.write_png(path);

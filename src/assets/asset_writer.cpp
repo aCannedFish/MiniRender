@@ -43,7 +43,7 @@ bool equal_files(const std::filesystem::path& first, const std::filesystem::path
         return false;
     }
     std::array<char, block_size> ba{}, bb{};
-    std::size_t completed = 0;
+    std::size_t                  completed = 0;
     while (completed < total) {
         cancellation.check();
         const auto size = static_cast<std::streamsize>(std::min(block_size, total - completed));
@@ -67,14 +67,14 @@ bool equal_files(const std::filesystem::path& first, const std::filesystem::path
 // FNV-1a 仅用于稳定文件名，随后仍比较完整字节；它不承担安全校验职责。
 std::string content_name(const std::filesystem::path& file, std::size_t index, std::size_t count,
                          CancellationToken cancellation, const SceneSaveCallback& progress) {
-    const auto total = static_cast<std::size_t>(std::filesystem::file_size(file));
+    const auto    total = static_cast<std::size_t>(std::filesystem::file_size(file));
     std::ifstream stream(file, std::ios::binary);
     if (!stream) {
         throw std::runtime_error("Cannot read staged mesh");
     }
-    std::uint64_t hash = 14695981039346656037ULL;
+    std::uint64_t                hash = 14695981039346656037ULL;
     std::array<char, block_size> buffer{};
-    std::size_t completed = 0;
+    std::size_t                  completed = 0;
     report(cancellation, progress, SceneSaveStage::hash, index, count, 0, total);
     while (completed < total) {
         cancellation.check();
@@ -142,7 +142,7 @@ std::filesystem::path publish(const std::filesystem::path& source,
 std::filesystem::path portable_asset_path(const std::filesystem::path& source,
                                           const std::filesystem::path& destination,
                                           std::size_t index, std::size_t count,
-                                          CancellationToken cancellation,
+                                          CancellationToken        cancellation,
                                           const SceneSaveCallback& progress) {
     cancellation.check();
     if (!std::filesystem::is_regular_file(source)) {
@@ -158,12 +158,12 @@ std::filesystem::path portable_asset_path(const std::filesystem::path& source,
                    progress);
 }
 
-std::filesystem::path write_generated_asset(const MeshData& mesh,
+std::filesystem::path write_generated_asset(const MeshData&              mesh,
                                             const std::filesystem::path& destination,
                                             const std::filesystem::path& staging, std::size_t index,
                                             std::size_t count, CancellationToken cancellation,
                                             const SceneSaveCallback& progress) {
-    const auto temporary = staging / ("mesh-" + std::to_string(index) + ".obj");
+    const auto    temporary = staging / ("mesh-" + std::to_string(index) + ".obj");
     std::ofstream stream;
     stream.exceptions(std::ios::badbit | std::ios::failbit);
     stream.open(temporary, std::ios::binary);

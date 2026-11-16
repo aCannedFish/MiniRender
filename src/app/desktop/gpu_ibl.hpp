@@ -18,13 +18,13 @@ class GpuFloatTexture {
     VkDescriptorImageInfo descriptor() const noexcept;
 
   private:
-    VkDevice device_ = VK_NULL_HANDLE;
-    GpuImage image_;
-    GpuBuffer staging_;
-    VkSampler sampler_ = VK_NULL_HANDLE;
+    VkDevice                       device_ = VK_NULL_HANDLE;
+    GpuImage                       image_;
+    GpuBuffer                      staging_;
+    VkSampler                      sampler_ = VK_NULL_HANDLE;
     std::vector<VkBufferImageCopy> copies_;
-    std::uint32_t layers_ = 0;
-    bool uploaded_ = false;
+    std::uint32_t                  layers_   = 0;
+    bool                           uploaded_ = false;
 };
 
 // IBL 的四张逻辑纹理。始终提供有效 fallback 描述符，烘焙数据到达时分别替换。
@@ -40,8 +40,8 @@ class GpuIbl {
 
   private:
     void upload_environment(VulkanViewport& viewport);
-    GpuFloatTexture diffuse_, specular_, brdf_;
-    GpuTexture source_;
+    GpuFloatTexture                                   diffuse_, specular_, brdf_;
+    GpuTexture                                        source_;
     std::shared_ptr<const minirender::IblEnvironment> maps_;
-    std::shared_ptr<const minirender::Image> lut_;
+    std::shared_ptr<const minirender::Image>          lut_;
 };

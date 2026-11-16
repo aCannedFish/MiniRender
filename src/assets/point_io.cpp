@@ -21,14 +21,16 @@ namespace minirender {
 namespace {
 
 enum class Scalar { i8, u8, i16, u16, i32, u32, f32, f64 };
+
 struct Property {
-    std::string name;
-    Scalar value;
+    std::string           name;
+    Scalar                value;
     std::optional<Scalar> count;
 };
+
 struct Element {
-    std::string name;
-    std::size_t count;
+    std::string           name;
+    std::size_t           count;
     std::vector<Property> properties;
 };
 
@@ -47,15 +49,18 @@ Scalar scalar_type(const std::string& name) {
     }
     throw std::invalid_argument("Unsupported PLY scalar type: " + name);
 }
+
 bool floating(Scalar type) {
     return type == Scalar::f32 || type == Scalar::f64;
 }
+
 bool space(char ch) {
     return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' || ch == '\f' || ch == '\v';
 }
+
 std::size_t count_value(const std::string& text) {
     std::size_t result = 0;
-    const auto parsed = std::from_chars(text.data(), text.data() + text.size(), result);
+    const auto  parsed = std::from_chars(text.data(), text.data() + text.size(), result);
     if (parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size()) {
         throw std::invalid_argument("PLY count must be an unsigned integer");
     }
@@ -138,9 +143,10 @@ class Reader final {
   private:
     static int semantic(const std::string& name) {
         const std::array<std::string_view, 6> names{"x", "y", "z", "nx", "ny", "nz"};
-        const auto found = std::find(names.begin(), names.end(), name);
+        const auto                            found = std::find(names.begin(), names.end(), name);
         return found == names.end() ? -1 : static_cast<int>(found - names.begin());
     }
+
     void report(std::size_t done) {
         cancellation_.check();
         if (progress_) {
@@ -148,9 +154,10 @@ class Reader final {
         }
         cancellation_.check();
     }
+
     std::vector<std::string> line() {
         std::string text;
-        char ch = 0;
+        char        ch = 0;
         for (;;) {
             if (!stream_.get(ch)) {
                 throw std::invalid_argument("Truncated PLY header");
@@ -175,12 +182,13 @@ class Reader final {
         std::istringstream input(text);
         input.imbue(std::locale::classic());
         std::vector<std::string> words;
-        std::string word;
+        std::string              word;
         while (input >> word) {
             words.push_back(word);
         }
         return words;
     }
+
     void read_header() {
         if (line() != std::vector<std::string>{"ply"}) {
             throw std::invalid_argument("PLY magic number is missing");
@@ -270,6 +278,7 @@ class Reader final {
             throw std::invalid_argument("PLY vertex element is missing");
         }
     }
+
     template <class T> double binary() {
         std::array<char, sizeof(T)> bytes{};
         if (!stream_.read(bytes.data(), static_cast<std::streamsize>(bytes.size()))) {
@@ -280,9 +289,10 @@ class Reader final {
         }
         return static_cast<double>(std::bit_cast<T>(bytes));
     }
+
     std::string token() {
         std::string text;
-        char ch = 0;
+        char        ch = 0;
         while (stream_.get(ch) && space(ch)) {
         }
         if (!stream_) {
@@ -296,10 +306,11 @@ class Reader final {
         } while (stream_.get(ch) && !space(ch));
         return text;
     }
+
     double ascii(Scalar type) {
-        const auto text = token();
+        const auto  text  = token();
         const auto* first = text.data() + (text.front() == '+' ? 1 : 0);
-        const auto* last = text.data() + text.size();
+        const auto* last  = text.data() + text.size();
         if (floating(type)) {
             double value = 0;
             // 与现有 CLI 保持一致，兼容尚无浮点 from_chars 的 libc++。
@@ -311,8 +322,8 @@ class Reader final {
             }
             return value;
         }
-        std::int64_t value = 0;
-        const auto parsed = std::from_chars(first, last, value);
+        std::int64_t value  = 0;
+        const auto   parsed = std::from_chars(first, last, value);
         if (parsed.ec != std::errc{} || parsed.ptr != last) {
             throw std::invalid_argument("Invalid PLY integer token");
         }
@@ -329,6 +340,7 @@ class Reader final {
         }
         return static_cast<double>(value);
     }
+
     double number(Scalar type) {
         if (++values_ > options_.maximum_values) {
             throw std::length_error("PLY data exceeds its value budget");
@@ -373,17 +385,18 @@ class Reader final {
         }
         return value;
     }
-    std::ifstream stream_;
-    PlyReadOptions options_;
-    CancellationToken cancellation_;
-    PointProgress progress_;
+
+    std::ifstream        stream_;
+    PlyReadOptions       options_;
+    CancellationToken    cancellation_;
+    PointProgress        progress_;
     std::vector<Element> elements_;
-    PlyFormat format_ = PlyFormat::ascii;
-    std::size_t total_records_ = 0;
-    std::size_t records_ = 0;
-    std::size_t values_ = 0;
-    std::size_t header_bytes_ = 0;
-    bool has_normals_ = false;
+    PlyFormat            format_        = PlyFormat::ascii;
+    std::size_t          total_records_ = 0;
+    std::size_t          records_       = 0;
+    std::size_t          values_        = 0;
+    std::size_t          header_bytes_  = 0;
+    bool                 has_normals_   = false;
 };
 
 } // namespace
@@ -401,7 +414,7 @@ void save_point_cloud(const PointCloud& cloud, const std::filesystem::path& path
         throw std::invalid_argument("Unknown PLY output encoding");
     }
     detail::StagedFile staged(path);
-    auto& stream = staged.stream();
+    auto&              stream = staged.stream();
     stream.imbue(std::locale::classic());
     const char* encoding = format == PlyFormat::ascii           ? "ascii"
                            : format == PlyFormat::little_endian ? "binary_little_endian"

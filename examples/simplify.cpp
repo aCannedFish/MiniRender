@@ -19,13 +19,13 @@ int main(int argc, char** argv) {
             throw std::invalid_argument("Usage: minirender_simplify_example [--stress]");
         }
         const auto source = std::filesystem::path(MINIRENDER_SOURCE_DIR);
-        auto scene = load_scene(source / "scenes/studio.json");
-        const auto cube = std::find_if(scene.meshes.begin(), scene.meshes.end(),
-                                       [](const auto& mesh) { return mesh.id == "cube"; });
+        auto       scene  = load_scene(source / "scenes/studio.json");
+        const auto cube   = std::find_if(scene.meshes.begin(), scene.meshes.end(),
+                                         [](const auto& mesh) { return mesh.id == "cube"; });
         if (cube == scene.meshes.end()) {
             throw std::runtime_error("Studio cube mesh is missing");
         }
-        const auto original = subdivide_loop(cube->data, {.levels = stress ? 6U : 4U}).mesh;
+        const auto original  = subdivide_loop(cube->data, {.levels = stress ? 6U : 4U}).mesh;
         const auto directory = std::filesystem::current_path() / "outputs/a4.3";
         std::filesystem::create_directories(directory);
         scene.meshes.push_back({"qem_example", {}, original});
@@ -35,13 +35,13 @@ int main(int argc, char** argv) {
             }
         }
         RenderSettings settings;
-        settings.width = 128;
-        settings.height = 128;
+        settings.width             = 128;
+        settings.height            = 128;
         settings.samples_per_pixel = 32;
-        settings.seed = 101;
-        const auto render = [&](const SceneDocument& document, const std::string& label) {
+        settings.seed              = 101;
+        const auto render          = [&](const SceneDocument& document, const std::string& label) {
             const PathTracer tracer(make_snapshot(document));
-            auto image = tracer.render(settings);
+            auto             image = tracer.render(settings);
             image.write_exr(directory / (label + ".exr"));
             display_image(image).write_png(directory / (label + ".png"));
             return image;
@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
         }
         for (const auto target :
              stress ? std::vector<std::size_t>{12288} : std::vector<std::size_t>{768, 384}) {
-            const auto start = std::chrono::steady_clock::now();
+            const auto start  = std::chrono::steady_clock::now();
             const auto result = simplify_qem(original, {.target_triangles = target});
             const auto milliseconds =
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
@@ -69,13 +69,13 @@ int main(int argc, char** argv) {
                 continue;
             }
             scene.meshes.back().data = result.mesh;
-            const auto label = "lod-" + std::to_string(target);
+            const auto label         = "lod-" + std::to_string(target);
             save_obj(*result.mesh, directory / (label + ".obj"));
             save_scene(scene, directory / (label + ".json"));
-            const auto image = render(scene, label);
-            const auto reopened = load_scene(directory / (label + ".json"));
+            const auto image     = render(scene, label);
+            const auto reopened  = load_scene(directory / (label + ".json"));
             const auto roundtrip = render(reopened, label + "-reopened");
-            double maximum = 0;
+            double     maximum   = 0;
             for (std::size_t y = 0; y < image.height(); ++y) {
                 for (std::size_t x = 0; x < image.width(); ++x) {
                     maximum = std::max(maximum, static_cast<double>(glm::length(

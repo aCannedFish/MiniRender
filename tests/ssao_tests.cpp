@@ -11,13 +11,13 @@ TEST_CASE("SSAO settings reject invalid world distance and sampling ranges", "[s
     SsaoSettings settings;
     REQUIRE_NOTHROW(settings.validate());
     for (const float radius : {0.0F, -1.0F, 1001.0F, std::numeric_limits<float>::infinity()}) {
-        auto invalid = settings;
+        auto invalid   = settings;
         invalid.radius = radius;
         REQUIRE_THROWS_AS(invalid.validate(), std::invalid_argument);
     }
     settings.bias = settings.radius + 0.01F;
     REQUIRE_THROWS_AS(settings.validate(), std::invalid_argument);
-    settings = {};
+    settings         = {};
     settings.samples = 65;
     REQUIRE_THROWS_AS(settings.validate(), std::invalid_argument);
     settings.samples = 0;
@@ -34,7 +34,7 @@ TEST_CASE("SSAO kernels cover the oriented unit hemisphere without a radius-depe
     REQUIRE(first == make_ssao_kernel());
     REQUIRE(first != make_ssao_kernel(102));
     double mean_cosine = 0;
-    int nearby = 0, distant = 0;
+    int    nearby = 0, distant = 0;
     for (const auto& sample : first) {
         const auto length = glm::length(glm::vec3(sample));
         REQUIRE(length >= 0.09999F);

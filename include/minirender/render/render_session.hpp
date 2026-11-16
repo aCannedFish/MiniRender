@@ -23,33 +23,33 @@ std::string render_state_name(RenderState state);
 bool render_terminal(RenderState state) noexcept;
 
 struct SessionSettings {
-    std::uint32_t threads = 0; // 0 自动选择并保留一个 CPU 核，最多 32 个工作线程。
-    std::uint32_t tile_size = 16;
+    std::uint32_t threads       = 0; // 0 自动选择并保留一个 CPU 核，最多 32 个工作线程。
+    std::uint32_t tile_size     = 16;
     std::uint32_t batch_samples = 4;
     void validate() const;
 };
 
 struct RenderProgress {
-    RenderState state = RenderState::idle;
-    std::uint64_t job_id = 0;
-    std::uint64_t recorded_samples = 0;
-    std::uint64_t total_samples = 0;
-    std::uint64_t completed_pixels = 0;
-    std::uint32_t worker_count = 0;
-    double elapsed_seconds = 0;
-    std::string error;
+    RenderState    state            = RenderState::idle;
+    std::uint64_t  job_id           = 0;
+    std::uint64_t  recorded_samples = 0;
+    std::uint64_t  total_samples    = 0;
+    std::uint64_t  completed_pixels = 0;
+    std::uint32_t  worker_count     = 0;
+    double         elapsed_seconds  = 0;
+    std::string    error;
     PathStatistics statistics; // 完成或取消、收回全部线程后归并。
     IntegratorKind integrator = IntegratorKind::path_tracing;
     SppmStatistics sppm{};
-    SppmProgress sppm_progress{};
+    SppmProgress   sppm_progress{};
 };
 
 // 不可变线性预览及对应的实际累计信息。忙时返回空 image，调用方可保留上一帧。
 struct RenderPreview {
     std::shared_ptr<const Image> image;
-    std::uint64_t job_id = 0;
-    std::uint64_t revision = 0;
-    std::uint64_t recorded_samples = 0;
+    std::uint64_t                job_id           = 0;
+    std::uint64_t                revision         = 0;
+    std::uint64_t                recorded_samples = 0;
 };
 
 // 异步 CPU 任务。生命周期操作由同一控制线程串行调用；progress/preview 可并发读取。
@@ -59,7 +59,7 @@ class RenderSession {
   public:
     RenderSession();
     ~RenderSession();
-    RenderSession(const RenderSession&) = delete;
+    RenderSession(const RenderSession&)            = delete;
     RenderSession& operator=(const RenderSession&) = delete;
     void start(std::shared_ptr<const SceneSnapshot> scene, RenderSettings render,
                IntegratorSettings integrator = {}, SessionSettings session = {});

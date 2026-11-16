@@ -6,7 +6,7 @@ class RegressionActivity final {
   public:
     explicit RegressionActivity(bool enabled);
     ~RegressionActivity();
-    RegressionActivity(const RegressionActivity&) = delete;
+    RegressionActivity(const RegressionActivity&)            = delete;
     RegressionActivity& operator=(const RegressionActivity&) = delete;
 
   private:

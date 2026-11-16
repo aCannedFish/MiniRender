@@ -7,11 +7,11 @@ class GpuShader {
   public:
     GpuShader(VkDevice device, const char* resource);
     ~GpuShader();
-    GpuShader(const GpuShader&) = delete;
+    GpuShader(const GpuShader&)            = delete;
     GpuShader& operator=(const GpuShader&) = delete;
     VkShaderModule handle() const noexcept;
 
   private:
-    VkDevice device_;
+    VkDevice       device_;
     VkShaderModule module_ = VK_NULL_HANDLE;
 };

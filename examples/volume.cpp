@@ -9,6 +9,7 @@
 #include <locale>
 
 using namespace minirender;
+
 namespace {
 
 // 与桌面共用后台任务和样本统计；例程只负责场景与文件，不另写积分器。
@@ -34,21 +35,24 @@ std::shared_ptr<const Image> render(const SceneDocument& scene, const std::strin
               << std::flush;
     return session.result();
 }
+
 MediumRegion medium(glm::dvec3 minimum, glm::dvec3 maximum, glm::dvec3 absorption,
                     glm::dvec3 scattering, double g) {
     MediumRegion region;
-    region.id = "fog";
-    region.name = "均匀体积";
+    region.id      = "fog";
+    region.name    = "均匀体积";
     region.minimum = minimum;
     region.maximum = maximum;
-    region.medium = {absorption, scattering, g};
+    region.medium  = {absorption, scattering, g};
     return region;
 }
+
 SceneDocument bounded_fog() {
     auto scene = load_scene(std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/studio.json");
     scene.media.push_back(medium({-2, .01, -2}, {2, 2.8, 2}, {.06, .12, .18}, {.3, .3, .3}, .6));
     return scene;
 }
+
 SceneDocument cornell_fog() {
     auto scene =
         load_scene(std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/cornell-box.json");
@@ -61,12 +65,12 @@ SceneDocument cornell_fog() {
 SceneDocument light_beam() {
     auto scene = load_scene(std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/studio.json");
     std::erase_if(scene.objects, [](const auto& object) { return object.id != "ground"; });
-    scene.environment = glm::vec3(.001F);
+    scene.environment        = glm::vec3(.001F);
     scene.directional_lights = {{"sun", {.2F, -1, .3F}, {1, .93F, .8F}, 12}};
-    scene.camera.position = {3, 1.8F, 4.5F};
-    scene.camera.target = {0, 1.2F, 0};
-    auto mesh = std::make_shared<MeshData>();
-    const auto quad = [&](float x0, float x1, float z0, float z1) {
+    scene.camera.position    = {3, 1.8F, 4.5F};
+    scene.camera.target      = {0, 1.2F, 0};
+    auto       mesh          = std::make_shared<MeshData>();
+    const auto quad          = [&](float x0, float x1, float z0, float z1) {
         const auto start = std::uint32_t(mesh->positions.size());
         mesh->positions.insert(mesh->positions.end(),
                                {{x0, 2.6F, z0}, {x0, 2.6F, z1}, {x1, 2.6F, z1}, {x1, 2.6F, z0}});
@@ -83,7 +87,7 @@ SceneDocument light_beam() {
     quad(-.35F, .35F, -2, -.35F);
     quad(-.35F, .35F, .35F, 2);
     Material ceiling;
-    ceiling.id = "aperture";
+    ceiling.id         = "aperture";
     ceiling.base_color = glm::vec3(.08F);
     scene.materials.push_back(ceiling);
     scene.meshes.push_back({"aperture", {}, mesh});
@@ -102,7 +106,7 @@ void write_example(const SceneDocument& scene, const std::filesystem::path& outp
     display_image(*image).write_png(output / (name + ".png"));
     const auto reopened = load_scene(file);
     const auto repeated = render(reopened, name + "-reload");
-    double maximum = 0;
+    double     maximum  = 0;
     for (std::size_t y = 0; y < image->height(); ++y) {
         for (std::size_t x = 0; x < image->width(); ++x) {
             maximum = std::max(maximum, double(glm::length(image->at(x, y) - repeated->at(x, y))));
@@ -116,8 +120,8 @@ void write_example(const SceneDocument& scene, const std::filesystem::path& outp
 
 // 独立高样本图固定为参考；三个种子分别记录误差，避免用某一张噪声图判断收敛。
 void convergence(const std::filesystem::path& output) {
-    const auto scene = bounded_fog();
-    const auto reference = render(scene, "reference", {32, 32, 4096, 909});
+    const auto    scene     = bounded_fog();
+    const auto    reference = render(scene, "reference", {32, 32, 4096, 909});
     std::ofstream csv(output / "convergence.csv");
     csv.imbue(std::locale::classic());
     csv << "spp,seed,linear_rgb_rmse\n";
@@ -125,8 +129,8 @@ void convergence(const std::filesystem::path& output) {
     for (const auto spp : {16U, 64U, 256U}) {
         double average = 0;
         for (const auto seed : {17ULL, 77ULL, 317ULL}) {
-            const auto image = render(scene, "convergence", {32, 32, spp, seed});
-            double squared_error = 0;
+            const auto image         = render(scene, "convergence", {32, 32, spp, seed});
+            double     squared_error = 0;
             for (std::size_t y = 0; y < 32; ++y) {
                 for (std::size_t x = 0; x < 32; ++x) {
                     const auto delta =

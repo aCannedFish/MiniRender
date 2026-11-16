@@ -23,18 +23,18 @@ double transmission_moment(double eta) {
         return 1;
     }
     constexpr int count = 64;
-    double sum = 0;
+    double        sum   = 0;
     for (int i = 0; i < count / 2; ++i) {
-        double z = std::cos(pi * (i + .75) / (count + .5));
+        double z          = std::cos(pi * (i + .75) / (count + .5));
         double derivative = 0;
         for (int iteration = 0; iteration < 20; ++iteration) {
             double previous = 0, value = 1;
             for (int order = 1; order <= count; ++order) {
                 const double next = ((2 * order - 1) * z * value - (order - 1) * previous) / order;
-                previous = value;
-                value = next;
+                previous          = value;
+                value             = next;
             }
-            derivative = count * (z * value - previous) / (z * z - 1);
+            derivative         = count * (z * value - previous) / (z * z - 1);
             const double delta = value / derivative;
             z -= delta;
             if (std::abs(delta) < 2e-16) {
@@ -56,21 +56,21 @@ DipoleProfile::DipoleProfile(SubsurfaceParameters parameters, double ior) : ior_
         throw std::invalid_argument("Dipole IOR must be in 1..3");
     }
     external_transmission_ = transmission_moment(ior);
-    const double escape = external_transmission_ / (ior * ior);
-    internal_reflectance_ = 1 - escape;
-    const double boundary = (2 - escape) / escape;
+    const double escape    = external_transmission_ / (ior * ior);
+    internal_reflectance_  = 1 - escape;
+    const double boundary  = (2 - escape) / escape;
     for (int c = 0; c < 3; ++c) {
         const double absorption = parameters.absorption[c] * parameters.density;
         const double scattering = parameters.reduced_scattering[c] * parameters.density;
         const double extinction = absorption + scattering;
-        auto& channel = channels_[c];
-        channel.albedo = scattering / extinction;
-        channel.real_depth = 1 / extinction;
-        channel.virtual_depth = channel.real_depth * (1 + 4 * boundary / 3);
-        channel.extinction = std::sqrt(3 * absorption * extinction);
-        reflectance_[c] = channel.albedo / 2 *
-                          (std::exp(-channel.extinction * channel.real_depth) +
-                           std::exp(-channel.extinction * channel.virtual_depth));
+        auto&        channel    = channels_[c];
+        channel.albedo          = scattering / extinction;
+        channel.real_depth      = 1 / extinction;
+        channel.virtual_depth   = channel.real_depth * (1 + 4 * boundary / 3);
+        channel.extinction      = std::sqrt(3 * absorption * extinction);
+        reflectance_[c]         = channel.albedo / 2 *
+                                  (std::exp(-channel.extinction * channel.real_depth) +
+                                   std::exp(-channel.extinction * channel.virtual_depth));
     }
 }
 
@@ -96,7 +96,7 @@ double DipoleProfile::integral(const Channel& channel, double radius) const {
         const double d = std::hypot(radius, z);
         // d-z 在小半径时相消；用 r*(r/d)/(1+z/d) 计算同一个差值。
         const double difference = radius * (radius / d) / (1 + z / d);
-        const double log_tail = -std::log1p(difference / z) - channel.extinction * difference;
+        const double log_tail   = -std::log1p(difference / z) - channel.extinction * difference;
         value += std::exp(-channel.extinction * z) * -std::expm1(log_tail);
     }
     return channel.albedo / 2 * value;
@@ -107,17 +107,19 @@ glm::dvec3 DipoleProfile::cumulative(double radius) const {
     return {integral(channels_[0], radius), integral(channels_[1], radius),
             integral(channels_[2], radius)};
 }
+
 glm::dvec3 DipoleProfile::reflectance() const noexcept {
     return reflectance_;
 }
+
 double DipoleProfile::sample_radius(int channel, double u, double maximum_radius) const {
     check_radius(maximum_radius);
     if (channel < 0 || channel > 2 || !(u >= 0 && u < 1) || maximum_radius == 0) {
         throw std::invalid_argument(
             "Dipole sampling requires a channel, u in [0,1) and radius > 0");
     }
-    const auto& parameters = channels_[channel];
-    const double total = integral(parameters, maximum_radius);
+    const auto&  parameters = channels_[channel];
+    const double total      = integral(parameters, maximum_radius);
     if (total == 0) {
         throw std::invalid_argument("Dipole channel has no scattering mass");
     }
@@ -125,7 +127,7 @@ double DipoleProfile::sample_radius(int channel, double u, double maximum_radius
         return 0;
     }
     const double target = u * total;
-    double low = 0, high = std::min(maximum_radius, parameters.real_depth);
+    double       low = 0, high = std::min(maximum_radius, parameters.real_depth);
     while (integral(parameters, high) < target && high < maximum_radius) {
         high = std::min(maximum_radius, high * 2);
     }
@@ -139,15 +141,19 @@ double DipoleProfile::sample_radius(int channel, double u, double maximum_radius
     }
     return low + (high - low) / 2;
 }
+
 double DipoleProfile::directional(double cosine) const {
     return (1 - fresnel_dielectric(cosine, 1, ior_)) / pi;
 }
+
 double DipoleProfile::external_transmission() const noexcept {
     return external_transmission_;
 }
+
 double DipoleProfile::internal_reflectance() const noexcept {
     return internal_reflectance_;
 }
+
 double DipoleProfile::ior() const noexcept {
     return ior_;
 }

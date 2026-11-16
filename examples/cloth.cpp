@@ -13,12 +13,12 @@ namespace {
 // 使用已有场景资源显示模拟几何；A6.2 再接入专门的微圆柱布料材质。
 SceneDocument scene_for(const FrozenCloth& cloth, bool sphere) {
     const auto source = std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes";
-    auto scene = load_scene(source / "studio.json");
+    auto       scene  = load_scene(source / "studio.json");
     std::erase_if(scene.objects, [](const auto& object) { return object.id != "ground"; });
     Material fabric;
-    fabric.id = "fabric";
-    fabric.name = "布料几何参照";
-    fabric.base_color = {.08F, .42F, .68F};
+    fabric.id                 = "fabric";
+    fabric.name               = "布料几何参照";
+    fabric.base_color         = {.08F, .42F, .68F};
     fabric.base_color_texture = "fabric-grid";
     scene.materials.push_back(fabric);
     scene.textures.push_back(
@@ -28,8 +28,8 @@ SceneDocument scene_for(const FrozenCloth& cloth, bool sphere) {
     scene.objects.push_back({"cloth", "模拟布料", "cloth", "fabric", cloth.transform});
     if (sphere) {
         Material support;
-        support.id = "support";
-        support.name = "支撑球";
+        support.id         = "support";
+        support.name       = "支撑球";
         support.base_color = {.65F, .7F, .75F};
         scene.materials.push_back(support);
         scene.meshes.push_back(
@@ -37,22 +37,22 @@ SceneDocument scene_for(const FrozenCloth& cloth, bool sphere) {
              std::make_shared<const MeshData>(load_obj(source / "assets/demo-sphere.obj"))});
         Transform transform;
         transform.translation = {0, .65F, 0};
-        transform.scale = glm::vec3(.65F);
+        transform.scale       = glm::vec3(.65F);
         scene.objects.push_back({"support", "碰撞球", "support", "support", transform});
         scene.camera.position = {3, 2.4F, 3.8F};
-        scene.camera.target = {0, .7F, 0};
+        scene.camera.target   = {0, .7F, 0};
     } else {
         scene.camera.position = {2.7F, 2.1F, 4.5F};
-        scene.camera.target = {0, 1.25F, .35F};
+        scene.camera.target   = {0, 1.25F, .35F};
     }
     return scene;
 }
 
 void render_frame(const ClothSimulation& simulation, bool sphere,
                   const std::filesystem::path& output, const std::string& name, bool save) {
-    const auto scene = scene_for(simulation.freeze(), sphere);
+    const auto           scene = scene_for(simulation.freeze(), sphere);
     const RenderSettings settings{160, 160, 32, 101};
-    const auto image = PathTracer(make_snapshot(scene)).render(settings);
+    const auto           image = PathTracer(make_snapshot(scene)).render(settings);
     image.write_exr(output / (name + ".exr"));
     display_image(image).write_png(output / (name + ".png"));
     const auto statistics = simulation.statistics();
@@ -64,8 +64,8 @@ void render_frame(const ClothSimulation& simulation, bool sphere,
         const auto path = output / std::filesystem::path(u8"布料 冻结.json");
         save_scene(scene, path);
         const auto reopened = load_scene(path);
-        const auto check = PathTracer(make_snapshot(reopened)).render(settings);
-        double maximum = 0;
+        const auto check    = PathTracer(make_snapshot(reopened)).render(settings);
+        double     maximum  = 0;
         for (std::size_t y = 0; y < settings.height; ++y) {
             for (std::size_t x = 0; x < settings.width; ++x) {
                 maximum = std::max(maximum, double(glm::length(image.at(x, y) - check.at(x, y))));
@@ -119,7 +119,7 @@ int main() {
         environment.spheres.clear();
         environment.wind_velocity = {0, 0, 1.5};
         ClothSimulation pinned(grid, {}, environment);
-        const auto report = pinned.advance(90);
+        const auto      report = pinned.advance(90);
         std::cout << "pinned contacts=" << report.contacts
                   << " contact_limits=" << report.contact_limits << '\n';
         if (report.contact_limits) {

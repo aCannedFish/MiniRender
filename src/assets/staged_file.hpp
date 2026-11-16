@@ -11,7 +11,7 @@ class StagedFile {
   public:
     explicit StagedFile(const std::filesystem::path& destination);
     ~StagedFile();
-    StagedFile(const StagedFile&) = delete;
+    StagedFile(const StagedFile&)            = delete;
     StagedFile& operator=(const StagedFile&) = delete;
     std::ostream& stream() noexcept;
     const std::filesystem::path& directory() const noexcept;
@@ -19,7 +19,7 @@ class StagedFile {
 
   private:
     std::filesystem::path destination_, directory_, temporary_;
-    std::ofstream stream_;
+    std::ofstream         stream_;
 };
 
 } // namespace minirender::detail

@@ -35,24 +35,29 @@ void require(bool condition, const char* message) {
         throw std::runtime_error(message);
     }
 }
+
 template <class T> T* control(Workbench& window, const char* name) {
     auto* result = window.findChild<T*>(name);
     require(result, "Volume regression control is missing");
     return result;
 }
+
 void click(Workbench& window, const char* name) {
     auto* button = control<QPushButton>(window, name);
     require(button->isEnabled(), "Volume regression button is disabled");
     button->click();
 }
+
 void set(Workbench& window, const char* name, double number) {
     control<QDoubleSpinBox>(window, name)->setValue(number);
 }
+
 void action(Workbench& window, const char* name) {
     auto* value = control<QAction>(window, name);
     require(value->isEnabled(), "Volume history or import action is disabled");
     value->trigger();
 }
+
 const MediumRegion& region(Workbench& window) {
     require(!window.document().media.empty(), "Volume scene has no medium");
     return window.document().media[0];
@@ -62,7 +67,7 @@ const MediumRegion& region(Workbench& window) {
 void verify_result(Workbench& window, const std::shared_ptr<const SceneSnapshot>& snapshot,
                    RenderSettings settings, IntegratorSettings integrator) {
     const auto expected = PathTracer(snapshot, integrator).render(settings);
-    const auto actual = window.offline_panel()->session().result();
+    const auto actual   = window.offline_panel()->session().result();
     require(actual && actual->width() == settings.width && actual->height() == settings.height,
             "Volume render result dimensions differ");
     double largest = 0;
@@ -84,13 +89,13 @@ void verify_display(Workbench& window, const QString& directory, const QString& 
     const auto actual = viewport->grab();
     const auto linear = window.offline_panel()->session().result();
     require(linear && !actual.isNull(), "Volume GPU display is missing");
-    const auto expected = display_image(*linear, viewport->exposure());
-    const double scale = std::min(double(actual.width()) / double(linear->width()),
-                                  double(actual.height()) / double(linear->height()));
-    const int width = int(std::floor(double(linear->width()) * scale));
-    const int height = int(std::floor(double(linear->height()) * scale));
-    const int left = (actual.width() - width) / 2, top = (actual.height() - height) / 2;
-    int probes = 0;
+    const auto   expected = display_image(*linear, viewport->exposure());
+    const double scale    = std::min(double(actual.width()) / double(linear->width()),
+                                     double(actual.height()) / double(linear->height()));
+    const int    width    = int(std::floor(double(linear->width()) * scale));
+    const int    height   = int(std::floor(double(linear->height()) * scale));
+    const int    left = (actual.width() - width) / 2, top = (actual.height() - height) / 2;
+    int          probes = 0;
     for (std::size_t y = 0; y < linear->height(); ++y) {
         for (std::size_t x = 0; x < linear->width(); ++x) {
             const auto pixel =
@@ -112,7 +117,7 @@ void verify_display(Workbench& window, const QString& directory, const QString& 
 void verify_layout(Workbench& window, const QString& directory) {
     auto* tabs = window.panels();
     tabs->setCurrentIndex(10);
-    auto* area = qobject_cast<QScrollArea*>(tabs->currentWidget());
+    auto* area  = qobject_cast<QScrollArea*>(tabs->currentWidget());
     auto* panel = control<QWidget>(window, "volume_panel");
     require(area, "Volume page is not scrollable");
     for (const auto size : {QSize(1200, 800), QSize(960, 700)}) {
@@ -187,38 +192,39 @@ enum class Stage {
     exit_start,
     exit_running
 };
+
 struct State {
-    Stage stage = Stage::create;
-    int ticks = 0, frame = 0, settle = 0, edits = 0;
-    std::vector<MediumRegion> before;
+    Stage                                stage = Stage::create;
+    int                                  ticks = 0, frame = 0, settle = 0, edits = 0;
+    std::vector<MediumRegion>            before;
     std::shared_ptr<const SceneSnapshot> snapshot;
-    SceneUploadStatistics uploads;
-    RenderSettings render{32, 32, 256, 101};
-    IntegratorSettings integrator{SamplingMode::mis, 6, true, 3};
-    std::uint64_t job = 0, samples = 0;
-    QElapsedTimer cancellation;
-    UiResponseProbe* probe = nullptr;
+    SceneUploadStatistics                uploads;
+    RenderSettings                       render{32, 32, 256, 101};
+    IntegratorSettings                   integrator{SamplingMode::mis, 6, true, 3};
+    std::uint64_t                        job = 0, samples = 0;
+    QElapsedTimer                        cancellation;
+    UiResponseProbe*                     probe = nullptr;
 };
 } // namespace
 
 void start_volume_smoke(Workbench& window, const QString& directory, bool enforce_response) {
-    auto state = std::make_shared<State>();
+    auto state   = std::make_shared<State>();
     state->probe = new UiResponseProbe(&window, "Volume");
-    auto* timer = new QTimer(&window);
+    auto* timer  = new QTimer(&window);
     timer->setInterval(50);
     QObject::connect(
         timer, &QTimer::timeout, &window, [state, timer, &window, directory, enforce_response] {
             try {
                 auto* viewport = window.viewport();
-                auto* offline = window.offline_panel();
+                auto* offline  = window.offline_panel();
                 require(++state->ticks < 3000 && viewport->failure().isEmpty(),
                         "Volume smoke timed out");
                 if (!viewport->can_render() || viewport->rendered_frames() <= state->frame + 2) {
                     return;
                 }
                 const auto next = [&] {
-                    state->stage = static_cast<Stage>(static_cast<int>(state->stage) + 1);
-                    state->frame = viewport->rendered_frames();
+                    state->stage  = static_cast<Stage>(static_cast<int>(state->stage) + 1);
+                    state->frame  = viewport->rendered_frames();
                     state->settle = 0;
                     qInfo() << "Volume stage" << static_cast<int>(state->stage);
                 };
@@ -312,10 +318,10 @@ void start_volume_smoke(Workbench& window, const QString& directory, bool enforc
                     state->probe->verify([&] {
                         auto scene = window.document();
                         scene.media.resize(1);
-                        scene.media[0].minimum.x = -.9987654321098765;
+                        scene.media[0].minimum.x           = -.9987654321098765;
                         scene.media[0].medium.absorption.x = .14285714285714285;
-                        scene.media[0].medium.anisotropy = .12345678901234567;
-                        state->before = scene.media;
+                        scene.media[0].medium.anisotropy   = .12345678901234567;
+                        state->before                      = scene.media;
                         save_scene(scene, std::filesystem::path(
                                               (directory + "/精度 准备.json").toStdU16String()));
                     });
@@ -400,7 +406,7 @@ void start_volume_smoke(Workbench& window, const QString& directory, bool enforc
                         verify_display(window, directory, "volume-old-snapshot");
                     });
                     state->snapshot = make_snapshot(window.document());
-                    state->render = {16, 16, 32, 101};
+                    state->render   = {16, 16, 32, 101};
                     offline->set_settings(state->render, state->integrator, {2, 8, 4});
                     click(window, "volume_render");
                     require(!offline->stale(), "New volume render retained old stale flag");
@@ -420,7 +426,7 @@ void start_volume_smoke(Workbench& window, const QString& directory, bool enforc
                         verify_result(window, state->snapshot, state->render, state->integrator);
                         verify_display(window, directory, "volume-new-snapshot");
                     });
-                    state->job = offline->session().progress().job_id;
+                    state->job     = offline->session().progress().job_id;
                     state->samples = offline->session().progress().recorded_samples;
                     set(window, "offline_exposure", 2);
                     next();

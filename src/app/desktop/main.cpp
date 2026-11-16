@@ -89,9 +89,9 @@ bool validate_capture(const QImage& image) {
     if (image.isNull() || image.width() < 100 || image.height() < 100) {
         return false;
     }
-    int cyan = 0;
+    int cyan  = 0;
     int cream = 0;
-    int red = 0;
+    int red   = 0;
     for (int y = 0; y < image.height(); ++y) {
         for (int x = 0; x < image.width(); ++x) {
             const QColor color = image.pixelColor(x, y);
@@ -101,9 +101,9 @@ bool validate_capture(const QImage& image) {
             red += color.red() > 180 && color.green() < 70 && color.blue() < 70;
         }
     }
-    const QColor center = image.pixelColor(image.width() / 2, image.height() / 2);
-    const int minimum = image.width() * image.height() / 100;
-    const bool depth_occludes_red = center.green() > 140;
+    const QColor center             = image.pixelColor(image.width() / 2, image.height() / 2);
+    const int    minimum            = image.width() * image.height() / 100;
+    const bool   depth_occludes_red = center.green() > 140;
     qInfo() << "Capture:" << image.size() << "cyan" << cyan << "cream" << cream << "red" << red
             << "center" << center;
     return cyan > minimum && cream > minimum && red > minimum && depth_occludes_red;
@@ -223,7 +223,7 @@ int main(int argc, char** argv) {
     RegressionActivity regression_activity(regression);
 #endif
     const bool timing_only = parser.isSet("timing-only");
-    const bool offscreen = regression && !parser.isSet("onscreen-regression");
+    const bool offscreen   = regression && !parser.isSet("onscreen-regression");
     if (parser.isSet("onscreen-regression") && !regression) {
         qCritical() << "--onscreen-regression requires a regression mode.";
         return 1;
@@ -240,8 +240,8 @@ int main(int argc, char** argv) {
         application.installEventFilter(&input_guard);
     }
     std::atomic_int validation_errors = 0;
-    int result = 0;
-    QElapsedTimer geometry_cleanup;
+    int             result            = 0;
+    QElapsedTimer   geometry_cleanup;
 
     QVulkanInstance instance;
     instance.setApiVersion(QVersionNumber(1, 2));
@@ -371,8 +371,9 @@ int main(int argc, char** argv) {
             start_subsurface_smoke(window, parser.value("subsurface-smoke"), timing_only);
         }
 
-        if (parser.isSet("lightfield-smoke"))
+        if (parser.isSet("lightfield-smoke")) {
             start_lightfield_smoke(window, parser.value("lightfield-smoke"), timing_only);
+        }
         if (parser.isSet("theme-smoke")) {
             start_theme_smoke(window, parser.value("theme-smoke"));
         }
@@ -382,10 +383,10 @@ int main(int argc, char** argv) {
         if (parser.isSet("outline-smoke")) {
             start_outline_smoke(window, parser.value("outline-smoke"), timing_only);
         }
-        int ticks = 0;
-        bool resized = false;
-        QSize initial_size;
-        int initial_generation = 0;
+        int    ticks   = 0;
+        bool   resized = false;
+        QSize  initial_size;
+        int    initial_generation = 0;
         QTimer timer;
         timer.setInterval(100);
         QObject::connect(&timer, &QTimer::timeout, &window, [&] {
@@ -415,7 +416,7 @@ int main(int argc, char** argv) {
                 return;
             }
             if (!resized && viewport->rendered_frames() > 5) {
-                initial_size = viewport->swapChainImageSize();
+                initial_size       = viewport->swapChainImageSize();
                 initial_generation = viewport->resource_generations();
                 window.resize(1120, 720);
                 resized = true;
@@ -430,9 +431,9 @@ int main(int argc, char** argv) {
                     application.exit(1);
                     return;
                 }
-                const QImage image = viewport->grab();
-                const auto output = parser.value("smoke");
-                const bool saved =
+                const QImage image  = viewport->grab();
+                const auto   output = parser.value("smoke");
+                const bool   saved =
                     QDir().mkpath(QFileInfo(output).absolutePath()) && image.save(output);
                 const bool passed = saved && validate_capture(image);
                 qInfo() << "GPU smoke" << (passed ? "PASS" : "FAIL") << "swapchain generations"

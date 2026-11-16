@@ -28,6 +28,7 @@ ImagePtr preview(ImagePtr input, CancellationToken token) {
     return image;
 }
 } // namespace
+
 LightFieldController::LightFieldController(VulkanViewport& viewport, QObject* parent)
     : QObject(parent), viewport_(viewport), watcher_(new QFutureWatcher<Result>(this)) {
     connect(watcher_, &QFutureWatcher<Result>::finished, this, [this] { finish(); });
@@ -35,9 +36,11 @@ LightFieldController::LightFieldController(VulkanViewport& viewport, QObject* pa
     connect(timer, &QTimer::timeout, this, [this] { poll(); });
     timer->start(80);
 }
+
 LightFieldController::~LightFieldController() {
     shutdown();
 }
+
 void LightFieldController::shutdown() {
     if (stopped_) {
         return;
@@ -49,14 +52,17 @@ void LightFieldController::shutdown() {
     capture_.wait();
     watcher_->waitForFinished();
 }
+
 bool LightFieldController::capture_active() const {
     return !render_terminal(capture_.progress().state);
 }
+
 void LightFieldController::require_idle() const {
     if (acquiring_ || job_ != Job::idle) {
         throw std::logic_error("请等待当前光场任务完成或先取消。");
     }
 }
+
 void LightFieldController::start(
     const std::function<std::shared_ptr<const SceneSnapshot>()>& snapshot,
     LightFieldCaptureSettings settings, IntegratorSettings integrator) {
@@ -69,15 +75,16 @@ void LightFieldController::start(
     }
     capture_.start(snapshot(), settings, integrator);
     capture_thumbnail_.reset();
-    discard_capture_ = false;
-    acquiring_ = true;
-    capture_stale_ = false;
-    seen_preview_ = 0;
+    discard_capture_  = false;
+    acquiring_        = true;
+    capture_stale_    = false;
+    seen_preview_     = 0;
     candidate_memory_ = settings.memory_budget_bytes;
-    candidate_cache_ = std::min<std::uint64_t>(64ULL << 20, candidate_memory_ / 4);
-    message_ = "正在采集光场";
+    candidate_cache_  = std::min<std::uint64_t>(64ULL << 20, candidate_memory_ / 4);
+    message_          = "正在采集光场";
     show(true);
 }
+
 void LightFieldController::pause_resume() {
     const auto state = capture_.progress().state;
     if (state == RenderState::paused || state == RenderState::pausing) {
@@ -86,12 +93,14 @@ void LightFieldController::pause_resume() {
         capture_.pause();
     }
 }
+
 void LightFieldController::cancel() {
     discard_capture_ = acquiring_;
     pending_.reset();
     cancellation_.request();
     capture_.cancel();
 }
+
 void LightFieldController::scene_changed() {
     if (acquiring_) {
         capture_stale_ = true;
@@ -100,6 +109,7 @@ void LightFieldController::scene_changed() {
         data_stale_ = true;
     }
 }
+
 void LightFieldController::show(bool visible) {
     if (visible) {
         viewport_.set_offline_image(acquiring_ && capture_thumbnail_ ? capture_thumbnail_
@@ -110,14 +120,16 @@ void LightFieldController::show(bool visible) {
         viewport_.set_offline_visible(false);
     }
 }
+
 std::pair<std::uint64_t, std::uint64_t> LightFieldController::work() const {
     return progress_ ? std::pair{progress_->done.load(), progress_->total.load()}
                      : std::pair<std::uint64_t, std::uint64_t>{};
 }
+
 void LightFieldController::launch(Job job, Task task) {
     cancellation_ = CancellationSource();
-    progress_ = std::make_shared<Progress>();
-    job_ = job;
+    progress_     = std::make_shared<Progress>();
+    job_          = job;
     watcher_->setFuture(QtConcurrent::run(
         [task = std::move(task), token = cancellation_.token(), progress = progress_] {
             Result result;
@@ -134,6 +146,7 @@ void LightFieldController::launch(Job job, Task task) {
             return result;
         }));
 }
+
 // 首次重建成功后才替换数据。损坏文件和预算错误均保留原结果。
 void LightFieldController::initialize(FilePtr file, QString path, Job job) {
     launch(job, [file = std::move(file), path = std::move(path), memory = candidate_memory_,
@@ -147,22 +160,24 @@ void LightFieldController::initialize(FilePtr file, QString path, Job job) {
         }
         r.reader = std::make_shared<LightFieldReader>(r.file, std::min(cache, memory - scratch));
         const auto& c = r.file->calibration();
-        auto result = refocus_lightfield(*r.reader, {c.reference_focus, c.pupil_radius, memory},
-                                         token, progress);
-        r.views = result.selected_views;
-        r.image = std::make_shared<const Image>(std::move(result.image));
-        r.thumbnail = preview(r.image, token);
+        auto result   = refocus_lightfield(*r.reader, {c.reference_focus, c.pupil_radius, memory},
+                                           token, progress);
+        r.views       = result.selected_views;
+        r.image       = std::make_shared<const Image>(std::move(result.image));
+        r.thumbnail   = preview(r.image, token);
         return r;
     });
 }
+
 void LightFieldController::open(const QString& path, std::uint64_t memory, std::uint64_t cache) {
     require_idle();
     candidate_memory_ = memory;
-    candidate_cache_ = cache;
-    open_revision_ = viewport_.display_revision();
-    message_ = "正在读取并重建光场";
+    candidate_cache_  = cache;
+    open_revision_    = viewport_.display_revision();
+    message_          = "正在读取并重建光场";
     initialize({}, path, Job::load);
 }
+
 void LightFieldController::save(const QString& path) {
     require_idle();
     if (!file_) {
@@ -173,6 +188,7 @@ void LightFieldController::save(const QString& path) {
         return Result{};
     });
 }
+
 void LightFieldController::export_image(const QString& path, bool exr) {
     require_idle();
     if (!image_) {
@@ -190,6 +206,7 @@ void LightFieldController::export_image(const QString& path, bool exr) {
                return Result{};
            });
 }
+
 void LightFieldController::reconstruct(double focus, double aperture,
                                        std::optional<std::size_t> view) {
     if (!file_ || acquiring_ || (job_ != Job::idle && job_ != Job::focus && job_ != Job::view)) {
@@ -207,6 +224,7 @@ void LightFieldController::reconstruct(double focus, double aperture,
         begin_request(request);
     }
 }
+
 void LightFieldController::begin_request(Request request) {
     launch(request.view ? Job::view : Job::focus,
            [reader = reader_, request, memory = memory_](auto token, auto progress) {
@@ -224,13 +242,14 @@ void LightFieldController::begin_request(Request request) {
                return r;
            });
 }
+
 void LightFieldController::finish() {
     if (stopped_) {
         return;
     }
-    auto result = watcher_->result();
+    auto       result    = watcher_->result();
     const auto completed = job_;
-    job_ = Job::idle;
+    job_                 = Job::idle;
     if (pending_) {
         auto request = *pending_;
         pending_.reset();
@@ -274,17 +293,17 @@ void LightFieldController::finish() {
         QThreadPool::globalInstance()->start([old = std::move(image_)]() mutable { old.reset(); });
     }
     if (result.file) {
-        file_ = std::move(result.file);
+        file_   = std::move(result.file);
         reader_ = std::move(result.reader);
         memory_ = candidate_memory_;
 
         scene_linked_ = completed == Job::adopt;
-        data_stale_ = scene_linked_ && capture_stale_;
+        data_stale_   = scene_linked_ && capture_stale_;
         ++data_revision_;
     }
     if (result.image) {
-        image_ = std::move(result.image);
-        thumbnail_ = std::move(result.thumbnail);
+        image_          = std::move(result.image);
+        thumbnail_      = std::move(result.thumbnail);
         selected_views_ = result.views;
         if (completed == Job::load && open_revision_ == viewport_.display_revision()) {
             show(true);
@@ -299,6 +318,7 @@ void LightFieldController::finish() {
                : completed == Job::view         ? "已显示子视图"
                                                 : "重聚焦完成";
 }
+
 void LightFieldController::poll() {
     if (stopped_ || !acquiring_ || job_ != Job::idle) {
         return;
@@ -323,7 +343,7 @@ void LightFieldController::poll() {
         launch(Job::thumbnail, [image = raw.image](auto token, auto) {
             Result r;
             r.thumbnail = preview(image, token);
-            r.views = 1;
+            r.views     = 1;
             return r;
         });
     }

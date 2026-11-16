@@ -18,9 +18,9 @@ std::shared_ptr<const MeshData> irregular_grid(MeshIndex side) {
     auto mesh = std::make_shared<MeshData>();
     for (MeshIndex z = 0; z <= side; ++z) {
         for (MeshIndex x = 0; x <= side; ++x) {
-            const bool interior = x > 0 && z > 0 && x < side && z < side;
-            const double dx = interior ? 0.23 * std::sin(x * 17.0 + z * 13.0) : 0;
-            const double dz = interior ? 0.23 * std::cos(x * 11.0 - z * 19.0) : 0;
+            const bool   interior = x > 0 && z > 0 && x < side && z < side;
+            const double dx       = interior ? 0.23 * std::sin(x * 17.0 + z * 13.0) : 0;
+            const double dz       = interior ? 0.23 * std::cos(x * 11.0 - z * 19.0) : 0;
             mesh->positions.emplace_back((x + dx) / side, 0, (z + dz) / side);
         }
     }
@@ -31,7 +31,7 @@ std::shared_ptr<const MeshData> irregular_grid(MeshIndex side) {
                  {std::array{a, a + side + 2, a + 1}, std::array{a, a + side + 1, a + side + 2}}) {
                 MeshTriangle face;
                 for (std::size_t i = 0; i < 3; ++i) {
-                    const auto p = mesh->positions[ids[i]];
+                    const auto p    = mesh->positions[ids[i]];
                     face.corners[i] = {ids[i], {0, 1, 0}, {p.x, p.z}};
                 }
                 mesh->triangles.push_back(face);
@@ -83,9 +83,9 @@ int main(int argc, char** argv) {
             return 0;
         }
         const auto source = std::filesystem::path(MINIRENDER_SOURCE_DIR);
-        auto scene = load_scene(source / "scenes/studio.json");
-        const auto cube = std::find_if(scene.meshes.begin(), scene.meshes.end(),
-                                       [](const auto& mesh) { return mesh.id == "cube"; });
+        auto       scene  = load_scene(source / "scenes/studio.json");
+        const auto cube   = std::find_if(scene.meshes.begin(), scene.meshes.end(),
+                                         [](const auto& mesh) { return mesh.id == "cube"; });
         if (cube == scene.meshes.end()) {
             throw std::runtime_error("Studio cube is missing");
         }
@@ -104,17 +104,17 @@ int main(int argc, char** argv) {
         }
         RenderSettings settings;
         settings.width = settings.height = 128;
-        settings.samples_per_pixel = 32;
-        settings.seed = 101;
+        settings.samples_per_pixel       = 32;
+        settings.seed                    = 101;
         const auto render = [&](const SceneDocument& document, const std::string& name) {
             const PathTracer tracer(make_snapshot(document));
-            auto image = tracer.render(settings);
+            auto             image = tracer.render(settings);
             image.write_exr(output / (name + ".exr"));
             display_image(image).write_png(output / (name + ".png"));
             return image;
         };
         render(scene, "original");
-        const auto start = std::chrono::steady_clock::now();
+        const auto start  = std::chrono::steady_clock::now();
         const auto result = remesh_isotropic(input, {.target_edge_length = 0.12, .iterations = 5});
         print(result,
               std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
@@ -122,9 +122,9 @@ int main(int argc, char** argv) {
         scene.meshes.back().data = result.mesh;
         save_obj(*result.mesh, output / "remeshed.obj");
         save_scene(scene, output / "remeshed.json");
-        const auto image = render(scene, "remeshed");
+        const auto image    = render(scene, "remeshed");
         const auto reopened = render(load_scene(output / "remeshed.json"), "reopened");
-        double maximum = 0;
+        double     maximum  = 0;
         for (std::size_t y = 0; y < image.height(); ++y) {
             for (std::size_t x = 0; x < image.width(); ++x) {
                 maximum = std::max(

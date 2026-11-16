@@ -8,8 +8,8 @@
 namespace minirender {
 namespace {
 
-constexpr std::uint32_t bin_count = 12;
-constexpr std::size_t maximum_build_depth = 48;
+constexpr std::uint32_t bin_count           = 12;
+constexpr std::size_t   maximum_build_depth = 48;
 
 bool finite(glm::vec3 value) {
     return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
@@ -54,15 +54,15 @@ SceneBvh::SceneBvh(std::shared_ptr<const SceneSnapshot> scene, CancellationToken
             if ((index & 255U) == 0) {
                 construction_cancellation_.check();
             }
-            const auto& triangle = instance.mesh->triangles[index];
-            Primitive primitive{};
+            const auto&    triangle = instance.mesh->triangles[index];
+            Primitive      primitive{};
             BuildPrimitive build_primitive{};
             primitive.instance = static_cast<std::uint32_t>(instance_index);
             primitive.triangle = static_cast<std::uint32_t>(index);
             glm::dvec3 center(0);
             for (std::size_t corner = 0; corner < 3; ++corner) {
                 const auto position = instance.mesh->positions[triangle.corners[corner].position];
-                const auto world = glm::vec3(instance.object_to_world * glm::vec4(position, 1));
+                const auto world    = glm::vec3(instance.object_to_world * glm::vec4(position, 1));
                 if (!finite(world)) {
                     throw std::invalid_argument("Transformed triangle position is not finite");
                 }
@@ -90,7 +90,7 @@ SceneBvh::SceneBvh(std::shared_ptr<const SceneSnapshot> scene, CancellationToken
         nodes_.reserve(primitives_.size() * 2 - 1);
         build(0, static_cast<std::uint32_t>(primitives_.size()), 0, build_primitives);
     }
-    statistics_.nodes = nodes_.size();
+    statistics_.nodes          = nodes_.size();
     construction_cancellation_ = {};
 }
 
@@ -108,9 +108,9 @@ std::uint32_t SceneBvh::build(std::uint32_t begin, std::uint32_t end, std::size_
         bounds.expand(primitives[order_[index]].bounds);
         centroids.expand(primitives[order_[index]].centroid);
     }
-    const auto count = end - begin;
+    const auto count          = end - begin;
     statistics_.maximum_depth = std::max(statistics_.maximum_depth, depth);
-    const auto leaf = [&] {
+    const auto leaf           = [&] {
         nodes_[node_index] = {bounds, begin, 0, count};
         ++statistics_.leaves;
         return node_index;
@@ -118,12 +118,14 @@ std::uint32_t SceneBvh::build(std::uint32_t begin, std::uint32_t end, std::size_
     if (count <= 4 || depth >= maximum_build_depth) {
         return leaf();
     }
+
     struct Bin {
-        Bounds3 bounds;
+        Bounds3       bounds;
         std::uint32_t count = 0;
     };
-    double best_cost = static_cast<double>(count);
-    int best_axis = -1;
+
+    double        best_cost  = static_cast<double>(count);
+    int           best_axis  = -1;
     std::uint32_t best_split = 0;
     // C = C_traversal + (A_left*N_left + A_right*N_right) / A_parent。
     // 这里令一次节点遍历和一次三角形测试的相对代价均为 1，比较是否优于直接建叶子。
@@ -138,22 +140,22 @@ std::uint32_t SceneBvh::build(std::uint32_t begin, std::uint32_t end, std::size_
                 construction_cancellation_.check();
             }
             const auto& primitive = primitives[order_[index]];
-            auto& bin = bins[bin_index(primitive.centroid[axis], centroids.minimum[axis],
-                                       centroids.maximum[axis])];
+            auto&       bin = bins[bin_index(primitive.centroid[axis], centroids.minimum[axis],
+                                             centroids.maximum[axis])];
             ++bin.count;
             bin.bounds.expand(primitive.bounds);
         }
-        std::array<Bounds3, bin_count> right_bounds;
+        std::array<Bounds3, bin_count>       right_bounds;
         std::array<std::uint32_t, bin_count> right_counts{};
-        Bounds3 right;
-        std::uint32_t right_count = 0;
+        Bounds3                              right;
+        std::uint32_t                        right_count = 0;
         for (std::uint32_t index = bin_count; index-- > 0;) {
             right.expand(bins[index].bounds);
             right_count += bins[index].count;
             right_bounds[index] = right;
             right_counts[index] = right_count;
         }
-        Bounds3 left;
+        Bounds3       left;
         std::uint32_t left_count = 0;
         for (std::uint32_t split = 0; split + 1 < bin_count; ++split) {
             left.expand(bins[split].bounds);
@@ -166,8 +168,8 @@ std::uint32_t SceneBvh::build(std::uint32_t begin, std::uint32_t end, std::size_
                      right_bounds[split + 1].surface_area() * right_counts[split + 1]) /
                         parent_area;
             if (cost < best_cost) {
-                best_cost = cost;
-                best_axis = axis;
+                best_cost  = cost;
+                best_axis  = axis;
                 best_split = split;
             }
         }
@@ -175,15 +177,15 @@ std::uint32_t SceneBvh::build(std::uint32_t begin, std::uint32_t end, std::size_
     if (best_axis < 0) {
         return leaf();
     }
-    const auto first = order_.begin() + begin;
-    const auto last = order_.begin() + end;
+    const auto first  = order_.begin() + begin;
+    const auto last   = order_.begin() + end;
     const auto middle = std::partition(first, last, [&](std::uint32_t index) {
         return bin_index(primitives[index].centroid[best_axis], centroids.minimum[best_axis],
                          centroids.maximum[best_axis]) <= best_split;
     });
-    const auto split = static_cast<std::uint32_t>(middle - order_.begin());
-    const auto left = build(begin, split, depth + 1, primitives);
-    const auto right = build(split, end, depth + 1, primitives);
+    const auto split  = static_cast<std::uint32_t>(middle - order_.begin());
+    const auto left   = build(begin, split, depth + 1, primitives);
+    const auto right  = build(split, end, depth + 1, primitives);
     // 递归可能使 vector 重新分配，不能跨递归保存 Node&。
     nodes_[node_index] = {bounds, left, right, 0};
     return node_index;
@@ -192,13 +194,14 @@ std::uint32_t SceneBvh::build(std::uint32_t begin, std::uint32_t end, std::size_
 const SceneSnapshot& SceneBvh::scene() const noexcept {
     return *scene_;
 }
+
 const BvhBuildStatistics& SceneBvh::statistics() const noexcept {
     return statistics_;
 }
 
 std::optional<SceneBvh::PrimitiveHit>
 SceneBvh::trace(const Ray& ray, RayInterval interval, bool any_hit, TraceStatistics* statistics,
-                const CancellationToken& cancellation,
+                const CancellationToken&     cancellation,
                 std::optional<std::uint32_t> instance_filter) const {
     interval.validate();
     const RayQuery query(ray);
@@ -215,14 +218,16 @@ SceneBvh::trace(const Ray& ray, RayInterval interval, bool any_hit, TraceStatist
     if (!root) {
         return std::nullopt;
     }
+
     struct Entry {
         std::uint32_t node;
-        double enter;
+        double        enter;
     };
+
     // 最大构建深度为 48，深度优先时最多保留每层一个兄弟节点及当前节点。
     std::array<Entry, maximum_build_depth + 2> stack{};
-    std::size_t pending = 0;
-    stack[pending++] = {0, *root};
+    std::size_t                                pending = 0;
+    stack[pending++]                                   = {0, *root};
     std::optional<PrimitiveHit> result;
     while (pending) {
         cancellation.check();
@@ -246,7 +251,7 @@ SceneBvh::trace(const Ray& ray, RayInterval interval, bool any_hit, TraceStatist
                 const auto hit = query.intersect(primitives_[primitive].vertices, interval);
                 if (hit) {
                     const auto& candidate = primitives_[primitive];
-                    const auto& instance = scene_->instances[candidate.instance];
+                    const auto& instance  = scene_->instances[candidate.instance];
                     if (!instance_filter && !instance.material.double_sided &&
                         instance.material.kind != MaterialKind::subsurface) {
                         // 用几何绕序判断朝向，不能用平滑或法线贴图改变可见性。
@@ -272,7 +277,7 @@ SceneBvh::trace(const Ray& ray, RayInterval interval, bool any_hit, TraceStatist
                 }
             }
         } else {
-            const auto left = box_hit(nodes_[node.first].bounds);
+            const auto left  = box_hit(nodes_[node.first].bounds);
             const auto right = box_hit(nodes_[node.right].bounds);
             if (left && right) {
                 const bool left_nearer = *left <= *right;
@@ -292,11 +297,11 @@ SceneBvh::trace(const Ray& ray, RayInterval interval, bool any_hit, TraceStatist
 
 SurfaceHit SceneBvh::surface_hit(const Ray& ray, const PrimitiveHit& hit) const {
     const auto& primitive = primitives_[hit.primitive];
-    const auto& instance = scene_->instances[primitive.instance];
-    const auto& triangle = instance.mesh->triangles[primitive.triangle];
-    const auto edge1 = glm::dvec3(primitive.vertices[1]) - glm::dvec3(primitive.vertices[0]);
-    const auto edge2 = glm::dvec3(primitive.vertices[2]) - glm::dvec3(primitive.vertices[0]);
-    auto geometric = glm::normalize(glm::cross(edge1, edge2));
+    const auto& instance  = scene_->instances[primitive.instance];
+    const auto& triangle  = instance.mesh->triangles[primitive.triangle];
+    const auto  edge1     = glm::dvec3(primitive.vertices[1]) - glm::dvec3(primitive.vertices[0]);
+    const auto  edge2     = glm::dvec3(primitive.vertices[2]) - glm::dvec3(primitive.vertices[0]);
+    auto        geometric = glm::normalize(glm::cross(edge1, edge2));
     if (mirrored_[primitive.instance]) {
         geometric = -geometric;
     }
@@ -304,7 +309,7 @@ SurfaceHit SceneBvh::surface_hit(const Ray& ray, const PrimitiveHit& hit) const 
     glm::dvec2 uv(0);
     glm::dvec3 position(0), absolute_position(0);
     for (std::size_t corner = 0; corner < 3; ++corner) {
-        const auto& data = triangle.corners[corner];
+        const auto&  data   = triangle.corners[corner];
         const double weight = hit.hit.barycentric[static_cast<int>(corner)];
         shading +=
             weight * glm::normalize(glm::dmat3(instance.normal_to_world) * glm::dvec3(data.normal));
@@ -334,12 +339,13 @@ SurfaceHit SceneBvh::surface_hit(const Ray& ray, const PrimitiveHit& hit) const 
 }
 
 std::optional<SurfaceHit> SceneBvh::intersect(const Ray& ray, RayInterval interval,
-                                              TraceStatistics* statistics,
+                                              TraceStatistics*         statistics,
                                               const CancellationToken& cancellation) const {
     cancellation.check();
     const auto hit = trace(ray, interval, false, statistics, cancellation);
     return hit ? std::optional(surface_hit(ray, *hit)) : std::nullopt;
 }
+
 bool SceneBvh::occluded(const Ray& ray, RayInterval interval, TraceStatistics* statistics,
                         const CancellationToken& cancellation) const {
     cancellation.check();
@@ -348,7 +354,7 @@ bool SceneBvh::occluded(const Ray& ray, RayInterval interval, TraceStatistics* s
 
 std::optional<SurfaceHit>
 SceneBvh::intersect_instance(const Ray& ray, std::uint32_t instance, RayInterval interval,
-                             TraceStatistics* statistics,
+                             TraceStatistics*         statistics,
                              const CancellationToken& cancellation) const {
     cancellation.check();
     if (instance >= scene_->instances.size()) {

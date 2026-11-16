@@ -11,13 +11,13 @@ namespace minirender::detail {
 // 标量高度独立使用 double UV/插值，使接缝的分段二次检查与实际位移完全一致。
 // 图像仍为线性 float 资产，方向和纹素中心约定与 Texture 相同。
 double height_value(const Image& image, glm::dvec2 uv) {
-    const auto coordinate = uv - glm::floor(uv);
-    const double x = coordinate.x * static_cast<double>(image.width()) - 0.5;
-    const double y = (1 - coordinate.y) * static_cast<double>(image.height()) - 0.5;
-    const auto ix = static_cast<int>(std::floor(x)), iy = static_cast<int>(std::floor(y));
+    const auto   coordinate = uv - glm::floor(uv);
+    const double x          = coordinate.x * static_cast<double>(image.width()) - 0.5;
+    const double y          = (1 - coordinate.y) * static_cast<double>(image.height()) - 0.5;
+    const auto   ix = static_cast<int>(std::floor(x)), iy = static_cast<int>(std::floor(y));
     const double tx = x - std::floor(x), ty = y - std::floor(y);
-    const auto texel = [&](int px, int py) -> double {
-        const auto width = static_cast<int>(image.width()),
+    const auto   texel = [&](int px, int py) -> double {
+        const auto width  = static_cast<int>(image.width()),
                    height = static_cast<int>(image.height());
         return image
             .at(static_cast<std::size_t>((px % width + width) % width),
@@ -25,7 +25,7 @@ double height_value(const Image& image, glm::dvec2 uv) {
             .r;
     };
     const double a = texel(ix, iy), b = texel(ix, iy + 1);
-    const double top = a + tx * (texel(ix + 1, iy) - a);
+    const double top    = a + tx * (texel(ix + 1, iy) - a);
     const double bottom = b + tx * (texel(ix + 1, iy + 1) - b);
     return top + ty * (bottom - top);
 }
@@ -43,10 +43,10 @@ double offset(const Image& image, glm::dvec2 uv, const DisplacementSettings& set
 // UV 起点先减去整数平移，保持 Repeat 结果并避免大整数部分损失精度。
 std::array<glm::dvec2, 2> edge_uv(const MeshData& mesh, const HalfedgeMesh& topology,
                                   MeshIndex halfedge, bool reverse) {
-    const auto& h = topology.halfedges()[halfedge];
+    const auto& h       = topology.halfedges()[halfedge];
     const auto& corners = mesh.triangles[h.face].corners;
-    glm::dvec2 a = corners[halfedge % 3].uv;
-    glm::dvec2 b = corners[(halfedge % 3 + 1) % 3].uv;
+    glm::dvec2  a       = corners[halfedge % 3].uv;
+    glm::dvec2  b       = corners[(halfedge % 3 + 1) % 3].uv;
     if (reverse) {
         std::swap(a, b);
     }
@@ -83,10 +83,10 @@ void add_knots(double start, double end, std::vector<double>& knots, std::size_t
 
 HeightFieldSamples inspect_height_field(const MeshData& input, const HalfedgeMesh& topology,
                                         const Image& image, const DisplacementSettings& settings,
-                                        CancellationToken cancellation,
+                                        CancellationToken            cancellation,
                                         DisplacementProgressCallback progress) {
     HeightFieldSamples result;
-    const auto report = [&](DisplacementStage stage, std::size_t done, std::size_t total) {
+    const auto         report = [&](DisplacementStage stage, std::size_t done, std::size_t total) {
         cancellation.check();
         if (progress) {
             progress({stage, done, total});
@@ -96,17 +96,17 @@ HeightFieldSamples inspect_height_field(const MeshData& input, const HalfedgeMes
     result.offsets.resize(input.positions.size(), 0);
     std::vector<double> minimums(input.positions.size(), std::numeric_limits<double>::infinity());
     std::vector<double> maximums(input.positions.size(), -std::numeric_limits<double>::infinity());
-    const auto samples = input.triangles.size() * 3;
+    const auto          samples = input.triangles.size() * 3;
     report(DisplacementStage::samples, 0, samples);
     for (const auto& face : input.triangles) {
         for (const auto& corner : face.corners) {
-            const auto vertex = corner.position;
-            const double value = offset(image, glm::dvec2(corner.uv), settings);
+            const auto   vertex = corner.position;
+            const double value  = offset(image, glm::dvec2(corner.uv), settings);
             if (!std::isfinite(minimums[vertex])) {
                 result.offsets[vertex] = value;
             }
-            minimums[vertex] = std::min(minimums[vertex], value);
-            maximums[vertex] = std::max(maximums[vertex], value);
+            minimums[vertex]        = std::min(minimums[vertex], value);
+            maximums[vertex]        = std::max(maximums[vertex], value);
             const double difference = maximums[vertex] - minimums[vertex];
             if (difference > settings.seam_tolerance) {
                 seam_error("vertex", vertex);
@@ -121,10 +121,10 @@ HeightFieldSamples inspect_height_field(const MeshData& input, const HalfedgeMes
     const auto hs = topology.halfedges();
     report(DisplacementStage::seams, 0, topology.edges().size());
     for (std::size_t edge = 0; edge < topology.edges().size(); ++edge) {
-        const auto h = topology.edges()[edge].halfedge;
+        const auto h    = topology.edges()[edge].halfedge;
         const auto twin = hs[h].twin;
         if (!topology.is_boundary(twin)) {
-            const auto first = edge_uv(input, topology, h, false);
+            const auto first  = edge_uv(input, topology, h, false);
             const auto second = edge_uv(input, topology, twin, true);
             if (first != second) {
                 ++result.seam_edges;
@@ -159,8 +159,8 @@ HeightFieldSamples inspect_height_field(const MeshData& input, const HalfedgeMes
                     }
                     const double a = knots[interval], b = knots[interval + 1];
                     const double q0 = difference(a), q1 = difference(b),
-                                 qm = difference((a + b) / 2);
-                    double maximum = std::max({std::abs(q0), std::abs(q1), std::abs(qm)});
+                                 qm      = difference((a + b) / 2);
+                    double       maximum = std::max({std::abs(q0), std::abs(q1), std::abs(qm)});
                     if (!std::isfinite(maximum)) {
                         seam_error("edge", edge);
                     }

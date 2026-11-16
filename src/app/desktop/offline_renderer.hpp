@@ -22,18 +22,18 @@ class OfflineRenderer final : public ViewportRenderer {
 
   private:
     void upload(VkCommandBuffer command);
-    VulkanViewport* window_;
-    VkDevice device_ = VK_NULL_HANDLE;
-    GpuImage texture_;
-    GpuBuffer staging_;
-    VkExtent2D extent_{};
-    bool uploaded_ = false;
+    VulkanViewport*                          window_;
+    VkDevice                                 device_ = VK_NULL_HANDLE;
+    GpuImage                                 texture_;
+    GpuBuffer                                staging_;
+    VkExtent2D                               extent_{};
+    bool                                     uploaded_ = false;
     std::shared_ptr<const minirender::Image> displayed_;
-    std::vector<glm::vec4> pixels_;
-    VkSampler sampler_ = VK_NULL_HANDLE;
-    VkDescriptorSetLayout descriptor_layout_ = VK_NULL_HANDLE;
-    VkDescriptorPool descriptor_pool_ = VK_NULL_HANDLE;
-    VkDescriptorSet descriptor_ = VK_NULL_HANDLE;
-    VkPipelineLayout layout_ = VK_NULL_HANDLE;
-    VkPipeline pipeline_ = VK_NULL_HANDLE;
+    std::vector<glm::vec4>                   pixels_;
+    VkSampler                                sampler_           = VK_NULL_HANDLE;
+    VkDescriptorSetLayout                    descriptor_layout_ = VK_NULL_HANDLE;
+    VkDescriptorPool                         descriptor_pool_   = VK_NULL_HANDLE;
+    VkDescriptorSet                          descriptor_        = VK_NULL_HANDLE;
+    VkPipelineLayout                         layout_            = VK_NULL_HANDLE;
+    VkPipeline                               pipeline_          = VK_NULL_HANDLE;
 };

@@ -19,8 +19,8 @@ class ClothColliderPanel final : public QGroupBox {
 
   private:
     std::optional<minirender::ClothCollider> current_;
-    QCheckBox* enabled_ = nullptr;
-    QDoubleSpinBox* friction_ = nullptr;
-    QLabel* kind_ = nullptr;
-    bool refreshing_ = false;
+    QCheckBox*                               enabled_    = nullptr;
+    QDoubleSpinBox*                          friction_   = nullptr;
+    QLabel*                                  kind_       = nullptr;
+    bool                                     refreshing_ = false;
 };

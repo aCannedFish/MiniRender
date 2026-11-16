@@ -19,7 +19,7 @@ class SceneEditor {
     void edit(const std::function<void(SceneDocument&)>& operation);
     // 后台网格已校验后合并其所有权缓存，再执行普通事务；其他文档参数仍完整校验。
     void edit_prevalidated(const std::function<void(SceneDocument&)>& operation,
-                           const MeshValidationCache& validated);
+                           const MeshValidationCache&                 validated);
     // 连续物体操纵：预览更新当前文档，提交时整次手势进入一条历史，取消时恢复启动状态。
     // 普通 edit 会先提交已有手势；replace 清除手势，undo 优先取消尚未提交的变化。
     void begin_transform_edit(const std::string& object_id);
@@ -33,24 +33,26 @@ class SceneEditor {
     bool can_redo() const noexcept;
     void update_navigation(const Camera& camera);
     // 运行时完整帧不增加历史。来源组件与变换须仍相同，共享网格资产会先为目标拆分。
-    bool update_cloth_frame(const std::string& object_id,
+    bool update_cloth_frame(const std::string&                           object_id,
                             const std::shared_ptr<const ClothComponent>& expected,
-                            const Transform& expected_transform,
-                            std::shared_ptr<const ClothComponent> frame,
+                            const Transform&                             expected_transform,
+                            std::shared_ptr<const ClothComponent>        frame,
                             const MeshValidationCache& validated = {}, bool history = false);
     // 快照仍校验全部参数与引用，已验证的不可变网格不再逐三角形扫描。
     std::shared_ptr<const SceneSnapshot> snapshot();
 
   private:
-    SceneDocument document_;
+    SceneDocument              document_;
     std::vector<SceneDocument> undo_;
     std::vector<SceneDocument> redo_;
-    MeshValidationCache validated_meshes_;
+    MeshValidationCache        validated_meshes_;
+
     struct TransformEdit {
-        std::string object_id;
+        std::string   object_id;
         SceneDocument initial;
-        bool changed = false;
+        bool          changed = false;
     };
+
     std::optional<TransformEdit> transform_edit_;
 };
 

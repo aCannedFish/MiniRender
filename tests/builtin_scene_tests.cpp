@@ -27,8 +27,8 @@ TEST_CASE("Built-in offline scenes load complete editable geometry and lighting"
         }
         REQUIRE(emitter);
         const PathTracer tracer(snapshot, {.maximum_depth = 8});
-        const auto image = tracer.render({16, 16, 16, 101});
-        double energy = 0;
+        const auto       image  = tracer.render({16, 16, 16, 101});
+        double           energy = 0;
         for (std::size_t y = 0; y < image.height(); ++y) {
             for (std::size_t x = 0; x < image.width(); ++x) {
                 const auto value = image.at(x, y);

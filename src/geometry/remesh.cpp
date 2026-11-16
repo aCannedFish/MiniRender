@@ -17,7 +17,7 @@ using detail::RemeshMesh;
 // 最近点查询同时返回原三角面上插值的 UV。
 struct ReferenceSample {
     glm::dvec3 position{0};
-    glm::vec2 uv{0};
+    glm::vec2  uv{0};
 };
 
 // 保护边将输入划分为查询片区，每片拥有紧凑的原始三角形与只读 AABB 树。
@@ -25,7 +25,7 @@ struct ReferenceSample {
 class ReferencePatches {
   public:
     ReferencePatches(const MeshData& input, const RemeshMesh& work, CancellationToken token) {
-        const auto count = work.component_count();
+        const auto                          count = work.component_count();
         std::vector<std::vector<MeshIndex>> faces(count);
         for (MeshIndex i = 0; i < work.faces().size(); ++i) {
             if (i % 1024 == 0) {
@@ -62,26 +62,27 @@ class ReferencePatches {
             surfaces_.push_back(std::make_unique<MeshSurface>(mesh, token));
         }
     }
+
     ReferenceSample sample(MeshIndex patch, glm::dvec3 position, CancellationToken token) const {
-        const auto hit = surfaces_.at(patch)->closest(position, token);
-        const auto& c = meshes_[patch]->triangles[hit.triangle].corners;
-        const auto uv = hit.barycentric.x * glm::dvec2(c[0].uv) +
-                        hit.barycentric.y * glm::dvec2(c[1].uv) +
-                        hit.barycentric.z * glm::dvec2(c[2].uv);
+        const auto  hit = surfaces_.at(patch)->closest(position, token);
+        const auto& c   = meshes_[patch]->triangles[hit.triangle].corners;
+        const auto  uv  = hit.barycentric.x * glm::dvec2(c[0].uv) +
+                          hit.barycentric.y * glm::dvec2(c[1].uv) +
+                          hit.barycentric.z * glm::dvec2(c[2].uv);
         return {hit.position, glm::vec2(uv)};
     }
 
   private:
     std::vector<std::shared_ptr<const MeshData>> meshes_;
-    std::vector<std::unique_ptr<MeshSurface>> surfaces_;
+    std::vector<std::unique_ptr<MeshSurface>>    surfaces_;
 };
 
 MeshQuality measure_quality(const RemeshMesh& mesh, double length, CancellationToken token,
                             const SurfaceProgress& progress) {
-    const auto edges = mesh.edges();
-    const auto total = edges.size() + mesh.triangle_count();
+    const auto  edges     = mesh.edges();
+    const auto  total     = edges.size() + mesh.triangle_count();
     std::size_t completed = 0;
-    const auto report = [&] {
+    const auto  report    = [&] {
         token.check();
         if (progress) {
             progress(completed, total);
@@ -107,20 +108,20 @@ MeshQuality measure_quality(const RemeshMesh& mesh, double length, CancellationT
     });
     const auto quantile = [&](double fraction) {
         const auto coordinate = fraction * static_cast<double>(lengths.size() - 1);
-        const auto low = static_cast<std::size_t>(coordinate);
-        const auto high = std::min(low + 1, lengths.size() - 1);
+        const auto low        = static_cast<std::size_t>(coordinate);
+        const auto high       = std::min(low + 1, lengths.size() - 1);
         return lengths[low] +
                (coordinate - static_cast<double>(low)) * (lengths[high] - lengths[low]);
     };
     MeshQuality result;
-    result.edges = edges.size();
+    result.edges        = edges.size();
     result.minimum_edge = lengths.front();
     result.maximum_edge = lengths.back();
     result.mean_edge =
         std::accumulate(lengths.begin(), lengths.end(), 0.0) / static_cast<double>(lengths.size());
     result.median_edge = quantile(0.5);
-    result.edge_p10 = quantile(0.1);
-    result.edge_p90 = quantile(0.9);
+    result.edge_p10    = quantile(0.1);
+    result.edge_p90    = quantile(0.9);
     result.in_target_range =
         static_cast<std::size_t>(std::count_if(lengths.begin(), lengths.end(), [&](double value) {
             return value >= length * 4 / 5 && value <= length * 4 / 3;
@@ -132,12 +133,12 @@ MeshQuality measure_quality(const RemeshMesh& mesh, double length, CancellationT
         }
         for (std::size_t i = 0; i < 3; ++i) {
             const auto& c = face.triangle.corners;
-            const auto p = mesh.vertices()[c[i].position].position;
-            const auto a = mesh.vertices()[c[(i + 1) % 3].position].position - p;
-            const auto b = mesh.vertices()[c[(i + 2) % 3].position].position - p;
-            const auto cosine =
+            const auto  p = mesh.vertices()[c[i].position].position;
+            const auto  a = mesh.vertices()[c[(i + 1) % 3].position].position - p;
+            const auto  b = mesh.vertices()[c[(i + 2) % 3].position].position - p;
+            const auto  cosine =
                 std::clamp(glm::dot(a, b) / (glm::length(a) * glm::length(b)), -1.0, 1.0);
-            const auto angle = std::acos(cosine) * 180 / std::numbers::pi;
+            const auto angle     = std::acos(cosine) * 180 / std::numbers::pi;
             result.minimum_angle = std::min(result.minimum_angle, angle);
             result.mean_angle_deviation += std::abs(angle - 60);
         }
@@ -152,17 +153,19 @@ MeshQuality measure_quality(const RemeshMesh& mesh, double length, CancellationT
 
 // 候选保存端点版本，局部修改后据此丢弃失效的队列项。
 struct EdgeCandidate {
-    RemeshEdge edge = 0;
-    double length = 0;
+    RemeshEdge    edge      = 0;
+    double        length    = 0;
     std::uint64_t a_version = 0;
     std::uint64_t b_version = 0;
 };
+
 // 长度优先；等长时按边编号排序，保持重复运行的结果一致。
 struct LongestFirst {
     bool operator()(const EdgeCandidate& a, const EdgeCandidate& b) const {
         return a.length == b.length ? a.edge > b.edge : a.length < b.length;
     }
 };
+
 // 短边队列先处理最短边，等长时沿用相同的编号顺序。
 struct ShortestFirst {
     bool operator()(const EdgeCandidate& a, const EdgeCandidate& b) const {
@@ -190,6 +193,7 @@ class Remesher {
             report(RemeshStage::reference_surface, 1, 1);
         }
     }
+
     void run() {
         for (iteration_ = 1; iteration_ <= settings_.iterations; ++iteration_) {
             const auto before =
@@ -221,16 +225,18 @@ class Remesher {
                 break;
             }
         }
-        iteration_ = result_.iterations_completed;
+        iteration_                 = result_.iterations_completed;
         result_.protected_vertices = static_cast<std::size_t>(
             std::count_if(mesh_->vertices().begin(), mesh_->vertices().end(),
                           [](const auto& v) { return v.fixed; }));
     }
+
     MeshQuality quality() {
         return measure_quality(
             *mesh_, settings_.target_edge_length, token_,
             [&](auto done, auto total) { report(RemeshStage::quality, done, total); });
     }
+
     std::shared_ptr<const MeshData> publish() {
         report(RemeshStage::output, 0, 1);
         auto result = mesh_->publish(true);
@@ -246,23 +252,25 @@ class Remesher {
         }
         token_.check();
     }
+
     bool valid(const EdgeCandidate& candidate) const {
         const auto [a, b] = detail::remesh_endpoints(candidate.edge);
         return mesh_->vertices()[a].alive && mesh_->vertices()[b].alive &&
                mesh_->vertices()[a].version == candidate.a_version &&
                mesh_->vertices()[b].version == candidate.b_version && mesh_->has_edge(a, b);
     }
+
     template <class Compare> void edit_edges(bool splitting) {
         std::priority_queue<EdgeCandidate, std::vector<EdgeCandidate>, Compare> pending;
         const double threshold = settings_.target_edge_length * (splitting ? 4.0 / 3 : 4.0 / 5);
-        const auto enqueue = [&](RemeshEdge edge) {
+        const auto   enqueue   = [&](RemeshEdge edge) {
             const auto [a, b] = detail::remesh_endpoints(edge);
             if (!mesh_->has_edge(a, b)) {
                 return;
             }
-            const auto& va = mesh_->vertices()[a];
-            const auto& vb = mesh_->vertices()[b];
-            const auto length = glm::length(va.position - vb.position);
+            const auto& va     = mesh_->vertices()[a];
+            const auto& vb     = mesh_->vertices()[b];
+            const auto  length = glm::length(va.position - vb.position);
             if (splitting ? length > threshold : length < threshold) {
                 pending.push({edge, length, va.version, vb.version});
             }
@@ -281,7 +289,7 @@ class Remesher {
             report(RemeshStage::edge_queue, edges.size(), edges.size());
         };
         rebuild();
-        const auto stage = splitting ? RemeshStage::split : RemeshStage::collapse;
+        const auto  stage     = splitting ? RemeshStage::split : RemeshStage::collapse;
         std::size_t processed = 0;
         report(stage, 0, pending.size());
         while (!pending.empty()) {
@@ -295,19 +303,19 @@ class Remesher {
                 }
                 continue;
             }
-            const auto [a, b] = detail::remesh_endpoints(candidate.edge);
-            const auto& va = mesh_->vertices()[a];
-            const auto& vb = mesh_->vertices()[b];
-            auto position = va.position + (vb.position - va.position) / 2.0;
+            const auto [a, b]                 = detail::remesh_endpoints(candidate.edge);
+            const auto&              va       = mesh_->vertices()[a];
+            const auto&              vb       = mesh_->vertices()[b];
+            auto                     position = va.position + (vb.position - va.position) / 2.0;
             std::optional<glm::vec2> uv;
-            const bool fixed =
+            const bool               fixed =
                 splitting ? mesh_->protected_edge(candidate.edge) : va.fixed || vb.fixed;
             if (reference_ && !fixed) {
                 const auto faces = mesh_->edge_faces(a, b);
                 const auto sample =
                     reference_->sample(mesh_->faces()[faces.front()].component, position, token_);
                 position = sample.position;
-                uv = sample.uv;
+                uv       = sample.uv;
             }
             const auto edited = splitting
                                     ? mesh_->split(candidate.edge, position, uv)
@@ -322,7 +330,7 @@ class Remesher {
             }
             if (edited.applied) {
                 std::vector<RemeshEdge> edges;
-                std::size_t visited = 0;
+                std::size_t             visited = 0;
                 for (const auto vertex : edited.affected) {
                     if (++visited % 1024 == 0) {
                         token_.check();
@@ -357,7 +365,7 @@ class Remesher {
     }
 
     void smooth() {
-        const auto vertices = mesh_->vertices();
+        const auto              vertices = mesh_->vertices();
         std::vector<glm::dvec3> directions(vertices.size(), glm::dvec3(0));
         std::vector<glm::dvec2> uv_directions(vertices.size(), glm::dvec2(0));
         report(RemeshStage::smooth, 0, vertices.size());
@@ -372,9 +380,9 @@ class Remesher {
                     uv_relative += glm::dvec2(vertices[neighbor].uv) - glm::dvec2(vertex.uv);
                 }
                 const auto average = relative / static_cast<double>(neighbors.size());
-                const auto normal = mesh_->vertex_normal(i);
-                directions[i] = average - normal * glm::dot(normal, average);
-                uv_directions[i] = uv_relative / static_cast<double>(neighbors.size());
+                const auto normal  = mesh_->vertex_normal(i);
+                directions[i]      = average - normal * glm::dot(normal, average);
+                uv_directions[i]   = uv_relative / static_cast<double>(neighbors.size());
             }
             if ((i + 1) % 1024 == 0) {
                 report(RemeshStage::smooth, i + 1, vertices.size());
@@ -382,23 +390,23 @@ class Remesher {
         }
         report(RemeshStage::smooth, vertices.size(), vertices.size());
         std::vector<glm::dvec3> positions(vertices.size());
-        std::vector<glm::vec2> uv_values(vertices.size());
-        std::size_t proposed = 0;
+        std::vector<glm::vec2>  uv_values(vertices.size());
+        std::size_t             proposed = 0;
         // 全局回退保持 Jacobi 同时更新的合法性；每次试探均重新投影到原表面。
         for (int trial = 0; trial < 8; ++trial) {
-            const double step = std::ldexp(settings_.smoothing_step, -trial);
-            const auto stage = reference_ ? RemeshStage::projection : RemeshStage::smooth;
+            const double step  = std::ldexp(settings_.smoothing_step, -trial);
+            const auto   stage = reference_ ? RemeshStage::projection : RemeshStage::smooth;
             report(stage, 0, vertices.size());
             for (MeshIndex i = 0; i < vertices.size(); ++i) {
                 const auto& vertex = vertices[i];
-                positions[i] = vertex.position;
-                uv_values[i] = vertex.uv;
+                positions[i]       = vertex.position;
+                uv_values[i]       = vertex.uv;
                 if (vertex.alive && !vertex.fixed && !vertex.faces.empty()) {
                     const auto candidate = vertex.position + step * directions[i];
                     if (reference_) {
                         const auto sample = reference_->sample(vertex.component, candidate, token_);
-                        positions[i] = sample.position;
-                        uv_values[i] = sample.uv;
+                        positions[i]      = sample.position;
+                        uv_values[i]      = sample.uv;
                     } else {
                         positions[i] = candidate;
                         uv_values[i] = glm::vec2(glm::dvec2(vertex.uv) + step * uv_directions[i]);
@@ -422,13 +430,13 @@ class Remesher {
         result_.rejected_moves += proposed;
     }
 
-    std::unique_ptr<RemeshMesh> mesh_;
-    RemeshSettings settings_;
-    CancellationToken token_;
-    RemeshProgressCallback progress_;
-    RemeshResult& result_;
+    std::unique_ptr<RemeshMesh>       mesh_;
+    RemeshSettings                    settings_;
+    CancellationToken                 token_;
+    RemeshProgressCallback            progress_;
+    RemeshResult&                     result_;
     std::unique_ptr<ReferencePatches> reference_;
-    std::uint32_t iteration_ = 0;
+    std::uint32_t                     iteration_ = 0;
 };
 
 } // namespace
@@ -470,7 +478,7 @@ RemeshResult remesh_isotropic(std::shared_ptr<const MeshData> input, RemeshSetti
         cancellation.check();
     };
     RemeshResult result;
-    result.mesh = input;
+    result.mesh               = input;
     result.target_edge_length = settings.target_edge_length;
     report(RemeshStage::input_topology, 0, 0, 1, input->triangles.size());
     std::unique_ptr<RemeshMesh> work;
@@ -482,7 +490,7 @@ RemeshResult remesh_isotropic(std::shared_ptr<const MeshData> input, RemeshSetti
     report(RemeshStage::input_topology, 0, 1, 1, input->triangles.size());
     Remesher remesher(std::move(work), settings, cancellation, progress, result);
     result.before = remesher.quality();
-    result.after = result.before;
+    result.after  = result.before;
     if (settings.iterations > 0) {
         remesher.prepare_reference(*input);
         remesher.run();

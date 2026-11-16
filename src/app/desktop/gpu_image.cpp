@@ -28,15 +28,15 @@ void GpuImage::create(VkDevice device, VkPhysicalDevice physical, VkExtent2D ext
         throw std::runtime_error("Required offscreen image format is unsupported");
     }
     VkImageCreateInfo info{};
-    info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    info.imageType = VK_IMAGE_TYPE_2D;
-    info.format = format;
-    info.extent = {extent.width, extent.height, 1};
-    info.mipLevels = mip_levels;
+    info.sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    info.imageType   = VK_IMAGE_TYPE_2D;
+    info.format      = format;
+    info.extent      = {extent.width, extent.height, 1};
+    info.mipLevels   = mip_levels;
     info.arrayLayers = array_layers;
-    info.samples = VK_SAMPLE_COUNT_1_BIT;
-    info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    info.usage = usage;
+    info.samples     = VK_SAMPLE_COUNT_1_BIT;
+    info.tiling      = VK_IMAGE_TILING_OPTIMAL;
+    info.usage       = usage;
     check_vk(vkCreateImage(device_, &info, nullptr, &image_), "create offscreen image");
     VkMemoryRequirements requirements{};
     vkGetImageMemoryRequirements(device_, image_, &requirements);
@@ -54,16 +54,16 @@ void GpuImage::create(VkDevice device, VkPhysicalDevice physical, VkExtent2D ext
         throw std::runtime_error("No offscreen memory type");
     }
     VkMemoryAllocateInfo allocation{};
-    allocation.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocation.allocationSize = requirements.size;
+    allocation.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocation.allocationSize  = requirements.size;
     allocation.memoryTypeIndex = type;
     check_vk(vkAllocateMemory(device_, &allocation, nullptr, &memory_), "allocate offscreen image");
     check_vk(vkBindImageMemory(device_, image_, memory_, 0), "bind offscreen image");
     VkImageViewCreateInfo view{};
-    view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    view.image = image_;
-    view.viewType = array_layers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
-    view.format = format;
+    view.sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view.image            = image_;
+    view.viewType         = array_layers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+    view.format           = format;
     view.subresourceRange = {aspect, 0, mip_levels, 0, array_layers};
     check_vk(vkCreateImageView(device_, &view, nullptr, &view_), "create offscreen view");
 }
@@ -75,13 +75,15 @@ void GpuImage::release() {
         vkFreeMemory(device_, memory_, nullptr);
     }
     device_ = VK_NULL_HANDLE;
-    image_ = VK_NULL_HANDLE;
+    image_  = VK_NULL_HANDLE;
     memory_ = VK_NULL_HANDLE;
-    view_ = VK_NULL_HANDLE;
+    view_   = VK_NULL_HANDLE;
 }
+
 VkImage GpuImage::image() const noexcept {
     return image_;
 }
+
 VkImageView GpuImage::view() const noexcept {
     return view_;
 }

@@ -6,7 +6,7 @@
 #include <span>
 
 struct ScreenInput {
-    VkImageView view;
+    VkImageView   view;
     VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 };
 
@@ -25,16 +25,16 @@ class ScreenPass {
     VkImageView view() const noexcept;
 
   private:
-    GpuImage target_;
-    VkDevice device_ = VK_NULL_HANDLE;
-    VkExtent2D extent_{};
-    VkRenderPass pass_ = VK_NULL_HANDLE;
-    VkFramebuffer framebuffer_ = VK_NULL_HANDLE;
-    VkSampler sampler_ = VK_NULL_HANDLE;
+    GpuImage              target_;
+    VkDevice              device_ = VK_NULL_HANDLE;
+    VkExtent2D            extent_{};
+    VkRenderPass          pass_              = VK_NULL_HANDLE;
+    VkFramebuffer         framebuffer_       = VK_NULL_HANDLE;
+    VkSampler             sampler_           = VK_NULL_HANDLE;
     VkDescriptorSetLayout descriptor_layout_ = VK_NULL_HANDLE;
-    VkDescriptorPool pool_ = VK_NULL_HANDLE;
-    VkDescriptorSet descriptor_ = VK_NULL_HANDLE;
-    VkPipelineLayout layout_ = VK_NULL_HANDLE;
-    VkPipeline pipeline_ = VK_NULL_HANDLE;
-    std::uint32_t vertices_ = 3;
+    VkDescriptorPool      pool_              = VK_NULL_HANDLE;
+    VkDescriptorSet       descriptor_        = VK_NULL_HANDLE;
+    VkPipelineLayout      layout_            = VK_NULL_HANDLE;
+    VkPipeline            pipeline_          = VK_NULL_HANDLE;
+    std::uint32_t         vertices_          = 3;
 };

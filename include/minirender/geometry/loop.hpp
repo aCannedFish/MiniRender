@@ -9,8 +9,8 @@ namespace minirender {
 // 均匀细分每层使面数变为四倍。先检查全部层的预算，再分配输出。
 // maximum_triangles 限制最终面数，取值 1..16000000；levels 取值 0..8。
 struct LoopSettings {
-    std::uint32_t levels = 1;
-    std::size_t maximum_triangles = 2000000;
+    std::uint32_t levels            = 1;
+    std::size_t   maximum_triangles = 2000000;
     void validate() const;
 };
 
@@ -19,11 +19,12 @@ enum class LoopStage { input_topology, vertices, edges, faces, normals, output_t
 // level 为当前处理层，输入层为 0。completed/total 属于当前阶段，不跨阶段累加。
 // topology 阶段以一次完整校验为单位；其余阶段以实际处理的位置、边、面或面角计数。
 struct LoopProgress {
-    LoopStage stage = LoopStage::input_topology;
-    std::uint32_t level = 0;
-    std::size_t completed = 0;
-    std::size_t total = 0;
+    LoopStage     stage     = LoopStage::input_topology;
+    std::uint32_t level     = 0;
+    std::size_t   completed = 0;
+    std::size_t   total     = 0;
 };
+
 using LoopProgressCallback = std::function<void(const LoopProgress&)>;
 
 struct LoopResult {

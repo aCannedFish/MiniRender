@@ -23,8 +23,8 @@ StagedFile::StagedFile(const std::filesystem::path& destination)
     std::filesystem::create_directories(parent);
     std::random_device random;
     for (unsigned attempt = 0; attempt < 64; ++attempt) {
-        const auto candidate = parent / (".minirender-tmp-" + std::to_string(random()) + "-" +
-                                         std::to_string(random()));
+        const auto      candidate = parent / (".minirender-tmp-" + std::to_string(random()) + "-" +
+                                              std::to_string(random()));
         std::error_code error;
         if (std::filesystem::create_directory(candidate, error)) {
             directory_ = candidate;
@@ -56,12 +56,15 @@ StagedFile::~StagedFile() {
     std::error_code error;
     std::filesystem::remove_all(directory_, error);
 }
+
 std::ostream& StagedFile::stream() noexcept {
     return stream_;
 }
+
 const std::filesystem::path& StagedFile::directory() const noexcept {
     return directory_;
 }
+
 void StagedFile::commit() {
     stream_.flush();
     stream_.close();

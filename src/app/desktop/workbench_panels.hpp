@@ -30,15 +30,16 @@ class WorkbenchPanels final : public QObject {
 
   private:
     struct Page {
-        QWidget* widget;
-        QString title;
-        QTabWidget* tabs = nullptr;
-        int local_index = 0;
+        QWidget*    widget;
+        QString     title;
+        QTabWidget* tabs        = nullptr;
+        int         local_index = 0;
     };
-    QMainWindow& window_;
+
+    QMainWindow&      window_;
     std::vector<Page> pages_;
-    QDockWidget* object_dock_ = nullptr;
-    QDockWidget* scene_dock_ = nullptr;
-    QDockWidget* tree_dock_ = nullptr;
-    int current_ = 0;
+    QDockWidget*      object_dock_ = nullptr;
+    QDockWidget*      scene_dock_  = nullptr;
+    QDockWidget*      tree_dock_   = nullptr;
+    int               current_     = 0;
 };

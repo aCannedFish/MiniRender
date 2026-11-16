@@ -27,6 +27,7 @@ QLabel* label(QWidget* parent, const char* name) {
     value->setMinimumWidth(0);
     return value;
 }
+
 QSpinBox* integer(QWidget* parent, const char* name, int minimum, int maximum, int initial) {
     auto* value = new QSpinBox(parent);
     value->setObjectName(name);
@@ -35,6 +36,7 @@ QSpinBox* integer(QWidget* parent, const char* name, int minimum, int maximum, i
     value->setKeyboardTracking(false);
     return value;
 }
+
 QDoubleSpinBox* scalar(QWidget* parent, const char* name, double minimum, double maximum,
                        double initial, int decimals) {
     auto* value = new QDoubleSpinBox(parent);
@@ -66,7 +68,7 @@ PointCloudPanel::PointCloudPanel(GeometryController& controller, QWidget* parent
     sample_ = button("points_sample", "从选中网格采样");
     form->addRow(import_);
     samples_ = integer(this, "points_samples", 100, 500000, 5000);
-    seed_ = integer(this, "points_seed", 0, std::numeric_limits<int>::max(), 101);
+    seed_    = integer(this, "points_seed", 0, std::numeric_limits<int>::max(), 101);
     form->addRow("采样点数", samples_);
     form->addRow("采样种子", seed_);
     form->addRow(sample_);
@@ -80,7 +82,7 @@ PointCloudPanel::PointCloudPanel(GeometryController& controller, QWidget* parent
     flip_ = new QCheckBox("整体翻转法线", this);
     flip_->setObjectName("points_flip");
     neighbors_ = integer(this, "points_neighbors", 3, 128, 20);
-    distance_ = scalar(this, "points_neighbor_distance", 0, 1000000, 0, 6);
+    distance_  = scalar(this, "points_neighbor_distance", 0, 1000000, 0, 6);
     distance_->setSpecialValueText("不限");
     distance_->setSuffix(" m");
     form->addRow(estimate_);
@@ -100,7 +102,7 @@ PointCloudPanel::PointCloudPanel(GeometryController& controller, QWidget* parent
     radii_->setToolTip("局部米制半径，按递增顺序填写，用逗号或空格分隔。自动建议采用最近邻间距 P90 "
                        "的 2、3、4 倍。");
     faces_ = integer(this, "points_face_budget", 1, 1000000, 500000);
-    work_ = integer(this, "points_work_budget", 1000, 100000000, 20000000);
+    work_  = integer(this, "points_work_budget", 1000, 100000000, 20000000);
     work_->setSingleStep(1000000);
     fit_ = new QCheckBox("文件导入结果适应场景尺寸", this);
     fit_->setObjectName("points_fit_scene");
@@ -115,15 +117,15 @@ PointCloudPanel::PointCloudPanel(GeometryController& controller, QWidget* parent
     warning_ = label(this, "points_warning");
     form->addRow(warning_);
     reconstruct_ = button("points_reconstruct", "重建并应用到场景");
-    export_ = button("points_export", "导出当前点云 PLY");
-    cancel_ = button("points_cancel", "取消后台任务");
+    export_      = button("points_export", "导出当前点云 PLY");
+    cancel_      = button("points_cancel", "取消后台任务");
     form->addRow(reconstruct_);
     form->addRow(export_);
     form->addRow(cancel_);
     visible_ = new QCheckBox("点云预览（独立视角）", this);
     visible_->setObjectName("points_visible");
-    locate_ = button("points_locate", "定位点云");
-    point_size_ = scalar(this, "points_size", 1, 32, 6, 1);
+    locate_        = button("points_locate", "定位点云");
+    point_size_    = scalar(this, "points_size", 1, 32, 6, 1);
     normal_length_ = scalar(this, "points_normal_length", 0, 100, 3, 1);
     normal_colors_ = new QCheckBox("法线颜色", this);
     normal_colors_->setObjectName("points_normal_colors");
@@ -139,8 +141,8 @@ PointCloudPanel::PointCloudPanel(GeometryController& controller, QWidget* parent
     form->addRow(show_normals_);
     form->addRow("法线长度 / 模型 %", normal_length_);
     form->addRow(show_boundary_);
-    stage_ = label(this, "points_stage");
-    counts_ = label(this, "points_counts");
+    stage_    = label(this, "points_stage");
+    counts_   = label(this, "points_counts");
     progress_ = new QProgressBar(this);
     progress_->setObjectName("points_progress");
     metrics_ = label(this, "points_metrics");
@@ -196,34 +198,40 @@ PointCloudPanel::PointCloudPanel(GeometryController& controller, QWidget* parent
 const PointCloudSource& PointCloudPanel::source() const noexcept {
     return source_;
 }
+
 std::uint64_t PointCloudPanel::source_revision() const noexcept {
     return revision_;
 }
+
 const std::string& PointCloudPanel::target_id() const noexcept {
     return source_.object_id.empty() ? output_object_id_ : source_.object_id;
 }
+
 std::shared_ptr<const minirender::PointPreviewData> PointCloudPanel::preview_data() const noexcept {
     return preview_;
 }
+
 std::size_t PointCloudPanel::sample_count() const {
     return static_cast<std::size_t>(samples_->value());
 }
+
 std::uint64_t PointCloudPanel::sample_seed() const {
     return static_cast<std::uint64_t>(seed_->value());
 }
+
 bool PointCloudPanel::fit_new_object() const {
     return fit_->isChecked();
 }
 
-void PointCloudPanel::set_source(PointCloudSource source,
+void PointCloudPanel::set_source(PointCloudSource                                    source,
                                  std::shared_ptr<const minirender::PointPreviewData> preview) {
-    source_ = std::move(source);
+    source_  = std::move(source);
     preview_ = std::move(preview);
     normals_.reset();
     result_.reset();
     generated_.clear();
     target_valid_ = true;
-    will_create_ = source_.object_id.empty();
+    will_create_  = source_.object_id.empty();
     output_object_id_.clear();
     ++revision_;
     if (automatic_->isChecked()) {
@@ -232,28 +240,34 @@ void PointCloudPanel::set_source(PointCloudSource source,
     update_metrics();
     update_state();
 }
+
 void PointCloudPanel::clear_source() {
     set_source({}, {});
 }
+
 void PointCloudPanel::set_selected_mesh(bool present, const QString& name) {
     selected_mesh_ = present;
     sample_->setToolTip(present ? QString("当前物体：%1").arg(name) : "请先选择场景网格物体。");
     update_state();
 }
+
 void PointCloudPanel::set_target_state(bool valid, bool create) {
     target_valid_ = valid;
-    will_create_ = create;
+    will_create_  = create;
     update_state();
 }
+
 void PointCloudPanel::set_asset_task_busy(bool busy) {
     external_busy_ = busy;
     update_state();
 }
+
 void PointCloudPanel::set_preview_visible(bool visible) {
     const QSignalBlocker block(visible_);
     visible_->setChecked(visible);
 }
-void PointCloudPanel::show_normals(std::shared_ptr<const PointNormalCache> cache,
+
+void PointCloudPanel::show_normals(std::shared_ptr<const PointNormalCache>             cache,
                                    std::shared_ptr<const minirender::PointPreviewData> preview) {
     if (!cache || cache->source != source_.cloud) {
         throw std::logic_error("Point normal result belongs to another source");
@@ -265,12 +279,14 @@ void PointCloudPanel::show_normals(std::shared_ptr<const PointNormalCache> cache
     update_metrics();
     update_state();
 }
+
 void PointCloudPanel::show_reconstruction(const GeometryTaskResult& result) {
     show_normals(result.point_normals, result.point_preview);
     result_ = result.point_reconstruction;
     update_metrics();
     update_state();
 }
+
 void PointCloudPanel::remember_generated(const std::shared_ptr<const minirender::MeshData>& mesh,
                                          const std::string& object_id) {
     std::erase_if(generated_, [](const auto& value) { return value.expired(); });
@@ -279,11 +295,13 @@ void PointCloudPanel::remember_generated(const std::shared_ptr<const minirender:
         output_object_id_ = object_id;
     }
 }
+
 bool PointCloudPanel::allows_mesh(const std::shared_ptr<const minirender::MeshData>& mesh) const {
     return mesh && (mesh == source_.sampled_mesh ||
                     std::any_of(generated_.begin(), generated_.end(),
                                 [&](const auto& value) { return value.lock() == mesh; }));
 }
+
 std::shared_ptr<const minirender::PointCloud> PointCloudPanel::display_cloud() const {
     return normals_ ? normals_->value.cloud : source_.cloud;
 }
@@ -294,24 +312,25 @@ minirender::PointNormalSettings PointCloudPanel::normal_parameters() const {
     settings.maximum_distance =
         distance_->value() == 0 ? std::numeric_limits<double>::infinity() : distance_->value();
     settings.estimate = estimate_->isChecked();
-    settings.orient = orient_->isChecked();
-    settings.flip = flip_->isChecked();
+    settings.orient   = orient_->isChecked();
+    settings.flip     = flip_->isChecked();
     settings.validate();
     return settings;
 }
+
 PointReconstructionInput PointCloudPanel::reconstruction_parameters() const {
     PointReconstructionInput input;
-    input.cloud = source_.cloud;
-    input.normals = normal_parameters();
-    input.cached_normals = normals_;
-    input.automatic_radii = automatic_->isChecked();
-    input.balls.maximum_triangles = static_cast<std::size_t>(faces_->value());
+    input.cloud                         = source_.cloud;
+    input.normals                       = normal_parameters();
+    input.cached_normals                = normals_;
+    input.automatic_radii               = automatic_->isChecked();
+    input.balls.maximum_triangles       = static_cast<std::size_t>(faces_->value());
     input.balls.maximum_candidate_tests = static_cast<std::size_t>(work_->value());
     if (!input.automatic_radii) {
         input.balls.radii.clear();
         for (const auto& text :
              radii_->text().split(QRegularExpression("[,，;\\s]+"), Qt::SkipEmptyParts)) {
-            bool valid = false;
+            bool         valid = false;
             const double value = QLocale::c().toDouble(text, &valid);
             if (!valid) {
                 throw std::invalid_argument("半径须使用点号小数，用逗号或空格分隔。");
@@ -322,11 +341,13 @@ PointReconstructionInput PointCloudPanel::reconstruction_parameters() const {
     input.balls.validate();
     return input;
 }
+
 minirender::PointPreviewSettings PointCloudPanel::display_parameters() const {
     return {static_cast<float>(point_size_->value() * .5),
             static_cast<float>(normal_length_->value() * .02), normal_colors_->isChecked(),
             show_normals_->isChecked(), show_boundary_->isChecked()};
 }
+
 void PointCloudPanel::update_suggested_radii() {
     if (automatic_->isChecked() && normals_) {
         const double spacing = normals_->value.spacing_p90;
@@ -336,6 +357,7 @@ void PointCloudPanel::update_suggested_radii() {
                             .arg(4 * spacing, 0, 'g', 8));
     }
 }
+
 void PointCloudPanel::update_metrics() {
     QString text;
     if (normals_) {
@@ -383,25 +405,26 @@ void PointCloudPanel::update_metrics() {
     }
     metrics_->setText(text);
 }
+
 void PointCloudPanel::update_state() {
-    const auto status = controller_.status();
+    const auto status  = controller_.status();
     const bool running = controller_.busy();
     const bool blocked = running || external_busy_;
-    const bool source = source_.cloud != nullptr;
-    QString warning;
-    bool valid = source;
+    const bool source  = source_.cloud != nullptr;
+    QString    warning;
+    bool       valid = source;
     try {
         const auto parameters = reconstruction_parameters();
         if (source && !parameters.normals.estimate && source_.cloud->normals.empty()) {
-            valid = false;
+            valid   = false;
             warning = "原始点云没有法线，请启用估计。";
         }
     } catch (const std::exception& error) {
-        valid = false;
+        valid   = false;
         warning = QString::fromUtf8(error.what());
     }
     if (source && !target_valid_) {
-        valid = false;
+        valid   = false;
         warning = "来源物体或网格已改变，请重新采样。";
     }
     source_label_->setText(

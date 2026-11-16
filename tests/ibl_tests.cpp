@@ -15,20 +15,23 @@ using namespace minirender;
 namespace {
 
 constexpr double pi = std::numbers::pi;
+
 IblEnvironmentSettings small_settings() {
     IblEnvironmentSettings settings;
-    settings.diffuse_width = 8;
-    settings.specular_width = 16;
-    settings.specular_layers = 3;
-    settings.diffuse_samples = 128;
+    settings.diffuse_width    = 8;
+    settings.specular_width   = 16;
+    settings.specular_layers  = 3;
+    settings.diffuse_samples  = 128;
     settings.specular_samples = 128;
     return settings;
 }
+
 glm::dvec3 direction(std::size_t x, std::size_t y, std::size_t width, std::size_t height) {
-    const auto phi = 2 * pi * (static_cast<double>(x) + 0.5) / static_cast<double>(width);
+    const auto phi   = 2 * pi * (static_cast<double>(x) + 0.5) / static_cast<double>(width);
     const auto theta = pi * (static_cast<double>(y) + 0.5) / static_cast<double>(height);
     return {std::sin(theta) * std::cos(phi), std::cos(theta), std::sin(theta) * std::sin(phi)};
 }
+
 std::shared_ptr<const Texture> constant(glm::vec3 color, std::size_t width = 8,
                                         std::size_t height = 4) {
     Image image(width, height);
@@ -39,6 +42,7 @@ std::shared_ptr<const Texture> constant(glm::vec3 color, std::size_t width = 8,
     }
     return std::make_shared<const Texture>(std::move(image));
 }
+
 void constant_image(const Image& image, glm::vec3 value, float tolerance = 1e-5F) {
     for (std::size_t y = 0; y < image.height(); ++y) {
         for (std::size_t x = 0; x < image.width(); ++x) {
@@ -46,6 +50,7 @@ void constant_image(const Image& image, glm::vec3 value, float tolerance = 1e-5F
         }
     }
 }
+
 double sphere_integral(const Image& image) {
     double sum = 0;
     // 对包含极点的 theta 节点，精确积分分段线性插值乘以 sin(theta)。
@@ -53,8 +58,8 @@ double sphere_integral(const Image& image) {
     for (std::size_t y = 0; y + 1 < image.height(); ++y) {
         const double a = step * static_cast<double>(y), b = a + step;
         const double difference = (std::sin(b) - std::sin(a)) / step;
-        const double first = std::cos(a) - difference;
-        const double second = difference - std::cos(b);
+        const double first      = std::cos(a) - difference;
+        const double second     = difference - std::cos(b);
         for (std::size_t x = 0; x < image.width(); ++x) {
             sum += image.at(x, y).x * first + image.at(x, y + 1).x * second;
         }
@@ -73,7 +78,7 @@ TEST_CASE("IBL latlong agrees with path lighting across axes seams poles and rot
         }
     }
     SceneSnapshot scene{};
-    scene.environment = glm::vec3(0);
+    scene.environment         = glm::vec3(0);
     scene.environment_texture = std::make_shared<const Texture>(image);
     Sampler random(409);
     for (const float rotation : {-360.0F, -90.0F, 0.0F, 90.0F, 370.0F}) {
@@ -99,10 +104,10 @@ TEST_CASE("IBL latlong agrees with path lighting across axes seams poles and rot
 }
 
 TEST_CASE("IBL constant environments retain linear HDR in every roughness layer", "[ibl]") {
-    const glm::vec3 value{2, 0.5F, 7};
-    const auto source = constant(value);
+    const glm::vec3          value{2, 0.5F, 7};
+    const auto               source = constant(value);
     std::vector<IblProgress> progress;
-    const auto settings = small_settings();
+    const auto               settings = small_settings();
     const auto maps = bake_ibl_environment(source, settings, {},
                                            [&](const IblProgress& p) { progress.push_back(p); });
     REQUIRE(maps->source == source);
@@ -123,7 +128,7 @@ TEST_CASE("IBL constant environments retain linear HDR in every roughness layer"
         }
     }
     const auto frozen = maps->specular[1].at(2, 1);
-    const auto black = bake_ibl_environment(constant(glm::vec3(0)), settings);
+    const auto black  = bake_ibl_environment(constant(glm::vec3(0)), settings);
     constant_image(black->diffuse, glm::vec3(0));
     REQUIRE(maps->specular[1].at(2, 1) == frozen);
 }
@@ -132,17 +137,17 @@ TEST_CASE("IBL diffuse and fully rough maps preserve directional first moments",
     Image image(128, 64);
     for (std::size_t y = 0; y < image.height(); ++y) {
         for (std::size_t x = 0; x < image.width(); ++x) {
-            const auto d = direction(x, y, image.width(), image.height());
+            const auto d   = direction(x, y, image.width(), image.height());
             image.at(x, y) = glm::vec3(1.0 + 0.5 * d);
         }
     }
-    const auto source = std::make_shared<const Texture>(std::move(image));
-    auto settings = small_settings();
-    settings.diffuse_width = 16;
-    settings.diffuse_samples = 1024;
+    const auto source         = std::make_shared<const Texture>(std::move(image));
+    auto       settings       = small_settings();
+    settings.diffuse_width    = 16;
+    settings.diffuse_samples  = 1024;
     settings.specular_samples = 1024;
-    const auto maps = bake_ibl_environment(source, settings);
-    double diffuse_error = 0, specular_error = 0;
+    const auto maps           = bake_ibl_environment(source, settings);
+    double     diffuse_error = 0, specular_error = 0;
     for (const auto normal : {glm::dvec3(1, 0, 0), glm::dvec3(-1, 0, 0), glm::dvec3(0, 1, 0),
                               glm::dvec3(0, -1, 0), glm::dvec3(0, 0, 1), glm::dvec3(0, 0, -1)}) {
         // ∫ L cos/π 对 L=1+0.5*d 的解析结果为 1+n/3。
@@ -159,7 +164,7 @@ TEST_CASE("IBL diffuse and fully rough maps preserve directional first moments",
     }
     const auto rotated = sample_ibl_diffuse(*maps, {1, 0, 0}, 90);
     REQUIRE(glm::length(rotated - sample_ibl_diffuse(*maps, {0, 0, 1})) < 1e-12);
-    const auto up = sample_ibl_specular(*maps, {0, 1, 0}, 1);
+    const auto up   = sample_ibl_specular(*maps, {0, 1, 0}, 1);
     const auto down = sample_ibl_specular(*maps, {0, -1, 0}, 1);
     REQUIRE(up.y - down.y > 0.6); // 高粗糙度仍保留角度变化，不能退化为 1×1。
     for (const double angle : {0.0, 45.0, 120.0, 270.0}) {
@@ -185,15 +190,15 @@ TEST_CASE("IBL diffuse and fully rough maps preserve directional first moments",
 
 TEST_CASE("IBL roughness spreads a small bright source while retaining spherical energy", "[ibl]") {
     Image image(64, 32);
-    image.at(0, 16) = glm::vec3(20);
-    auto settings = small_settings();
-    settings.specular_width = 64;
+    image.at(0, 16)           = glm::vec3(20);
+    auto settings             = small_settings();
+    settings.specular_width   = 64;
     settings.specular_samples = 512;
     const auto maps =
         bake_ibl_environment(std::make_shared<const Texture>(std::move(image)), settings);
-    const auto& sharp = maps->specular.front();
-    const auto& rough = maps->specular.back();
-    float sharp_peak = 0, rough_peak = 0;
+    const auto& sharp      = maps->specular.front();
+    const auto& rough      = maps->specular.back();
+    float       sharp_peak = 0, rough_peak = 0;
     std::size_t sharp_lit = 0, rough_lit = 0;
     for (std::size_t y = 0; y < sharp.height(); ++y) {
         for (std::size_t x = 0; x < sharp.width(); ++x) {
@@ -234,24 +239,24 @@ TEST_CASE("IBL BRDF coefficients match mirror limits energy and independent quad
     for (const double cosine : {0.25, 0.7, 1.0}) {
         for (const float roughness : {0.5F, 1.0F}) {
             Material metal;
-            metal.kind = MaterialKind::conductor;
+            metal.kind       = MaterialKind::conductor;
             metal.base_color = {0.15F, 0.5F, 0.9F};
-            metal.roughness = roughness;
-            const Bsdf reference(metal);
+            metal.roughness  = roughness;
+            const Bsdf       reference(metal);
             const glm::dvec3 wo{std::sqrt(1 - cosine * cosine), 0, cosine};
-            glm::dvec3 integral(0);
-            constexpr int side = 256;
+            glm::dvec3       integral(0);
+            constexpr int    side = 256;
             for (int y = 0; y < side; ++y) {
                 const double z = (static_cast<double>(y) + 0.5) / side;
                 for (int x = 0; x < side; ++x) {
-                    const double phi = 2 * pi * (static_cast<double>(x) + 0.5) / side;
+                    const double phi  = 2 * pi * (static_cast<double>(x) + 0.5) / side;
                     const double sine = std::sqrt(1 - z * z);
                     integral +=
                         reference.evaluate(wo, {sine * std::cos(phi), sine * std::sin(phi), z}) * z;
                 }
             }
             integral *= 2 * pi / (side * side);
-            const auto ab = integrate_ibl_brdf(cosine, roughness, 16384, 302);
+            const auto ab     = integrate_ibl_brdf(cosine, roughness, 16384, 302);
             const auto actual = glm::dvec3(metal.base_color) * ab.x + ab.y;
             INFO("NdotV " << cosine << " roughness " << roughness << " error "
                           << glm::length(actual - integral));
@@ -281,9 +286,9 @@ TEST_CASE("IBL source clamping precedes mip reduction and preserves the original
     }
     const auto source = std::make_shared<const Texture>(std::move(image));
     constant_image(source->level(1), glm::vec3(0));
-    auto settings = small_settings();
+    auto settings                     = small_settings();
     settings.source_maximum_dimension = 16;
-    const auto maps = bake_ibl_environment(source, settings);
+    const auto maps                   = bake_ibl_environment(source, settings);
     REQUIRE(maps->source->level(0).width() == 16);
     constant_image(maps->source->level(0), glm::vec3(1));
     constant_image(maps->diffuse, glm::vec3(1));
@@ -325,12 +330,12 @@ TEST_CASE("IBL settings bound dimensions layers and computational work", "[ibl]"
     REQUIRE_NOTHROW(settings.validate());
     settings.specular_width = 15;
     REQUIRE_THROWS_AS(settings.validate(), std::invalid_argument);
-    settings = small_settings();
+    settings                  = small_settings();
     settings.specular_samples = 1;
     REQUIRE_THROWS_AS(settings.validate(), std::invalid_argument);
     settings.specular_samples = 4096;
-    settings.specular_layers = 16;
-    settings.specular_width = 512;
+    settings.specular_layers  = 16;
+    settings.specular_width   = 512;
     REQUIRE_THROWS_AS(settings.validate(), std::invalid_argument);
     REQUIRE_THROWS_AS(bake_ibl_environment(nullptr), std::invalid_argument);
     REQUIRE_THROWS_AS(bake_ibl_brdf({256, 16384, 1}), std::invalid_argument);

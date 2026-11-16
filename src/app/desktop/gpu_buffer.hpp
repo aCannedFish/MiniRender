@@ -11,7 +11,7 @@ class GpuBuffer {
   public:
     GpuBuffer() = default;
     ~GpuBuffer();
-    GpuBuffer(const GpuBuffer&) = delete;
+    GpuBuffer(const GpuBuffer&)            = delete;
     GpuBuffer& operator=(const GpuBuffer&) = delete;
     GpuBuffer(GpuBuffer&& other) noexcept;
     GpuBuffer& operator=(GpuBuffer&& other) noexcept;
@@ -23,10 +23,10 @@ class GpuBuffer {
     VkBuffer handle() const noexcept;
 
   private:
-    VkDevice device_ = VK_NULL_HANDLE;
-    VkBuffer buffer_ = VK_NULL_HANDLE;
+    VkDevice       device_ = VK_NULL_HANDLE;
+    VkBuffer       buffer_ = VK_NULL_HANDLE;
     VkDeviceMemory memory_ = VK_NULL_HANDLE;
-    VkDeviceSize size_ = 0;
+    VkDeviceSize   size_   = 0;
 };
 
 void check_vk(VkResult result, const char* operation);

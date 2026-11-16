@@ -8,25 +8,25 @@
 
 namespace minirender {
 
-using MeshIndex = std::uint32_t;
+using MeshIndex                               = std::uint32_t;
 inline constexpr MeshIndex invalid_mesh_index = std::numeric_limits<MeshIndex>::max();
 
 // halfedge 指向该顶点的一条出边。边界顶点优先指向边界半边；孤立位置为 invalid。
 // valence 计数所有相邻位置，包含边界环上的两个邻点。
 struct HalfedgeVertex {
     MeshIndex halfedge = invalid_mesh_index;
-    MeshIndex valence = 0;
+    MeshIndex valence  = 0;
 };
 
 // origin 是起点，twin 指向反向半边，next/previous 沿同一面的绕序连接。
 // 每条边总有两个半边。边界半边的 face 为 invalid，next/previous 沿边界环连接。
 struct Halfedge {
-    MeshIndex origin = invalid_mesh_index;
-    MeshIndex twin = invalid_mesh_index;
-    MeshIndex next = invalid_mesh_index;
+    MeshIndex origin   = invalid_mesh_index;
+    MeshIndex twin     = invalid_mesh_index;
+    MeshIndex next     = invalid_mesh_index;
     MeshIndex previous = invalid_mesh_index;
-    MeshIndex face = invalid_mesh_index;
-    MeshIndex edge = invalid_mesh_index;
+    MeshIndex face     = invalid_mesh_index;
+    MeshIndex edge     = invalid_mesh_index;
 };
 
 struct HalfedgeEdge {
@@ -39,13 +39,13 @@ struct HalfedgeFace {
 
 // Euler 数只计被面引用的位置。孤立位置保留在 MeshData 中，单独报告。
 struct TopologyStatistics {
-    std::size_t referenced_vertices = 0;
-    std::size_t isolated_vertices = 0;
-    std::size_t edges = 0;
-    std::size_t faces = 0;
-    std::size_t boundary_edges = 0;
-    std::size_t boundary_loops = 0;
-    std::size_t face_components = 0;
+    std::size_t  referenced_vertices  = 0;
+    std::size_t  isolated_vertices    = 0;
+    std::size_t  edges                = 0;
+    std::size_t  faces                = 0;
+    std::size_t  boundary_edges       = 0;
+    std::size_t  boundary_loops       = 0;
+    std::size_t  face_components      = 0;
     std::int64_t euler_characteristic = 0;
 };
 
@@ -70,10 +70,10 @@ class HalfedgeMesh {
 
   private:
     std::vector<HalfedgeVertex> vertices_;
-    std::vector<Halfedge> halfedges_;
-    std::vector<HalfedgeEdge> edges_;
-    std::vector<HalfedgeFace> faces_;
-    TopologyStatistics statistics_;
+    std::vector<Halfedge>       halfedges_;
+    std::vector<HalfedgeEdge>   edges_;
+    std::vector<HalfedgeFace>   faces_;
+    TopologyStatistics          statistics_;
 };
 
 } // namespace minirender

@@ -24,10 +24,11 @@ class DipoleProfile final {
     struct Channel {
         double albedo, real_depth, virtual_depth, extinction;
     };
+
     double integral(const Channel& channel, double radius) const;
-    Channel channels_[3];
+    Channel    channels_[3];
     glm::dvec3 reflectance_;
-    double ior_, external_transmission_, internal_reflectance_;
+    double     ior_, external_transmission_, internal_reflectance_;
 };
 
 } // namespace minirender

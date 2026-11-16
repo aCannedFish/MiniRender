@@ -9,7 +9,7 @@ class GpuTexture {
   public:
     GpuTexture() = default;
     ~GpuTexture();
-    GpuTexture(const GpuTexture&) = delete;
+    GpuTexture(const GpuTexture&)            = delete;
     GpuTexture& operator=(const GpuTexture&) = delete;
     void create(VulkanViewport& viewport, const minirender::Texture& texture);
     void record_upload(VkCommandBuffer command);
@@ -18,11 +18,11 @@ class GpuTexture {
     VkDescriptorImageInfo descriptor() const noexcept;
 
   private:
-    VkDevice device_ = VK_NULL_HANDLE;
-    GpuImage image_;
-    GpuBuffer staging_;
-    VkSampler sampler_ = VK_NULL_HANDLE;
+    VkDevice                       device_ = VK_NULL_HANDLE;
+    GpuImage                       image_;
+    GpuBuffer                      staging_;
+    VkSampler                      sampler_ = VK_NULL_HANDLE;
     std::vector<VkBufferImageCopy> regions_;
-    std::uint32_t levels_ = 0;
-    bool uploaded_ = false;
+    std::uint32_t                  levels_   = 0;
+    bool                           uploaded_ = false;
 };

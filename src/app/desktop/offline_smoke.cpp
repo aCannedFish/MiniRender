@@ -28,6 +28,7 @@ void require(bool value, const char* message) {
         throw std::runtime_error(message);
     }
 }
+
 std::filesystem::path file(const QString& value) {
     const auto bytes = value.toUtf8();
     return std::filesystem::path(std::u8string(bytes.begin(), bytes.end()));
@@ -35,26 +36,26 @@ std::filesystem::path file(const QString& value) {
 
 // 在每个源像素映射到的屏幕中心采样，逐通道对照 CPU 的 Reinhard/sRGB 输出。
 void verify_display(Workbench& window, const QString& directory) {
-    auto* viewport = window.viewport();
-    const auto image = viewport->grab();
+    auto*      viewport = window.viewport();
+    const auto image    = viewport->grab();
     require(!image.isNull() && image.save(directory + "/display.png"), "Offline capture failed");
     const auto linear = window.offline_panel()->session().result();
     require(linear != nullptr, "Offline result is missing");
-    const auto expected = minirender::display_image(*linear, viewport->exposure());
-    const auto source_width = static_cast<double>(linear->width());
-    const auto source_height = static_cast<double>(linear->height());
-    const double scale = std::min(static_cast<double>(image.width()) / source_width,
-                                  static_cast<double>(image.height()) / source_height);
-    const auto width = static_cast<int>(std::floor(source_width * scale));
-    const auto height = static_cast<int>(std::floor(source_height * scale));
-    const int left = (image.width() - width) / 2, top = (image.height() - height) / 2;
-    int probes = 0, nonblack = 0;
+    const auto   expected      = minirender::display_image(*linear, viewport->exposure());
+    const auto   source_width  = static_cast<double>(linear->width());
+    const auto   source_height = static_cast<double>(linear->height());
+    const double scale         = std::min(static_cast<double>(image.width()) / source_width,
+                                          static_cast<double>(image.height()) / source_height);
+    const auto   width         = static_cast<int>(std::floor(source_width * scale));
+    const auto   height        = static_cast<int>(std::floor(source_height * scale));
+    const int    left = (image.width() - width) / 2, top = (image.height() - height) / 2;
+    int          probes = 0, nonblack = 0;
     for (std::size_t y = 0; y < linear->height(); ++y) {
         for (std::size_t x = 0; x < linear->width(); ++x) {
             const auto pixel = image.pixelColor(
                 left + static_cast<int>((static_cast<double>(x) + 0.5) * width / source_width),
                 top + static_cast<int>((static_cast<double>(y) + 0.5) * height / source_height));
-            const auto color = expected.at(x, y);
+            const auto               color = expected.at(x, y);
             const std::array<int, 3> actual{pixel.red(), pixel.green(), pixel.blue()};
             for (int channel = 0; channel < 3; ++channel) {
                 const auto wanted =
@@ -74,11 +75,11 @@ void verify_display(Workbench& window, const QString& directory) {
 }
 
 struct State {
-    int step = 0, ticks = 0, paused_ticks = 0, cycles = 0;
-    std::uint64_t samples = 0, job = 0;
-    qint64 previous = 0, maximum_gap = 0;
-    int heartbeats = 0, generations = 0;
-    QElapsedTimer clock;
+    int                   step = 0, ticks = 0, paused_ticks = 0, cycles = 0;
+    std::uint64_t         samples = 0, job = 0;
+    qint64                previous = 0, maximum_gap = 0;
+    int                   heartbeats = 0, generations = 0;
+    QElapsedTimer         clock;
     SceneUploadStatistics uploads;
 };
 
@@ -105,7 +106,7 @@ void start_offline_smoke(Workbench& window, const QString& directory) {
         timer, &QTimer::timeout, &window, [state, timer, heartbeat, &window, directory] {
             try {
                 auto* viewport = window.viewport();
-                auto* panel = window.offline_panel();
+                auto* panel    = window.offline_panel();
                 if (++state->ticks >= 500) {
                     qCritical() << "Offline timeout at step" << state->step << "state"
                                 << QString::fromStdString(minirender::render_state_name(
@@ -161,11 +162,11 @@ void start_offline_smoke(Workbench& window, const QString& directory) {
                     require(panel->findChild<QProgressBar*>("offline_progress")->maximum() == 10000,
                             "Paused progress is indeterminate");
                     {
-                        const auto before = viewport->camera();
+                        const auto    before = viewport->camera();
                         const QPointF origin(viewport->width() * 0.5, viewport->height() * 0.5);
-                        QMouseEvent press(QEvent::MouseButtonPress, origin,
-                                          viewport->mapToGlobal(origin), Qt::LeftButton,
-                                          Qt::LeftButton, Qt::NoModifier);
+                        QMouseEvent   press(QEvent::MouseButtonPress, origin,
+                                            viewport->mapToGlobal(origin), Qt::LeftButton,
+                                            Qt::LeftButton, Qt::NoModifier);
                         QCoreApplication::sendEvent(viewport, &press);
                         QMouseEvent move(QEvent::MouseMove, origin + QPointF(30, 10),
                                          viewport->mapToGlobal(origin + QPointF(30, 10)),
@@ -229,7 +230,7 @@ void start_offline_smoke(Workbench& window, const QString& directory) {
                             "Offline final render failed");
                     // 用 snapshot.json 在独立 CLI 进程中对照，避免参考渲染阻塞 UI。
                     panel->save_image(directory + "/result.exr", true);
-                    state->job = p.job_id;
+                    state->job     = p.job_id;
                     state->samples = p.recorded_samples;
                     window.findChild<QDoubleSpinBox*>("offline_exposure")->setValue(0.75);
                     state->generations = viewport->resource_generations();
@@ -269,7 +270,7 @@ void start_offline_smoke(Workbench& window, const QString& directory) {
                     window.findChild<QDoubleSpinBox*>("fov")->setValue(
                         window.document().camera.vertical_fov_degrees + 1);
                     require(panel->stale(), "Scene edit did not mark offline result stale");
-                    state->uploads = viewport->upload_statistics();
+                    state->uploads     = viewport->upload_statistics();
                     state->generations = viewport->resource_generations();
                     panel->findChild<QCheckBox*>("offline_show")->setChecked(false);
                     ++state->step;

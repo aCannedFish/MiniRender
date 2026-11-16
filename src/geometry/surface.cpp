@@ -23,32 +23,32 @@ std::array<glm::dvec3, 3> vertices(const MeshData& mesh, MeshIndex face) {
 // 保留重心坐标，后续投影工具可以据此插值面角 UV 与法线。
 MeshClosestPoint triangle_closest(glm::dvec3 p, const std::array<glm::dvec3, 3>& v,
                                   MeshIndex face) {
-    const auto ab = v[1] - v[0], ac = v[2] - v[0];
-    const auto n = glm::cross(ab, ac);
-    const auto projected = p - n * (glm::dot(p - v[0], n) / glm::dot(n, n));
-    const auto relative = projected - v[0];
-    const double b = glm::dot(glm::cross(relative, ac), n) / glm::dot(n, n);
-    const double c = glm::dot(glm::cross(ab, relative), n) / glm::dot(n, n);
+    const auto       ab = v[1] - v[0], ac = v[2] - v[0];
+    const auto       n         = glm::cross(ab, ac);
+    const auto       projected = p - n * (glm::dot(p - v[0], n) / glm::dot(n, n));
+    const auto       relative  = projected - v[0];
+    const double     b         = glm::dot(glm::cross(relative, ac), n) / glm::dot(n, n);
+    const double     c         = glm::dot(glm::cross(ab, relative), n) / glm::dot(n, n);
     MeshClosestPoint result;
     result.triangle = face;
     if (b >= 0 && c >= 0 && b + c <= 1) {
-        result.position = projected;
-        result.barycentric = {1 - b - c, b, c};
+        result.position         = projected;
+        result.barycentric      = {1 - b - c, b, c};
         result.distance_squared = glm::dot(p - projected, p - projected);
         return result;
     }
     for (std::size_t i = 0; i < 3; ++i) {
-        const auto j = (i + 1) % 3;
-        const auto edge = v[j] - v[i];
-        const auto t = std::clamp(glm::dot(p - v[i], edge) / glm::dot(edge, edge), 0.0, 1.0);
-        const auto q = v[i] + t * edge;
+        const auto j        = (i + 1) % 3;
+        const auto edge     = v[j] - v[i];
+        const auto t        = std::clamp(glm::dot(p - v[i], edge) / glm::dot(edge, edge), 0.0, 1.0);
+        const auto q        = v[i] + t * edge;
         const auto distance = glm::dot(p - q, p - q);
         if (distance < result.distance_squared) {
-            result.position = q;
-            result.barycentric = glm::dvec3(0);
+            result.position                                   = q;
+            result.barycentric                                = glm::dvec3(0);
             result.barycentric[static_cast<glm::length_t>(i)] = 1 - t;
             result.barycentric[static_cast<glm::length_t>(j)] = t;
-            result.distance_squared = distance;
+            result.distance_squared                           = distance;
         }
     }
     return result;
@@ -103,8 +103,8 @@ MeshSurface::MeshSurface(std::shared_ptr<const MeshData> mesh, CancellationToken
 MeshIndex MeshSurface::build(MeshIndex begin, MeshIndex end, const CancellationToken& token) {
     token.check();
     Node node;
-    node.low = glm::dvec3(std::numeric_limits<double>::infinity());
-    node.high = -node.low;
+    node.low              = glm::dvec3(std::numeric_limits<double>::infinity());
+    node.high             = -node.low;
     glm::dvec3 center_low = node.low, center_high = node.high;
     for (auto i = begin; i < end; ++i) {
         if (i % 1024 == 0) {
@@ -112,12 +112,12 @@ MeshIndex MeshSurface::build(MeshIndex begin, MeshIndex end, const CancellationT
         }
         const auto v = vertices(*mesh_, order_[i]);
         for (auto p : v) {
-            node.low = glm::min(node.low, p);
+            node.low  = glm::min(node.low, p);
             node.high = glm::max(node.high, p);
         }
         const auto center = (v[0] + v[1] + v[2]) / 3.0;
-        center_low = glm::min(center_low, center);
-        center_high = glm::max(center_high, center);
+        center_low        = glm::min(center_low, center);
+        center_high       = glm::max(center_high, center);
     }
     const auto index = static_cast<MeshIndex>(nodes_.size());
     nodes_.push_back(node);
@@ -126,24 +126,24 @@ MeshIndex MeshSurface::build(MeshIndex begin, MeshIndex end, const CancellationT
         nodes_[index].count = end - begin;
         return index;
     }
-    const auto extent = center_high - center_low;
-    const int axis = extent.x >= extent.y && extent.x >= extent.z ? 0
-                     : extent.y >= extent.z                       ? 1
-                                                                  : 2;
-    const auto middle = begin + (end - begin) / 2;
+    const auto  extent      = center_high - center_low;
+    const int   axis        = extent.x >= extent.y && extent.x >= extent.z ? 0
+                              : extent.y >= extent.z                       ? 1
+                                                                           : 2;
+    const auto  middle      = begin + (end - begin) / 2;
     std::size_t comparisons = 0;
     std::nth_element(order_.begin() + begin, order_.begin() + middle, order_.begin() + end,
                      [&](auto a, auto b) {
                          if (++comparisons % 1024 == 0) {
                              token.check();
                          }
-                         const auto va = vertices(*mesh_, a), vb = vertices(*mesh_, b);
+                         const auto   va = vertices(*mesh_, a), vb = vertices(*mesh_, b);
                          const double ca = va[0][axis] + va[1][axis] + va[2][axis];
                          const double cb = vb[0][axis] + vb[1][axis] + vb[2][axis];
                          return ca == cb ? a < b : ca < cb;
                      });
-    const auto left = build(begin, middle, token);
-    const auto right = build(middle, end, token);
+    const auto left     = build(begin, middle, token);
+    const auto right    = build(middle, end, token);
     nodes_[index].first = left;
     nodes_[index].right = right;
     return index;
@@ -156,7 +156,7 @@ MeshClosestPoint MeshSurface::closest(glm::dvec3 point, CancellationToken cancel
     cancellation.check();
     // 中位数树的最大深度受 32 位面索引约束，64 个槽足以保存待访问的兄弟节点。
     std::array<std::pair<MeshIndex, double>, 64> stack;
-    std::size_t pending = 1, visited = 0;
+    std::size_t                                  pending = 1, visited = 0;
     stack[0] = {0, 0};
     MeshClosestPoint result;
     while (pending) {
@@ -171,15 +171,15 @@ MeshClosestPoint MeshSurface::closest(glm::dvec3 point, CancellationToken cancel
         if (node.count) {
             for (auto i = node.first; i < node.first + node.count; ++i) {
                 const auto face = order_[i];
-                const auto hit = triangle_closest(point, vertices(*mesh_, face), face);
+                const auto hit  = triangle_closest(point, vertices(*mesh_, face), face);
                 if (hit.distance_squared < result.distance_squared ||
                     (hit.distance_squared == result.distance_squared && face < result.triangle)) {
                     result = hit;
                 }
             }
         } else {
-            const auto& left = nodes_[node.first];
-            const auto& right = nodes_[node.right];
+            const auto&                  left  = nodes_[node.first];
+            const auto&                  right = nodes_[node.right];
             std::pair<MeshIndex, double> a{node.first, bounds_distance(point, left.low, left.high)};
             std::pair<MeshIndex, double> b{node.right,
                                            bounds_distance(point, right.low, right.high)};
@@ -204,14 +204,14 @@ SurfaceComparison compare_surfaces(std::shared_ptr<const MeshData> original,
     const MeshSurface original_surface(original, cancellation),
         result_surface(result, cancellation);
     const auto original_used = referenced(*original, cancellation);
-    const auto result_used = referenced(*result, cancellation);
-    const auto sample_count = [](const MeshData& mesh, const auto& used) {
+    const auto result_used   = referenced(*result, cancellation);
+    const auto sample_count  = [](const MeshData& mesh, const auto& used) {
         return mesh.triangles.size() +
                static_cast<std::size_t>(std::count(used.begin(), used.end(), true));
     };
-    const auto total = sample_count(*original, original_used) + sample_count(*result, result_used);
+    const auto  total = sample_count(*original, original_used) + sample_count(*result, result_used);
     std::size_t completed = 0;
-    const auto report = [&] {
+    const auto  report    = [&] {
         cancellation.check();
         if (progress) {
             progress(completed, total);
@@ -221,8 +221,8 @@ SurfaceComparison compare_surfaces(std::shared_ptr<const MeshData> original,
     report();
     const auto measure = [&](const MeshData& mesh, const auto& used, const MeshSurface& surface) {
         SurfaceDistance distance;
-        double squared_sum = 0;
-        const auto sample = [&](glm::dvec3 p) {
+        double          squared_sum = 0;
+        const auto      sample      = [&](glm::dvec3 p) {
             const auto hit = surface.closest(p, cancellation);
             squared_sum += hit.distance_squared;
             distance.maximum = std::max(distance.maximum, std::sqrt(hit.distance_squared));
@@ -249,12 +249,12 @@ SurfaceComparison compare_surfaces(std::shared_ptr<const MeshData> original,
     SurfaceComparison comparison;
     comparison.original_to_result = measure(*original, original_used, result_surface);
     comparison.result_to_original = measure(*result, result_used, original_surface);
-    const auto& a = comparison.original_to_result;
-    const auto& b = comparison.result_to_original;
-    comparison.symmetric_rms = std::sqrt((a.rms * a.rms * static_cast<double>(a.samples) +
-                                          b.rms * b.rms * static_cast<double>(b.samples)) /
-                                         static_cast<double>(total));
-    comparison.sampled_maximum = std::max(a.maximum, b.maximum);
+    const auto& a                 = comparison.original_to_result;
+    const auto& b                 = comparison.result_to_original;
+    comparison.symmetric_rms      = std::sqrt((a.rms * a.rms * static_cast<double>(a.samples) +
+                                               b.rms * b.rms * static_cast<double>(b.samples)) /
+                                              static_cast<double>(total));
+    comparison.sampled_maximum    = std::max(a.maximum, b.maximum);
     report();
     return comparison;
 }

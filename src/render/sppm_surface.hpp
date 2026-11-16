@@ -22,8 +22,8 @@ class SppmSurface final {
     static Bsdf make_bsdf(const SceneSnapshot& scene, const SurfaceHit& hit,
                           const ShadingFrame& frame);
     ShadingFrame frame_;
-    glm::dvec3 wo_;
-    Bsdf bsdf_;
+    glm::dvec3   wo_;
+    Bsdf         bsdf_;
     MaterialKind kind_;
 };
 

@@ -37,13 +37,13 @@ LoopHierarchy::LoopHierarchy(std::shared_ptr<const MeshData> input, const Halfed
             cancellation_.check();
         }
         const auto& source = topology.vertices()[vertex];
-        Point point;
+        Point       point;
         point.position = glm::dvec3(input_->positions[vertex]);
-        point.ready = true;
+        point.ready    = true;
         LoopRing ring;
         if (source.halfedge != invalid_mesh_index) {
             ring.boundary = topology.is_boundary(source.halfedge);
-            auto current = source.halfedge;
+            auto current  = source.halfedge;
             if (ring.boundary) {
                 current = hs[hs[current].previous].twin;
             }
@@ -88,7 +88,7 @@ MeshIndex LoopHierarchy::midpoint(MeshIndex a, MeshIndex b, std::uint32_t parent
         std::swap(a, b);
     }
     const EdgeKey key{a, b, parent_level};
-    const auto found = edges_.find(key);
+    const auto    found = edges_.find(key);
     if (found != edges_.end()) {
         return found->second;
     }
@@ -97,12 +97,12 @@ MeshIndex LoopHierarchy::midpoint(MeshIndex a, MeshIndex b, std::uint32_t parent
         throw std::length_error("Adaptive evaluation exceeds the point budget");
     }
     Point point;
-    point.birth = parent_level + 1;
-    point.a = a;
-    point.b = b;
-    point.left = adjacent[0];
-    point.right = adjacent[1];
-    point.boundary = point.left == invalid_mesh_index || point.right == invalid_mesh_index;
+    point.birth      = parent_level + 1;
+    point.a          = a;
+    point.b          = b;
+    point.left       = adjacent[0];
+    point.right      = adjacent[1];
+    point.boundary   = point.left == invalid_mesh_index || point.right == invalid_mesh_index;
     const auto index = static_cast<MeshIndex>(points_.size());
     points_.push_back(point);
     edges_.emplace(key, index);
@@ -111,13 +111,13 @@ MeshIndex LoopHierarchy::midpoint(MeshIndex a, MeshIndex b, std::uint32_t parent
 
 const LoopRing& LoopHierarchy::ring(MeshIndex vertex, std::uint32_t level) {
     validate_query(vertex, level);
-    const auto key = ring_key(vertex, level);
+    const auto key      = ring_key(vertex, level);
     const auto existing = rings_.find(key);
     if (existing != rings_.end()) {
         return existing->second;
     }
     const auto point = points_[vertex];
-    LoopRing result;
+    LoopRing   result;
     result.boundary = point.boundary;
     if (point.birth < level) {
         // even 点的一环由父层每条出边的 odd 点组成，顺序保持不变。
@@ -149,15 +149,15 @@ const LoopRing& LoopHierarchy::ring(MeshIndex vertex, std::uint32_t level) {
 
 std::array<MeshIndex, 2> LoopHierarchy::opposites(MeshIndex a, MeshIndex b, std::uint32_t level) {
     const auto& around = ring(a, level);
-    const auto found = std::find(around.neighbors.begin(), around.neighbors.end(), b);
+    const auto  found  = std::find(around.neighbors.begin(), around.neighbors.end(), b);
     if (found == around.neighbors.end()) {
         throw std::logic_error("Loop hierarchy endpoints do not form an edge");
     }
     const auto index = static_cast<std::size_t>(found - around.neighbors.begin());
     const auto count = around.neighbors.size();
-    const auto left = index + 1 < count ? around.neighbors[index + 1]
-                      : around.boundary ? invalid_mesh_index
-                                        : around.neighbors[0];
+    const auto left  = index + 1 < count ? around.neighbors[index + 1]
+                       : around.boundary ? invalid_mesh_index
+                                         : around.neighbors[0];
     const auto right = index > 0         ? around.neighbors[index - 1]
                        : around.boundary ? invalid_mesh_index
                                          : around.neighbors[count - 1];
@@ -169,16 +169,16 @@ glm::dvec3 LoopHierarchy::birth_position(MeshIndex vertex) {
     if (point.ready) {
         return point.position;
     }
-    const auto a = control_position(point.a, point.birth - 1);
-    const auto b = control_position(point.b, point.birth - 1);
-    auto position = a + (b - a) / 2.0;
+    const auto a        = control_position(point.a, point.birth - 1);
+    const auto b        = control_position(point.b, point.birth - 1);
+    auto       position = a + (b - a) / 2.0;
     if (!point.boundary) {
-        const auto left = control_position(point.left, point.birth - 1);
+        const auto left  = control_position(point.left, point.birth - 1);
         const auto right = control_position(point.right, point.birth - 1);
-        position = a + (b - a) * (3.0 / 8.0) + ((left - a) + (right - a)) / 8.0;
+        position         = a + (b - a) * (3.0 / 8.0) + ((left - a) + (right - a)) / 8.0;
     }
     points_[vertex].position = position;
-    points_[vertex].ready = true;
+    points_[vertex].ready    = true;
     return position;
 }
 
@@ -186,36 +186,36 @@ void LoopHierarchy::prepare_coefficient(MeshIndex vertex) {
     if (points_[vertex].coefficient_ready) {
         return;
     }
-    const auto point = points_[vertex];
-    const auto position = birth_position(vertex);
+    const auto  point     = points_[vertex];
+    const auto  position  = birth_position(vertex);
     const auto& neighbors = ring(vertex, point.birth);
-    glm::dvec3 relative_sum(0);
-    double gamma = 0;
-    double rho = 0;
+    glm::dvec3  relative_sum(0);
+    double      gamma = 0;
+    double      rho   = 0;
     if (neighbors.boundary) {
         relative_sum = control_position(neighbors.neighbors.front(), point.birth) - position +
                        control_position(neighbors.neighbors.back(), point.birth) - position;
-        gamma = 1.0 / 6;
-        rho = 0.25;
+        gamma        = 1.0 / 6;
+        rho          = 0.25;
     } else if (!neighbors.neighbors.empty()) {
         for (const auto neighbor : neighbors.neighbors) {
             relative_sum += control_position(neighbor, point.birth) - position;
         }
-        const auto n = static_cast<std::uint32_t>(neighbors.neighbors.size());
+        const auto   n    = static_cast<std::uint32_t>(neighbors.neighbors.size());
         const double beta = loop_beta(n);
-        gamma = 1.0 / (n + 3.0 / (8 * beta));
-        rho = 5.0 / 8.0 - n * beta;
+        gamma             = 1.0 / (n + 3.0 / (8 * beta));
+        rho               = 5.0 / 8.0 - n * beta;
     }
     // 由 [p,S] 的二维线性递推得到有限层系数，省去逐层展开全部邻域。
-    points_[vertex].delta = gamma * relative_sum;
-    points_[vertex].rho = rho;
+    points_[vertex].delta             = gamma * relative_sum;
+    points_[vertex].rho               = rho;
     points_[vertex].coefficient_ready = true;
 }
 
 glm::dvec3 LoopHierarchy::control_position(MeshIndex vertex, std::uint32_t level) {
     validate_query(vertex, level);
     const auto position = birth_position(vertex);
-    const auto steps = level - points_[vertex].birth;
+    const auto steps    = level - points_[vertex].birth;
     if (steps == 0) {
         return position;
     }
@@ -231,13 +231,13 @@ glm::dvec3 LoopHierarchy::smooth_normal(MeshIndex vertex, std::uint32_t level) {
     }
     const auto p = glm::dvec3(glm::vec3(control_position(vertex, level)));
     glm::dvec3 sum(0);
-    double area_sum = 0;
-    const auto count = around.neighbors.size() - (around.boundary ? 1 : 0);
+    double     area_sum = 0;
+    const auto count    = around.neighbors.size() - (around.boundary ? 1 : 0);
     for (std::size_t i = 0; i < count; ++i) {
-        const auto a = glm::dvec3(glm::vec3(control_position(around.neighbors[i], level)));
-        const auto b = glm::dvec3(glm::vec3(
+        const auto a      = glm::dvec3(glm::vec3(control_position(around.neighbors[i], level)));
+        const auto b      = glm::dvec3(glm::vec3(
             control_position(around.neighbors[(i + 1) % around.neighbors.size()], level)));
-        const auto area = glm::cross(a - p, b - p);
+        const auto area   = glm::cross(a - p, b - p);
         const auto length = glm::length(area);
         if (!std::isfinite(length) || length <= 1e-10) {
             throw std::invalid_argument("Adaptive reference contains a degenerate face");
@@ -256,6 +256,7 @@ std::uint32_t LoopHierarchy::birth_level(MeshIndex vertex) const {
     cancellation_.check();
     return points_.at(vertex).birth;
 }
+
 std::array<MeshIndex, 2> LoopHierarchy::parent_edge(MeshIndex vertex) const {
     cancellation_.check();
     const auto& point = points_.at(vertex);
@@ -264,6 +265,7 @@ std::array<MeshIndex, 2> LoopHierarchy::parent_edge(MeshIndex vertex) const {
     }
     return {point.a, point.b};
 }
+
 std::size_t LoopHierarchy::point_count() const noexcept {
     return points_.size();
 }

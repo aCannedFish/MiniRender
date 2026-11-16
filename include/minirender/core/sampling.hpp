@@ -23,7 +23,7 @@ class Sampler {
     glm::dvec2 next_2d();
 
   private:
-    std::uint64_t state_ = 0;
+    std::uint64_t state_     = 0;
     std::uint64_t increment_ = 1;
 };
 
@@ -37,9 +37,9 @@ glm::dvec3 sample_triangle(glm::dvec2 u);
 double cosine_hemisphere_pdf(glm::dvec3 direction);
 
 struct DiscreteSample {
-    std::size_t index = 0;
-    double probability = 0;
-    double remapped = 0; // 选中区间内重新映射到 [0,1)，可复用为后续条件采样。
+    std::size_t index       = 0;
+    double      probability = 0;
+    double      remapped    = 0; // 选中区间内重新映射到 [0,1)，可复用为后续条件采样。
 };
 
 // 非负有限权重的离散 CDF。空分布不产生样本，全零权重退化为均匀分布。

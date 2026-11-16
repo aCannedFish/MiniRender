@@ -8,9 +8,10 @@
 namespace minirender::detail {
 
 inline constexpr std::uint32_t no_point = std::numeric_limits<std::uint32_t>::max();
+
 struct PointNeighbor {
     std::uint32_t index;
-    double squared_distance;
+    double        squared_distance;
 };
 
 // 固定点集的平衡 k-d 树。叶子持有位置索引，距离与边界使用 double。
@@ -26,19 +27,20 @@ class PointIndex final {
 
   private:
     struct Node {
-        glm::dvec3 low;
-        glm::dvec3 high;
-        std::size_t begin;
-        std::size_t end;
-        std::uint32_t left = no_point;
+        glm::dvec3    low;
+        glm::dvec3    high;
+        std::size_t   begin;
+        std::size_t   end;
+        std::uint32_t left  = no_point;
         std::uint32_t right = no_point;
     };
+
     std::uint32_t build(std::size_t begin, std::size_t end);
     static double distance_to(const Node& node, glm::dvec3 point);
     std::span<const glm::vec3> positions_;
     std::vector<std::uint32_t> order_;
-    std::vector<Node> nodes_;
-    CancellationToken cancellation_;
+    std::vector<Node>          nodes_;
+    CancellationToken          cancellation_;
 };
 
 } // namespace minirender::detail

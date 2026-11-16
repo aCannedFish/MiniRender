@@ -32,12 +32,12 @@ Image make_height() {
 Image render(const SceneDocument& scene, const std::filesystem::path& output,
              const std::string& label) {
     RenderSettings settings;
-    settings.width = 128;
-    settings.height = 128;
+    settings.width             = 128;
+    settings.height            = 128;
     settings.samples_per_pixel = 64;
-    settings.seed = 101;
+    settings.seed              = 101;
     const PathTracer tracer(make_snapshot(scene));
-    auto image = tracer.render(settings);
+    auto             image = tracer.render(settings);
     image.write_exr(output / (label + ".exr"));
     display_image(image).write_png(output / (label + ".png"));
     return image;
@@ -50,8 +50,8 @@ void compare_visibility(std::shared_ptr<const SceneSnapshot> before,
         throw std::runtime_error("The visibility example requires a directional light");
     }
     const SceneBvh first(before), second(after);
-    const auto light = -glm::normalize(glm::dvec3(after->directional_lights[0].direction));
-    std::size_t silhouettes = 0, shadows = 0;
+    const auto     light = -glm::normalize(glm::dvec3(after->directional_lights[0].direction));
+    std::size_t    silhouettes = 0, shadows = 0;
     for (std::size_t y = 0; y < 128; ++y) {
         for (std::size_t x = 0; x < 128; ++x) {
             const auto ray = after->camera.generate_ray(
@@ -99,13 +99,13 @@ int main() {
         const auto height = std::make_shared<const Texture>(height_image);
         scene.textures.push_back({"height", output / "height.exr", ColorEncoding::linear, height});
         const auto result = displace_mesh(cube->data, height, {0.15});
-        cube->data = result.mesh;
+        cube->data        = result.mesh;
         compare_visibility(baseline, make_snapshot(scene));
         const auto after = render(scene, output, "displaced");
         save_obj(*result.mesh, output / "displaced.obj");
         save_scene(scene, output / "scene.json");
         const auto reopened = render(load_scene(output / "scene.json"), output, "reopened");
-        double error = 0;
+        double     error    = 0;
         for (std::size_t y = 0; y < after.height(); ++y) {
             for (std::size_t x = 0; x < after.width(); ++x) {
                 error = std::max(

@@ -9,6 +9,7 @@
 #include <numbers>
 
 using namespace minirender;
+
 namespace {
 
 // 复用场景、后台积分器和图像输出，例程不另设一套 SSS 实现。
@@ -54,14 +55,14 @@ SceneDocument material_scene(const std::string& preset_name, double density) {
     scene.camera.near_plane *= scale;
     scene.camera.far_plane *= scale;
     scene.camera.focus_distance *= scale;
-    const auto preset = make_subsurface_preset(preset_name);
-    auto parameters = *preset.parameters;
-    parameters.density = density;
+    const auto preset     = make_subsurface_preset(preset_name);
+    auto       parameters = *preset.parameters;
+    parameters.density    = density;
     for (auto& material : scene.materials) {
         if (material.id == "mat_glass_ball") {
-            material.name = preset_name;
-            material.kind = MaterialKind::subsurface;
-            material.ior = float(preset.ior);
+            material.name       = preset_name;
+            material.kind       = MaterialKind::subsurface;
+            material.ior        = float(preset.ior);
             material.subsurface = std::make_shared<const SubsurfaceParameters>(parameters);
         }
     }
@@ -76,19 +77,19 @@ SceneDocument edge_scene(const std::string& preset, double density) {
                       [](const auto& value) { return value.kind == MaterialKind::subsurface; });
     material.id = "block";
     Material floor;
-    floor.id = "floor";
-    floor.base_color = glm::vec3(.12F);
+    floor.id           = "floor";
+    floor.base_color   = glm::vec3(.12F);
     floor.double_sided = false;
-    scene.materials = {material, floor};
+    scene.materials    = {material, floor};
     scene.objects = {{"block", "SSS block", "cube", "block", {{}, {}, {.04F, .04F, .04F}}},
                      {"floor", "Floor", "plane", "floor", {{0, -.0201F, 0}, {}, {.1F, 1, .1F}}}};
-    scene.camera.position = {.065F, .045F, .12F};
-    scene.camera.target = {};
+    scene.camera.position             = {.065F, .045F, .12F};
+    scene.camera.target               = {};
     scene.camera.vertical_fov_degrees = 35;
-    scene.camera.near_plane = .001F;
-    scene.camera.far_plane = 2;
-    scene.environment = glm::vec3(.01F);
-    scene.directional_lights = {{"sun", {0, -1, 0}, {1, .95F, .9F}, 5}};
+    scene.camera.near_plane           = .001F;
+    scene.camera.far_plane            = 2;
+    scene.environment                 = glm::vec3(.01F);
+    scene.directional_lights          = {{"sun", {0, -1, 0}, {1, .95F, .9F}, 5}};
     return scene;
 }
 
@@ -100,7 +101,7 @@ void example(const std::filesystem::path& directory, const std::string& name,
     image->write_exr(directory / (name + ".exr"));
     display_image(*image).write_png(directory / (name + ".png"));
     const auto repeated = render(load_scene(file), name + "-reload", samples);
-    double maximum = 0;
+    double     maximum  = 0;
     for (std::size_t y = 0; y < image->height(); ++y) {
         for (std::size_t x = 0; x < image->width(); ++x) {
             maximum = std::max(maximum, double(glm::length(image->at(x, y) - repeated->at(x, y))));
@@ -118,18 +119,18 @@ void convergence(const std::filesystem::path& directory) {
         load_scene(std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/cornell-materials.json");
     std::erase_if(scene.meshes, [](const auto& mesh) { return mesh.id != "cube"; });
     Material material;
-    material.id = "block";
-    material.kind = MaterialKind::subsurface;
-    material.ior = 1.3F;
+    material.id         = "block";
+    material.kind       = MaterialKind::subsurface;
+    material.ior        = 1.3F;
     material.subsurface = std::make_shared<const SubsurfaceParameters>(
         SubsurfaceParameters{{.1, .2, .3}, {1, 2, 3}, 1});
-    scene.materials = {material};
-    scene.objects = {{"block", "Block", "cube", "block", {}}};
-    scene.environment = glm::vec3(0);
+    scene.materials          = {material};
+    scene.objects            = {{"block", "Block", "cube", "block", {}}};
+    scene.environment        = glm::vec3(0);
     scene.directional_lights = {{"side", {1, 0, 0}, {1, .8F, .6F}, 4}};
     const DipoleProfile profile(*material.subsurface, material.ior);
-    glm::dvec3 reference(0);
-    constexpr int grid = 512;
+    glm::dvec3          reference(0);
+    constexpr int       grid = 512;
     for (int y = 0; y < grid; ++y) {
         for (int z = 0; z < grid; ++z) {
             const glm::dvec3 point{-.5, (y + .5) / grid - .5, (z + .5) / grid - .5};
@@ -140,7 +141,7 @@ void convergence(const std::filesystem::path& directory) {
     const double f0 = std::pow((material.ior - 1.) / (material.ior + 1.), 2);
     reference *= (1 - f0) * (1 - f0) / std::numbers::pi * 4 * glm::dvec3(1, .8F, .6F);
     const PathTracer tracer(make_snapshot(scene), {SamplingMode::mis, 1, false, 3});
-    std::ofstream csv(directory / "convergence.csv");
+    std::ofstream    csv(directory / "convergence.csv");
     csv.imbue(std::locale::classic());
     csv << "samples,seed,linear_rgb_rmse\n";
     for (const std::uint64_t count : {1000ULL, 4000ULL, 16000ULL, 64000ULL}) {
@@ -151,7 +152,7 @@ void convergence(const std::filesystem::path& directory) {
                 auto random = Sampler::for_sample(seed, 0, i);
                 sum += tracer.trace({{0, 0, 3}, {0, 0, -1}}, random);
             }
-            const auto error = sum / double(count) - reference;
+            const auto   error   = sum / double(count) - reference;
             const double squared = glm::dot(error, error) / 3;
             csv << count << ',' << seed << ',' << std::sqrt(squared) << '\n';
             mse += squared / 5;

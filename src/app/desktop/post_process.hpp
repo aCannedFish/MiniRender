@@ -10,7 +10,7 @@ class PostProcess {
   public:
     PostProcess() = default;
     ~PostProcess();
-    PostProcess(const PostProcess&) = delete;
+    PostProcess(const PostProcess&)            = delete;
     PostProcess& operator=(const PostProcess&) = delete;
     void create(VulkanViewport& viewport, const HdrTargets& targets, VkBuffer uniform_buffer,
                 VkDeviceSize uniform_size, VkImageView hdr, VkImageView raw_ao,
@@ -21,13 +21,13 @@ class PostProcess {
 
   private:
     // 显示轮廓使用独立附件，HDR 导出继续读取原始合成图。
-    ScreenPass outline_;
-    bool outline_initialized_ = false;
-    VkDevice device_ = VK_NULL_HANDLE;
-    VkSampler sampler_ = VK_NULL_HANDLE;
-    VkDescriptorSetLayout descriptor_layout_ = VK_NULL_HANDLE;
-    VkDescriptorPool descriptor_pool_ = VK_NULL_HANDLE;
-    VkDescriptorSet descriptor_ = VK_NULL_HANDLE;
-    VkPipelineLayout layout_ = VK_NULL_HANDLE;
-    VkPipeline pipeline_ = VK_NULL_HANDLE;
+    ScreenPass            outline_;
+    bool                  outline_initialized_ = false;
+    VkDevice              device_              = VK_NULL_HANDLE;
+    VkSampler             sampler_             = VK_NULL_HANDLE;
+    VkDescriptorSetLayout descriptor_layout_   = VK_NULL_HANDLE;
+    VkDescriptorPool      descriptor_pool_     = VK_NULL_HANDLE;
+    VkDescriptorSet       descriptor_          = VK_NULL_HANDLE;
+    VkPipelineLayout      layout_              = VK_NULL_HANDLE;
+    VkPipeline            pipeline_            = VK_NULL_HANDLE;
 };

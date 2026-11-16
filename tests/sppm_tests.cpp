@@ -14,45 +14,50 @@
 
 using namespace minirender;
 using Catch::Approx;
+
 namespace {
 constexpr double pi = std::numbers::pi;
+
 SceneDocument plane(bool emitter = false, bool double_sided = false) {
     SceneDocument scene;
     scene.camera.position = {0, 1, 0};
-    scene.camera.target = {0, 0, 0};
-    scene.camera.up = {0, 0, -1};
-    scene.environment = glm::vec3(emitter ? 0 : 1);
-    auto mesh = std::make_shared<MeshData>();
-    mesh->positions = {{-1, 0, -1}, {-1, 0, 1}, {1, 0, 1}, {1, 0, -1}};
-    mesh->triangles = {{{{{0, {0, 1, 0}, {}}, {1, {0, 1, 0}, {}}, {2, {0, 1, 0}, {}}}}},
-                       {{{{0, {0, 1, 0}, {}}, {2, {0, 1, 0}, {}}, {3, {0, 1, 0}, {}}}}}};
+    scene.camera.target   = {0, 0, 0};
+    scene.camera.up       = {0, 0, -1};
+    scene.environment     = glm::vec3(emitter ? 0 : 1);
+    auto mesh             = std::make_shared<MeshData>();
+    mesh->positions       = {{-1, 0, -1}, {-1, 0, 1}, {1, 0, 1}, {1, 0, -1}};
+    mesh->triangles       = {{{{{0, {0, 1, 0}, {}}, {1, {0, 1, 0}, {}}, {2, {0, 1, 0}, {}}}}},
+                             {{{{0, {0, 1, 0}, {}}, {2, {0, 1, 0}, {}}, {3, {0, 1, 0}, {}}}}}};
     scene.meshes.push_back({"plane", {}, mesh});
     Material material;
-    material.id = "surface";
-    material.base_color = glm::vec3(.6F);
-    material.emission = glm::vec3(emitter ? 2 : 0);
+    material.id           = "surface";
+    material.base_color   = glm::vec3(.6F);
+    material.emission     = glm::vec3(emitter ? 2 : 0);
     material.double_sided = double_sided;
     scene.materials.push_back(material);
     scene.objects.push_back({"plane", "plane", "plane", "surface", {}});
     return scene;
 }
+
 IntegratorSettings options(std::uint32_t depth = 6) {
     IntegratorSettings result;
-    result.kind = IntegratorKind::sppm;
-    result.maximum_depth = depth;
-    result.russian_roulette = false;
+    result.kind                       = IntegratorKind::sppm;
+    result.maximum_depth              = depth;
+    result.russian_roulette           = false;
     result.sppm.photons_per_iteration = 2000;
-    result.sppm.initial_radius = .3;
+    result.sppm.initial_radius        = .3;
     return result;
 }
+
 PhotonEmission emission(const LightSampler& light, Sampler& random) {
-    const auto select = random.next_1d();
-    const auto position = random.next_2d();
+    const auto select    = random.next_1d();
+    const auto position  = random.next_2d();
     const auto direction = random.next_2d();
-    const auto sample = light.sample_emission(select, position, direction);
+    const auto sample    = light.sample_emission(select, position, direction);
     REQUIRE(sample);
     return *sample;
 }
+
 double difference(const Image& a, const Image& b) {
     double maximum = 0;
     for (std::size_t y = 0; y < a.height(); ++y) {
@@ -62,6 +67,7 @@ double difference(const Image& a, const Image& b) {
     }
     return maximum;
 }
+
 void same(std::span<const SppmPixel> a, std::span<const SppmPixel> b) {
     REQUIRE(a.size() == b.size());
     for (std::size_t i = 0; i < a.size(); ++i) {
@@ -76,14 +82,14 @@ void same(std::span<const SppmPixel> a, std::span<const SppmPixel> b) {
 TEST_CASE("Area photon emission conserves power and samples the selected hemispheres",
           "[sppm][emission]") {
     for (const bool two_sided : {false, true}) {
-        const auto snapshot = make_snapshot(plane(true, two_sided));
+        const auto         snapshot = make_snapshot(plane(true, two_sided));
         const LightSampler light(snapshot);
-        const SceneBvh bvh(snapshot);
-        Sampler random(101);
-        glm::dvec3 center(0), flux(0);
-        double cosine = 0;
-        int back = 0, self_hits = 0;
-        constexpr int samples = 30000;
+        const SceneBvh     bvh(snapshot);
+        Sampler            random(101);
+        glm::dvec3         center(0), flux(0);
+        double             cosine = 0;
+        int                back = 0, self_hits = 0;
+        constexpr int      samples = 30000;
         for (int i = 0; i < samples; ++i) {
             const auto value = emission(light, random);
             center += value.ray.origin;
@@ -106,16 +112,16 @@ TEST_CASE("Area photon emission conserves power and samples the selected hemisph
 
 TEST_CASE("Infinite photon emission accounts for projected area and missed photons",
           "[sppm][emission]") {
-    auto scene = plane();
+    auto scene        = plane();
     scene.environment = glm::vec3(0);
     scene.directional_lights.push_back({"sun", {0, -1, 0}, {1, 1, 1}, 3});
-    const auto snapshot = make_snapshot(scene);
-    const SceneBvh bvh(snapshot);
+    const auto         snapshot = make_snapshot(scene);
+    const SceneBvh     bvh(snapshot);
     const LightSampler light(snapshot);
-    Sampler random(917);
-    glm::dvec3 irradiance(0);
-    constexpr int samples = 50000;
-    int hits = 0;
+    Sampler            random(917);
+    glm::dvec3         irradiance(0);
+    constexpr int      samples = 50000;
+    int                hits    = 0;
     for (int i = 0; i < samples; ++i) {
         const auto value = emission(light, random);
         REQUIRE(value.ray.direction == glm::dvec3(0, -1, 0));
@@ -131,7 +137,7 @@ TEST_CASE("Infinite photon emission accounts for projected area and missed photo
     scene.directional_lights.clear();
     scene.environment = glm::vec3(1);
     const LightSampler sky(make_snapshot(scene));
-    glm::dvec3 direction_sum(0);
+    glm::dvec3         direction_sum(0);
     for (int i = 0; i < samples; ++i) {
         const auto value = emission(sky, random);
         direction_sum += value.ray.direction;
@@ -143,14 +149,14 @@ TEST_CASE("Infinite photon emission accounts for projected area and missed photo
 
 TEST_CASE("Emission light mixture retains RGB power through its selection PMF",
           "[sppm][emission]") {
-    auto scene = plane(true);
+    auto scene                  = plane(true);
     scene.materials[0].emission = {2, 0, 0};
     scene.directional_lights.push_back({"sun", {0, -1, 0}, {0, 1, 0}, 3});
     scene.environment = {0, 0, 1};
     const LightSampler lights(make_snapshot(scene));
-    Sampler random(781);
-    glm::dvec3 mean(0);
-    constexpr int count = 100000;
+    Sampler            random(781);
+    glm::dvec3         mean(0);
+    constexpr int      count = 100000;
     for (int i = 0; i < count; ++i) {
         mean += emission(lights, random).flux / double(count);
     }
@@ -160,7 +166,7 @@ TEST_CASE("Emission light mixture retains RGB power through its selection PMF",
 }
 
 TEST_CASE("SPPM grid agrees with brute force and never repeats a visible point", "[sppm][grid]") {
-    Sampler random(91);
+    Sampler                            random(91);
     std::vector<detail::SppmGridPoint> points;
     for (std::size_t i = 0; i < 200; ++i) {
         const auto a = random.next_2d();
@@ -170,12 +176,12 @@ TEST_CASE("SPPM grid agrees with brute force and never repeats a visible point",
     }
     const detail::SppmGrid grid(points);
     for (int i = 0; i < 1000; ++i) {
-        const auto a = random.next_2d();
-        const auto b = random.next_2d();
+        const auto a        = random.next_2d();
+        const auto b        = random.next_2d();
         const auto position = i < 200 ? points[std::size_t(i)].position
                                       : glm::dvec3(1e6, 2e6, -1e6) + glm::dvec3(a.x, a.y, b.x);
         std::set<std::size_t> expected, actual;
-        std::size_t callbacks = 0;
+        std::size_t           callbacks = 0;
         for (const auto& point : points) {
             if (glm::length(position - point.position) <= point.radius) {
                 expected.insert(point.index);
@@ -192,7 +198,7 @@ TEST_CASE("SPPM grid agrees with brute force and never repeats a visible point",
 
 TEST_CASE("SPPM progressive update matches independent count area and flux equations", "[sppm]") {
     const SppmPixel before{.4, 10, {1, 2, 3}, {.1, .2, .3}};
-    const auto after = update_sppm_pixel(before, 20, {4, 5, 6}, {.2, .3, .4}, .7);
+    const auto      after = update_sppm_pixel(before, 20, {4, 5, 6}, {.2, .3, .4}, .7);
     REQUIRE(after.effective_photons == 24);
     REQUIRE(after.radius == Approx(.4 * std::sqrt(.8)).epsilon(1e-14));
     REQUIRE(glm::length(after.tau - glm::dvec3(4, 5.6, 7.2)) < 1e-12);
@@ -206,15 +212,15 @@ TEST_CASE("SPPM progressive update matches independent count area and flux equat
 
 TEST_CASE("SPPM direct lighting is counted once and matches the existing light estimator",
           "[sppm]") {
-    const auto snapshot = make_snapshot(plane());
-    auto config = options(1);
+    const auto           snapshot = make_snapshot(plane());
+    auto                 config   = options(1);
     const RenderSettings film{8, 8, 16, 101};
-    SppmIntegrator renderer(snapshot, film, config);
+    SppmIntegrator       renderer(snapshot, film, config);
     for (std::uint32_t i = 0; i < film.samples_per_pixel; ++i) {
         renderer.advance();
     }
     IntegratorSettings reference{SamplingMode::light, 1, false, 3};
-    const auto expected = PathTracer(snapshot, reference).render(film);
+    const auto         expected = PathTracer(snapshot, reference).render(film);
     REQUIRE(difference(renderer.image(), expected) < 1e-6);
     REQUIRE(renderer.statistics().emitted_photons ==
             std::uint64_t(film.samples_per_pixel) * config.sppm.photons_per_iteration);
@@ -230,8 +236,8 @@ TEST_CASE("SPPM cancellation and callback exceptions keep the complete previous 
     const auto scene = make_snapshot(
         load_scene(std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/cornell-box.json"));
     const RenderSettings film{8, 8, 3, 113};
-    const auto config = options();
-    SppmIntegrator renderer(scene, film, config), reference(scene, film, config);
+    const auto           config = options();
+    SppmIntegrator       renderer(scene, film, config), reference(scene, film, config);
     renderer.advance();
     reference.advance();
     const auto image = renderer.image();
@@ -262,8 +268,8 @@ TEST_CASE("SPPM parallel photon streams preserve counts radii and image", "[sppm
     const auto scene = make_snapshot(
         load_scene(std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/cornell-box.json"));
     const RenderSettings film{8, 8, 8, 211};
-    const auto config = options();
-    SppmIntegrator serial(scene, film, config, 1), parallel(scene, film, config, 3);
+    const auto           config = options();
+    SppmIntegrator       serial(scene, film, config, 1), parallel(scene, film, config, 3);
     for (int i = 0; i < 8; ++i) {
         serial.advance();
         parallel.advance();
@@ -281,16 +287,16 @@ TEST_CASE("SPPM parallel photon streams preserve counts radii and image", "[sppm
 
 TEST_CASE("Cloth importance sampling uses the transposed radiance kernel", "[sppm][cloth-bsdf]") {
     Material material;
-    material.kind = MaterialKind::cloth;
+    material.kind  = MaterialKind::cloth;
     material.cloth = make_cloth_preset("silk").appearance;
     const Bsdf bsdf(material);
     const auto wo = glm::normalize(glm::dvec3(.3, .2, 1));
-    Sampler random(51);
-    int checked = 0;
+    Sampler    random(51);
+    int        checked = 0;
     for (int i = 0; i < 2000; ++i) {
         const double component = random.next_1d();
-        const auto u = random.next_2d();
-        const auto value = bsdf.sample(wo, component, u, TransportMode::importance);
+        const auto   u         = random.next_2d();
+        const auto   value     = bsdf.sample(wo, component, u, TransportMode::importance);
         if (!value) {
             continue;
         }
@@ -305,7 +311,7 @@ TEST_CASE("Cloth importance sampling uses the transposed radiance kernel", "[spp
 
 TEST_CASE("SPPM rejects unsupported camera media and over-budget work before allocating",
           "[sppm]") {
-    auto scene = plane();
+    auto scene  = plane();
     auto config = options();
     REQUIRE_THROWS_AS(SppmIntegrator(make_snapshot(scene), {1024, 1024, 1, 1}, config, 32),
                       std::length_error);
@@ -314,7 +320,7 @@ TEST_CASE("SPPM rejects unsupported camera media and over-budget work before all
                       std::invalid_argument);
     scene.camera.aperture_radius = 0;
     MediumRegion region;
-    region.id = "fog";
+    region.id                = "fog";
     region.medium.scattering = glm::dvec3(.2);
     scene.media.push_back(region);
     REQUIRE_THROWS_AS(SppmIntegrator(make_snapshot(scene), {1, 1, 1, 1}, config),
@@ -333,7 +339,7 @@ TEST_CASE("Glass and mirror scenes record nonzero specular diffuse specular merg
                 }
             }
         }
-        auto config = options(8);
+        auto config                       = options(8);
         config.sppm.photons_per_iteration = 5000;
         SppmIntegrator renderer(make_snapshot(scene), {8, 8, 16, 101}, config, 2);
         for (int i = 0; i < 16; ++i) {
@@ -347,25 +353,25 @@ TEST_CASE("Glass and mirror scenes record nonzero specular diffuse specular merg
 TEST_CASE("SPPM shading normal conversion matches the radiance operator transpose", "[sppm]") {
     const auto scene = make_snapshot(plane());
     SurfaceHit hit;
-    hit.geometric_normal = {0, 1, 0};
-    hit.shading_normal = glm::normalize(glm::vec3(0, .8F, .6F));
-    const auto wo = glm::normalize(glm::dvec3(.1, 1, .2));
+    hit.geometric_normal         = {0, 1, 0};
+    hit.shading_normal           = glm::normalize(glm::vec3(0, .8F, .6F));
+    const auto                wo = glm::normalize(glm::dvec3(.1, 1, .2));
     const detail::SppmSurface surface(*scene, hit, wo);
-    const auto ns = glm::normalize(glm::dvec3(hit.shading_normal));
-    const glm::dvec3 ng{0, 1, 0};
-    Sampler random(17);
-    int checked = 0;
+    const auto                ns = glm::normalize(glm::dvec3(hit.shading_normal));
+    const glm::dvec3          ng{0, 1, 0};
+    Sampler                   random(17);
+    int                       checked = 0;
     for (int i = 0; i < 1000; ++i) {
         const double component = random.next_1d();
-        const auto u = random.next_2d();
-        const auto sample = surface.sample(component, u, TransportMode::importance);
+        const auto   u         = random.next_2d();
+        const auto   sample    = surface.sample(component, u, TransportMode::importance);
         if (!sample) {
             continue;
         }
-        const auto wi = sample->direction;
-        const double f = double(.6F) / pi;
-        const auto expected = glm::dvec3(f * glm::dot(ns, wo) * glm::dot(ng, wi) /
-                                         glm::dot(ng, wo) / sample->probability);
+        const auto   wi       = sample->direction;
+        const double f        = double(.6F) / pi;
+        const auto   expected = glm::dvec3(f * glm::dot(ns, wo) * glm::dot(ng, wi) /
+                                           glm::dot(ng, wo) / sample->probability);
         REQUIRE(glm::length(sample->weight - expected) < 1e-9);
         REQUIRE(glm::length(surface.gather(wi) * glm::dot(ng, wi) - surface.response(wi)) < 1e-12);
         ++checked;
@@ -377,9 +383,9 @@ TEST_CASE("SPPM background task shares previews pause rollback resume and cancel
           "[sppm][session]") {
     const auto snapshot = make_snapshot(
         load_scene(std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/cornell-box.json"));
-    auto config = options();
+    auto                 config = options();
     const RenderSettings film{8, 8, 4, 101};
-    SppmIntegrator reference(snapshot, film, config, 2);
+    SppmIntegrator       reference(snapshot, film, config, 2);
     for (int i = 0; i < 4; ++i) {
         reference.advance();
     }

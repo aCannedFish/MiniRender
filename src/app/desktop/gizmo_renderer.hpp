@@ -21,11 +21,12 @@ class GizmoRenderer {
         glm::vec2 position{0};
         glm::vec4 color{1};
     };
+
     void triangle(glm::dvec2 a, glm::dvec2 b, glm::dvec2 c, glm::vec4 color, glm::dvec2 size);
     void stroke(glm::dvec2 a, glm::dvec2 b, double width, glm::vec4 color, glm::dvec2 size);
-    VkDevice device_ = VK_NULL_HANDLE;
-    VkPipelineLayout layout_ = VK_NULL_HANDLE;
-    VkPipeline pipeline_ = VK_NULL_HANDLE;
-    GpuBuffer buffer_;
+    VkDevice            device_   = VK_NULL_HANDLE;
+    VkPipelineLayout    layout_   = VK_NULL_HANDLE;
+    VkPipeline          pipeline_ = VK_NULL_HANDLE;
+    GpuBuffer           buffer_;
     std::vector<Vertex> vertices_;
 };

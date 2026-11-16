@@ -38,48 +38,54 @@ void require(bool condition, const char* message) {
         throw std::runtime_error(message);
     }
 }
+
 template <class T> T* control(Workbench& window, const char* name) {
     auto* result = window.findChild<T*>(name);
     require(result, "Cloth playback control is missing");
     return result;
 }
+
 void click(Workbench& window, const char* name) {
     auto* button = control<QPushButton>(window, name);
     require(button->isEnabled(), "Cloth playback button is disabled");
     button->click();
 }
+
 const SceneObject& object(Workbench& window, const std::string& id = "cloth") {
     const auto& objects = window.document().objects;
-    const auto found = std::find_if(objects.begin(), objects.end(),
-                                    [&](const auto& item) { return item.id == id; });
+    const auto  found   = std::find_if(objects.begin(), objects.end(),
+                                       [&](const auto& item) { return item.id == id; });
     require(found != objects.end(), "Cloth test object is missing");
     return *found;
 }
+
 const std::shared_ptr<const ClothComponent>& component(Workbench& window) {
     const auto& result = object(window).cloth;
     require(result != nullptr, "Cloth test component is missing");
     return result;
 }
+
 void mouse(VulkanViewport& viewport, QEvent::Type type, glm::dvec2 point, Qt::MouseButton button,
            Qt::MouseButtons buttons) {
     const QPointF local(point.x, point.y);
-    QMouseEvent event(type, local, viewport.mapToGlobal(local), button, buttons, Qt::NoModifier);
+    QMouseEvent   event(type, local, viewport.mapToGlobal(local), button, buttons, Qt::NoModifier);
     QCoreApplication::sendEvent(&viewport, &event);
 }
 
 // 根据实际屏幕布局选取手柄，拖动通过真实鼠标事件进入 Workbench 的事务流程。
 struct Gesture {
-    Transform original;
+    Transform  original;
     glm::dvec2 start{0}, end{0};
 };
+
 Gesture begin_gesture(Workbench& window, GizmoMode mode) {
     auto& viewport = *window.viewport();
     window.select_object("cloth");
     viewport.set_gizmo_mode(mode);
-    const auto& layout = viewport.gizmo_layout();
-    const auto original = object(window).transform;
-    const auto forward = glm::normalize(glm::dvec3(viewport.camera().target) -
-                                        glm::dvec3(viewport.camera().position));
+    const auto& layout   = viewport.gizmo_layout();
+    const auto  original = object(window).transform;
+    const auto  forward  = glm::normalize(glm::dvec3(viewport.camera().target) -
+                                          glm::dvec3(viewport.camera().position));
     for (const auto& segment : layout.segments) {
         const auto start = segment.a * .35 + segment.b * .65;
         if (segment.handle == GizmoHandle::none || layout.hit(start).handle != segment.handle) {
@@ -102,7 +108,7 @@ Gesture begin_gesture(Workbench& window, GizmoMode mode) {
             const auto rotated =
                 glm::dvec3(glm::rotate(glm::dmat4(1), .25, axis) * glm::dvec4(radial, 0));
             const GizmoView view{viewport.camera(), {viewport.width(), viewport.height()}};
-            const auto projected = view.project(layout.pivot + rotated);
+            const auto      projected = view.project(layout.pivot + rotated);
             require(projected.has_value(), "Rotation endpoint is outside the viewport");
             end = *projected;
         }
@@ -114,6 +120,7 @@ Gesture begin_gesture(Workbench& window, GizmoMode mode) {
     }
     throw std::runtime_error("No cloth gizmo handle is selectable");
 }
+
 void finish_gesture(Workbench& window, const Gesture& gesture, GizmoMode mode) {
     auto& viewport = *window.viewport();
     mouse(viewport, QEvent::MouseMove, gesture.end, Qt::NoButton, Qt::LeftButton);
@@ -129,7 +136,7 @@ void finish_gesture(Workbench& window, const Gesture& gesture, GizmoMode mode) {
 void verify_layout(Workbench& window, const QString& directory) {
     auto* tabs = window.panels();
     tabs->setCurrentIndex(9);
-    auto* area = qobject_cast<QScrollArea*>(tabs->currentWidget());
+    auto* area  = qobject_cast<QScrollArea*>(tabs->currentWidget());
     auto* panel = control<QWidget>(window, "cloth_panel");
     require(area, "Cloth panel has no scroll area");
     for (const auto size : {QSize(1200, 800), QSize(960, 700)}) {
@@ -145,7 +152,7 @@ void verify_layout(Workbench& window, const QString& directory) {
         auto* form = qobject_cast<QFormLayout*>(panel->layout());
         require(form, "Cloth form layout is missing");
         std::vector<QWidget*> fields;
-        QWidget* bottom = nullptr;
+        QWidget*              bottom = nullptr;
         for (int i = 0; i < form->count(); ++i) {
             auto* field = form->itemAt(i)->widget();
             if (!field || !field->isVisibleTo(panel) || field->height() == 0) {
@@ -208,23 +215,25 @@ enum class Stage {
     shutdown_ready,
     shutdown
 };
+
 struct State {
-    Stage stage = Stage::setup;
-    int ticks = 0, gpu_frame = 0;
-    std::uint64_t frame = 0;
-    Gesture gesture;
+    Stage                                 stage = Stage::setup;
+    int                                   ticks = 0, gpu_frame = 0;
+    std::uint64_t                         frame = 0;
+    Gesture                               gesture;
     std::shared_ptr<const ClothComponent> expected, preserved;
-    std::shared_ptr<const SceneSnapshot> snapshot;
-    std::shared_ptr<const MeshData> static_mesh;
-    std::string copy_id;
-    SceneUploadStatistics uploads;
-    QElapsedTimer cancellation;
-    UiResponseProbe* probe = nullptr;
+    std::shared_ptr<const SceneSnapshot>  snapshot;
+    std::shared_ptr<const MeshData>       static_mesh;
+    std::string                           copy_id;
+    SceneUploadStatistics                 uploads;
+    QElapsedTimer                         cancellation;
+    UiResponseProbe*                      probe = nullptr;
 };
+
 void expect_step(Workbench& window, State& state) {
     state.probe->verify([&] {
-        const auto& source = object(window);
-        auto simulation = make_cloth_simulation(
+        const auto& source     = object(window);
+        auto        simulation = make_cloth_simulation(
             *source.cloth, source.transform,
             cloth_environment(*source.cloth->definition(), window.document()));
         simulation->advance();
@@ -233,13 +242,15 @@ void expect_step(Workbench& window, State& state) {
                 .component;
     });
 }
+
 void verify_step(Workbench& window, State& state) {
-    const auto& actual = component(window)->state();
+    const auto& actual   = component(window)->state();
     const auto& expected = state.expected->state();
     require(actual.frame == expected.frame && actual.positions == expected.positions &&
                 actual.velocities == expected.velocities,
             "Edited simulation differs from independently restored world-space step");
 }
+
 void heavy_parameters(Workbench& window) {
     window.panels()->setCurrentIndex(9);
     control<QSpinBox>(window, "cloth_columns")->setValue(128);
@@ -247,6 +258,7 @@ void heavy_parameters(Workbench& window) {
     control<QSpinBox>(window, "cloth_substeps")->setValue(4096);
     click(window, "cloth_apply");
 }
+
 bool advancing(const ClothRuntimeStatus& status) {
     return status.busy && status.stage == "推进子步" && status.completed > 0 &&
            status.completed < status.total;
@@ -255,16 +267,16 @@ bool advancing(const ClothRuntimeStatus& status) {
 
 void start_cloth_playback_deep_smoke(Workbench& window, const QString& directory,
                                      bool enforce_response) {
-    auto state = std::make_shared<State>();
+    auto state   = std::make_shared<State>();
     state->probe = new UiResponseProbe(&window, "Simulation editing");
-    auto* timer = new QTimer(&window);
+    auto* timer  = new QTimer(&window);
     timer->setInterval(50);
     QObject::connect(
         timer, &QTimer::timeout, &window, [state, timer, &window, directory, enforce_response] {
             try {
-                auto* controller = window.cloth_controller();
-                auto* viewport = window.viewport();
-                const auto status = controller->status();
+                auto*      controller = window.cloth_controller();
+                auto*      viewport   = window.viewport();
+                const auto status     = controller->status();
                 require(++state->ticks < 3500 && viewport->failure().isEmpty(),
                         "Cloth editing regression timed out");
                 require(!status.failed, status.message.toStdString().c_str());
@@ -272,7 +284,7 @@ void start_cloth_playback_deep_smoke(Workbench& window, const QString& directory
                     return;
                 }
                 const auto next = [&] {
-                    state->stage = static_cast<Stage>(static_cast<int>(state->stage) + 1);
+                    state->stage     = static_cast<Stage>(static_cast<int>(state->stage) + 1);
                     state->gpu_frame = viewport->rendered_frames();
                     qInfo() << "Simulation stage" << static_cast<int>(state->stage);
                 };
@@ -297,7 +309,7 @@ void start_cloth_playback_deep_smoke(Workbench& window, const QString& directory
                     if (component(window)->state().frame < state->frame + 3) {
                         return;
                     }
-                    state->gesture = begin_gesture(window, GizmoMode::translate);
+                    state->gesture   = begin_gesture(window, GizmoMode::translate);
                     state->preserved = component(window);
                     next();
                     return;
@@ -373,7 +385,7 @@ void start_cloth_playback_deep_smoke(Workbench& window, const QString& directory
                     state->probe->verify([&] {
                         const auto reference = PathTracer(state->snapshot, {.maximum_depth = 4})
                                                    .render({16, 16, 8, 101});
-                        const auto actual = window.offline_panel()->session().result();
+                        const auto actual    = window.offline_panel()->session().result();
                         require(actual != nullptr, "Cloth offline result is missing");
                         for (std::size_t y = 0; y < 16; ++y) {
                             for (std::size_t x = 0; x < 16; ++x) {
@@ -480,7 +492,7 @@ void start_cloth_playback_deep_smoke(Workbench& window, const QString& directory
                             "Moved sphere produced no cloth contact");
                     const auto environment =
                         cloth_environment(*component(window)->definition(), window.document());
-                    const auto& sphere = environment.spheres.at(0);
+                    const auto&      sphere = environment.spheres.at(0);
                     const glm::dmat4 matrix(object(window).transform.matrix());
                     for (const auto position : component(window)->state().positions) {
                         const auto world = glm::dvec3(matrix * glm::dvec4(position, 1));
@@ -500,7 +512,7 @@ void start_cloth_playback_deep_smoke(Workbench& window, const QString& directory
                     require(!object(window, state->copy_id).cloth,
                             "Target selection froze the wrong component");
                     state->static_mesh = component(window)->mesh();
-                    state->uploads = viewport->upload_statistics();
+                    state->uploads     = viewport->upload_statistics();
                     // 先等待 duplicate/freeze 的场景上传，再记录实际分配计数。
                     next();
                     return;

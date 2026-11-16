@@ -8,15 +8,17 @@
 #include <locale>
 
 using namespace minirender;
+
 namespace {
 IntegratorSettings options(std::uint32_t photons = 40000) {
     IntegratorSettings settings;
-    settings.kind = IntegratorKind::sppm;
-    settings.maximum_depth = 8;
+    settings.kind                       = IntegratorKind::sppm;
+    settings.maximum_depth              = 8;
     settings.sppm.photons_per_iteration = photons;
-    settings.sppm.initial_radius = .12;
+    settings.sppm.initial_radius        = .12;
     return settings;
 }
+
 // 使用同一后台接口报告相机、哈希、光子与统计阶段，主线程不执行路径循环。
 std::shared_ptr<const Image> render(const SceneDocument& scene, RenderSettings film,
                                     IntegratorSettings settings, const std::string& label) {
@@ -49,6 +51,7 @@ std::shared_ptr<const Image> render(const SceneDocument& scene, RenderSettings f
     std::cout << " seconds=" << p.elapsed_seconds << '\n' << std::flush;
     return task.result();
 }
+
 double error(const Image& a, const Image& b) {
     double sum = 0;
     for (std::size_t y = 0; y < a.height(); ++y) {
@@ -59,6 +62,7 @@ double error(const Image& a, const Image& b) {
     }
     return std::sqrt(sum / double(3 * a.width() * a.height()));
 }
+
 void example(const SceneDocument& scene, const std::filesystem::path& output,
              const std::string& name) {
     const auto file = output / (name + ".json");
@@ -78,24 +82,24 @@ void example(const SceneDocument& scene, const std::filesystem::path& output,
 
 int main() {
     try {
-        const auto root = std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes";
+        const auto root   = std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes";
         const auto output = std::filesystem::current_path() / "outputs/a7.3";
         std::filesystem::create_directories(output);
         auto glass = load_scene(root / "cornell-materials.json");
         example(glass, output, "glass-caustic");
         for (auto& material : glass.materials) {
             if (material.id == "mat_back") {
-                material.kind = MaterialKind::mirror;
+                material.kind       = MaterialKind::mirror;
                 material.base_color = glm::vec3(.95F);
             }
         }
-        glass.camera.position = {-.43F, 1.5F, 2.4F};
-        glass.camera.target = {-.43F, .45F, -1};
+        glass.camera.position             = {-.43F, 1.5F, 2.4F};
+        glass.camera.target               = {-.43F, .45F, -1};
         glass.camera.vertical_fov_degrees = 35;
         example(glass, output, "mirror-caustic");
-        const auto diffuse = load_scene(root / "cornell-box.json");
+        const auto         diffuse = load_scene(root / "cornell-box.json");
         IntegratorSettings pt;
-        pt.maximum_depth = 8;
+        pt.maximum_depth     = 8;
         const auto reference = render(diffuse, {32, 32, 4096, 909}, pt, "PT-reference");
         reference->write_exr(output / "pt-reference.exr");
         display_image(*reference).write_png(output / "pt-reference.png");

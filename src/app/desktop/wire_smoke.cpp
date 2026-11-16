@@ -24,16 +24,16 @@ void require(bool condition, const char* message) {
 // 前方正方形遮挡后方三角形的中段，三角形顶部仍可见。
 // 采样位置来自世界空间几何，与线段光栅化实现无关。
 void prepare_scene(Workbench& window, const QString& directory) {
-    const auto path = std::filesystem::path(directory.toStdU16String());
+    const auto path  = std::filesystem::path(directory.toStdU16String());
     const auto front = path / "front.obj";
-    const auto back = path / "back.obj";
+    const auto back  = path / "back.obj";
     std::ofstream(front) << "v -0.8 -0.8 0\nv 0.8 -0.8 0\nv 0.8 0.8 0\nv -0.8 0.8 0\n"
                             "f 1 2 3\nf 1 3 4\n";
     std::ofstream(back) << "v -1.2 -1.4 -0.8\nv 1.2 -1.4 -0.8\nv 0 1.4 -0.8\nf 1 2 3\n";
     minirender::SceneDocument scene;
     scene.camera.position = {0, 0, 4};
-    scene.camera.target = {0, 0, 0};
-    scene.environment = glm::vec3(0);
+    scene.camera.target   = {0, 0, 0};
+    scene.environment     = glm::vec3(0);
     scene.materials.push_back({"test", "test"});
     scene.materials[0].emission = {3, 1, 0.5F};
     scene.meshes.push_back(
@@ -51,10 +51,10 @@ void prepare_scene(Workbench& window, const QString& directory) {
 void verify_edges(Workbench& window, const QImage& image) {
     const auto& camera = window.viewport()->camera();
     const float aspect = static_cast<float>(image.width()) / static_cast<float>(image.height());
-    const auto matrix = camera.projection_matrix(aspect) * camera.view_matrix();
-    const auto sample = [&](glm::vec3 point, bool visible, const char* object) {
-        const auto clip = matrix * glm::vec4(point, 1);
-        const glm::vec2 uv = glm::vec2(clip) / clip.w * 0.5F + 0.5F;
+    const auto  matrix = camera.projection_matrix(aspect) * camera.view_matrix();
+    const auto  sample = [&](glm::vec3 point, bool visible, const char* object) {
+        const auto      clip = matrix * glm::vec4(point, 1);
+        const glm::vec2 uv   = glm::vec2(clip) / clip.w * 0.5F + 0.5F;
         // CPU 查询略向几何内部移动，避免精确边界的浮点舍入导致漏交。
         // 光栅像素检查仍投影原始边线位置。
         const auto inside = uv * 0.9999F + glm::vec2(0.00005F);
@@ -63,7 +63,7 @@ void verify_edges(Workbench& window, const QImage& image) {
         require(picked && *picked == object, "Wire probe has unexpected CPU occlusion");
         const QPoint pixel(static_cast<int>(uv.x * static_cast<float>(image.width())),
                            static_cast<int>(uv.y * static_cast<float>(image.height())));
-        bool white = false;
+        bool         white = false;
         for (int y = -3; y <= 3; ++y) {
             for (int x = -3; x <= 3; ++x) {
                 require(image.rect().contains(pixel + QPoint(x, y)), "Wire probe is outside image");
@@ -84,11 +84,11 @@ void verify_edges(Workbench& window, const QImage& image) {
 }
 
 struct State {
-    int step = 0;
-    int ticks = 0;
-    int generation = 0;
+    int                              step       = 0;
+    int                              ticks      = 0;
+    int                              generation = 0;
     std::optional<minirender::Image> hdr;
-    SceneUploadStatistics uploads;
+    SceneUploadStatistics            uploads;
 };
 
 } // namespace
@@ -96,7 +96,7 @@ struct State {
 void start_wire_smoke(Workbench& window, const QString& directory) {
     require(QDir().mkpath(directory), "Cannot create wire output directory");
     const auto state = std::make_shared<State>();
-    auto* timer = new QTimer(&window);
+    auto*      timer = new QTimer(&window);
     timer->setInterval(150);
     QObject::connect(timer, &QTimer::timeout, &window, [state, timer, &window, directory] {
         try {
@@ -120,7 +120,7 @@ void start_wire_smoke(Workbench& window, const QString& directory) {
                 prepare_scene(window, directory);
                 break;
             case 1:
-                state->hdr = viewport->grab_hdr();
+                state->hdr     = viewport->grab_hdr();
                 state->uploads = viewport->upload_statistics();
                 window.findChild<QComboBox*>("view_mode")->setCurrentIndex(3);
                 break;

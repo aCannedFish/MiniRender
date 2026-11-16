@@ -35,6 +35,7 @@ QDoubleSpinBox* scalar(QWidget* parent, const QString& name, double low, double 
     spin->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     return spin;
 }
+
 QFormLayout* form(QWidget* widget) {
     auto* result = new QFormLayout(widget);
     result->setContentsMargins(0, 0, 0, 0);
@@ -43,9 +44,10 @@ QFormLayout* form(QWidget* widget) {
     result->setRowWrapPolicy(QFormLayout::WrapLongRows);
     return result;
 }
+
 QWidget* buttons(QWidget* parent, std::initializer_list<QPushButton*> values) {
     auto* widget = new QWidget(parent);
-    auto* row = new QHBoxLayout(widget);
+    auto* row    = new QHBoxLayout(widget);
     row->setContentsMargins(0, 0, 0, 0);
     row->setSpacing(6);
     for (auto* button : values) {
@@ -66,7 +68,7 @@ class SdfVectorField final : public QWidget {
         row->setSpacing(6);
         for (std::size_t i = 0; i < values_.size(); ++i) {
             const auto axis = QString(QChar('x' + static_cast<char>(i)));
-            values_[i] = scalar(this, name + '.' + axis, low, high, step);
+            values_[i]      = scalar(this, name + '.' + axis, low, high, step);
             values_[i]->setPrefix(axis + ' ');
             row->addWidget(values_[i], 1);
             connect(values_[i], &QDoubleSpinBox::valueChanged, this, [this, i] {
@@ -76,20 +78,24 @@ class SdfVectorField final : public QWidget {
             });
         }
     }
+
     glm::vec3 value() const {
         return {float(values_[0]->value()), float(values_[1]->value()), float(values_[2]->value())};
     }
+
     void set(glm::vec3 value) {
         for (int i = 0; i < 3; ++i) {
             const QSignalBlocker blocker(values_[std::size_t(i)]);
             values_[std::size_t(i)]->setValue(value[i]);
         }
     }
+
     void components(int count) {
         for (int i = 0; i < 3; ++i) {
             values_[std::size_t(i)]->setVisible(i < count);
         }
     }
+
     std::function<void(int)> changed;
 
   private:
@@ -134,14 +140,14 @@ void SdfPanel::build_document_controls(QFormLayout* layout) {
         commit(minirender::make_sdf_example(), true, true);
         viewport_.set_sdf_visible(true);
     });
-    auto* open = button("打开", "sdf_open", [this] {
+    auto* open    = button("打开", "sdf_open", [this] {
         const auto path =
             QFileDialog::getOpenFileName(this, "打开距离场", {}, "SDF (*.sdf.json *.json)");
         if (!path.isEmpty()) {
             invoke([&] { load_file(path); });
         }
     });
-    auto* save = button("保存", "sdf_save", [this] {
+    auto* save    = button("保存", "sdf_save", [this] {
         const auto path =
             QFileDialog::getSaveFileName(this, "保存距离场", "scene.sdf.json", "SDF (*.sdf.json)");
         if (!path.isEmpty()) {
@@ -238,13 +244,13 @@ void SdfPanel::build_node_controls(QFormLayout* layout) {
     remove_ = button("删除未引用节点", "sdf_remove", [this] { invoke([&] { remove_node(); }); });
     layout->addRow(remove_);
 
-    primitive_ = new QWidget(this);
+    primitive_     = new QWidget(this);
     auto* geometry = form(primitive_);
-    parameters_ = new SdfVectorField(primitive_, "sdf_parameters", 0, 1e6);
-    position_ = new SdfVectorField(primitive_, "sdf_position", -1e6, 1e6);
-    rotation_ = new SdfVectorField(primitive_, "sdf_rotation", -3600, 3600, 5);
-    color_ = new SdfVectorField(primitive_, "sdf_color", 0, 1, .05);
-    scale_ = scalar(primitive_, "sdf_scale", .000001, 1e6, .1, 6);
+    parameters_    = new SdfVectorField(primitive_, "sdf_parameters", 0, 1e6);
+    position_      = new SdfVectorField(primitive_, "sdf_position", -1e6, 1e6);
+    rotation_      = new SdfVectorField(primitive_, "sdf_rotation", -3600, 3600, 5);
+    color_         = new SdfVectorField(primitive_, "sdf_color", 0, 1, .05);
+    scale_         = scalar(primitive_, "sdf_scale", .000001, 1e6, .1, 6);
     geometry->addRow("半径 / 半长", parameters_);
     geometry->addRow("位置", position_);
     geometry->addRow("旋转 °", rotation_);
@@ -271,9 +277,9 @@ void SdfPanel::build_node_controls(QFormLayout* layout) {
         }
     });
     layout->addRow(primitive_);
-    operation_ = new QWidget(this);
+    operation_      = new QWidget(this);
     auto* operation = form(operation_);
-    left_ = new QComboBox(operation_);
+    left_           = new QComboBox(operation_);
     left_->setObjectName("sdf_left");
     right_ = new QComboBox(operation_);
     right_->setObjectName("sdf_right");
@@ -283,7 +289,7 @@ void SdfPanel::build_node_controls(QFormLayout* layout) {
         if (!refreshing_) {
             edit([&](auto& doc) {
                 auto& node = doc.nodes[selected_index()];
-                node.left = std::uint32_t(left_->currentIndex());
+                node.left  = std::uint32_t(left_->currentIndex());
                 node.right = std::uint32_t(right_->currentIndex());
             });
         }
@@ -294,10 +300,10 @@ void SdfPanel::build_node_controls(QFormLayout* layout) {
 }
 
 void SdfPanel::build_render_controls(QFormLayout* layout) {
-    light_ = new SdfVectorField(this, "sdf_light_direction", -1000, 1000);
+    light_       = new SdfVectorField(this, "sdf_light_direction", -1000, 1000);
     light_color_ = new SdfVectorField(this, "sdf_light_color", 0, 100, .05);
-    ambient_ = new SdfVectorField(this, "sdf_ambient", 0, 100, .01);
-    intensity_ = scalar(this, "sdf_light_intensity", 0, 1000);
+    ambient_     = new SdfVectorField(this, "sdf_ambient", 0, 100, .01);
+    intensity_   = scalar(this, "sdf_light_intensity", 0, 1000);
     layout->addRow("光方向", light_);
     layout->addRow("光颜色", light_color_);
     layout->addRow("强度", intensity_);
@@ -330,11 +336,11 @@ void SdfPanel::build_render_controls(QFormLayout* layout) {
     shadow_steps_->setObjectName("sdf_shadow_steps");
     shadow_steps_->setRange(1, 1024);
     shadow_steps_->setKeyboardTracking(false);
-    epsilon_ = scalar(this, "sdf_epsilon", 1e-7, .1, .0001, 7);
+    epsilon_  = scalar(this, "sdf_epsilon", 1e-7, .1, .0001, 7);
     relative_ = scalar(this, "sdf_relative_epsilon", 0, .01, .00001, 7);
-    normal_ = scalar(this, "sdf_normal_step", 1e-6, .1, .0001, 6);
+    normal_   = scalar(this, "sdf_normal_step", 1e-6, .1, .0001, 6);
     distance_ = scalar(this, "sdf_maximum_distance", .001, 1e6, 1);
-    safety_ = scalar(this, "sdf_safety", .1, 1, .05);
+    safety_   = scalar(this, "sdf_safety", .1, 1, .05);
     layout->addRow("最大步数", steps_);
     layout->addRow("阴影步数", shadow_steps_);
     layout->addRow("绝对容差 m", epsilon_);
@@ -370,9 +376,11 @@ void SdfPanel::build_render_controls(QFormLayout* layout) {
 const minirender::SdfDocument& SdfPanel::document() const noexcept {
     return document_;
 }
+
 std::uint32_t SdfPanel::selected_index() const {
     return std::uint32_t(std::max(0, nodes_->currentIndex()));
 }
+
 std::string SdfPanel::new_id(const minirender::SdfDocument& document) const {
     for (std::uint32_t index = 1;; ++index) {
         auto id = "sdf-" + std::to_string(index);
@@ -382,10 +390,12 @@ std::string SdfPanel::new_id(const minirender::SdfDocument& document) const {
         }
     }
 }
+
 void SdfPanel::publish(bool reset_camera) {
     viewport_.set_sdf_document(std::make_shared<const minirender::SdfDocument>(document_),
                                reset_camera);
 }
+
 void SdfPanel::commit(minirender::SdfDocument next, bool reset_camera, bool rebuild_list) {
     next.validate();
     undo_.push_back(document_);
@@ -398,6 +408,7 @@ void SdfPanel::commit(minirender::SdfDocument next, bool reset_camera, bool rebu
     refresh(rebuild_list);
     notice_->clear();
 }
+
 void SdfPanel::edit(const std::function<void(minirender::SdfDocument&)>& work, bool rebuild_list) {
     try {
         auto next = document_;
@@ -408,8 +419,9 @@ void SdfPanel::edit(const std::function<void(minirender::SdfDocument&)>& work, b
         notice_->setText(QString::fromUtf8(error.what()));
     }
 }
+
 void SdfPanel::refresh(bool rebuild_list) {
-    refreshing_ = true;
+    refreshing_   = true;
     auto selected = std::min(selected_index(), std::uint32_t(document_.nodes.size() - 1));
     if (rebuild_list) {
         for (auto* combo : {nodes_, root_, left_, right_}) {
@@ -454,11 +466,12 @@ void SdfPanel::refresh(bool rebuild_list) {
     redo_button_->setEnabled(!redo_.empty());
     refreshing_ = false;
 }
+
 void SdfPanel::append_primitive(minirender::SdfKind kind) {
     edit(
         [&](auto& doc) {
             minirender::SdfNode node;
-            node.id = new_id(doc);
+            node.id   = new_id(doc);
             node.name = minirender::sdf_kind_name(kind);
             node.kind = kind;
             node.parameters =
@@ -469,15 +482,16 @@ void SdfPanel::append_primitive(minirender::SdfKind kind) {
         true);
     nodes_->setCurrentIndex(int(document_.nodes.size() - 1));
 }
+
 void SdfPanel::combine(minirender::SdfKind kind) {
     const auto right = selected_index();
     edit(
         [&](auto& doc) {
             minirender::SdfNode node;
-            node.id = new_id(doc);
-            node.name = minirender::sdf_kind_name(kind);
-            node.kind = kind;
-            node.left = doc.root;
+            node.id    = new_id(doc);
+            node.name  = minirender::sdf_kind_name(kind);
+            node.kind  = kind;
+            node.left  = doc.root;
             node.right = right;
             doc.nodes.push_back(std::move(node));
             doc.root = std::uint32_t(doc.nodes.size() - 1);
@@ -485,6 +499,7 @@ void SdfPanel::combine(minirender::SdfKind kind) {
         true);
     nodes_->setCurrentIndex(int(document_.root));
 }
+
 void SdfPanel::remove_node() {
     const auto index = selected_index();
     if (index == document_.root ||
@@ -509,8 +524,9 @@ void SdfPanel::remove_node() {
         },
         true);
 }
+
 void SdfPanel::restore_history(bool redo) {
-    auto& source = redo ? redo_ : undo_;
+    auto& source      = redo ? redo_ : undo_;
     auto& destination = redo ? undo_ : redo_;
     if (source.empty()) {
         return;
@@ -522,14 +538,16 @@ void SdfPanel::restore_history(bool redo) {
     refresh(true);
     notice_->clear();
 }
+
 void SdfPanel::load_file(const QString& path) {
     commit(minirender::load_sdf(std::filesystem::path(path.toStdU16String())), true, true);
     viewport_.set_sdf_visible(true);
     notice_->setText("已打开独立距离场文档。");
 }
+
 void SdfPanel::save_file(const QString& path) {
-    auto snapshot = document_;
-    snapshot.camera = viewport_.sdf_camera();
+    auto snapshot          = document_;
+    snapshot.camera        = viewport_.sdf_camera();
     const auto destination = std::filesystem::path(path.toStdU16String());
     if (std::filesystem::exists(destination)) {
         (void)minirender::load_sdf(destination);

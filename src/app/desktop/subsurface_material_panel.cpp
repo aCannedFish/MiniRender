@@ -21,6 +21,7 @@ class Scalar final : public QDoubleSpinBox {
         return locale().toString(value, 'g', QLocale::FloatingPointShortest);
     }
 };
+
 QDoubleSpinBox* scalar(QWidget* parent, const QString& name, double low, double high, double step) {
     auto* field = new Scalar(parent);
     field->setObjectName(name);
@@ -33,6 +34,7 @@ QDoubleSpinBox* scalar(QWidget* parent, const QString& name, double low, double 
     field->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     return field;
 }
+
 void display(QDoubleSpinBox* field, double value) {
     const QSignalBlocker blocker(field);
     field->setValue(value);
@@ -59,7 +61,7 @@ SubsurfaceMaterialPanel::SubsurfaceMaterialPanel(QWidget* parent) : QWidget(pare
     preset_->addItem("蜡（示例）", "wax");
     auto* preset_button = new QPushButton("使用预置", this);
     preset_button->setObjectName("subsurface_apply_preset");
-    auto* preset_row = new QWidget(this);
+    auto* preset_row    = new QWidget(this);
     auto* preset_layout = new QHBoxLayout(preset_row);
     preset_layout->setContentsMargins(0, 0, 0, 0);
     preset_layout->addWidget(preset_, 1);
@@ -83,7 +85,7 @@ SubsurfaceMaterialPanel::SubsurfaceMaterialPanel(QWidget* parent) : QWidget(pare
     apply_->setObjectName("subsurface_apply");
     restore_ = new QPushButton("恢复草稿", this);
     restore_->setObjectName("subsurface_restore");
-    auto* buttons = new QWidget(this);
+    auto* buttons       = new QWidget(this);
     auto* button_layout = new QHBoxLayout(buttons);
     button_layout->setContentsMargins(0, 0, 0, 0);
     button_layout->addWidget(apply_);
@@ -124,16 +126,17 @@ SubsurfaceMaterialPanel::SubsurfaceMaterialPanel(QWidget* parent) : QWidget(pare
     timer->start();
     set_material(nullptr, 0);
 }
-QWidget* SubsurfaceMaterialPanel::vector_field(const char* name,
+
+QWidget* SubsurfaceMaterialPanel::vector_field(const char*                     name,
                                                std::array<QDoubleSpinBox*, 3>& fields,
-                                               bool absorption) {
-    auto* row = new QWidget(this);
+                                               bool                            absorption) {
+    auto* row    = new QWidget(this);
     auto* layout = new QHBoxLayout(row);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(4);
     for (int c = 0; c < 3; ++c) {
         layout->addWidget(new QLabel(QString("RGB").mid(c, 1), row));
-        auto* field = scalar(row, QString("%1.%2").arg(name).arg(c), 0, 1e6, 1);
+        auto* field            = scalar(row, QString("%1.%2").arg(name).arg(c), 0, 1e6, 1);
         fields[std::size_t(c)] = field;
         layout->addWidget(field, 1);
         connect(field, &QDoubleSpinBox::valueChanged, this, [this, c, absorption](double value) {
@@ -147,8 +150,9 @@ QWidget* SubsurfaceMaterialPanel::vector_field(const char* name,
     row->setMinimumWidth(layout->minimumSize().width());
     return row;
 }
+
 void SubsurfaceMaterialPanel::set_material(const minirender::Material* material,
-                                           std::uint64_t generation) {
+                                           std::uint64_t               generation) {
     const bool valid = material && material->kind == minirender::MaterialKind::subsurface;
     setVisible(valid);
     if (!valid) {
@@ -161,15 +165,17 @@ void SubsurfaceMaterialPanel::set_material(const minirender::Material* material,
     if (!source_ || material_id_ != material->id || generation_ != generation ||
         *source_ != source) {
         material_id_ = material->id;
-        generation_ = generation;
+        generation_  = generation;
         source_ = draft_ = source;
         error_.clear();
         refresh_fields();
     }
 }
+
 bool SubsurfaceMaterialPanel::dirty() const {
     return source_ && draft_ && *source_ != *draft_;
 }
+
 void SubsurfaceMaterialPanel::refresh_fields() {
     if (!draft_) {
         return;
@@ -181,9 +187,10 @@ void SubsurfaceMaterialPanel::refresh_fields() {
     display(density_, draft_->density);
     update_buttons();
 }
+
 void SubsurfaceMaterialPanel::update_buttons() {
     const bool active = render_active && render_active();
-    viewing_task_ = active;
+    viewing_task_     = active;
     apply_->setEnabled(dirty());
     restore_->setEnabled(dirty());
     render_->setEnabled(draft_.has_value() && (active || !dirty()));
@@ -192,6 +199,7 @@ void SubsurfaceMaterialPanel::update_buttons() {
                      : dirty()         ? "草稿尚未应用，离线渲染使用已提交参数。"
                                        : "");
 }
+
 void SubsurfaceMaterialPanel::apply() {
     try {
         draft_->validate();

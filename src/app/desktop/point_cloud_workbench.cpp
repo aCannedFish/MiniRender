@@ -15,13 +15,14 @@ using minirender::desktop::unique_id;
 
 // 所有读取都只查询对象与资产引用，原始顶点留在 worker 和不可变网格中。
 const minirender::SceneObject* object_for(const minirender::SceneDocument& scene,
-                                          const std::string& id) {
+                                          const std::string&               id) {
     const auto found = std::find_if(scene.objects.begin(), scene.objects.end(),
                                     [&](const auto& object) { return object.id == id; });
     return found == scene.objects.end() ? nullptr : &*found;
 }
+
 const minirender::MeshAsset* mesh_for(const minirender::SceneDocument& scene,
-                                      const minirender::SceneObject* object) {
+                                      const minirender::SceneObject*   object) {
     if (!object) {
         return nullptr;
     }
@@ -50,10 +51,10 @@ void Workbench::connect_point_panel() {
             invoke([&] { import_point_file(path); });
         }
     };
-    points_->on_sample = [this, invoke] { invoke([&] { sample_point_cloud(); }); };
-    points_->on_prepare = [this, invoke] { invoke([&] { prepare_point_cloud_normals(); }); };
+    points_->on_sample      = [this, invoke] { invoke([&] { sample_point_cloud(); }); };
+    points_->on_prepare     = [this, invoke] { invoke([&] { prepare_point_cloud_normals(); }); };
     points_->on_reconstruct = [this, invoke] { invoke([&] { reconstruct_point_cloud(); }); };
-    points_->on_export = [this, invoke] {
+    points_->on_export      = [this, invoke] {
         const auto path =
             QFileDialog::getSaveFileName(this, "导出当前点云", {}, "PLY point clouds (*.ply)");
         if (!path.isEmpty()) {
@@ -104,10 +105,10 @@ void Workbench::update_point_selection() {
 }
 
 void Workbench::import_point_file(const QString& path) {
-    const auto source = std::filesystem::path(path.toStdU16String());
-    const auto name = QFileInfo(path).completeBaseName().toStdString();
+    const auto source     = std::filesystem::path(path.toStdU16String());
+    const auto name       = QFileInfo(path).completeBaseName().toStdString();
     const auto generation = document_generation_;
-    const auto revision = points_->source_revision();
+    const auto revision   = points_->source_revision();
     begin_asset_task("正在读取点云…");
     try {
         geometry_tasks_->import_points(source, [this, source, name, generation,
@@ -134,18 +135,18 @@ void Workbench::import_point_file(const QString& path) {
 
 void Workbench::sample_point_cloud() {
     const auto& document = editor_.document();
-    const auto* object = object_for(document, selected_id_);
-    const auto* mesh = mesh_for(document, object);
+    const auto* object   = object_for(document, selected_id_);
+    const auto* mesh     = mesh_for(document, object);
     if (!mesh) {
         throw std::invalid_argument("请先选择要采样的网格物体。");
     }
     const auto source_mesh = mesh->data;
-    const auto target = object->id;
-    const auto name = object->name;
-    const auto generation = document_generation_;
-    const auto revision = points_->source_revision();
-    const auto count = points_->sample_count();
-    const auto seed = points_->sample_seed();
+    const auto target      = object->id;
+    const auto name        = object->name;
+    const auto generation  = document_generation_;
+    const auto revision    = points_->source_revision();
+    const auto count       = points_->sample_count();
+    const auto seed        = points_->sample_seed();
     begin_asset_task("正在采样表面点云…");
     try {
         geometry_tasks_->sample_points(
@@ -154,7 +155,7 @@ void Workbench::sample_point_cloud() {
                 if (!finish_geometry_task(result)) {
                     return true;
                 }
-                const auto& current = editor_.document();
+                const auto& current      = editor_.document();
                 const auto* current_mesh = mesh_for(current, object_for(current, target));
                 if (generation != document_generation_ || revision != points_->source_revision() ||
                     !current_mesh || current_mesh->data != source_mesh) {
@@ -182,7 +183,7 @@ void Workbench::prepare_point_cloud_normals() {
     }
     const auto parameters = points_->normal_parameters();
     const auto generation = document_generation_;
-    const auto revision = points_->source_revision();
+    const auto revision   = points_->source_revision();
     begin_asset_task("正在准备点云法线…");
     try {
         geometry_tasks_->prepare_points(
@@ -211,23 +212,23 @@ void Workbench::reconstruct_point_cloud() {
     if (!source.cloud) {
         throw std::invalid_argument("请先导入或采样点云。");
     }
-    auto input = points_->reconstruction_parameters();
-    const auto generation = document_generation_;
-    const auto revision = points_->source_revision();
-    const auto fit = points_->fit_new_object();
-    std::string expected_mesh_id;
+    auto                                        input      = points_->reconstruction_parameters();
+    const auto                                  generation = document_generation_;
+    const auto                                  revision   = points_->source_revision();
+    const auto                                  fit        = points_->fit_new_object();
+    std::string                                 expected_mesh_id;
     std::shared_ptr<const minirender::MeshData> expected_mesh;
-    const auto candidate_id = points_->target_id();
-    std::string target_id;
+    const auto                                  candidate_id = points_->target_id();
+    std::string                                 target_id;
     if (!source.object_id.empty() || object_for(editor_.document(), candidate_id)) {
         const auto& document = editor_.document();
-        const auto* mesh = mesh_for(document, object_for(document, candidate_id));
+        const auto* mesh     = mesh_for(document, object_for(document, candidate_id));
         if (!mesh || !points_->allows_mesh(mesh->data)) {
             throw std::invalid_argument("来源网格已改变，请重新采样。");
         }
         expected_mesh_id = mesh->id;
-        expected_mesh = mesh->data;
-        target_id = candidate_id;
+        expected_mesh    = mesh->data;
+        target_id        = candidate_id;
     }
     begin_asset_task("正在重建点云网格…");
     try {
@@ -264,17 +265,17 @@ void Workbench::reconstruct_point_cloud() {
                         } else {
                             const auto material = unique_id(scene.materials, "point_material_");
                             minirender::Material appearance;
-                            appearance.id = material;
-                            appearance.name = "点云材质";
+                            appearance.id         = material;
+                            appearance.name       = "点云材质";
                             appearance.base_color = {.32F, .58F, .72F};
                             scene.materials.push_back(appearance);
                             minirender::Transform transform;
                             if (fit) {
-                                const auto low = result.raster->minimum;
-                                const auto extent = result.raster->maximum - low;
-                                const float scale = 2 / std::max({extent.x, extent.y, extent.z});
-                                const auto center = low + extent * .5F;
-                                transform.scale = glm::vec3(scale);
+                                const auto  low    = result.raster->minimum;
+                                const auto  extent = result.raster->maximum - low;
+                                const float scale  = 2 / std::max({extent.x, extent.y, extent.z});
+                                const auto  center = low + extent * .5F;
+                                transform.scale    = glm::vec3(scale);
                                 transform.translation = {-center.x * scale, .03F - low.y * scale,
                                                          -center.z * scale};
                             }

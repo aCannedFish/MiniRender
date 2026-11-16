@@ -9,6 +9,7 @@ struct SymmetricEigen {
     glm::dvec3 values;
     glm::dmat3 vectors;
 };
+
 SymmetricEigen symmetric_eigen(glm::dmat3 matrix);
 
 } // namespace minirender::detail

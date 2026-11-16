@@ -13,9 +13,9 @@ namespace {
 float visibility(const SdfField& field, const SdfDocument& document, const SdfTraceResult& hit,
                  glm::dvec3 normal, CancellationToken cancellation) {
     const double epsilon = document.trace.epsilon + document.trace.relative_epsilon * hit.distance;
-    const Ray shadow{hit.position + normal * (4 * epsilon),
-                     -glm::normalize(glm::dvec3(document.light.direction))};
-    auto settings = document.trace;
+    const Ray    shadow{hit.position + normal * (4 * epsilon),
+                        -glm::normalize(glm::dvec3(document.light.direction))};
+    auto         settings  = document.trace;
     settings.maximum_steps = settings.shadow_steps;
     const auto result =
         trace_sdf(field, shadow, settings, 2 * epsilon, settings.maximum_distance, cancellation);
@@ -39,20 +39,20 @@ SdfRenderResult render_sdf(const SdfDocument& document, SdfRenderOptions options
          options.view != SdfView::depth && options.view != SdfView::steps)) {
         throw std::invalid_argument("Invalid SDF image dimensions or view");
     }
-    const SdfField field(document, cancellation);
+    const SdfField  field(document, cancellation);
     SdfRenderResult result{Image(options.width, options.height)};
-    const auto forward =
+    const auto      forward =
         glm::normalize(glm::dvec3(document.camera.target) - glm::dvec3(document.camera.position));
-    const auto toward_light = -glm::normalize(glm::dvec3(document.light.direction));
+    const auto   toward_light = -glm::normalize(glm::dvec3(document.light.direction));
     const double aspect = static_cast<double>(options.width) / static_cast<double>(options.height);
-    const auto count = options.width * options.height;
+    const auto   count  = options.width * options.height;
     if (progress) {
         progress(0, count);
     }
     for (std::size_t pixel = 0; pixel < count; ++pixel) {
         cancellation.check();
-        const auto x = pixel % options.width;
-        const auto y = pixel / options.width;
+        const auto x   = pixel % options.width;
+        const auto y   = pixel / options.width;
         const auto ray = document.camera.generate_ray(
             {(static_cast<double>(x) + .5) / static_cast<double>(options.width),
              (static_cast<double>(y) + .5) / static_cast<double>(options.height)},
@@ -72,7 +72,7 @@ SdfRenderResult render_sdf(const SdfDocument& document, SdfRenderOptions options
             if (options.view == SdfView::depth) {
                 // 与三角形预览保持相同的线性观察深度显示约定。
                 const double depth = hit.distance * glm::dot(ray.direction, forward);
-                color = glm::vec3(static_cast<float>(1 / (1 + depth)));
+                color              = glm::vec3(static_cast<float>(1 / (1 + depth)));
             } else {
                 glm::dvec3 normal;
                 try {

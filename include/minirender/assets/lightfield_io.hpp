@@ -22,13 +22,13 @@ class LightFieldFile final {
               LightFieldCallback progress = {}) const;
 
   private:
-    LightFieldFile() = default;
+    LightFieldFile()                      = default;
     LightFieldFile(const LightFieldFile&) = default;
     friend class LightFieldReader;
     friend struct detail::LightFieldAccess;
-    LightFieldCalibration calibration_;
-    std::filesystem::path path_;
-    std::uint64_t payload_offset_ = 0, file_bytes_ = 0, paths_ = 0;
+    LightFieldCalibration       calibration_;
+    std::filesystem::path       path_;
+    std::uint64_t               payload_offset_ = 0, file_bytes_ = 0, paths_ = 0;
     std::shared_ptr<const void> lifetime_;
 };
 
@@ -38,7 +38,7 @@ class LightFieldWriter final {
   public:
     LightFieldWriter(const std::filesystem::path& destination, LightFieldCalibration calibration);
     ~LightFieldWriter();
-    LightFieldWriter(const LightFieldWriter&) = delete;
+    LightFieldWriter(const LightFieldWriter&)            = delete;
     LightFieldWriter& operator=(const LightFieldWriter&) = delete;
     void write_view(std::size_t index, const Image& image, CancellationToken cancellation = {},
                     LightFieldCallback progress = {});

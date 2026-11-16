@@ -59,9 +59,9 @@ PointCloud sample_mesh_surface(const MeshData& mesh, std::size_t count, std::uin
     report(0);
     for (std::size_t i = 0; i < mesh.triangles.size(); ++i) {
         const auto& c = mesh.triangles[i].corners;
-        const auto a = glm::dvec3(mesh.positions[c[0].position]);
-        const auto b = glm::dvec3(mesh.positions[c[1].position]);
-        const auto d = glm::dvec3(mesh.positions[c[2].position]);
+        const auto  a = glm::dvec3(mesh.positions[c[0].position]);
+        const auto  b = glm::dvec3(mesh.positions[c[1].position]);
+        const auto  d = glm::dvec3(mesh.positions[c[2].position]);
         area += glm::length(glm::cross(b - a, d - a)) * .5;
         cumulative.push_back(area);
         if (i % 1024 == 0) {
@@ -77,14 +77,14 @@ PointCloud sample_mesh_surface(const MeshData& mesh, std::size_t count, std::uin
     Sampler sampler(seed);
     for (std::size_t i = 0; i < count; ++i) {
         const auto target = sampler.next_1d() * area;
-        const auto face = static_cast<std::size_t>(
+        const auto face   = static_cast<std::size_t>(
             std::upper_bound(cumulative.begin(), cumulative.end(), target) - cumulative.begin());
-        const auto& c = mesh.triangles[std::min(face, mesh.triangles.size() - 1)].corners;
-        const double root = std::sqrt(sampler.next_1d());
-        const double fraction = sampler.next_1d();
+        const auto&      c    = mesh.triangles[std::min(face, mesh.triangles.size() - 1)].corners;
+        const double     root = std::sqrt(sampler.next_1d());
+        const double     fraction = sampler.next_1d();
         const glm::dvec3 weights{1 - root, root * (1 - fraction), root * fraction};
-        glm::dvec3 position(0);
-        glm::dvec3 normal(0);
+        glm::dvec3       position(0);
+        glm::dvec3       normal(0);
         for (std::size_t corner = 0; corner < 3; ++corner) {
             position +=
                 weights[static_cast<int>(corner)] * glm::dvec3(mesh.positions[c[corner].position]);
@@ -111,6 +111,7 @@ struct PositionKey {
     std::array<std::uint32_t, 3> components;
     bool operator==(const PositionKey&) const = default;
 };
+
 struct PositionHash {
     std::size_t operator()(const PositionKey& key) const noexcept {
         std::size_t hash = 0;
@@ -125,9 +126,9 @@ struct PositionHash {
 UniquePointCloud unique_points(const PointCloud& input, CancellationToken cancellation,
                                PointProgress progress) {
     input.validate(cancellation);
-    UniquePointCloud result;
+    UniquePointCloud                              result;
     std::unordered_set<PositionKey, PositionHash> seen;
-    const auto report = [&](std::size_t done) {
+    const auto                                    report = [&](std::size_t done) {
         cancellation.check();
         if (progress) {
             progress(done, input.positions.size());
@@ -136,7 +137,7 @@ UniquePointCloud unique_points(const PointCloud& input, CancellationToken cancel
     };
     report(0);
     for (std::size_t i = 0; i < input.positions.size(); ++i) {
-        const auto p = input.positions[i];
+        const auto        p = input.positions[i];
         const PositionKey key{{p.x == 0 ? 0 : std::bit_cast<std::uint32_t>(p.x),
                                p.y == 0 ? 0 : std::bit_cast<std::uint32_t>(p.y),
                                p.z == 0 ? 0 : std::bit_cast<std::uint32_t>(p.z)}};

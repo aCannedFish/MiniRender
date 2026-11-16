@@ -37,11 +37,13 @@ void require(bool condition, const char* message) {
         throw std::runtime_error(message);
     }
 }
+
 template <class T> T* control(Workbench& window, const char* name) {
     auto* value = window.findChild<T*>(name);
     require(value, "SPPM regression control is missing");
     return value;
 }
+
 void click(Workbench& window, const char* name) {
     auto* value = control<QPushButton>(window, name);
     if (!value->isEnabled()) {
@@ -49,6 +51,7 @@ void click(Workbench& window, const char* name) {
     }
     value->click();
 }
+
 void action(Workbench& window, const char* name) {
     auto* value = control<QAction>(window, name);
     require(value->isEnabled(), "SPPM import action is disabled");
@@ -59,7 +62,7 @@ void action(Workbench& window, const char* name) {
 void verify_result(Workbench& window, std::shared_ptr<const SceneSnapshot> snapshot,
                    RenderSettings render, IntegratorSettings integrator) {
     SppmStatistics statistics;
-    const auto expected = [&] {
+    const auto     expected = [&] {
         if (integrator.kind == IntegratorKind::path_tracing) {
             return PathTracer(snapshot, integrator).render(render);
         }
@@ -94,16 +97,16 @@ void verify_result(Workbench& window, std::shared_ptr<const SceneSnapshot> snaps
 
 // 对照每个源像素的显示变换，覆盖新图像上传和仅修改曝光时的 Vulkan 路径。
 void verify_display(Workbench& window, const QString& directory, const QString& label) {
-    auto* viewport = window.viewport();
-    const auto actual = viewport->grab();
-    const auto image = window.offline_panel()->session().result();
+    auto*      viewport = window.viewport();
+    const auto actual   = viewport->grab();
+    const auto image    = window.offline_panel()->session().result();
     require(image && !actual.isNull() && viewport->offline_visible(), "SPPM GPU image is missing");
-    const auto expected = display_image(*image, viewport->exposure());
-    const double scale = std::min(double(actual.width()) / double(image->width()),
-                                  double(actual.height()) / double(image->height()));
-    const int width = int(std::floor(double(image->width()) * scale));
-    const int height = int(std::floor(double(image->height()) * scale));
-    const int left = (actual.width() - width) / 2, top = (actual.height() - height) / 2;
+    const auto   expected = display_image(*image, viewport->exposure());
+    const double scale    = std::min(double(actual.width()) / double(image->width()),
+                                     double(actual.height()) / double(image->height()));
+    const int    width    = int(std::floor(double(image->width()) * scale));
+    const int    height   = int(std::floor(double(image->height()) * scale));
+    const int    left = (actual.width() - width) / 2, top = (actual.height() - height) / 2;
     for (std::size_t y = 0; y < image->height(); ++y) {
         for (std::size_t x = 0; x < image->width(); ++x) {
             const auto pixel =
@@ -124,7 +127,7 @@ void verify_display(Workbench& window, const QString& directory, const QString& 
 void verify_layout(Workbench& window, const QString& directory) {
     auto* tabs = window.panels();
     tabs->setCurrentIndex(3);
-    auto* area = qobject_cast<QScrollArea*>(tabs->currentWidget());
+    auto* area  = qobject_cast<QScrollArea*>(tabs->currentWidget());
     auto* panel = window.offline_panel();
     require(area, "Offline page is not scrollable");
     for (const auto size : {QSize(1200, 800), QSize(960, 700)}) {
@@ -187,38 +190,38 @@ enum class Stage {
 
 // 每个步骤通过事件循环等待真实任务，参考计算和截图单独排除出响应测量。
 struct State {
-    Stage stage = Stage::import;
-    int ticks = 0, frame = 0, settle = 0;
-    RenderSettings render{24, 24, 64, 101};
-    IntegratorSettings integrator{};
+    Stage                                stage = Stage::import;
+    int                                  ticks = 0, frame = 0, settle = 0;
+    RenderSettings                       render{24, 24, 64, 101};
+    IntegratorSettings                   integrator{};
     std::shared_ptr<const SceneSnapshot> snapshot;
-    std::shared_ptr<const Image> paused_image;
-    std::uint64_t job = 0, samples = 0;
-    QElapsedTimer cancellation;
-    UiResponseProbe* probe = nullptr;
+    std::shared_ptr<const Image>         paused_image;
+    std::uint64_t                        job = 0, samples = 0;
+    QElapsedTimer                        cancellation;
+    UiResponseProbe*                     probe = nullptr;
 };
 } // namespace
 
 void start_sppm_smoke(Workbench& window, const QString& directory, bool enforce_response) {
     require(QDir().mkpath(directory), "Cannot create SPPM test directory");
-    auto state = std::make_shared<State>();
+    auto state   = std::make_shared<State>();
     state->probe = new UiResponseProbe(&window, "SPPM");
-    auto* timer = new QTimer(&window);
+    auto* timer  = new QTimer(&window);
     timer->setInterval(50);
     QObject::connect(
         timer, &QTimer::timeout, &window, [state, timer, &window, directory, enforce_response] {
             try {
-                auto* viewport = window.viewport();
-                auto* panel = window.offline_panel();
-                const auto p = panel->session().progress();
+                auto*      viewport = window.viewport();
+                auto*      panel    = window.offline_panel();
+                const auto p        = panel->session().progress();
                 require(++state->ticks < 4000 && viewport->failure().isEmpty(),
                         "SPPM smoke timed out");
                 if (!viewport->can_render() || viewport->rendered_frames() <= state->frame + 2) {
                     return;
                 }
                 const auto next = [&] {
-                    state->stage = static_cast<Stage>(int(state->stage) + 1);
-                    state->frame = viewport->rendered_frames();
+                    state->stage  = static_cast<Stage>(int(state->stage) + 1);
+                    state->frame  = viewport->rendered_frames();
                     state->settle = 0;
                     qInfo() << "SPPM stage" << int(state->stage);
                 };
@@ -285,7 +288,7 @@ void start_sppm_smoke(Workbench& window, const QString& directory, bool enforce_
                         return;
                     }
                     if (state->settle++ == 0) {
-                        state->samples = p.recorded_samples;
+                        state->samples      = p.recorded_samples;
                         state->paused_image = panel->session().preview().image;
                         window.select_object("glass_ball");
                         control<QDoubleSpinBox>(window, "translation.x")->setValue(-.3);
@@ -325,7 +328,7 @@ void start_sppm_smoke(Workbench& window, const QString& directory, bool enforce_
                         verify_display(window, directory, "old-snapshot");
                     });
                     require(panel->stale(), "Scene edits did not mark the old SPPM image stale");
-                    state->render = {16, 16, 8, 101};
+                    state->render                                = {16, 16, 8, 101};
                     state->integrator.sppm.photons_per_iteration = 2000;
                     panel->set_settings(state->render, state->integrator, {.threads = 2});
                     state->snapshot = make_snapshot(window.document());
@@ -348,7 +351,7 @@ void start_sppm_smoke(Workbench& window, const QString& directory, bool enforce_
                         verify_display(window, directory, "new-snapshot");
                         verify_layout(window, directory);
                     });
-                    state->job = p.job_id;
+                    state->job     = p.job_id;
                     state->samples = p.recorded_samples;
                     control<QDoubleSpinBox>(window, "offline_exposure")->setValue(2);
                     next();
@@ -415,7 +418,7 @@ void start_sppm_smoke(Workbench& window, const QString& directory, bool enforce_
                         control<QComboBox>(window, "offline_backend")->currentIndex() != 1) {
                         return;
                     }
-                    state->integrator.kind = IntegratorKind::sppm;
+                    state->integrator.kind                     = IntegratorKind::sppm;
                     state->integrator.sppm.memory_budget_bytes = 1024 * 1024;
                     panel->set_settings({128, 128, 8, 101}, state->integrator, {.threads = 2});
                     click(window, "offline_start");
@@ -431,7 +434,7 @@ void start_sppm_smoke(Workbench& window, const QString& directory, bool enforce_
                             p.error.find("budget") != std::string::npos &&
                             control<QLabel>(window, "offline_notice")->text().contains("budget"),
                         "SPPM memory failure has no inline diagnostic");
-                    state->integrator.sppm.memory_budget_bytes = 128 * 1024 * 1024;
+                    state->integrator.sppm.memory_budget_bytes   = 128 * 1024 * 1024;
                     state->integrator.sppm.photons_per_iteration = 2000000;
                     panel->set_settings({64, 64, 1000000, 101}, state->integrator, {.threads = 2});
                     click(window, "offline_start");

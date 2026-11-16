@@ -16,12 +16,12 @@ class EnvironmentPanel final : public QWidget {
     void set_document(const minirender::SceneDocument& document);
     void set_import_enabled(bool enabled);
     std::function<void(glm::vec3, minirender::EnvironmentMap)> on_edited;
-    std::function<void()> on_import;
+    std::function<void()>                                      on_import;
 
   private:
     void edit();
-    QComboBox* texture_;
+    QComboBox*                     texture_;
     std::array<QDoubleSpinBox*, 3> constant_;
-    QDoubleSpinBox *strength_, *rotation_;
-    QPushButton* import_;
+    QDoubleSpinBox *               strength_, *rotation_;
+    QPushButton*                   import_;
 };

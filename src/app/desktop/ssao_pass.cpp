@@ -22,6 +22,7 @@ void SsaoPass::create(VulkanViewport& viewport, const HdrTargets& targets, VkBuf
     composite_.create(viewport, VK_FORMAT_R32G32B32A32_SFLOAT, ":/shaders/ao_composite.frag.spv",
                       uniform, bytes, composite_inputs);
 }
+
 void SsaoPass::draw(VulkanViewport& viewport) {
     const bool enabled = viewport.view_mode() == VulkanViewport::base_color_preview_mode
                              ? viewport.preview_occlusion()
@@ -36,6 +37,7 @@ void SsaoPass::draw(VulkanViewport& viewport) {
     composite_.draw(viewport);
     was_enabled_ = enabled;
 }
+
 void SsaoPass::release() {
     composite_.release();
     filtered_.release();
@@ -43,15 +45,19 @@ void SsaoPass::release() {
     raw_.release();
     initialized_ = was_enabled_ = false;
 }
+
 VkImage SsaoPass::hdr_image() const noexcept {
     return composite_.image();
 }
+
 VkImageView SsaoPass::hdr_view() const noexcept {
     return composite_.view();
 }
+
 VkImageView SsaoPass::raw_view() const noexcept {
     return raw_.view();
 }
+
 VkImageView SsaoPass::filtered_view() const noexcept {
     return filtered_.view();
 }

@@ -14,6 +14,7 @@ constexpr double pi = std::numbers::pi;
 bool power_of_two(std::size_t value) {
     return value != 0 && (value & (value - 1)) == 0;
 }
+
 void parameter(double value, const char* name) {
     if (!std::isfinite(value) || value < 0 || value > 1) {
         throw std::invalid_argument(std::string(name) + " must be in [0,1]");
@@ -29,11 +30,13 @@ double radical_inverse(std::uint32_t bits) {
     bits = ((bits & 0x00FF00FFU) << 8U) | ((bits & 0xFF00FF00U) >> 8U);
     return static_cast<double>(bits) * 0x1p-32;
 }
+
 glm::dvec2 sequence(std::uint32_t index, std::uint32_t count, glm::dvec2 shift) {
     const glm::dvec2 point{(static_cast<double>(index) + 0.5) / count, radical_inverse(index)};
-    const auto moved = point + shift;
+    const auto       moved = point + shift;
     return moved - glm::floor(moved);
 }
+
 glm::dvec2 rotation(std::uint64_t seed, std::uint64_t pixel, std::uint64_t stage) {
     auto random = Sampler::for_sample(seed, pixel, stage);
     return random.next_2d();
@@ -53,13 +56,14 @@ glm::dvec2 coordinates(glm::dvec3 direction, double rotation_degrees) {
         !std::isfinite(rotation_degrees)) {
         throw std::invalid_argument("IBL lookup requires a unit direction and finite rotation");
     }
-    direction = glm::normalize(direction);
+    direction          = glm::normalize(direction);
     const double angle = std::remainder(rotation_degrees, 360.0) * pi / 180;
-    double u = (std::atan2(direction.z, direction.x) + angle) / (2 * pi);
+    double       u     = (std::atan2(direction.z, direction.x) + angle) / (2 * pi);
     u -= std::floor(u);
     const double v = std::atan2(std::hypot(direction.x, direction.z), direction.y) / pi;
     return {u, v};
 }
+
 glm::dvec3 direction_at(std::size_t x, std::size_t y, const Image& image) {
     if (y == 0) {
         return {0, 1, 0};
@@ -73,12 +77,12 @@ glm::dvec3 direction_at(std::size_t x, std::size_t y, const Image& image) {
 }
 
 glm::dvec3 bilinear(const Image& image, double x, double y, bool repeat_x, bool nonnegative) {
-    const auto ix = static_cast<int>(std::floor(x)), iy = static_cast<int>(std::floor(y));
+    const auto   ix = static_cast<int>(std::floor(x)), iy = static_cast<int>(std::floor(y));
     const double tx = x - std::floor(x), ty = y - std::floor(y);
-    const auto texel = [&](int column, int row) {
-        const auto width = static_cast<int>(image.width()),
+    const auto   texel = [&](int column, int row) {
+        const auto width  = static_cast<int>(image.width()),
                    height = static_cast<int>(image.height());
-        column = repeat_x ? (column % width + width) % width : std::clamp(column, 0, width - 1);
+        column     = repeat_x ? (column % width + width) % width : std::clamp(column, 0, width - 1);
         auto color = glm::dvec3(image.at(static_cast<std::size_t>(column),
                                          static_cast<std::size_t>(std::clamp(row, 0, height - 1))));
         return nonnegative ? glm::max(color, glm::dvec3(0)) : color;
@@ -86,19 +90,22 @@ glm::dvec3 bilinear(const Image& image, double x, double y, bool repeat_x, bool 
     return glm::mix(glm::mix(texel(ix, iy), texel(ix + 1, iy), tx),
                     glm::mix(texel(ix, iy + 1), texel(ix + 1, iy + 1), tx), ty);
 }
+
 glm::dvec3 latlong(const Image& image, glm::dvec2 uv) {
     return bilinear(image, uv.x * static_cast<double>(image.width()) - 0.5,
                     uv.y * static_cast<double>(image.height()) - 0.5, true, true);
 }
+
 glm::dvec3 baked_latlong(const Image& image, glm::dvec2 uv) {
     return bilinear(image, uv.x * static_cast<double>(image.width()) - 0.5,
                     uv.y * static_cast<double>(image.height() - 1), true, true);
 }
+
 glm::dvec3 source_lookup(const Texture& texture, glm::dvec3 direction, double lod) {
-    const auto uv = coordinates(direction, 0);
+    const auto   uv    = coordinates(direction, 0);
     const double level = std::clamp(lod, 0.0, static_cast<double>(texture.level_count() - 1));
-    const auto lower = static_cast<std::size_t>(level);
-    const auto upper = std::min(lower + 1, texture.level_count() - 1);
+    const auto   lower = static_cast<std::size_t>(level);
+    const auto   upper = std::min(lower + 1, texture.level_count() - 1);
     return glm::mix(latlong(texture.level(lower), uv), latlong(texture.level(upper), uv),
                     level - static_cast<double>(lower));
 }
@@ -106,11 +113,11 @@ glm::dvec3 source_lookup(const Texture& texture, glm::dvec3 direction, double lo
 // 先对原图截去负辐射，再生成 mip，避免正负像素先平均而丢掉照明。
 // 正常非负图像直接复用已有 mip；最终仅保留有界的预处理源。
 std::shared_ptr<const Texture> prepare_source(std::shared_ptr<const Texture> source,
-                                              std::size_t maximum_dimension,
-                                              const CancellationToken& cancellation,
-                                              const IblProgressCallback& progress) {
-    const auto& base = source->level(0);
-    const auto total = static_cast<std::uint64_t>(base.width()) * base.height();
+                                              std::size_t                    maximum_dimension,
+                                              const CancellationToken&       cancellation,
+                                              const IblProgressCallback&     progress) {
+    const auto& base  = source->level(0);
+    const auto  total = static_cast<std::uint64_t>(base.width()) * base.height();
     report(progress, IblStage::source, 0, total, cancellation);
     bool negative = false;
     for (std::size_t y = 0; y < base.height(); ++y) {
@@ -137,7 +144,7 @@ std::shared_ptr<const Texture> prepare_source(std::shared_ptr<const Texture> sou
     }
     if (level != 0) {
         const auto& selected = source->level(level);
-        Image bounded(selected.width(), selected.height());
+        Image       bounded(selected.width(), selected.height());
         for (std::size_t y = 0; y < selected.height(); ++y) {
             cancellation.check();
             for (std::size_t x = 0; x < selected.width(); ++x) {
@@ -152,9 +159,9 @@ std::shared_ptr<const Texture> prepare_source(std::shared_ptr<const Texture> sou
 // FIS 的纹素立体角按 latlong 行精确计算，极点附近不使用固定的平均面积。
 double source_lod(const Texture& source, glm::dvec3 direction, double pdf, std::uint32_t samples) {
     const auto& image = source.level(0);
-    const auto uv = coordinates(direction, 0);
-    const auto row = std::min(static_cast<std::size_t>(uv.y * static_cast<double>(image.height())),
-                              image.height() - 1);
+    const auto  uv    = coordinates(direction, 0);
+    const auto  row = std::min(static_cast<std::size_t>(uv.y * static_cast<double>(image.height())),
+                               image.height() - 1);
     const double theta0 = pi * static_cast<double>(row) / static_cast<double>(image.height());
     const double theta1 = pi * static_cast<double>(row + 1) / static_cast<double>(image.height());
     const double solid_angle = 2 * pi / static_cast<double>(image.width()) * 2 *
@@ -183,6 +190,7 @@ void IblEnvironmentSettings::validate() const {
         throw std::invalid_argument("IBL environment exceeds the sample budget");
     }
 }
+
 void IblBrdfSettings::validate() const {
     if (!power_of_two(resolution) || resolution < 4 || resolution > 256 || samples == 0 ||
         samples > 16384 || resolution * resolution * samples > 128ULL * 1024 * 1024) {
@@ -194,10 +202,12 @@ void IblBrdfSettings::validate() const {
 glm::dvec3 sample_ibl_latlong(const Image& image, glm::dvec3 direction, double rotation_degrees) {
     return latlong(image, coordinates(direction, rotation_degrees));
 }
+
 glm::dvec3 sample_ibl_diffuse(const IblEnvironment& maps, glm::dvec3 normal,
                               double rotation_degrees) {
     return baked_latlong(maps.diffuse, coordinates(normal, rotation_degrees));
 }
+
 glm::dvec3 sample_ibl_specular(const IblEnvironment& maps, glm::dvec3 reflection, double roughness,
                                double rotation_degrees) {
     parameter(roughness, "Roughness");
@@ -205,12 +215,13 @@ glm::dvec3 sample_ibl_specular(const IblEnvironment& maps, glm::dvec3 reflection
         throw std::invalid_argument("IBL specular maps require at least two roughness layers");
     }
     const double layer = roughness * static_cast<double>(maps.specular.size() - 1);
-    const auto lower = static_cast<std::size_t>(layer);
-    const auto upper = std::min(lower + 1, maps.specular.size() - 1);
-    const auto uv = coordinates(reflection, rotation_degrees);
+    const auto   lower = static_cast<std::size_t>(layer);
+    const auto   upper = std::min(lower + 1, maps.specular.size() - 1);
+    const auto   uv    = coordinates(reflection, rotation_degrees);
     return glm::mix(baked_latlong(maps.specular[lower], uv),
                     baked_latlong(maps.specular[upper], uv), layer - static_cast<double>(lower));
 }
+
 glm::dvec2 sample_ibl_brdf(const Image& lut, double normal_dot_view, double roughness) {
     parameter(normal_dot_view, "NdotV");
     parameter(roughness, "Roughness");
@@ -234,12 +245,12 @@ glm::dvec2 integrate_ibl_brdf(double normal_dot_view, double roughness, std::uin
         return {1 - fresnel, fresnel};
     }
     // 节点 NdotV=0 使用连续模型的掠射极限近似，避免向 BSDF 传入零余弦。
-    const double cosine = std::max(normal_dot_view, 1e-6);
+    const double     cosine = std::max(normal_dot_view, 1e-6);
     const glm::dvec3 wo{std::sqrt(std::max(0.0, 1 - cosine * cosine)), 0, cosine};
-    Material white;
-    white.kind = MaterialKind::conductor;
+    Material         white;
+    white.kind       = MaterialKind::conductor;
     white.base_color = glm::vec3(1);
-    white.roughness = static_cast<float>(roughness);
+    white.roughness  = static_cast<float>(roughness);
     const Bsdf bsdf(white);
     const auto shift = rotation(seed, 0, 0);
     glm::dvec2 sum(0);
@@ -284,8 +295,8 @@ std::shared_ptr<const Image> bake_ibl_brdf(IblBrdfSettings settings, Cancellatio
 }
 
 std::shared_ptr<const IblEnvironment> bake_ibl_environment(std::shared_ptr<const Texture> source,
-                                                           IblEnvironmentSettings settings,
-                                                           CancellationToken cancellation,
+                                                           IblEnvironmentSettings         settings,
+                                                           CancellationToken   cancellation,
                                                            IblProgressCallback progress) {
     cancellation.check();
     settings.validate();
@@ -294,7 +305,7 @@ std::shared_ptr<const IblEnvironment> bake_ibl_environment(std::shared_ptr<const
     }
     source = prepare_source(std::move(source), settings.source_maximum_dimension, cancellation,
                             progress);
-    Image diffuse(settings.diffuse_width, settings.diffuse_width / 2);
+    Image      diffuse(settings.diffuse_width, settings.diffuse_width / 2);
     const auto diffuse_total = diffuse.width() * diffuse.height();
     report(progress, IblStage::diffuse, 0, diffuse_total, cancellation);
     for (std::size_t y = 0; y < diffuse.height(); ++y) {
@@ -305,8 +316,8 @@ std::shared_ptr<const IblEnvironment> bake_ibl_environment(std::shared_ptr<const
                 continue;
             }
             const ShadingFrame frame(direction_at(x, y, diffuse));
-            const auto shift = rotation(settings.seed, y * diffuse.width() + x, 1);
-            glm::dvec3 sum(0);
+            const auto         shift = rotation(settings.seed, y * diffuse.width() + x, 1);
+            glm::dvec3         sum(0);
             for (std::uint32_t i = 0; i < settings.diffuse_samples; ++i) {
                 if ((i & 63U) == 0) {
                     cancellation.check();
@@ -321,11 +332,11 @@ std::shared_ptr<const IblEnvironment> bake_ibl_environment(std::shared_ptr<const
     }
     std::vector<Image> specular;
     specular.reserve(settings.specular_layers);
-    const auto layer_pixels = settings.specular_width * settings.specular_width / 2;
+    const auto layer_pixels   = settings.specular_width * settings.specular_width / 2;
     const auto specular_total = layer_pixels * settings.specular_layers;
     report(progress, IblStage::specular, 0, specular_total, cancellation);
     for (std::size_t layer = 0; layer < settings.specular_layers; ++layer) {
-        Image image(settings.specular_width, settings.specular_width / 2);
+        Image        image(settings.specular_width, settings.specular_width / 2);
         const double roughness =
             static_cast<double>(layer) / static_cast<double>(settings.specular_layers - 1);
         const double alpha = roughness * roughness;
@@ -343,21 +354,21 @@ std::shared_ptr<const IblEnvironment> bake_ibl_environment(std::shared_ptr<const
                 const ShadingFrame frame(normal);
                 const auto shift = rotation(settings.seed, y * image.width() + x, 2 + layer);
                 glm::dvec3 sum(0);
-                double weights = 0;
+                double     weights = 0;
                 for (std::uint32_t i = 0; i < settings.specular_samples; ++i) {
                     if ((i & 63U) == 0) {
                         cancellation.check();
                     }
-                    const auto u = sequence(i, settings.specular_samples, shift);
+                    const auto   u      = sequence(i, settings.specular_samples, shift);
                     const double cosine = std::sqrt((1 - u.y) / (1 + (alpha * alpha - 1) * u.y));
-                    const double sine = std::sqrt(std::max(0.0, 1 - cosine * cosine));
+                    const double sine   = std::sqrt(std::max(0.0, 1 - cosine * cosine));
                     const glm::dvec3 halfway{sine * std::cos(2 * pi * u.x),
                                              sine * std::sin(2 * pi * u.x), cosine};
-                    const auto local = 2 * cosine * halfway - glm::dvec3(0, 0, 1);
+                    const auto       local = 2 * cosine * halfway - glm::dvec3(0, 0, 1);
                     if (local.z <= 0) {
                         continue;
                     }
-                    const auto direction = frame.to_world(local);
+                    const auto   direction   = frame.to_world(local);
                     const double denominator = sine * sine + alpha * alpha * cosine * cosine;
                     // N=V 时 NdotH/(4*VdotH) 抵消为 1/4，反射方向密度为 D/4。
                     const double pdf = alpha * alpha / (4 * pi * denominator * denominator);

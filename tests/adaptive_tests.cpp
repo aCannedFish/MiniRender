@@ -39,23 +39,23 @@ using VirtualFace = std::array<MeshIndex, 3>;
 
 // 独立均匀实现实际生成网格；测试将相同参数三角形的顶点映射到虚拟层级 ID。
 void compare_uniform(const std::shared_ptr<const MeshData>& input) {
-    const HalfedgeMesh topology(*input);
-    detail::LoopHierarchy hierarchy(input, topology, 200000);
+    const HalfedgeMesh       topology(*input);
+    detail::LoopHierarchy    hierarchy(input, topology, 200000);
     std::vector<VirtualFace> faces;
     for (const auto& triangle : input->triangles) {
         faces.push_back({triangle.corners[0].position, triangle.corners[1].position,
                          triangle.corners[2].position});
     }
     for (std::uint32_t level = 0; level <= 4; ++level) {
-        const auto uniform = subdivide_loop(input, {.levels = level}).mesh;
+        const auto         uniform = subdivide_loop(input, {.levels = level}).mesh;
         const HalfedgeMesh uniform_topology(*uniform);
-        const auto normals = smooth_vertex_normals(*uniform);
+        const auto         normals = smooth_vertex_normals(*uniform);
         REQUIRE(faces.size() == uniform->triangles.size());
         std::vector<MeshIndex> mapping(uniform->positions.size(), invalid_mesh_index);
         for (std::size_t face = 0; face < faces.size(); ++face) {
             for (std::size_t corner = 0; corner < 3; ++corner) {
                 const auto index = uniform->triangles[face].corners[corner].position;
-                const auto id = faces[face][corner];
+                const auto id    = faces[face][corner];
                 if (mapping[index] != invalid_mesh_index) {
                     REQUIRE(mapping[index] == id);
                 }
@@ -77,9 +77,9 @@ void compare_uniform(const std::shared_ptr<const MeshData>& input) {
             REQUIRE(glm::length(hierarchy.smooth_normal(id, level) - glm::dvec3(normals[index])) <
                     2e-5);
             std::set<MeshIndex> expected;
-            const auto hs = uniform_topology.halfedges();
-            const auto start = uniform_topology.vertices()[index].halfedge;
-            auto current = start;
+            const auto          hs      = uniform_topology.halfedges();
+            const auto          start   = uniform_topology.vertices()[index].halfedge;
+            auto                current = start;
             do {
                 expected.insert(mapping[uniform_topology.destination(current)]);
                 current = hs[hs[current].twin].next;
@@ -115,9 +115,9 @@ TEST_CASE("Lazy Loop evaluates isolated and high level support without a dense m
           "[adaptive][loop]") {
     auto input = std::make_shared<MeshData>(*fan(5));
     input->positions.push_back({8, -7, 6});
-    const HalfedgeMesh topology(*input);
+    const HalfedgeMesh    topology(*input);
     detail::LoopHierarchy hierarchy(input, topology, 100000);
-    const auto isolated = static_cast<MeshIndex>(input->positions.size() - 1);
+    const auto            isolated = static_cast<MeshIndex>(input->positions.size() - 1);
     REQUIRE(hierarchy.control_position(isolated, 8) == glm::dvec3(8, -7, 6));
     REQUIRE(hierarchy.smooth_normal(isolated, 8) == glm::dvec3(0));
     REQUIRE(hierarchy.point_count() == input->positions.size());
@@ -130,13 +130,13 @@ TEST_CASE("Lazy Loop evaluates isolated and high level support without a dense m
 
 TEST_CASE("Lazy Loop rejects invalid queries and honors evaluation budgets and cancellation",
           "[adaptive][loop]") {
-    const auto input = fan(5);
-    const HalfedgeMesh topology(*input);
+    const auto            input = fan(5);
+    const HalfedgeMesh    topology(*input);
     detail::LoopHierarchy hierarchy(input, topology, input->positions.size());
     REQUIRE_THROWS_AS(hierarchy.midpoint(0, 1, 0), std::length_error);
     REQUIRE_THROWS_AS(hierarchy.control_position(0, 9), std::invalid_argument);
     REQUIRE_THROWS_AS(hierarchy.midpoint(0, 0, 0), std::invalid_argument);
-    CancellationSource cancellation;
+    CancellationSource    cancellation;
     detail::LoopHierarchy cancellable(input, topology, 10000, cancellation.token());
     cancellation.request();
     REQUIRE_THROWS_AS(cancellable.control_position(0, 4), OperationCancelled);
@@ -149,7 +149,7 @@ TEST_CASE("Adaptive Loop emits a conforming approximation with fewer triangles",
     const auto input = std::make_shared<const MeshData>(
         load_obj(std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes/assets/cube.obj"));
     const AdaptiveSettings settings{.maximum_level = 4, .tolerance = 0.025};
-    const auto result = subdivide_adaptive(input, {}, settings);
+    const auto             result = subdivide_adaptive(input, {}, settings);
     INFO("output=" << result.topology.faces << " transitions=" << result.transition_triangles
                    << " error=" << result.maximum_sampled_error
                    << " points=" << result.evaluation_points);
@@ -168,8 +168,8 @@ TEST_CASE("Adaptive Loop emits a conforming approximation with fewer triangles",
 }
 
 TEST_CASE("Adaptive uniform levels retain the original Loop target", "[adaptive]") {
-    const auto input = fan(5);
-    const auto result = subdivide_adaptive(input, {}, {.minimum_level = 2, .maximum_level = 2});
+    const auto input   = fan(5);
+    const auto result  = subdivide_adaptive(input, {}, {.minimum_level = 2, .maximum_level = 2});
     const auto uniform = subdivide_loop(input, {.levels = 2}).mesh;
     REQUIRE(result.topology.faces == uniform->triangles.size());
     REQUIRE(result.transition_triangles == 0);
@@ -187,7 +187,7 @@ TEST_CASE("Adaptive uniform levels retain the original Loop target", "[adaptive]
 }
 
 TEST_CASE("Adaptive budgets and cancellation preserve the source", "[adaptive]") {
-    const auto input = fan(5);
+    const auto input    = fan(5);
     const auto original = *input;
     REQUIRE_THROWS_AS(subdivide_adaptive(input, {}, {.tolerance = 0}), std::invalid_argument);
     REQUIRE_THROWS_AS(subdivide_adaptive(input, {}, {.maximum_level = 9}), std::invalid_argument);
@@ -199,7 +199,7 @@ TEST_CASE("Adaptive budgets and cancellation preserve the source", "[adaptive]")
           AdaptiveStage::balance, AdaptiveStage::transitions, AdaptiveStage::normals,
           AdaptiveStage::output, AdaptiveStage::complete}) {
         CancellationSource cancellation;
-        bool reached = false;
+        bool               reached = false;
         REQUIRE_THROWS_AS(subdivide_adaptive(input, {}, {.maximum_level = 3, .tolerance = .01},
                                              cancellation.token(),
                                              [&](auto p) {
@@ -244,7 +244,7 @@ std::shared_ptr<const MeshData> adaptive_patch(MeshIndex side) {
 TEST_CASE("Adaptive displacement resolves a localized texture feature with conforming transitions",
           "[adaptive]") {
     const auto input = adaptive_patch(3);
-    Image image(32, 32);
+    Image      image(32, 32);
     for (std::size_t y = 0; y < 32; ++y) {
         for (std::size_t x = 0; x < 32; ++x) {
             const double u = (static_cast<double>(x) + .5) / 32;
@@ -253,12 +253,12 @@ TEST_CASE("Adaptive displacement resolves a localized texture feature with confo
                 .5 + .8 * std::exp(-((u - .68) * (u - .68) + (v - .62) * (v - .62)) / .008)));
         }
     }
-    const auto texture = std::make_shared<const Texture>(image);
+    const auto       texture = std::make_shared<const Texture>(image);
     AdaptiveSettings settings;
     settings.maximum_level = 6;
-    settings.tolerance = .008;
-    settings.displacement = DisplacementSettings{.scale = .3};
-    const auto result = subdivide_adaptive(input, texture, settings);
+    settings.tolerance     = .008;
+    settings.displacement  = DisplacementSettings{.scale = .3};
+    const auto result      = subdivide_adaptive(input, texture, settings);
     INFO("faces=" << result.topology.faces << " error=" << result.maximum_sampled_error
                   << " transitions=" << result.transition_triangles
                   << " points=" << result.evaluation_points);
@@ -275,8 +275,8 @@ TEST_CASE("Adaptive displacement resolves a localized texture feature with confo
     REQUIRE(levels > 1);
     REQUIRE(std::any_of(result.mesh->positions.begin(), result.mesh->positions.end(),
                         [](auto p) { return p.z > .15; }));
-    const auto fine = subdivide_loop(input, {.levels = 6}).mesh;
-    const auto reference = displace_mesh(fine, texture, *settings.displacement).mesh;
+    const auto fine       = subdivide_loop(input, {.levels = 6}).mesh;
+    const auto reference  = displace_mesh(fine, texture, *settings.displacement).mesh;
     const auto comparison = compare_surfaces(reference, result.mesh);
     INFO("independent dense maximum=" << comparison.sampled_maximum
                                       << " eval points=" << result.evaluation_points);
@@ -286,25 +286,25 @@ TEST_CASE("Adaptive displacement resolves a localized texture feature with confo
     for (const auto p : result.mesh->positions) {
         REQUIRE(std::sqrt(dense.closest(glm::dvec3(p)).distance_squared) < 2e-5);
     }
-    auto limited = settings;
+    auto limited          = settings;
     limited.maximum_level = 2;
-    limited.tolerance = .0001;
-    const auto coarse = subdivide_adaptive(input, texture, limited);
+    limited.tolerance     = .0001;
+    const auto coarse     = subdivide_adaptive(input, texture, limited);
     REQUIRE(coarse.maximum_level_reached);
     REQUIRE(coarse.maximum_sampled_error > limited.tolerance);
 }
 
 TEST_CASE("Adaptive projected error uses the fixed viewport and validates settings", "[adaptive]") {
-    const auto input = fan(5);
+    const auto       input = fan(5);
     AdaptiveSettings settings;
     settings.maximum_level = 3;
-    settings.metric = AdaptiveMetric::screen_pixels;
-    settings.tolerance = 2;
+    settings.metric        = AdaptiveMetric::screen_pixels;
+    settings.tolerance     = 2;
     REQUIRE_THROWS_AS(subdivide_adaptive(input, {}, settings), std::invalid_argument);
-    settings.projection = AdaptiveProjection{.viewport_pixels = {128, 128}};
-    const auto small = subdivide_adaptive(input, {}, settings);
+    settings.projection                  = AdaptiveProjection{.viewport_pixels = {128, 128}};
+    const auto small                     = subdivide_adaptive(input, {}, settings);
     settings.projection->viewport_pixels = {512, 512};
-    const auto large = subdivide_adaptive(input, {}, settings);
+    const auto large                     = subdivide_adaptive(input, {}, settings);
     REQUIRE(large.topology.faces > small.topology.faces);
     REQUIRE(large.maximum_sampled_error <= settings.tolerance);
     REQUIRE(large.metric == AdaptiveMetric::screen_pixels);
@@ -313,9 +313,9 @@ TEST_CASE("Adaptive projected error uses the fixed viewport and validates settin
 }
 
 TEST_CASE("Adaptive displacement checks seam interiors before refinement", "[adaptive]") {
-    auto mesh = std::make_shared<MeshData>(*adaptive_patch(1));
+    auto  mesh = std::make_shared<MeshData>(*adaptive_patch(1));
     Image image(4, 4);
-    image.at(1, 1) = glm::vec3(1);
+    image.at(1, 1)                   = glm::vec3(1);
     mesh->triangles[0].corners[0].uv = {.125F, .875F};
     mesh->triangles[0].corners[1].uv = {.5F, .875F};
     mesh->triangles[0].corners[2].uv = {.875F, .875F};
@@ -324,7 +324,7 @@ TEST_CASE("Adaptive displacement checks seam interiors before refinement", "[ada
     mesh->triangles[1].corners[2].uv = {.125F, .125F};
     AdaptiveSettings settings;
     settings.displacement = DisplacementSettings{};
-    const auto height = std::make_shared<const Texture>(image);
+    const auto height     = std::make_shared<const Texture>(image);
     REQUIRE_THROWS_AS(subdivide_adaptive(mesh, height, settings), std::invalid_argument);
     REQUIRE(mesh->positions[0].z == 0.0F);
 }
@@ -332,21 +332,21 @@ TEST_CASE("Adaptive displacement checks seam interiors before refinement", "[ada
 TEST_CASE("Adaptive projection handles perspective mirrored transforms and near camera geometry",
           "[adaptive]") {
     const auto input = fan(5);
-    Camera camera;
+    Camera     camera;
     camera.position = {2, 1.5F, 3};
-    camera.target = {0, 0, 0};
+    camera.target   = {0, 0, 0};
     AdaptiveSettings settings;
     settings.maximum_level = 3;
-    settings.metric = AdaptiveMetric::screen_pixels;
-    settings.tolerance = 1.5;
+    settings.metric        = AdaptiveMetric::screen_pixels;
+    settings.tolerance     = 1.5;
     const auto clip = glm::dmat4(camera.projection_matrix(1)) * glm::dmat4(camera.view_matrix());
     settings.projection = AdaptiveProjection{clip, {256, 256}};
-    const auto normal = subdivide_adaptive(input, {}, settings);
+    const auto normal   = subdivide_adaptive(input, {}, settings);
     REQUIRE(normal.maximum_sampled_error <= settings.tolerance);
     glm::dmat4 mirror(1);
-    mirror[0][0] = -1;
+    mirror[0][0]                          = -1;
     settings.projection->clip_from_object = clip * mirror;
-    const auto mirrored = subdivide_adaptive(input, {}, settings);
+    const auto mirrored                   = subdivide_adaptive(input, {}, settings);
     REQUIRE(mirrored.topology.euler_characteristic == 1);
     REQUIRE(mirrored.maximum_sampled_error <= settings.tolerance);
     camera.position = {0, 0, .03F};
@@ -360,15 +360,15 @@ TEST_CASE("Adaptive projection handles perspective mirrored transforms and near 
 }
 
 TEST_CASE("Adaptive height scanning has explicit budgets and cancellation", "[adaptive]") {
-    auto input = std::make_shared<MeshData>(*adaptive_patch(1));
+    auto  input = std::make_shared<MeshData>(*adaptive_patch(1));
     Image image(2, 2);
-    image.at(1, 1) = glm::vec3(1);
-    const auto height = std::make_shared<const Texture>(image);
+    image.at(1, 1)          = glm::vec3(1);
+    const auto       height = std::make_shared<const Texture>(image);
     AdaptiveSettings settings;
     settings.maximum_level = 3;
-    settings.displacement = DisplacementSettings{};
+    settings.displacement  = DisplacementSettings{};
     CancellationSource source;
-    bool reached = false;
+    bool               reached = false;
     REQUIRE_THROWS_AS(subdivide_adaptive(input, height, settings, source.token(),
                                          [&](auto p) {
                                              if (p.stage == AdaptiveStage::seams) {

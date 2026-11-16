@@ -12,14 +12,14 @@ namespace minirender {
 struct SubsurfaceParameters {
     glm::dvec3 absorption{2.1, 4.1, 7.1};
     glm::dvec3 reduced_scattering{2190, 2620, 3000};
-    double density = 1;
+    double     density = 1;
     void validate() const;
     bool operator==(const SubsurfaceParameters&) const = default;
 };
 
 struct SubsurfacePreset {
-    std::string id;
-    double ior;
+    std::string                                 id;
+    double                                      ior;
     std::shared_ptr<const SubsurfaceParameters> parameters;
 };
 

@@ -15,7 +15,7 @@ MeshData load_obj(const std::filesystem::path& path) {
         const auto utf8 = path.generic_u8string();
         throw std::runtime_error("Cannot open OBJ: " + std::string(utf8.begin(), utf8.end()));
     }
-    const std::string text((std::istreambuf_iterator<char>(stream)), {});
+    const std::string        text((std::istreambuf_iterator<char>(stream)), {});
     tinyobj::ObjReaderConfig config;
     config.triangulate = true;
     tinyobj::ObjReader reader;
@@ -37,7 +37,7 @@ MeshData load_obj(const std::filesystem::path& path) {
             if (vertices != 3 || offset + 3 > shape.mesh.indices.size()) {
                 throw std::runtime_error("OBJ triangulation did not produce triangles");
             }
-            MeshTriangle triangle;
+            MeshTriangle        triangle;
             std::array<bool, 3> needs_normal{};
             for (std::size_t k = 0; k < 3; ++k) {
                 const auto index = shape.mesh.indices[offset + k];
@@ -45,15 +45,15 @@ MeshData load_obj(const std::filesystem::path& path) {
                     static_cast<std::size_t>(index.vertex_index) >= mesh.positions.size()) {
                     throw std::runtime_error("OBJ has an invalid vertex index");
                 }
-                auto& corner = triangle.corners[k];
+                auto& corner    = triangle.corners[k];
                 corner.position = static_cast<std::uint32_t>(index.vertex_index);
                 if (index.normal_index >= 0) {
                     const auto n = static_cast<std::size_t>(index.normal_index) * 3;
                     if (n + 2 >= attributes.normals.size()) {
                         throw std::runtime_error("Invalid OBJ normal index");
                     }
-                    corner.normal = {attributes.normals[n], attributes.normals[n + 1],
-                                     attributes.normals[n + 2]};
+                    corner.normal     = {attributes.normals[n], attributes.normals[n + 1],
+                                         attributes.normals[n + 2]};
                     const auto length = glm::length(corner.normal);
                     if (!(length > 1e-10F)) {
                         throw std::runtime_error("OBJ normal is zero");
@@ -70,9 +70,9 @@ MeshData load_obj(const std::filesystem::path& path) {
                     corner.uv = {attributes.texcoords[uv], attributes.texcoords[uv + 1]};
                 }
             }
-            const auto a = mesh.positions[triangle.corners[0].position];
-            const auto b = mesh.positions[triangle.corners[1].position];
-            const auto c = mesh.positions[triangle.corners[2].position];
+            const auto a     = mesh.positions[triangle.corners[0].position];
+            const auto b     = mesh.positions[triangle.corners[1].position];
+            const auto c     = mesh.positions[triangle.corners[2].position];
             const auto cross = glm::cross(b - a, c - a);
             if (!(glm::length(cross) > 1e-10F)) {
                 throw std::runtime_error("OBJ has a degenerate triangle");

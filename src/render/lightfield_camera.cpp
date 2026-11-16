@@ -12,6 +12,7 @@ void grid(std::uint32_t columns, std::uint32_t rows) {
         throw std::invalid_argument("Light field grid dimensions must be odd integers in 3..15");
     }
 }
+
 void optics(double radius, double focus) {
     if (!std::isfinite(radius) || radius <= 0 || radius > 1e6 || !std::isfinite(focus) ||
         focus < 1e-6 || focus > 1e6) {
@@ -34,16 +35,20 @@ std::vector<glm::dvec2> lightfield_pupils(std::uint32_t columns, std::uint32_t r
     }
     return result;
 }
+
 std::size_t LightFieldCalibration::view_count() const noexcept {
     return std::size_t(columns) * rows;
 }
+
 std::size_t LightFieldCalibration::center_view() const noexcept {
     return std::size_t(rows / 2) * columns + columns / 2;
 }
+
 std::uint64_t LightFieldCalibration::view_bytes() const {
     render.validate();
     return std::uint64_t(render.width) * render.height * 3 * sizeof(float);
 }
+
 std::uint64_t LightFieldCalibration::total_paths() const {
     render.validate();
     grid(columns, rows);
@@ -54,10 +59,12 @@ std::uint64_t LightFieldCalibration::total_paths() const {
     }
     return pixels * render.samples_per_pixel * view_count();
 }
+
 double LightFieldCalibration::focal_pixels() const {
     return double(render.height) /
            (2 * std::tan(glm::radians(double(camera.vertical_fov_degrees)) / 2));
 }
+
 void LightFieldCalibration::validate() const {
     camera.validate();
     render.validate();
@@ -85,25 +92,27 @@ void LightFieldCalibration::validate() const {
     }
     total_paths();
 }
+
 Ray lightfield_ray(const LightFieldCalibration& calibration, std::size_t view, glm::dvec2 uv) {
     if (view >= calibration.pupils.size()) {
         throw std::out_of_range("Light field view index is out of range");
     }
-    const double aspect = double(calibration.render.width) / double(calibration.render.height);
-    const auto pinhole = calibration.camera.generate_ray(uv, aspect);
-    const auto pupil = calibration.pupils[view];
+    const double aspect  = double(calibration.render.width) / double(calibration.render.height);
+    const auto   pinhole = calibration.camera.generate_ray(uv, aspect);
+    const auto   pupil   = calibration.pupils[view];
     if (pupil == glm::dvec2(0)) {
         return pinhole;
     }
     const auto forward = glm::normalize(glm::dvec3(calibration.camera.target) -
                                         glm::dvec3(calibration.camera.position));
-    const auto right = glm::normalize(glm::cross(forward, glm::dvec3(calibration.camera.up)));
-    const auto up = glm::cross(right, forward);
-    const auto focus = pinhole.origin + pinhole.direction * (calibration.reference_focus /
-                                                             glm::dot(pinhole.direction, forward));
+    const auto right   = glm::normalize(glm::cross(forward, glm::dvec3(calibration.camera.up)));
+    const auto up      = glm::cross(right, forward);
+    const auto focus  = pinhole.origin + pinhole.direction * (calibration.reference_focus /
+                                                              glm::dot(pinhole.direction, forward));
     const auto origin = pinhole.origin + pupil.x * right + pupil.y * up;
     return {origin, glm::normalize(focus - origin)};
 }
+
 glm::dvec2 lightfield_shift(const LightFieldCalibration& calibration, std::size_t view,
                             double focus) {
     if (view >= calibration.pupils.size() || !std::isfinite(focus) || focus < 1e-6 || focus > 1e6) {

@@ -33,8 +33,8 @@ int run_cli(int argc, char** argv) {
             return 0;
         }
         if (argc == 3 && std::string_view(argv[1]) == "--inspect") {
-            const auto scene = minirender::load_scene(native_path(argv[2]));
-            const auto snapshot = minirender::make_snapshot(scene);
+            const auto  scene     = minirender::load_scene(native_path(argv[2]));
+            const auto  snapshot  = minirender::make_snapshot(scene);
             std::size_t triangles = 0;
             for (const auto& instance : snapshot->instances) {
                 triangles += instance.mesh->triangles.size();
@@ -53,13 +53,13 @@ int run_cli(int argc, char** argv) {
         if (argc == 4 && std::string_view(argv[1]) == "--trace-normals") {
             const auto snapshot =
                 minirender::make_snapshot(minirender::load_scene(native_path(argv[2])));
-            const auto start = std::chrono::steady_clock::now();
-            const minirender::SceneBvh bvh(snapshot);
-            const auto built = std::chrono::steady_clock::now();
-            minirender::Image image(256, 256);
+            const auto                  start = std::chrono::steady_clock::now();
+            const minirender::SceneBvh  bvh(snapshot);
+            const auto                  built = std::chrono::steady_clock::now();
+            minirender::Image           image(256, 256);
             minirender::TraceStatistics queries;
-            const auto& camera = snapshot->camera;
-            const auto forward =
+            const auto&                 camera = snapshot->camera;
+            const auto                  forward =
                 glm::normalize(glm::dvec3(camera.target) - glm::dvec3(camera.position));
             // 一条主射线对应一个像素中心。这里只输出法线，尚未计算光照或路径积分。
             for (std::size_t y = 0; y < image.height(); ++y) {
@@ -67,9 +67,9 @@ int run_cli(int argc, char** argv) {
                     const glm::vec2 uv{
                         (static_cast<float>(x) + 0.5F) / static_cast<float>(image.width()),
                         (static_cast<float>(y) + 0.5F) / static_cast<float>(image.height())};
-                    const auto ray = camera.generate_ray(uv, 1);
+                    const auto   ray    = camera.generate_ray(uv, 1);
                     const double cosine = glm::dot(ray.direction, forward);
-                    const auto hit = bvh.intersect(
+                    const auto   hit    = bvh.intersect(
                         ray, {camera.near_plane / cosine, camera.far_plane / cosine}, &queries);
                     image.at(x, y) = hit ? hit->shading_normal * 0.5F + 0.5F : glm::vec3(0);
                 }

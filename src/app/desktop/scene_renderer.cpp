@@ -22,6 +22,7 @@ std::size_t side_pipeline(const minirender::RenderInstance& instance) {
     }
     return glm::determinant(glm::mat3(instance.object_to_world)) < 0 ? 2 : 1;
 }
+
 // std430 按 16 字节对齐。normal 使用 mat4，避免 CPU mat3 的紧密布局与 GLSL 不一致。
 struct alignas(16) GpuInstance {
     glm::mat4 object_to_world;
@@ -29,40 +30,45 @@ struct alignas(16) GpuInstance {
     glm::vec4 base_color;
     glm::vec4 emission;
     glm::vec4 surface; // roughness, metallic, texture filter, double sided
-    GpuCloth cloth;
+    GpuCloth  cloth;
 };
+
 static_assert(sizeof(GpuInstance) == 800);
 static_assert(offsetof(GpuInstance, normal_to_world) == 64);
 static_assert(offsetof(GpuInstance, base_color) == 128);
 static_assert(offsetof(GpuInstance, surface) == 160);
 static_assert(offsetof(GpuInstance, cloth) == 176);
+
 struct DrawIndex {
     std::int32_t light;
     std::int32_t instance;
 };
+
 struct alignas(16) GpuLight {
     glm::vec4 direction;
     glm::vec4 radiance;
 };
+
 struct alignas(16) FrameUniform {
-    glm::mat4 view_projection;
-    glm::vec4 camera_position;
-    glm::vec4 environment;
-    std::array<GpuLight, 8> lights;
-    glm::ivec4 counts;
-    glm::vec4 display;
+    glm::mat4                view_projection;
+    glm::vec4                camera_position;
+    glm::vec4                environment;
+    std::array<GpuLight, 8>  lights;
+    glm::ivec4               counts;
+    glm::vec4                display;
     std::array<glm::mat4, 8> shadow_view_projection;
-    glm::vec4 shadow_settings;
-    glm::vec4 viewport;
-    glm::mat4 view;
-    glm::mat4 projection;
-    glm::mat4 inverse_projection;
-    glm::vec4 ao_settings; // enabled, radius/m, bias/m, strength
-    glm::vec4 ao_filter;   // samples, depth sigma/m, normal exponent, use filtered
+    glm::vec4                shadow_settings;
+    glm::vec4                viewport;
+    glm::mat4                view;
+    glm::mat4                projection;
+    glm::mat4                inverse_projection;
+    glm::vec4                ao_settings; // enabled, radius/m, bias/m, strength
+    glm::vec4                ao_filter;   // samples, depth sigma/m, normal exponent, use filtered
     std::array<glm::vec4, minirender::ssao_kernel_size> ao_kernel;
     glm::vec4 ibl;           // BRDF ready, maps ready, strength, rotation/radians
     glm::vec4 preview_edges; // effective strength, physical pixels per logical pixel, reserved
 };
+
 static_assert(offsetof(FrameUniform, lights) == 96);
 static_assert(offsetof(FrameUniform, shadow_view_projection) == 384);
 static_assert(offsetof(FrameUniform, view) == 928);
@@ -82,38 +88,38 @@ void SceneRenderer::initResources() {
     shadow_map_.create(*window_);
     ibl_.create(*window_);
     std::array<VkDescriptorSetLayoutBinding, 8> bindings{};
-    auto& binding = bindings[0];
-    binding.binding = 0;
-    binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    binding.descriptorCount = 1;
+    auto&                                       binding = bindings[0];
+    binding.binding                                     = 0;
+    binding.descriptorType                              = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    binding.descriptorCount                             = 1;
     binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     VkDescriptorSetLayoutCreateInfo layout{};
     layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    bindings[1] = {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT,
-                   nullptr};
-    bindings[2] = {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT,
-                   nullptr};
-    bindings[3] = {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
-                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
+    bindings[1]  = {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT,
+                    nullptr};
+    bindings[2]  = {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT,
+                    nullptr};
+    bindings[3]  = {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
+                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     for (std::uint32_t i = 4; i < bindings.size(); ++i) {
         bindings[i] = {i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
                        VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     }
     layout.bindingCount = static_cast<std::uint32_t>(bindings.size());
-    layout.pBindings = bindings.data();
+    layout.pBindings    = bindings.data();
     check_vk(vkCreateDescriptorSetLayout(device_, &layout, nullptr, &descriptor_layout_),
              "scene descriptor layout");
     minirender::Image white(1, 1);
     white.at(0, 0) = glm::vec3(1);
     white_texture_ = std::make_shared<const minirender::Texture>(std::move(white));
-    const VkPushConstantRange push{VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                                   sizeof(DrawIndex)};
+    const VkPushConstantRange  push{VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                                    sizeof(DrawIndex)};
     VkPipelineLayoutCreateInfo pipeline_layout{};
-    pipeline_layout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipeline_layout.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipeline_layout.pushConstantRangeCount = 1;
-    pipeline_layout.pPushConstantRanges = &push;
-    pipeline_layout.setLayoutCount = 1;
-    pipeline_layout.pSetLayouts = &descriptor_layout_;
+    pipeline_layout.pPushConstantRanges    = &push;
+    pipeline_layout.setLayoutCount         = 1;
+    pipeline_layout.pSetLayouts            = &descriptor_layout_;
     check_vk(vkCreatePipelineLayout(device_, &pipeline_layout, nullptr, &pipeline_layout_),
              "scene pipeline layout");
 }
@@ -121,12 +127,12 @@ void SceneRenderer::initResources() {
 void SceneRenderer::initSwapChainResources() {
     targets_.create(*window_);
     for (std::size_t side = 0; side < surface_pipelines_.size(); ++side) {
-        const auto cull = side == 0 ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT;
+        const auto cull  = side == 0 ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT;
         const auto front = side == 2 ? VK_FRONT_FACE_CLOCKWISE : VK_FRONT_FACE_COUNTER_CLOCKWISE;
         surface_pipelines_[side] = create_pipeline(Pass::surface, cull, front);
-        shadow_pipelines_[side] = create_pipeline(Pass::shadow, cull, front);
+        shadow_pipelines_[side]  = create_pipeline(Pass::shadow, cull, front);
     }
-    wire_pipeline_ = create_pipeline(Pass::wire);
+    wire_pipeline_       = create_pipeline(Pass::wire);
     background_pipeline_ = create_pipeline(Pass::background);
     ssao_.create(*window_, targets_, uniforms_.handle(), sizeof(FrameUniform));
     post_process_.create(*window_, targets_, uniforms_.handle(), sizeof(FrameUniform),
@@ -136,9 +142,9 @@ void SceneRenderer::initSwapChainResources() {
 }
 
 VkPipeline SceneRenderer::create_pipeline(Pass pass, VkCullModeFlags cull, VkFrontFace front) {
-    const bool shadow = pass == Pass::shadow;
-    const bool wire = pass == Pass::wire;
-    const bool background = pass == Pass::background;
+    const bool      shadow     = pass == Pass::shadow;
+    const bool      wire       = pass == Pass::wire;
+    const bool      background = pass == Pass::background;
     const GpuShader vertex(device_, background ? ":/shaders/screen.vert.spv"
                                                : (shadow ? ":/shaders/shadow.vert.spv"
                                                          : (wire ? ":/shaders/wire.vert.spv"
@@ -154,9 +160,9 @@ VkPipeline SceneRenderer::create_pipeline(Pass pass, VkCullModeFlags cull, VkFro
         stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stage.pName = "main";
     }
-    stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+    stages[0].stage  = VK_SHADER_STAGE_VERTEX_BIT;
     stages[0].module = vertex.handle();
-    stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    stages[1].stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
     stages[1].module = fragment ? fragment->handle() : VK_NULL_HANDLE;
     const VkVertexInputBindingDescription binding{0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX};
     std::array<VkVertexInputAttributeDescription, 5> attributes{
@@ -171,7 +177,7 @@ VkPipeline SceneRenderer::create_pipeline(Pass pass, VkCullModeFlags cull, VkFro
     VkPipelineVertexInputStateCreateInfo vertex_input{};
     vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertex_input.vertexBindingDescriptionCount = background ? 0 : 1;
-    vertex_input.pVertexBindingDescriptions = &binding;
+    vertex_input.pVertexBindingDescriptions    = &binding;
     vertex_input.vertexAttributeDescriptionCount =
         background ? 0 : (shadow ? 1 : (wire ? 2 : static_cast<std::uint32_t>(attributes.size())));
     vertex_input.pVertexAttributeDescriptions = attributes.data();
@@ -180,26 +186,26 @@ VkPipeline SceneRenderer::create_pipeline(Pass pass, VkCullModeFlags cull, VkFro
     assembly.topology =
         wire ? VK_PRIMITIVE_TOPOLOGY_LINE_LIST : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     VkPipelineViewportStateCreateInfo viewport{};
-    viewport.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewport.sType         = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewport.viewportCount = 1;
-    viewport.scissorCount = 1;
+    viewport.scissorCount  = 1;
     VkPipelineRasterizationStateCreateInfo raster{};
-    raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    raster.polygonMode = VK_POLYGON_MODE_FILL;
-    raster.cullMode = cull;
-    raster.frontFace = front;
-    raster.lineWidth = 1;
-    raster.depthBiasEnable = shadow;
+    raster.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    raster.polygonMode             = VK_POLYGON_MODE_FILL;
+    raster.cullMode                = cull;
+    raster.frontFace               = front;
+    raster.lineWidth               = 1;
+    raster.depthBiasEnable         = shadow;
     raster.depthBiasConstantFactor = 1.25F;
-    raster.depthBiasSlopeFactor = 1.75F;
+    raster.depthBiasSlopeFactor    = 1.75F;
     VkPipelineMultisampleStateCreateInfo multisample{};
-    multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisample.sType                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
     VkPipelineDepthStencilStateCreateInfo depth{};
-    depth.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depth.depthTestEnable = !background;
+    depth.sType            = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depth.depthTestEnable  = !background;
     depth.depthWriteEnable = !wire && !background;
-    depth.depthCompareOp = wire ? VK_COMPARE_OP_LESS_OR_EQUAL : VK_COMPARE_OP_LESS;
+    depth.depthCompareOp   = wire ? VK_COMPARE_OP_LESS_OR_EQUAL : VK_COMPARE_OP_LESS;
     std::array<VkPipelineColorBlendAttachmentState, 3> attachments{};
     for (auto& attachment : attachments) {
         attachment.colorWriteMask = 0xF;
@@ -210,23 +216,23 @@ VkPipeline SceneRenderer::create_pipeline(Pass pass, VkCullModeFlags cull, VkFro
         shadow ? 0 : (wire ? 1 : static_cast<std::uint32_t>(attachments.size()));
     blend.pAttachments = attachments.data();
     const std::array<VkDynamicState, 2> states{VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
-    VkPipelineDynamicStateCreateInfo dynamic{};
-    dynamic.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    VkPipelineDynamicStateCreateInfo    dynamic{};
+    dynamic.sType             = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
     dynamic.dynamicStateCount = static_cast<std::uint32_t>(states.size());
-    dynamic.pDynamicStates = states.data();
+    dynamic.pDynamicStates    = states.data();
     VkGraphicsPipelineCreateInfo pipeline{};
-    pipeline.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipeline.stageCount = shadow ? 1 : static_cast<std::uint32_t>(stages.size());
-    pipeline.pStages = stages.data();
-    pipeline.pVertexInputState = &vertex_input;
+    pipeline.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipeline.stageCount          = shadow ? 1 : static_cast<std::uint32_t>(stages.size());
+    pipeline.pStages             = stages.data();
+    pipeline.pVertexInputState   = &vertex_input;
     pipeline.pInputAssemblyState = &assembly;
-    pipeline.pViewportState = &viewport;
+    pipeline.pViewportState      = &viewport;
     pipeline.pRasterizationState = &raster;
-    pipeline.pMultisampleState = &multisample;
-    pipeline.pDepthStencilState = &depth;
-    pipeline.pColorBlendState = &blend;
-    pipeline.pDynamicState = &dynamic;
-    pipeline.layout = pipeline_layout_;
+    pipeline.pMultisampleState   = &multisample;
+    pipeline.pDepthStencilState  = &depth;
+    pipeline.pColorBlendState    = &blend;
+    pipeline.pDynamicState       = &dynamic;
+    pipeline.layout              = pipeline_layout_;
     pipeline.renderPass =
         shadow ? shadow_map_.render_pass() : (wire ? targets_.wire_pass() : targets_.render_pass());
     VkPipeline result = VK_NULL_HANDLE;
@@ -241,8 +247,8 @@ void SceneRenderer::upload_scene() {
     const auto& scene = *window_->scene();
     subsurface_previews_.begin_scene();
     std::set<MeshHandle, std::owner_less<MeshHandle>> used;
-    std::vector<Draw> draws;
-    std::vector<GpuInstance> instances;
+    std::vector<Draw>                                 draws;
+    std::vector<GpuInstance>                          instances;
     glm::vec3 minimum(std::numeric_limits<float>::infinity());
     glm::vec3 maximum(-std::numeric_limits<float>::infinity());
     // 先收集全部可见来源，避免复用仍被另一个实例引用的旧缓冲。
@@ -277,7 +283,7 @@ void SceneRenderer::upload_scene() {
                                  prepared->edges.size() * sizeof(std::uint32_t));
                 window_->report_mesh_allocation();
             }
-            mesh.count = static_cast<std::uint32_t>(count);
+            mesh.count   = static_cast<std::uint32_t>(count);
             mesh.minimum = prepared->minimum;
             mesh.maximum = prepared->maximum;
             mesh.vertices.write(prepared->vertices.data(), count * sizeof(Vertex));
@@ -290,16 +296,16 @@ void SceneRenderer::upload_scene() {
             const glm::vec3 point{(corner & 1U) ? mesh.maximum.x : mesh.minimum.x,
                                   (corner & 2U) ? mesh.maximum.y : mesh.minimum.y,
                                   (corner & 4U) ? mesh.maximum.z : mesh.minimum.z};
-            const auto world = glm::vec3(instance.object_to_world * glm::vec4(point, 1));
-            minimum = glm::min(minimum, world);
-            maximum = glm::max(maximum, world);
+            const auto      world = glm::vec3(instance.object_to_world * glm::vec4(point, 1));
+            minimum               = glm::min(minimum, world);
+            maximum               = glm::max(maximum, world);
         }
         const auto texture =
             instance.base_color_texture ? instance.base_color_texture : white_texture_;
         draws.push_back({instance.mesh, texture});
-        const auto& material = instance.material;
-        const bool subsurface = material.kind == minirender::MaterialKind::subsurface;
-        const auto color = subsurface ? subsurface_previews_.color(material) : material.base_color;
+        const auto& material   = instance.material;
+        const bool  subsurface = material.kind == minirender::MaterialKind::subsurface;
+        const auto  color = subsurface ? subsurface_previews_.color(material) : material.base_color;
         const float metallic = material.kind == minirender::MaterialKind::conductor ||
                                        material.kind == minirender::MaterialKind::mirror
                                    ? 1.0F
@@ -321,7 +327,7 @@ void SceneRenderer::upload_scene() {
         descriptors_changed = descriptors_changed || draws[index].texture != draws_[index].texture;
         draws[index].descriptor = draws_[index].descriptor;
     }
-    draws_ = std::move(draws);
+    draws_              = std::move(draws);
     const auto required = std::max<std::size_t>(instances.size(), 1);
     if (required > instance_capacity_) {
         instance_capacity_ = required;
@@ -366,40 +372,40 @@ void SceneRenderer::rebuild_texture_descriptors() {
             textures_.emplace(handle, std::move(texture));
         }
     }
-    const auto count = static_cast<std::uint32_t>(draws_.size() + 1);
+    const auto                                count = static_cast<std::uint32_t>(draws_.size() + 1);
     const std::array<VkDescriptorPoolSize, 3> sizes{
         {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, count},
          {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6 * count},
          {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, count}}};
     VkDescriptorPoolCreateInfo pool{};
-    pool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    pool.maxSets = count;
+    pool.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool.maxSets       = count;
     pool.poolSizeCount = static_cast<std::uint32_t>(sizes.size());
-    pool.pPoolSizes = sizes.data();
+    pool.pPoolSizes    = sizes.data();
     check_vk(vkCreateDescriptorPool(device_, &pool, nullptr, &descriptor_pool_),
              "create material descriptor pool");
     const std::vector<VkDescriptorSetLayout> layouts(count, descriptor_layout_);
-    std::vector<VkDescriptorSet> sets(count);
-    VkDescriptorSetAllocateInfo allocation{};
-    allocation.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocation.descriptorPool = descriptor_pool_;
+    std::vector<VkDescriptorSet>             sets(count);
+    VkDescriptorSetAllocateInfo              allocation{};
+    allocation.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocation.descriptorPool     = descriptor_pool_;
     allocation.descriptorSetCount = count;
-    allocation.pSetLayouts = layouts.data();
+    allocation.pSetLayouts        = layouts.data();
     check_vk(vkAllocateDescriptorSets(device_, &allocation, sets.data()),
              "allocate material descriptors");
     for (std::size_t index = 0; index < sets.size(); ++index) {
-        const auto& handle = index == 0 ? white_texture_ : draws_[index - 1].texture;
+        const auto&            handle = index == 0 ? white_texture_ : draws_[index - 1].texture;
         VkDescriptorBufferInfo uniform{uniforms_.handle(), 0, sizeof(FrameUniform)};
         const std::array<VkDescriptorImageInfo, 2> images{shadow_map_.descriptor(),
                                                           textures_.at(handle)->descriptor()};
-        VkDescriptorBufferInfo instances{instances_.handle(), 0,
-                                         instance_capacity_ * sizeof(GpuInstance)};
-        const auto ibl_images = ibl_.descriptors();
+        VkDescriptorBufferInfo              instances{instances_.handle(), 0,
+                                                      instance_capacity_ * sizeof(GpuInstance)};
+        const auto                          ibl_images = ibl_.descriptors();
         std::array<VkWriteDescriptorSet, 8> writes{};
         for (std::uint32_t binding = 0; binding < writes.size(); ++binding) {
-            writes[binding].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writes[binding].dstSet = sets[index];
-            writes[binding].dstBinding = binding;
+            writes[binding].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[binding].dstSet          = sets[index];
+            writes[binding].dstBinding      = binding;
             writes[binding].descriptorCount = 1;
             writes[binding].descriptorType =
                 binding == 0 ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
@@ -425,7 +431,7 @@ void SceneRenderer::rebuild_texture_descriptors() {
 }
 
 void SceneRenderer::update_ibl_descriptors() {
-    const auto images = ibl_.descriptors();
+    const auto                   images = ibl_.descriptors();
     std::vector<VkDescriptorSet> sets{descriptor_};
     for (const auto& draw : draws_) {
         sets.push_back(draw.descriptor);
@@ -434,12 +440,12 @@ void SceneRenderer::update_ibl_descriptors() {
     for (const auto set : sets) {
         for (std::uint32_t i = 0; i < images.size(); ++i) {
             VkWriteDescriptorSet write{};
-            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write.dstSet = set;
-            write.dstBinding = 4 + i;
+            write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            write.dstSet          = set;
+            write.dstBinding      = 4 + i;
             write.descriptorCount = 1;
-            write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            write.pImageInfo = &images[i];
+            write.descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            write.pImageInfo      = &images[i];
             writes.push_back(write);
         }
     }
@@ -448,52 +454,52 @@ void SceneRenderer::update_ibl_descriptors() {
 }
 
 void SceneRenderer::update_uniforms() {
-    const auto size = window_->swapChainImageSize();
-    const auto& camera = window_->camera();
+    const auto   size   = window_->swapChainImageSize();
+    const auto&  camera = window_->camera();
     FrameUniform frame{};
     frame.view_projection = camera.projection_matrix(static_cast<float>(size.width()) /
                                                      static_cast<float>(size.height())) *
                             camera.view_matrix();
     frame.camera_position = glm::vec4(camera.position, 1);
-    frame.environment = glm::vec4(window_->scene()->environment, 0);
-    const auto& lights = window_->scene()->directional_lights;
+    frame.environment     = glm::vec4(window_->scene()->environment, 0);
+    const auto& lights    = window_->scene()->directional_lights;
     if (lights.size() > frame.lights.size()) {
         throw std::runtime_error("Realtime preview supports at most 8 directional lights");
     }
     for (std::size_t i = 0; i < lights.size(); ++i) {
         frame.lights[i].direction = glm::vec4(lights[i].direction, 0);
-        frame.lights[i].radiance = glm::vec4(lights[i].color * lights[i].intensity, 0);
+        frame.lights[i].radiance  = glm::vec4(lights[i].color * lights[i].intensity, 0);
     }
-    frame.counts.x = static_cast<int>(lights.size());
-    frame.counts.y = window_->environment_background() ? 1 : 0;
-    frame.display = {window_->exposure(), static_cast<float>(window_->view_mode()),
-                     window_->fxaa_enabled() ? 1.0F : 0.0F, 0};
+    frame.counts.x      = static_cast<int>(lights.size());
+    frame.counts.y      = window_->environment_background() ? 1 : 0;
+    frame.display       = {window_->exposure(), static_cast<float>(window_->view_mode()),
+                           window_->fxaa_enabled() ? 1.0F : 0.0F, 0};
     frame.preview_edges = {window_->preview_outline() ? window_->preview_outline_strength() : 0.0F,
                            static_cast<float>(window_->devicePixelRatio()), 0, 0};
     frame.shadow_view_projection = shadow_matrices_;
     frame.shadow_settings = {window_->shadows_enabled() ? 1.0F : 0.0F, 1.0F / ShadowMap::resolution,
                              0, 0};
-    frame.viewport = {1.0F / static_cast<float>(size.width()),
-                      1.0F / static_cast<float>(size.height()), camera.near_plane,
-                      camera.far_plane};
-    frame.view = camera.view_matrix();
-    frame.projection = camera.projection_matrix(static_cast<float>(size.width()) /
-                                                static_cast<float>(size.height()));
+    frame.viewport        = {1.0F / static_cast<float>(size.width()),
+                             1.0F / static_cast<float>(size.height()), camera.near_plane,
+                             camera.far_plane};
+    frame.view            = camera.view_matrix();
+    frame.projection      = camera.projection_matrix(static_cast<float>(size.width()) /
+                                                     static_cast<float>(size.height()));
     frame.inverse_projection = glm::inverse(frame.projection);
-    const auto& ao = window_->ssao_settings();
-    const bool preview = window_->view_mode() == VulkanViewport::base_color_preview_mode;
-    const float radius = preview ? preview_radius_ : ao.radius;
-    frame.ao_settings = {preview ? (window_->preview_occlusion() ? 1.0F : 0.0F)
-                                 : (ao.enabled ? 1.0F : 0.0F),
-                         radius, preview ? radius * 0.02F : ao.bias, ao.strength};
+    const auto& ao           = window_->ssao_settings();
+    const bool  preview      = window_->view_mode() == VulkanViewport::base_color_preview_mode;
+    const float radius       = preview ? preview_radius_ : ao.radius;
+    frame.ao_settings        = {preview ? (window_->preview_occlusion() ? 1.0F : 0.0F)
+                                        : (ao.enabled ? 1.0F : 0.0F),
+                                radius, preview ? radius * 0.02F : ao.bias, ao.strength};
     frame.ao_filter = {preview ? 32.0F : static_cast<float>(ao.samples),
                        std::max(radius * 0.25F, 1e-6F), 16, preview || ao.filtered ? 1.0F : 0.0F};
     if (preview) {
         frame.ao_settings.w = 1.0F;
     }
     static const auto kernel = minirender::make_ssao_kernel();
-    frame.ao_kernel = kernel;
-    frame.ibl = {
+    frame.ao_kernel          = kernel;
+    frame.ibl                = {
         window_->ibl_lut() ? 1.0F : 0.0F, window_->ibl_maps() ? 1.0F : 0.0F,
         window_->scene()->environment_strength,
         glm::radians(std::remainder(window_->scene()->environment_rotation_degrees, 360.0F))};
@@ -524,9 +530,9 @@ void SceneRenderer::render_shadow_maps(VkCommandBuffer command) {
             vkCmdPushConstants(command, pipeline_layout_,
                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                                sizeof(push), &push);
-            const auto& mesh = meshes_.at(draws_[index].mesh);
+            const auto&        mesh   = meshes_.at(draws_[index].mesh);
             const VkDeviceSize offset = 0;
-            const auto buffer = mesh.vertices.handle();
+            const auto         buffer = mesh.vertices.handle();
             vkCmdBindVertexBuffers(command, 0, 1, &buffer, &offset);
             vkCmdDraw(command, mesh.count, 1, 0, 0);
         }
@@ -541,7 +547,7 @@ void SceneRenderer::render_wire(VkCommandBuffer command) {
     }
     targets_.begin_wire(command);
     if (window_->view_mode() == 3) {
-        const auto size = window_->swapChainImageSize();
+        const auto       size = window_->swapChainImageSize();
         const VkViewport viewport{
             0, 0, static_cast<float>(size.width()), static_cast<float>(size.height()), 0, 1};
         const VkRect2D scissor{
@@ -553,8 +559,8 @@ void SceneRenderer::render_wire(VkCommandBuffer command) {
         vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                 &descriptor_, 0, nullptr);
         for (std::size_t index = 0; index < draws_.size(); ++index) {
-            const auto& mesh = meshes_.at(draws_[index].mesh);
-            const auto buffer = mesh.vertices.handle();
+            const auto&        mesh   = meshes_.at(draws_[index].mesh);
+            const auto         buffer = mesh.vertices.handle();
             const VkDeviceSize offset = 0;
             vkCmdBindVertexBuffers(command, 0, 1, &buffer, &offset);
             vkCmdBindIndexBuffer(command, mesh.edges.handle(), 0, VK_INDEX_TYPE_UINT32);
@@ -584,10 +590,10 @@ void SceneRenderer::startNextFrame() {
     }
     update_uniforms();
     render_shadow_maps(window_->currentCommandBuffer());
-    const auto size = window_->swapChainImageSize();
+    const auto       size = window_->swapChainImageSize();
     const VkExtent2D extent{static_cast<std::uint32_t>(size.width()),
                             static_cast<std::uint32_t>(size.height())};
-    const auto command = window_->currentCommandBuffer();
+    const auto       command = window_->currentCommandBuffer();
     targets_.begin(command);
     const VkViewport viewport{
         0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1};
@@ -607,9 +613,9 @@ void SceneRenderer::startNextFrame() {
         const auto& draw = draws_[index];
         vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
                           surface_pipelines_[side_pipeline(window_->scene()->instances[index])]);
-        const auto& mesh = meshes_.at(draw.mesh);
+        const auto&        mesh   = meshes_.at(draw.mesh);
         const VkDeviceSize offset = 0;
-        const auto buffer = mesh.vertices.handle();
+        const auto         buffer = mesh.vertices.handle();
         vkCmdBindVertexBuffers(command, 0, 1, &buffer, &offset);
         vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                 &draw.descriptor, 0, nullptr);
@@ -647,7 +653,7 @@ void SceneRenderer::releaseSwapChainResources() {
     }
     surface_pipelines_.fill(VK_NULL_HANDLE);
     shadow_pipelines_.fill(VK_NULL_HANDLE);
-    wire_pipeline_ = VK_NULL_HANDLE;
+    wire_pipeline_       = VK_NULL_HANDLE;
     background_pipeline_ = VK_NULL_HANDLE;
     post_process_.release();
     gizmo_.release();
@@ -672,16 +678,17 @@ void SceneRenderer::releaseResources() {
     white_texture_.reset();
     draws_.clear();
     vkDestroyDescriptorSetLayout(device_, descriptor_layout_, nullptr);
-    pipeline_layout_ = VK_NULL_HANDLE;
-    descriptor_pool_ = VK_NULL_HANDLE;
+    pipeline_layout_   = VK_NULL_HANDLE;
+    descriptor_pool_   = VK_NULL_HANDLE;
     descriptor_layout_ = VK_NULL_HANDLE;
-    scene_revision_ = std::numeric_limits<std::uint64_t>::max();
-    device_ = VK_NULL_HANDLE;
+    scene_revision_    = std::numeric_limits<std::uint64_t>::max();
+    device_            = VK_NULL_HANDLE;
 }
 
 void SceneRenderer::request_hdr_capture() {
     capture_hdr_ = true;
 }
+
 minirender::Image SceneRenderer::read_hdr_capture() {
     return targets_.readback();
 }

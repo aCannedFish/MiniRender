@@ -29,20 +29,25 @@ void require(bool condition, const char* message) {
         throw std::runtime_error(message);
     }
 }
+
 template <class T> T* control(Workbench& window, const char* name) {
     auto* result = window.findChild<T*>(name);
     require(result != nullptr, "SDF control is missing");
     return result;
 }
+
 void click(Workbench& window, const char* name) {
     control<QPushButton>(window, name)->click();
 }
+
 void number(Workbench& window, const char* name, double value) {
     control<QDoubleSpinBox>(window, name)->setValue(value);
 }
+
 void select(Workbench& window, const char* name, int index) {
     control<QComboBox>(window, name)->setCurrentIndex(index);
 }
+
 std::string bytes(const std::filesystem::path& path) {
     std::ifstream stream(path, std::ios::binary);
     return {std::istreambuf_iterator<char>(stream), {}};
@@ -66,12 +71,12 @@ void drag(VulkanViewport& viewport) {
 // 控件映射到页面坐标后检查边界和交叠，覆盖嵌套表单中的三分量控件。
 void layout(Workbench& window) {
     auto* panel = window.sdf_panel();
-    auto* area = qobject_cast<QScrollArea*>(window.panels()->currentWidget());
+    auto* area  = qobject_cast<QScrollArea*>(window.panels()->currentWidget());
     require(area && area->widget() == panel, "SDF page is not selected");
     require(panel->width() <= area->viewport()->width(), "SDF panel needs horizontal scrolling");
     std::vector<std::pair<QWidget*, QRect>> fields;
-    QWidget* bottom = nullptr;
-    int last_y = 0;
+    QWidget*                                bottom = nullptr;
+    int                                     last_y = 0;
     for (auto* child : panel->findChildren<QWidget*>()) {
         if (!child->objectName().startsWith("sdf_") || !child->isVisibleTo(panel)) {
             continue;
@@ -102,33 +107,33 @@ void layout(Workbench& window) {
 }
 
 struct State {
-    int stage = 0;
-    int frame = 0;
-    int ticks = 0;
-    int edits = 0;
+    int                stage = 0;
+    int                frame = 0;
+    int                ticks = 0;
+    int                edits = 0;
     minirender::Camera original_camera;
     minirender::Camera saved_camera;
-    std::size_t objects = 0;
-    std::size_t meshes = 0;
-    std::uint64_t mesh_uploads = 0;
-    UiResponseProbe* probe = nullptr; // Qt 父对象拥有探针，State 只保留观察指针。
+    std::size_t        objects      = 0;
+    std::size_t        meshes       = 0;
+    std::uint64_t      mesh_uploads = 0;
+    UiResponseProbe*   probe        = nullptr; // Qt 父对象拥有探针，State 只保留观察指针。
 };
 
 } // namespace
 
 void start_sdf_editor_smoke(Workbench& window, const QString& directory, bool enforce_response) {
-    auto state = std::make_shared<State>();
+    auto state             = std::make_shared<State>();
     state->original_camera = window.document().camera;
-    state->objects = window.document().objects.size();
-    state->meshes = window.document().meshes.size();
-    state->mesh_uploads = window.viewport()->upload_statistics().mesh_uploads;
-    state->probe = new UiResponseProbe(&window, "SDF");
-    auto* timer = new QTimer(&window);
+    state->objects         = window.document().objects.size();
+    state->meshes          = window.document().meshes.size();
+    state->mesh_uploads    = window.viewport()->upload_statistics().mesh_uploads;
+    state->probe           = new UiResponseProbe(&window, "SDF");
+    auto* timer            = new QTimer(&window);
     timer->setInterval(70);
     QObject::connect(
         timer, &QTimer::timeout, &window, [state, timer, &window, directory, enforce_response] {
-            auto* viewport = window.viewport();
-            auto* panel = window.sdf_panel();
+            auto*      viewport = window.viewport();
+            auto*      panel    = window.sdf_panel();
             const auto path =
                 std::filesystem::path((directory + "/距离场 编辑.sdf.json").toStdU16String());
             const auto file = QString::fromStdU16String(path.u16string());
@@ -204,9 +209,9 @@ void start_sdf_editor_smoke(Workbench& window, const QString& directory, bool en
                     advance();
                     return;
                 case 3: {
-                    auto precise = panel->document();
+                    auto precise                   = panel->document();
                     precise.nodes[0].translation.y = .8543217F;
-                    precise.trace.epsilon = .000123456789;
+                    precise.trace.epsilon          = .000123456789;
                     minirender::save_sdf(precise, path);
                     panel->load_file(file);
                     select(window, "sdf_nodes", 0);
@@ -248,7 +253,7 @@ void start_sdf_editor_smoke(Workbench& window, const QString& directory, bool en
                         output << "{\"format\":\"triangle-scene\"}";
                     }
                     const auto original = bytes(protected_path);
-                    bool rejected = false;
+                    bool       rejected = false;
                     try {
                         panel->save_file(QString::fromStdU16String(protected_path.u16string()));
                     } catch (const std::exception&) {

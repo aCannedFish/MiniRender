@@ -26,6 +26,7 @@ namespace {
 class EditorStyle final : public QProxyStyle {
   public:
     EditorStyle() : QProxyStyle(QStyleFactory::create("Fusion")) {}
+
     int pixelMetric(PixelMetric metric, const QStyleOption* option,
                     const QWidget* widget) const override {
         switch (metric) {
@@ -57,7 +58,7 @@ void draw_icon(QPainter& p, Icon kind) {
     };
     auto path = [&](std::initializer_list<QPointF> points) {
         QPainterPath shape;
-        bool first = true;
+        bool         first = true;
         for (auto point : points) {
             if (first) {
                 shape.moveTo(point);
@@ -238,7 +239,7 @@ QLabel* section(const QString& title, QWidget* parent) {
 QWidget* inspector_navigation(QTabWidget* tabs, const std::vector<int>& page_ids,
                               const std::function<void(int)>& activate) {
     auto* container = new QWidget;
-    auto* layout = new QVBoxLayout(container);
+    auto* layout    = new QVBoxLayout(container);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     auto* navigation = new QWidget(container);

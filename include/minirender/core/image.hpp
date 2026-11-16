@@ -37,13 +37,13 @@ class Image {
 
     // PNG/JPEG 8/16 位输入按 encoding 解码；HDR/EXR 必须声明为 linear。
     static Image read(const std::filesystem::path& path,
-                      ColorEncoding encoding = ColorEncoding::srgb);
+                      ColorEncoding                encoding = ColorEncoding::srgb);
     void write_png(
         const std::filesystem::path& path) const; // 线性值编码为 RGB8 sRGB，不做 tone mapping。
 
   private:
-    std::size_t width_;
-    std::size_t height_;
+    std::size_t            width_;
+    std::size_t            height_;
     std::vector<glm::vec3> pixels_;
 };
 

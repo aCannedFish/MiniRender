@@ -7,26 +7,28 @@ namespace minirender {
 
 struct LightFieldCaptureSettings {
     RenderSettings render{128, 128, 32, 101};
-    std::uint32_t columns = 5, rows = 5;
-    double aperture_radius = .04, reference_focus = 4;
-    std::uint64_t memory_budget_bytes = 256ULL * 1024 * 1024;
-    std::uint32_t threads = 0, tile_size = 16;
+    std::uint32_t  columns = 5, rows = 5;
+    double         aperture_radius = .04, reference_focus = 4;
+    std::uint64_t  memory_budget_bytes = 256ULL * 1024 * 1024;
+    std::uint32_t  threads = 0, tile_size = 16;
 };
 enum class LightFieldPhase { preparing, rendering, writing, finalizing };
+
 struct LightFieldCaptureProgress {
-    RenderState state = RenderState::idle;
-    LightFieldPhase phase = LightFieldPhase::preparing;
-    std::uint64_t job_id = 0, recorded_samples = 0, total_samples = 0;
-    std::size_t current_view = 0, completed_views = 0, total_views = 0;
-    std::uint64_t work_completed = 0, work_total = 0, estimated_bytes = 0, payload_bytes = 0;
-    std::uint32_t workers = 0;
-    double elapsed_seconds = 0;
-    PathStatistics statistics;
-    std::string error;
+    RenderState     state  = RenderState::idle;
+    LightFieldPhase phase  = LightFieldPhase::preparing;
+    std::uint64_t   job_id = 0, recorded_samples = 0, total_samples = 0;
+    std::size_t     current_view = 0, completed_views = 0, total_views = 0;
+    std::uint64_t   work_completed = 0, work_total = 0, estimated_bytes = 0, payload_bytes = 0;
+    std::uint32_t   workers         = 0;
+    double          elapsed_seconds = 0;
+    PathStatistics  statistics;
+    std::string     error;
 };
+
 struct LightFieldCapturePreview {
-    std::uint64_t job_id = 0;
-    std::size_t view = 0, completed_views = 0;
+    std::uint64_t                job_id = 0;
+    std::size_t                  view = 0, completed_views = 0;
     std::shared_ptr<const Image> image;
 };
 
@@ -37,7 +39,7 @@ class LightFieldCaptureSession final {
   public:
     LightFieldCaptureSession();
     ~LightFieldCaptureSession();
-    LightFieldCaptureSession(const LightFieldCaptureSession&) = delete;
+    LightFieldCaptureSession(const LightFieldCaptureSession&)            = delete;
     LightFieldCaptureSession& operator=(const LightFieldCaptureSession&) = delete;
     void start(std::shared_ptr<const SceneSnapshot> scene, LightFieldCaptureSettings settings,
                IntegratorSettings integrator = {});

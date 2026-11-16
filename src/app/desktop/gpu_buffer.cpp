@@ -14,16 +14,18 @@ void check_vk(VkResult result, const char* operation) {
 GpuBuffer::~GpuBuffer() {
     release();
 }
+
 GpuBuffer::GpuBuffer(GpuBuffer&& other) noexcept {
     *this = std::move(other);
 }
+
 GpuBuffer& GpuBuffer::operator=(GpuBuffer&& other) noexcept {
     if (this != &other) {
         release();
         device_ = std::exchange(other.device_, VK_NULL_HANDLE);
         buffer_ = std::exchange(other.buffer_, VK_NULL_HANDLE);
         memory_ = std::exchange(other.memory_, VK_NULL_HANDLE);
-        size_ = std::exchange(other.size_, 0);
+        size_   = std::exchange(other.size_, 0);
     }
     return *this;
 }
@@ -32,10 +34,10 @@ void GpuBuffer::create(VkDevice device, VkPhysicalDevice physical, VkDeviceSize 
                        VkBufferUsageFlags usage) {
     release();
     device_ = device;
-    size_ = bytes;
+    size_   = bytes;
     VkBufferCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    info.size = bytes;
+    info.size  = bytes;
     info.usage = usage;
     check_vk(vkCreateBuffer(device_, &info, nullptr, &buffer_), "create buffer");
     VkMemoryRequirements requirements{};
@@ -47,8 +49,8 @@ void GpuBuffer::create(VkDevice device, VkPhysicalDevice physical, VkDeviceSize 
         if ((requirements.memoryTypeBits & (1U << index)) != 0 &&
             (memory.memoryTypes[index].propertyFlags & flags) == flags) {
             VkMemoryAllocateInfo allocate{};
-            allocate.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-            allocate.allocationSize = requirements.size;
+            allocate.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            allocate.allocationSize  = requirements.size;
             allocate.memoryTypeIndex = index;
             check_vk(vkAllocateMemory(device_, &allocate, nullptr, &memory_),
                      "allocate host buffer");
@@ -87,7 +89,7 @@ void GpuBuffer::release() {
     device_ = VK_NULL_HANDLE;
     buffer_ = VK_NULL_HANDLE;
     memory_ = VK_NULL_HANDLE;
-    size_ = 0;
+    size_   = 0;
 }
 
 VkBuffer GpuBuffer::handle() const noexcept {

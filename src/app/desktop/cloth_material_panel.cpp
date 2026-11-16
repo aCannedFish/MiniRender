@@ -29,6 +29,7 @@ QDoubleSpinBox* scalar(QWidget* parent, const QString& name, double low, double 
     spin->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     return spin;
 }
+
 QFormLayout* form(QWidget* widget) {
     auto* layout = new QFormLayout(widget);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -37,6 +38,7 @@ QFormLayout* form(QWidget* widget) {
     layout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     return layout;
 }
+
 QString curve_text(const std::vector<double>& values) {
     QStringList text;
     for (const auto value : values) {
@@ -44,6 +46,7 @@ QString curve_text(const std::vector<double>& values) {
     }
     return text.join(", ");
 }
+
 std::vector<double> curve_values(const QString& text) {
     const auto tokens = text.split(QRegularExpression("[,\\s]+"), Qt::SkipEmptyParts);
     if (tokens.empty() || tokens.size() > 16) {
@@ -51,7 +54,7 @@ std::vector<double> curve_values(const QString& text) {
     }
     std::vector<double> result;
     for (const auto& token : tokens) {
-        bool ok = false;
+        bool         ok    = false;
         const double value = QLocale::c().toDouble(token, &ok);
         if (!ok) {
             throw std::invalid_argument("曲线包含无效数值。");
@@ -66,7 +69,7 @@ std::vector<double> curve_values(const QString& text) {
 ClothMaterialPanel::ClothMaterialPanel(QWidget* parent) : QWidget(parent) {
     setObjectName("cloth_material_panel");
     auto* layout = form(this);
-    auto* hint = new QLabel(
+    auto* hint   = new QLabel(
         "底色和纹理调节内部散射，表面高光保持白色。实时环境光采用平均纱线颜色近似。", this);
     hint->setTextFormat(Qt::PlainText);
     hint->setWordWrap(true);
@@ -78,7 +81,7 @@ ClothMaterialPanel::ClothMaterialPanel(QWidget* parent) : QWidget(parent) {
     }
     auto* apply = new QPushButton("使用预置", this);
     apply->setObjectName("cloth_apply_preset");
-    auto* row = new QWidget(this);
+    auto* row     = new QWidget(this);
     auto* buttons = new QHBoxLayout(row);
     buttons->setContentsMargins(0, 0, 0, 0);
     buttons->addWidget(preset_, 1);
@@ -96,11 +99,11 @@ ClothMaterialPanel::ClothMaterialPanel(QWidget* parent) : QWidget(parent) {
             on_changed(preset.appearance, preset.ior);
         }
     });
-    rotation_ = scalar(this, "cloth_rotation", -3600, 3600, 5);
-    coverage_ = scalar(this, "cloth_coverage", .01, 1, .01);
-    ratio_ = scalar(this, "cloth_warp_ratio", 0, 1, .01);
+    rotation_    = scalar(this, "cloth_rotation", -3600, 3600, 5);
+    coverage_    = scalar(this, "cloth_coverage", .01, 1, .01);
+    ratio_       = scalar(this, "cloth_warp_ratio", 0, 1, .01);
     correlation_ = scalar(this, "cloth_correlation", 1, 90, 1);
-    samples_ = new QSpinBox(this);
+    samples_     = new QSpinBox(this);
     samples_->setObjectName("cloth_tangent_samples");
     samples_->setRange(1, 16);
     samples_->setKeyboardTracking(false);
@@ -130,7 +133,7 @@ ClothMaterialPanel::ClothMaterialPanel(QWidget* parent) : QWidget(parent) {
     });
     connect(ratio_, &QDoubleSpinBox::valueChanged, this, [this](double value) {
         edit([&](auto& settings) {
-            const double total = settings.coverage[0] + settings.coverage[1];
+            const double total   = settings.coverage[0] + settings.coverage[1];
             settings.coverage[0] = total * value;
             settings.coverage[1] = total - settings.coverage[0];
         });
@@ -147,11 +150,11 @@ ClothMaterialPanel::ClothMaterialPanel(QWidget* parent) : QWidget(parent) {
 
 void ClothMaterialPanel::build_thread(std::size_t index, QFormLayout* layout) {
     const QString prefix = index == 0 ? "cloth_warp" : "cloth_weft";
-    auto* group = new QGroupBox(index == 0 ? "经向纱线" : "纬向纱线", this);
-    auto* fields = form(group);
+    auto*         group  = new QGroupBox(index == 0 ? "经向纱线" : "纬向纱线", this);
+    auto*         fields = form(group);
     fields->setContentsMargins(8, 12, 8, 12);
-    auto& controls = threads_[index];
-    auto* color = new QWidget(group);
+    auto& controls   = threads_[index];
+    auto* color      = new QWidget(group);
     auto* components = new QHBoxLayout(color);
     components->setContentsMargins(0, 0, 0, 0);
     components->setSpacing(6);
@@ -169,9 +172,9 @@ void ClothMaterialPanel::build_thread(std::size_t index, QFormLayout* layout) {
             });
     }
     color->setMinimumWidth(components->minimumSize().width());
-    controls.kd = scalar(group, prefix + ".kd", 0, 1, .05);
+    controls.kd      = scalar(group, prefix + ".kd", 0, 1, .05);
     controls.surface = scalar(group, prefix + ".surface_width", 1, 90, .5);
-    controls.volume = scalar(group, prefix + ".volume_width", 1, 90, .5);
+    controls.volume  = scalar(group, prefix + ".volume_width", 1, 90, .5);
     fields->addRow(new QLabel("颜色 RGB", group));
     fields->addRow(color);
     fields->addRow("各向同性比例", controls.kd);
@@ -186,7 +189,7 @@ void ClothMaterialPanel::build_thread(std::size_t index, QFormLayout* layout) {
     connect(controls.volume, &QDoubleSpinBox::valueChanged, this, [this, index](double value) {
         edit([&](auto& settings) { settings.threads[index].volume_width_degrees = value; });
     });
-    controls.angles = new QLineEdit(group);
+    controls.angles  = new QLineEdit(group);
     controls.lengths = new QLineEdit(group);
     controls.angles->setObjectName(prefix + ".angles");
     controls.lengths->setObjectName(prefix + ".lengths");
@@ -202,7 +205,7 @@ void ClothMaterialPanel::build_thread(std::size_t index, QFormLayout* layout) {
 }
 
 void ClothMaterialPanel::set_material(const minirender::Material* material,
-                                      std::uint64_t scene_generation) {
+                                      std::uint64_t               scene_generation) {
     const bool enabled = material && material->kind == minirender::MaterialKind::cloth;
     setVisible(enabled);
     if (!enabled) {
@@ -219,8 +222,8 @@ void ClothMaterialPanel::set_material(const minirender::Material* material,
         }
     }
     material_id_ = material->id;
-    generation_ = scene_generation;
-    appearance_ = material->cloth;
+    generation_  = scene_generation;
+    appearance_  = material->cloth;
     refresh();
 }
 
@@ -228,7 +231,7 @@ void ClothMaterialPanel::refresh() {
     if (!appearance_) {
         return;
     }
-    refreshing_ = true;
+    refreshing_          = true;
     const auto& settings = appearance_->settings();
     rotation_->setValue(settings.rotation_degrees);
     correlation_->setValue(settings.correlation_width_degrees);
@@ -237,8 +240,8 @@ void ClothMaterialPanel::refresh() {
     coverage_->setValue(total);
     ratio_->setValue(settings.coverage[0] / total);
     for (std::size_t i = 0; i < 2; ++i) {
-        auto& controls = threads_[i];
-        const auto& thread = settings.threads[i];
+        auto&       controls = threads_[i];
+        const auto& thread   = settings.threads[i];
         for (int channel = 0; channel < 3; ++channel) {
             controls.color[std::size_t(channel)]->setValue(thread.albedo[channel]);
         }
@@ -279,7 +282,7 @@ void ClothMaterialPanel::apply_curve(std::size_t index) {
         return;
     }
     try {
-        auto settings = appearance_->settings();
+        auto settings                 = appearance_->settings();
         settings.threads[index].curve = {curve_values(threads_[index].angles->text()),
                                          curve_values(threads_[index].lengths->text())};
         const auto next = std::make_shared<const minirender::ClothAppearance>(std::move(settings));

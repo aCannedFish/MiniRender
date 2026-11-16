@@ -14,9 +14,11 @@ void require(bool condition, const char* message) {
         throw std::invalid_argument(message);
     }
 }
+
 bool range(double value, double low, double high) {
     return std::isfinite(value) && value >= low && value <= high;
 }
+
 double curve_angle(const ClothTangentCurve& curve, double position) {
     for (std::size_t segment = 0; segment < curve.lengths.size(); ++segment) {
         const double length = curve.lengths[segment];
@@ -66,39 +68,42 @@ ClothAppearance::ClothAppearance(ClothAppearanceSettings settings)
     : settings_(std::move(settings)) {
     settings_.validate();
     for (std::uint32_t thread = 0; thread < 2; ++thread) {
-        const auto& curve = settings_.threads[thread].curve;
+        const auto&  curve  = settings_.threads[thread].curve;
         const double length = std::accumulate(curve.lengths.begin(), curve.lengths.end(), 0.0);
         for (std::uint32_t sample = 0; sample < settings_.samples_per_thread; ++sample) {
             const double position = (sample + .5) * length / settings_.samples_per_thread;
-            const double angle = curve_angle(curve, position) * std::numbers::pi / 180;
+            const double angle    = curve_angle(curve, position) * std::numbers::pi / 180;
             samples_.push_back({std::cos(angle), std::sin(angle),
                                 settings_.coverage[thread] / settings_.samples_per_thread, thread});
         }
     }
 }
+
 const ClothAppearanceSettings& ClothAppearance::settings() const noexcept {
     return settings_;
 }
+
 std::span<const ClothTangentSample> ClothAppearance::samples() const noexcept {
     return samples_;
 }
+
 double ClothAppearance::coverage() const noexcept {
     return settings_.coverage[0] + settings_.coverage[1];
 }
 
 ClothPreset make_cloth_preset(const std::string& name) {
     ClothAppearanceSettings settings;
-    double ior = 1.46;
+    double                  ior = 1.46;
     if (name == "linen") {
         // 默认值对应 Table II(a)，两个方向均覆盖 0.33。
     } else if (name == "silk") {
-        ior = 1.345;
-        settings.coverage = {.75, .25};
+        ior                 = 1.345;
+        settings.coverage   = {.75, .25};
         settings.threads[0] = {{.12, .114, .006}, .2, 5, 10, {{-35, -35, 35, 35}, {1, 1, 1}}};
         settings.threads[1] = {{.16, .152, .008}, .3, 18, 32, {{0, 0}, {1}}};
     } else if (name == "satin") {
-        ior = 1.539;
-        settings.coverage = {.9, .1};
+        ior                 = 1.539;
+        settings.coverage   = {.9, .1};
         settings.threads[0] = {
             {.035, .01295, .0105},
             .1,
@@ -107,8 +112,8 @@ ClothPreset make_cloth_preset(const std::string& name) {
             {{-32, -32, -18, 0, 0, 18, 32, 32}, {1.33, .66, 2, 2, 2, .66, 1.33}}};
         settings.threads[1] = {{.2, .074, .06}, .7, 30, 60, {{0, 0}, {1}}};
     } else if (name == "shot") {
-        ior = 1.345;
-        settings.coverage = {.86, .14};
+        ior                 = 1.345;
+        settings.coverage   = {.86, .14};
         settings.threads[0] = {{.02, .2, .08}, .1, 4, 8, {{-25, -25, 25, 25}, {1.33, 2.67, 1.33}}};
         settings.threads[1] = {{.6, 0, .06}, .1, 5, 10, {{0, 0}, {1}}};
     } else {

@@ -18,15 +18,15 @@ FrozenCloth ClothSimulation::freeze(CancellationToken cancellation) const {
     }
     std::vector<glm::dvec3> sums(rest_.size(), glm::dvec3(0));
     std::vector<glm::dvec3> largest(rest_.size(), glm::dvec3(0));
-    std::vector<double> areas(rest_.size(), 0);
+    std::vector<double>     areas(rest_.size(), 0);
     for (std::size_t i = 0; i < triangles_.size(); ++i) {
         if (i % 512 == 0) {
             cancellation.check();
         }
         const auto [a, b, c] = triangles_[i];
         const glm::dvec3 p = mesh->positions[a], q = mesh->positions[b], r = mesh->positions[c];
-        const auto area = glm::cross(q - p, r - p);
-        const double length = glm::length(area);
+        const auto       area   = glm::cross(q - p, r - p);
+        const double     length = glm::length(area);
         if (!std::isfinite(length) || length <= 1e-10) {
             throw std::runtime_error("Cloth has a degenerate triangle; cannot freeze this frame");
         }
@@ -43,7 +43,7 @@ FrozenCloth ClothSimulation::freeze(CancellationToken cancellation) const {
             cancellation.check();
         }
         const auto direction = glm::length(sums[i]) > 1e-12 * areas[i] ? sums[i] : largest[i];
-        sums[i] = glm::normalize(direction);
+        sums[i]              = glm::normalize(direction);
     }
     for (std::size_t i = 0; i < triangles_.size(); ++i) {
         if (i % 512 == 0) {
@@ -51,7 +51,7 @@ FrozenCloth ClothSimulation::freeze(CancellationToken cancellation) const {
         }
         MeshTriangle face;
         for (std::size_t corner = 0; corner < 3; ++corner) {
-            const auto index = triangles_[i][corner];
+            const auto index     = triangles_[i][corner];
             face.corners[corner] = {
                 index,
                 glm::vec3(sums[index]),

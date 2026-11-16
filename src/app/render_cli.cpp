@@ -16,7 +16,7 @@
 namespace {
 
 template <typename T> T number(std::string_view text) {
-    T result{};
+    T    result{};
     bool valid = false;
     if constexpr (std::is_floating_point_v<T>) {
         // macOS 14 的 libc++ 尚无浮点 from_chars。固定 classic locale，避免系统小数格式影响 CLI。
@@ -26,13 +26,14 @@ template <typename T> T number(std::string_view text) {
         valid = static_cast<bool>(input) && input.peek() == std::char_traits<char>::eof();
     } else {
         const auto parsed = std::from_chars(text.data(), text.data() + text.size(), result);
-        valid = parsed.ec == std::errc{} && parsed.ptr == text.data() + text.size();
+        valid             = parsed.ec == std::errc{} && parsed.ptr == text.data() + text.size();
     }
     if (!valid) {
         throw std::invalid_argument("Invalid numeric render option: " + std::string(text));
     }
     return result;
 }
+
 std::filesystem::path native_path(std::string_view text) {
     return std::filesystem::path(std::u8string(text.begin(), text.end()));
 }
@@ -47,10 +48,10 @@ int run_render_cli(int argc, char** argv) {
             "N --batch N --integrator path|sppm --photons N --radius M --alpha A --sppm-memory-mb "
             "N]");
     }
-    minirender::RenderSettings render;
+    minirender::RenderSettings     render;
     minirender::IntegratorSettings integrator;
-    minirender::SessionSettings session_settings;
-    double exposure = 0;
+    minirender::SessionSettings    session_settings;
+    double                         exposure = 0;
     for (int index = 2; index < argc; ++index) {
         const std::string_view option(argv[index]);
         if (option == "--no-rr") {
@@ -133,10 +134,10 @@ int run_render_cli(int argc, char** argv) {
         throw std::runtime_error(progress.error.empty() ? "Render did not complete"
                                                         : progress.error);
     }
-    const auto image = session.result();
+    const auto  image      = session.result();
     const auto& statistics = progress.statistics;
-    const auto finished = std::chrono::steady_clock::now();
-    auto prefix = native_path(argv[1]);
+    const auto  finished   = std::chrono::steady_clock::now();
+    auto        prefix     = native_path(argv[1]);
     if (prefix.extension() == ".png" || prefix.extension() == ".exr") {
         prefix.replace_extension();
     }

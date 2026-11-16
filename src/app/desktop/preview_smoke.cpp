@@ -21,27 +21,33 @@
 
 namespace {
 using namespace minirender;
+
 void require(bool condition, const char* error) {
     if (!condition) {
         throw std::runtime_error(error);
     }
 }
+
 std::filesystem::path native(const QString& path) {
     const auto bytes = path.toUtf8();
     return std::filesystem::path(std::u8string(bytes.begin(), bytes.end()));
 }
+
 void mode(Workbench& window, int value) {
     window.findChild<QComboBox*>("viewport_view_mode")->setCurrentIndex(value);
     require(window.viewport()->view_mode() == value &&
                 window.findChild<QComboBox*>("view_mode")->currentIndex() == value,
             "Preview mode selectors are not synchronized");
 }
+
 void occlusion(Workbench& window, bool enabled) {
     window.findChild<QCheckBox*>("preview_occlusion")->setChecked(enabled);
 }
+
 template <typename V> auto max_component(const V& v) {
     return std::max({v.x, v.y, v.z});
 }
+
 double difference(const Image& a, const Image& b) {
     require(a.width() == b.width() && a.height() == b.height(), "Preview dimensions changed");
     double error = 0;
@@ -55,13 +61,13 @@ double difference(const Image& a, const Image& b) {
 
 // BVH 独立决定最近可见物体，逐像素比较线性底色和 sRGB 显示；排除轮廓与三角形边界。
 void verify_colors(Workbench& window, const Image& hdr, const QImage& screen) {
-    const auto scene = window.viewport()->scene();
-    const SceneBvh bvh(scene);
-    const auto& camera = window.viewport()->camera();
-    const double aspect = double(hdr.width()) / double(hdr.height());
+    const auto                 scene = window.viewport()->scene();
+    const SceneBvh             bvh(scene);
+    const auto&                camera = window.viewport()->camera();
+    const double               aspect = double(hdr.width()) / double(hdr.height());
     std::map<std::string, int> counts;
-    int texture_samples = 0;
-    double maximum = 0;
+    int                        texture_samples = 0;
+    double                     maximum         = 0;
     for (std::size_t y = 8; y + 8 < hdr.height(); y += 9) {
         for (std::size_t x = 8; x + 8 < hdr.width(); x += 9) {
             const auto ray = camera.generate_ray(
@@ -74,7 +80,7 @@ void verify_colors(Workbench& window, const Image& hdr, const QImage& screen) {
             }
             const auto& instance = scene->instances[hit->instance_index];
             const auto& material = instance.material;
-            auto expected = material.base_color;
+            auto        expected = material.base_color;
             if (instance.base_color_texture) {
                 expected *= glm::clamp(
                     instance.base_color_texture->sample(hit->uv, 0, material.texture_filter),
@@ -130,11 +136,11 @@ void verify_ao(const Image& plain, const Image& shaded) {
 }
 
 struct State {
-    int stage = 0, ticks = 0, frame = 0;
+    int                          stage = 0, ticks = 0, frame = 0;
     std::shared_ptr<const Image> plain, shaded, lit, offline;
-    SceneUploadStatistics uploads;
-    SceneDocument cornell;
-    std::filesystem::path source;
+    SceneUploadStatistics        uploads;
+    SceneDocument                cornell;
+    std::filesystem::path        source;
 };
 } // namespace
 
@@ -142,7 +148,7 @@ void start_preview_smoke(Workbench& window, const QString& directory) {
     require(QDir().mkpath(directory), "Cannot create preview directory");
     require(window.viewport()->view_mode() == VulkanViewport::base_color_preview_mode,
             "Startup did not use base color preview");
-    auto state = std::make_shared<State>();
+    auto  state = std::make_shared<State>();
     auto* timer = new QTimer(&window);
     timer->setInterval(60);
     QObject::connect(timer, &QTimer::timeout, &window, [state, timer, &window, directory] {
@@ -211,7 +217,7 @@ void start_preview_smoke(Workbench& window, const QString& directory) {
                         .render({8, 8, 4, 101});
                 require(difference(*state->offline, offline) == 0,
                         "Preview changes modified the scene used by offline rendering");
-                auto bright = state->cornell;
+                auto bright        = state->cornell;
                 bright.environment = {5, 3, 2};
                 bright.directional_lights.push_back({"test", {-1, -2, -1}, {1, .8F, .6F}, 10});
                 save_scene(bright, native(directory + "/bright.json"));
@@ -239,7 +245,7 @@ void start_preview_smoke(Workbench& window, const QString& directory) {
                     for (auto& material : scene.materials) {
                         material.texture_filter = TextureFilter::nearest;
                         if (material.id == "blue") {
-                            material.kind = MaterialKind::cloth;
+                            material.kind  = MaterialKind::cloth;
                             material.cloth = make_cloth_preset("linen").appearance;
                         }
                     }

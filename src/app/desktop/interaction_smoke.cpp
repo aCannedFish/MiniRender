@@ -32,9 +32,9 @@ void mouse(VulkanViewport& viewport, QEvent::Type type, QPointF point, Qt::Mouse
 
 // 比较同一表单的兄弟字段，滚动内容可以高于 viewport，但不能水平越界或彼此重叠。
 void check_form(QScrollArea& area) {
-    auto* panel = area.widget();
+    auto*                 panel = area.widget();
     std::vector<QWidget*> fields;
-    auto* form = qobject_cast<QFormLayout*>(panel->layout());
+    auto*                 form = qobject_cast<QFormLayout*>(panel->layout());
     require(form != nullptr, "Inspector panel is missing its form layout");
     for (int index = 0; index < form->count(); ++index) {
         auto* widget = form->itemAt(index)->widget();
@@ -68,23 +68,23 @@ void check_form(QScrollArea& area) {
 }
 
 struct State {
-    int tick = 0;
-    int heartbeats = 0;
-    int gesture = 0;
-    int step = 0;
-    int frame_at_start = 0;
-    int layout_step = 0;
+    int                tick           = 0;
+    int                heartbeats     = 0;
+    int                gesture        = 0;
+    int                step           = 0;
+    int                frame_at_start = 0;
+    int                layout_step    = 0;
     minirender::Camera before;
-    QElapsedTimer clock;
-    qint64 previous_tick = 0;
-    qint64 maximum_gap = 0;
+    QElapsedTimer      clock;
+    qint64             previous_tick = 0;
+    qint64             maximum_gap   = 0;
 };
 
 } // namespace
 
 void start_interaction_smoke(Workbench& window, const QString&) {
-    const auto state = std::make_shared<State>();
-    auto* heartbeat = new QTimer(&window);
+    const auto state     = std::make_shared<State>();
+    auto*      heartbeat = new QTimer(&window);
     heartbeat->setInterval(10);
     QObject::connect(heartbeat, &QTimer::timeout, &window, [state] { ++state->heartbeats; });
     heartbeat->start();
@@ -108,9 +108,9 @@ void start_interaction_smoke(Workbench& window, const QString&) {
                 state->maximum_gap = std::max(state->maximum_gap, now - state->previous_tick);
             }
             state->previous_tick = now;
-            auto* tabs = window.panels();
+            auto* tabs           = window.panels();
             if (state->gesture < 6) {
-                const auto button = state->gesture % 3 == 1 ? Qt::RightButton : Qt::LeftButton;
+                const auto button    = state->gesture % 3 == 1 ? Qt::RightButton : Qt::LeftButton;
                 const auto modifiers = state->gesture % 3 == 2 ? Qt::ShiftModifier : Qt::NoModifier;
                 const QPointF origin(viewport->width() * 0.5, viewport->height() * 0.5);
                 if (state->step == 0) {

@@ -7,7 +7,7 @@ namespace minirender::detail {
 struct LightFieldAccess {
     static std::shared_ptr<const LightFieldFile> retain(std::shared_ptr<const LightFieldFile> file,
                                                         std::shared_ptr<const void> lifetime) {
-        auto result = std::shared_ptr<LightFieldFile>(new LightFieldFile(*file));
+        auto result       = std::shared_ptr<LightFieldFile>(new LightFieldFile(*file));
         result->lifetime_ = std::move(lifetime);
         return result;
     }

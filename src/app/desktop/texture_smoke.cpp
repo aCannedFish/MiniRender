@@ -45,19 +45,19 @@ std::filesystem::path path(const QString& value) {
 
 void prepare_probe(Workbench& window, const QString& directory, float repeat,
                    const std::filesystem::path& image_path, minirender::TextureFilter filter) {
-    auto scene = window.document();
+    auto scene        = window.document();
     scene.environment = glm::vec3(1);
     scene.directional_lights.clear();
     scene.camera.position = {0, 4, 0};
-    scene.camera.target = {0, 0, 0};
-    scene.camera.up = {0, 0, -1};
+    scene.camera.target   = {0, 0, 0};
+    scene.camera.up       = {0, 0, -1};
     std::erase_if(scene.objects,
                   [](const minirender::SceneObject& object) { return object.id != "ground"; });
     require(scene.objects.size() == 1, "Texture probe requires the studio ground");
-    scene.objects[0].visible = true;
-    scene.objects[0].transform = {};
+    scene.objects[0].visible         = true;
+    scene.objects[0].transform       = {};
     scene.objects[0].transform.scale = {3, 1, 3};
-    const auto obj_path = path(directory + "/probe-plane.obj");
+    const auto obj_path              = path(directory + "/probe-plane.obj");
     std::ofstream(obj_path) << "v -1 0 -1\nv -1 0 1\nv 1 0 1\nv 1 0 -1\n"
                             << "vt 0 0\nvt 0 " << repeat << "\nvt " << repeat << ' ' << repeat
                             << "\nvt " << repeat << " 0\n"
@@ -76,11 +76,11 @@ void prepare_probe(Workbench& window, const QString& directory, float repeat,
     for (auto& material : scene.materials) {
         material.base_color_texture.clear();
         if (material.id == scene.objects[0].material_id) {
-            material.kind = minirender::MaterialKind::diffuse;
-            material.base_color = glm::vec3(1);
-            material.emission = glm::vec3(0);
+            material.kind               = minirender::MaterialKind::diffuse;
+            material.base_color         = glm::vec3(1);
+            material.emission           = glm::vec3(0);
             material.base_color_texture = "probe";
-            material.texture_filter = filter;
+            material.texture_filter     = filter;
         }
     }
     const auto filename = directory + "/probe.json";
@@ -91,26 +91,26 @@ void prepare_probe(Workbench& window, const QString& directory, float repeat,
 
 // 顶视平面在屏幕上是仿射映射；相邻像素射线给出与 GPU quad 导数对应的 UV footprint。
 void verify_sampling(Workbench& window, float repeat, minirender::TextureFilter filter) {
-    const auto image = window.viewport()->grab_hdr();
-    const auto& texture = *window.document().textures[0].data;
-    const auto& camera = window.viewport()->camera();
-    const float aspect = static_cast<float>(image.width()) / static_cast<float>(image.height());
-    const auto plane_uv = [&](glm::vec2 screen) {
-        const auto ray = camera.generate_ray(screen, aspect);
+    const auto  image    = window.viewport()->grab_hdr();
+    const auto& texture  = *window.document().textures[0].data;
+    const auto& camera   = window.viewport()->camera();
+    const float aspect   = static_cast<float>(image.width()) / static_cast<float>(image.height());
+    const auto  plane_uv = [&](glm::vec2 screen) {
+        const auto ray   = camera.generate_ray(screen, aspect);
         const auto point = ray.origin + ray.direction * (-ray.origin.y / ray.direction.y);
         return glm::vec2((point.x + 3) / 6, (point.z + 3) / 6) * repeat;
     };
     float maximum_error = 0;
-    float maximum_lod = 0;
-    int compared = 0;
+    float maximum_lod   = 0;
+    int   compared      = 0;
     for (int row = 2; row < 11; ++row) {
         for (int column = 2; column < 11; ++column) {
             const std::size_t x = image.width() * static_cast<std::size_t>(column) / 13;
             const std::size_t y = image.height() * static_cast<std::size_t>(row) / 13;
-            const glm::vec2 screen{
+            const glm::vec2   screen{
                 (static_cast<float>(x) + 0.5F) / static_cast<float>(image.width()),
                 (static_cast<float>(y) + 0.5F) / static_cast<float>(image.height())};
-            const auto uv = plane_uv(screen);
+            const auto      uv = plane_uv(screen);
             const glm::vec2 dimensions{static_cast<float>(texture.level(0).width()),
                                        static_cast<float>(texture.level(0).height())};
             if (filter == minirender::TextureFilter::nearest) {
@@ -127,9 +127,9 @@ void verify_sampling(Workbench& window, float repeat, minirender::TextureFilter 
                 (plane_uv(screen + glm::vec2(0, 1.0F / static_cast<float>(image.height()))) - uv) *
                 dimensions;
             const float lod = std::max(0.0F, std::log2(std::max(glm::length(dx), glm::length(dy))));
-            const auto expected = texture.sample(uv, lod, filter);
-            maximum_error = std::max(maximum_error, glm::length(image.at(x, y) - expected));
-            maximum_lod = std::max(maximum_lod, lod);
+            const auto  expected = texture.sample(uv, lod, filter);
+            maximum_error        = std::max(maximum_error, glm::length(image.at(x, y) - expected));
+            maximum_lod          = std::max(maximum_lod, lod);
             ++compared;
         }
     }
@@ -144,11 +144,11 @@ void verify_sampling(Workbench& window, float repeat, minirender::TextureFilter 
 }
 
 struct State {
-    int stage = 0;
-    int ticks = 0;
-    int frame_before_import = 0;
-    QImage original;
-    QImage textured;
+    int                   stage               = 0;
+    int                   ticks               = 0;
+    int                   frame_before_import = 0;
+    QImage                original;
+    QImage                textured;
     std::filesystem::path checker;
 };
 
@@ -156,9 +156,9 @@ struct State {
 
 void start_texture_smoke(Workbench& window, const QString& directory) {
     require(QDir().mkpath(directory), "Cannot create texture output directory");
-    auto state = std::make_shared<State>();
+    auto state     = std::make_shared<State>();
     state->checker = window.document().asset_directory / "assets/textures/checker.png";
-    auto* timer = new QTimer(&window);
+    auto* timer    = new QTimer(&window);
     timer->setInterval(150);
     QObject::connect(timer, &QTimer::timeout, &window, [state, timer, &window, directory] {
         try {
@@ -183,7 +183,7 @@ void start_texture_smoke(Workbench& window, const QString& directory) {
             switch (state->stage++) {
             case 0:
                 window.select_object("blue_cube");
-                state->original = capture("before-import");
+                state->original            = capture("before-import");
                 state->frame_before_import = window.viewport()->rendered_frames();
                 window.import_texture_file(QString::fromStdU16String(state->checker.u16string()),
                                            minirender::ColorEncoding::srgb);

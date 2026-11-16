@@ -10,11 +10,11 @@ enum class ClothColliderKind { sphere, plane };
 // visible 控制显示，enabled 独立控制碰撞；球体实例使用等比缩放。
 struct ClothCollider {
     ClothColliderKind kind = ClothColliderKind::sphere;
-    glm::dvec3 point{0};
-    glm::dvec3 normal{0, 1, 0};
-    double radius = 1;
-    double friction = .3;
-    bool enabled = true;
+    glm::dvec3        point{0};
+    glm::dvec3        normal{0, 1, 0};
+    double            radius   = 1;
+    double            friction = .3;
+    bool              enabled  = true;
     void validate() const;
 };
 

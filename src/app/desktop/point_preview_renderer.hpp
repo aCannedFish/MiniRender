@@ -22,14 +22,14 @@ class PointPreviewRenderer final : public ViewportRenderer {
   private:
     VkPipeline create_pipeline(bool lines, bool instanced);
     void upload();
-    VulkanViewport* viewport_;
-    VkDevice device_ = VK_NULL_HANDLE;
-    VkPipelineLayout layout_ = VK_NULL_HANDLE;
-    VkPipeline points_pipeline_ = VK_NULL_HANDLE;
-    VkPipeline normals_pipeline_ = VK_NULL_HANDLE;
-    VkPipeline boundary_pipeline_ = VK_NULL_HANDLE;
-    GpuBuffer points_;
-    GpuBuffer normals_;
-    GpuBuffer boundary_;
+    VulkanViewport*                                     viewport_;
+    VkDevice                                            device_            = VK_NULL_HANDLE;
+    VkPipelineLayout                                    layout_            = VK_NULL_HANDLE;
+    VkPipeline                                          points_pipeline_   = VK_NULL_HANDLE;
+    VkPipeline                                          normals_pipeline_  = VK_NULL_HANDLE;
+    VkPipeline                                          boundary_pipeline_ = VK_NULL_HANDLE;
+    GpuBuffer                                           points_;
+    GpuBuffer                                           normals_;
+    GpuBuffer                                           boundary_;
     std::shared_ptr<const minirender::PointPreviewData> uploaded_;
 };

@@ -12,7 +12,7 @@ void WorkbenchPanels::addTab(QWidget* widget, const QString& title) {
 }
 
 void WorkbenchPanels::build(QDockWidget* scene_tree) {
-    tree_dock_ = scene_tree;
+    tree_dock_   = scene_tree;
     object_dock_ = new QDockWidget("物体检查器", &window_);
     object_dock_->setObjectName("inspector_dock");
     object_dock_->setMinimumWidth(340);
@@ -27,10 +27,10 @@ void WorkbenchPanels::build(QDockWidget* scene_tree) {
     scene_tabs->setObjectName("scene_tabs");
     std::vector<int> object_ids, scene_ids;
     for (int index = 0; index < count(); ++index) {
-        auto& page = pages_[static_cast<std::size_t>(index)];
+        auto&      page   = pages_[static_cast<std::size_t>(index)];
         const bool object = index == 0 || index == 6 || index == 9;
-        page.tabs = object ? object_tabs : scene_tabs;
-        page.local_index = page.tabs->addTab(page.widget, page.title);
+        page.tabs         = object ? object_tabs : scene_tabs;
+        page.local_index  = page.tabs->addTab(page.widget, page.title);
         (object ? object_ids : scene_ids).push_back(index);
     }
     const auto activate = [this](int page) { setCurrentIndex(page); };
@@ -73,7 +73,7 @@ void WorkbenchPanels::restore() {
 }
 
 void WorkbenchPanels::setCurrentIndex(int page) {
-    auto& target = pages_.at(static_cast<std::size_t>(page));
+    auto&      target  = pages_.at(static_cast<std::size_t>(page));
     const bool changed = target.tabs->currentIndex() != target.local_index;
     target.tabs->setCurrentIndex(target.local_index);
     auto* dock = (page == 0 || page == 6 || page == 9) ? object_dock_ : scene_dock_;
@@ -84,21 +84,27 @@ void WorkbenchPanels::setCurrentIndex(int page) {
         on_current_changed(page);
     }
 }
+
 int WorkbenchPanels::currentIndex() const noexcept {
     return current_;
 }
+
 int WorkbenchPanels::count() const noexcept {
     return static_cast<int>(pages_.size());
 }
+
 QWidget* WorkbenchPanels::widget(int page) const {
     return pages_.at(static_cast<std::size_t>(page)).widget;
 }
+
 QWidget* WorkbenchPanels::currentWidget() const {
     return widget(current_);
 }
+
 QDockWidget* WorkbenchPanels::objectDock() const noexcept {
     return object_dock_;
 }
+
 QDockWidget* WorkbenchPanels::sceneDock() const noexcept {
     return scene_dock_;
 }

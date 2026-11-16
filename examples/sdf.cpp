@@ -12,7 +12,7 @@ int main() {
         const auto output = std::filesystem::current_path() / "outputs/a5.3/core";
         std::filesystem::create_directories(output);
         const auto document = make_sdf_example();
-        const auto path = output / std::filesystem::path(u8"距离场 示例.json");
+        const auto path     = output / std::filesystem::path(u8"距离场 示例.json");
         save_sdf(document, path);
         const auto reopened = load_sdf(path);
         for (const auto& [name, view] : {std::pair{"surface", SdfView::surface},
@@ -35,16 +35,16 @@ int main() {
         SdfDocument sphere;
         sphere.nodes.push_back({"sphere", "Sphere", SdfKind::sphere, {1, 0, 0}});
         sphere.camera.position = {0, 0, 4};
-        sphere.camera.target = {0, 0, 0};
+        sphere.camera.target   = {0, 0, 0};
         const SdfField field(sphere);
-        double maximum_error = 0;
-        std::size_t hits = 0;
-        std::size_t misses = 0;
+        double         maximum_error = 0;
+        std::size_t    hits          = 0;
+        std::size_t    misses        = 0;
         for (std::size_t y = 0; y < 128; ++y) {
             for (std::size_t x = 0; x < 128; ++x) {
                 const auto ray = sphere.camera.generate_ray(
                     {(static_cast<double>(x) + .5) / 128, (static_cast<double>(y) + .5) / 128}, 1);
-                const double b = glm::dot(ray.origin, ray.direction);
+                const double b            = glm::dot(ray.origin, ray.direction);
                 const double discriminant = b * b - glm::dot(ray.origin, ray.origin) + 1;
                 if (std::abs(discriminant) < .05) {
                     continue; // 轮廓附近另由图像检查覆盖，此处统计稳定解析样本。

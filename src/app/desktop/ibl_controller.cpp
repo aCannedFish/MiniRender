@@ -18,6 +18,7 @@ IblController::IblController(VulkanViewport& viewport, QObject* parent)
     connect(timer, &QTimer::timeout, this, [this] { poll(); });
     timer->start();
 }
+
 IblController::~IblController() {
     cancellation_.request();
     if (watcher_) {
@@ -25,6 +26,7 @@ IblController::~IblController() {
         watcher_->waitForFinished();
     }
 }
+
 std::shared_ptr<const minirender::IblEnvironment>
 IblController::cached(const std::shared_ptr<const minirender::Texture>& source) {
     std::erase_if(cache_, [](const auto& entry) { return entry.source.expired(); });
@@ -40,6 +42,7 @@ IblController::cached(const std::shared_ptr<const minirender::Texture>& source) 
     }
     return nullptr;
 }
+
 void IblController::cache(const Result& result) {
     if (!result.maps || !result.source) {
         return;
@@ -59,6 +62,7 @@ void IblController::cache(const Result& result) {
         cache_.erase(oldest);
     }
 }
+
 void IblController::poll() {
     if (!viewport_.scene()) {
         return;
@@ -68,9 +72,9 @@ void IblController::poll() {
         cancellation_.request();
         ++generation_;
         initialized_ = true;
-        source_ = current;
-        maps_ = cached(source_);
-        cancelled_ = false;
+        source_      = current;
+        maps_        = cached(source_);
+        cancelled_   = false;
         status_.error.clear();
     }
     const bool ready = lut_ && (!source_ || maps_);
@@ -87,9 +91,10 @@ void IblController::poll() {
     }
     viewport_.set_ibl_data(maps_, lut_);
 }
+
 void IblController::launch() {
     cancellation_ = minirender::CancellationSource();
-    progress_ = std::make_shared<Progress>();
+    progress_     = std::make_shared<Progress>();
     status_.state = IblTaskState::preparing;
     ++status_.jobs_started;
     const bool bake_environment = source_ && !maps_;
@@ -97,16 +102,16 @@ void IblController::launch() {
         ++status_.environment_started;
     }
     const auto generation = generation_;
-    active_generation_ = generation;
-    const auto token = cancellation_.token();
-    const auto progress = progress_;
-    const auto source = source_;
-    const auto lut = lut_;
-    watcher_ = new QFutureWatcher<Result>(this);
-    auto* watcher = watcher_;
+    active_generation_    = generation;
+    const auto token      = cancellation_.token();
+    const auto progress   = progress_;
+    const auto source     = source_;
+    const auto lut        = lut_;
+    watcher_              = new QFutureWatcher<Result>(this);
+    auto* watcher         = watcher_;
     connect(watcher, &QFutureWatcher<Result>::finished, this, [this, watcher, generation] {
         const auto result = watcher->result();
-        watcher_ = nullptr;
+        watcher_          = nullptr;
         watcher->deleteLater();
         if (result.lut && !lut_) {
             lut_ = result.lut;
@@ -127,8 +132,8 @@ void IblController::launch() {
     });
     watcher->setFuture(QtConcurrent::run([source, lut, token, progress, bake_environment] {
         Result result;
-        result.source = source;
-        result.lut = lut;
+        result.source       = source;
+        result.lut          = lut;
         const auto callback = [progress](const minirender::IblProgress& value) {
             std::lock_guard lock(progress->mutex);
             progress->value = value;
@@ -148,6 +153,7 @@ void IblController::launch() {
         return result;
     }));
 }
+
 void IblController::cancel() {
     if (status_.state != IblTaskState::preparing && status_.state != IblTaskState::cancelling) {
         return;
@@ -156,6 +162,7 @@ void IblController::cancel() {
     cancellation_.request();
     poll();
 }
+
 void IblController::retry() {
     cancelled_ = false;
     status_.error.clear();
@@ -164,11 +171,12 @@ void IblController::retry() {
     }
     poll();
 }
+
 IblTaskStatus IblController::status() const {
     auto result = status_;
     if (watcher_ && active_generation_ != generation_) {
         result.waiting_for_previous = true;
-        result.progress = {minirender::IblStage::source, 0, 0};
+        result.progress             = {minirender::IblStage::source, 0, 0};
         return result;
     }
     if (progress_) {

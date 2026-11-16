@@ -22,10 +22,10 @@ TEST_CASE("Packaged SPPM presets preserve caustic and SDS transport", "[sppm][pr
         REQUIRE(glass != scene.materials.end());
         REQUIRE(glass->kind == MaterialKind::dielectric);
         IntegratorSettings settings;
-        settings.kind = IntegratorKind::sppm;
-        settings.maximum_depth = 8;
+        settings.kind                       = IntegratorKind::sppm;
+        settings.maximum_depth              = 8;
         settings.sppm.photons_per_iteration = 2000;
-        settings.sppm.initial_radius = .12;
+        settings.sppm.initial_radius        = .12;
         SppmIntegrator renderer(make_snapshot(scene), {24, 24, 16, 101}, settings);
         for (int i = 0; i < 16; ++i) {
             renderer.advance();
@@ -35,8 +35,8 @@ TEST_CASE("Packaged SPPM presets preserve caustic and SDS transport", "[sppm][pr
         if (std::string(name) == "sppm-mirror") {
             REQUIRE(renderer.statistics().sds_contributions > 0);
         }
-        const auto image = renderer.image();
-        double energy = 0;
+        const auto image  = renderer.image();
+        double     energy = 0;
         for (std::size_t y = 0; y < image.height(); ++y) {
             for (std::size_t x = 0; x < image.width(); ++x) {
                 const auto value = image.at(x, y);

@@ -37,8 +37,8 @@ void check_layout(QWidget* panel) {
             if (!widget || !widget->isVisibleTo(panel)) {
                 continue;
             }
-            auto* parent = widget->parentWidget();
-            const auto r = widget->geometry();
+            auto*      parent = widget->parentWidget();
+            const auto r      = widget->geometry();
             if (r.left() < 0 || r.right() >= parent->width()) {
                 qCritical() << "Clipped field" << widget->objectName() << r << parent->size();
                 throw std::runtime_error("Theme clipped an inspector field");
@@ -58,20 +58,20 @@ void check_stepper(QDoubleSpinBox* spin) {
     require(spin && spin->isEnabled(), "Missing enabled transform field");
     QStyleOptionSpinBox option;
     option.initFrom(spin);
-    option.rect = spin->rect();
-    option.frame = true;
+    option.rect          = spin->rect();
+    option.frame         = true;
     option.buttonSymbols = spin->buttonSymbols();
-    option.stepEnabled = QAbstractSpinBox::StepUpEnabled | QAbstractSpinBox::StepDownEnabled;
+    option.stepEnabled   = QAbstractSpinBox::StepUpEnabled | QAbstractSpinBox::StepDownEnabled;
     const auto rect =
         spin->style()->subControlRect(QStyle::CC_SpinBox, &option, QStyle::SC_SpinBoxUp, spin);
     require(!rect.isEmpty() && spin->rect().contains(rect), "Spin button is outside its field");
-    const double before = spin->value();
+    const double  before   = spin->value();
     const QPointF position = rect.center();
-    const QPointF global = spin->mapToGlobal(rect.center());
-    QMouseEvent press(QEvent::MouseButtonPress, position, position, global, Qt::LeftButton,
-                      Qt::LeftButton, Qt::NoModifier);
-    QMouseEvent release(QEvent::MouseButtonRelease, position, position, global, Qt::LeftButton,
-                        Qt::NoButton, Qt::NoModifier);
+    const QPointF global   = spin->mapToGlobal(rect.center());
+    QMouseEvent   press(QEvent::MouseButtonPress, position, position, global, Qt::LeftButton,
+                        Qt::LeftButton, Qt::NoModifier);
+    QMouseEvent   release(QEvent::MouseButtonRelease, position, position, global, Qt::LeftButton,
+                          Qt::NoButton, Qt::NoModifier);
     QCoreApplication::sendEvent(spin, &press);
     QCoreApplication::sendEvent(spin, &release);
     require(spin->value() > before, "Styled spin button did not increment its value");
@@ -88,7 +88,7 @@ struct State {
 void start_theme_smoke(Workbench& window, const QString& directory) {
     require(QDir().mkpath(directory), "Cannot create theme capture directory");
     window.select_object("blue_cube");
-    auto state = std::make_shared<State>();
+    auto  state = std::make_shared<State>();
     auto* timer = new QTimer(&window);
     timer->setInterval(80);
     QObject::connect(timer, &QTimer::timeout, &window, [state, timer, &window, directory] {
@@ -98,10 +98,10 @@ void start_theme_smoke(Workbench& window, const QString& directory) {
             if (!window.viewport()->can_render() || window.viewport()->rendered_frames() < 5) {
                 return;
             }
-            auto* tabs = window.panels();
+            auto*                          tabs = window.panels();
             constexpr std::array<QSize, 3> sizes{QSize(1280, 800), QSize(960, 560),
                                                  QSize(1100, 700)};
-            const int case_id = state->stage / 4;
+            const int                      case_id = state->stage / 4;
             if (case_id >= tabs->count() * int(sizes.size())) {
                 const int object_page =
                     window.findChild<QTabWidget*>("object_tabs")->currentIndex();
@@ -125,13 +125,13 @@ void start_theme_smoke(Workbench& window, const QString& directory) {
                 return;
             }
             const auto size = sizes[static_cast<std::size_t>(case_id / tabs->count())];
-            const int page = case_id % tabs->count();
+            const int  page = case_id % tabs->count();
             auto* button = window.findChild<QToolButton*>(QString("inspector_page_%1").arg(page));
             require(button && button->isVisibleTo(&window), "Inspector page is not accessible");
             if (state->stage % 4 == 0) {
                 window.resize(size);
                 const bool object_page = page == 0 || page == 6 || page == 9;
-                auto* other_tabs =
+                auto*      other_tabs =
                     window.findChild<QTabWidget*>(object_page ? "scene_tabs" : "object_tabs");
                 const int other_page = other_tabs->currentIndex();
                 button->click();
@@ -150,10 +150,12 @@ void start_theme_smoke(Workbench& window, const QString& directory) {
                     qCritical() << "Panel overflow" << page << size << area->widget()->size()
                                 << area->viewport()->size() << area->widget()->minimumSizeHint();
                     for (auto* field : area->widget()->findChildren<QWidget*>(
-                             QString(), Qt::FindDirectChildrenOnly))
-                        if (field->isVisibleTo(area->widget()))
+                             QString(), Qt::FindDirectChildrenOnly)) {
+                        if (field->isVisibleTo(area->widget())) {
                             qCritical()
                                 << field->objectName() << field->size() << field->minimumSizeHint();
+                        }
+                    }
                     capture_workbench_ui(window, directory + "/overflow.png");
                     throw std::runtime_error("Theme requires hidden horizontal scrolling");
                 }

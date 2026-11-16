@@ -13,33 +13,33 @@
 
 // 主线程固定的任务来源。材质和相机不在物理键中，编辑它们允许当前帧正常提交。
 struct ClothRuntimeContext {
-    std::string object_id;
-    std::uint64_t document_generation = 0;
+    std::string                                       object_id;
+    std::uint64_t                                     document_generation = 0;
     std::shared_ptr<const minirender::ClothComponent> component;
-    minirender::Transform transform;
-    minirender::ClothEnvironment environment;
+    minirender::Transform                             transform;
+    minirender::ClothEnvironment                      environment;
 };
 
 struct ClothRuntimeFrame {
-    ClothRuntimeContext source;
-    minirender::ClothPreparedFrame frame;
+    ClothRuntimeContext                               source;
+    minirender::ClothPreparedFrame                    frame;
     std::shared_ptr<const minirender::RasterMeshData> raster;
-    minirender::MeshValidationCache validated;
-    minirender::ClothStepReport steps;
-    bool history = false;
+    minirender::MeshValidationCache                   validated;
+    minirender::ClothStepReport                       steps;
+    bool                                              history = false;
 };
 
 struct ClothRuntimeStatus {
-    bool bound = false;
-    bool playing = false;
-    bool busy = false;
-    bool failed = false;
-    std::uint64_t frame = 0;
-    std::uint32_t effective_substeps = 0;
-    std::size_t completed = 0, total = 0;
-    QString stage;
-    QString message;
-    double last_work_ms = 0;
+    bool                        bound              = false;
+    bool                        playing            = false;
+    bool                        busy               = false;
+    bool                        failed             = false;
+    std::uint64_t               frame              = 0;
+    std::uint32_t               effective_substeps = 0;
+    std::size_t                 completed = 0, total = 0;
+    QString                     stage;
+    QString                     message;
+    double                      last_work_ms = 0;
     minirender::ClothStatistics statistics;
     minirender::ClothStepReport last_steps;
 };
@@ -62,35 +62,39 @@ class ClothController final : public QObject {
 
   private:
     enum class Operation { advance, reset, configure };
+
     struct Request {
-        Operation operation = Operation::advance;
+        Operation                                          operation = Operation::advance;
         std::shared_ptr<const minirender::ClothDefinition> definition;
-        minirender::ClothEnvironment environment;
-        bool reset_geometry = false;
+        minirender::ClothEnvironment                       environment;
+        bool                                               reset_geometry = false;
     };
+
     struct Progress {
         mutable std::mutex mutex;
-        QString stage;
-        std::size_t completed = 0, total = 0;
+        QString            stage;
+        std::size_t        completed = 0, total = 0;
     };
+
     struct Result {
         std::unique_ptr<minirender::ClothSimulation> simulation;
-        ClothRuntimeFrame value;
-        minirender::ClothEnvironment environment;
-        QString error;
-        bool cancelled = false;
+        ClothRuntimeFrame                            value;
+        minirender::ClothEnvironment                 environment;
+        QString                                      error;
+        bool                                         cancelled = false;
     };
+
     void launch(Request request);
     void finished();
     void request(Request request);
-    std::optional<ClothRuntimeContext> context_;
-    std::optional<Request> pending_;
+    std::optional<ClothRuntimeContext>           context_;
+    std::optional<Request>                       pending_;
     std::unique_ptr<minirender::ClothSimulation> simulation_;
-    minirender::CancellationSource cancellation_;
-    std::shared_ptr<Progress> progress_;
-    QFutureWatcher<std::shared_ptr<Result>>* watcher_ = nullptr;
-    QTimer* timer_ = nullptr;
-    QElapsedTimer elapsed_;
-    ClothRuntimeStatus status_;
-    std::uint64_t epoch_ = 0, job_epoch_ = 0;
+    minirender::CancellationSource               cancellation_;
+    std::shared_ptr<Progress>                    progress_;
+    QFutureWatcher<std::shared_ptr<Result>>*     watcher_ = nullptr;
+    QTimer*                                      timer_   = nullptr;
+    QElapsedTimer                                elapsed_;
+    ClothRuntimeStatus                           status_;
+    std::uint64_t                                epoch_ = 0, job_epoch_ = 0;
 };
