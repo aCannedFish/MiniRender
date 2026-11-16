@@ -55,8 +55,8 @@ MiniRender/
 | 功能 | 公开接口 | 核心实现 |
 | --- | --- | --- |
 | BVH 求交 | [bvh.hpp](include/minirender/render/bvh.hpp) | [bvh.cpp](src/render/bvh.cpp) |
-| 路径追踪 | [path_tracer.hpp](include/minirender/render/path_tracer.hpp) | [path_tracer.cpp](src/render/path_tracer.cpp) |
-| 材质与 MIS | [bsdf.hpp](include/minirender/render/bsdf.hpp)、[light.hpp](include/minirender/render/light.hpp) | [bsdf.cpp](src/render/bsdf.cpp)、[light.cpp](src/render/light.cpp) |
+| 路径追踪与 MIS | [path_tracer.hpp](include/minirender/render/path_tracer.hpp) | [path_tracer.cpp](src/render/path_tracer.cpp) |
+| BSDF 与光源采样 | [bsdf.hpp](include/minirender/render/bsdf.hpp)、[light.hpp](include/minirender/render/light.hpp) | [bsdf.cpp](src/render/bsdf.cpp)、[light.cpp](src/render/light.cpp) |
 | 后台渲染 | [render_session.hpp](include/minirender/render/render_session.hpp) | [render_session.cpp](src/render/render_session.cpp) |
 | Loop 细分 | [loop.hpp](include/minirender/geometry/loop.hpp) | [loop.cpp](src/geometry/loop.cpp) |
 | 位移与自适应 | [displacement.hpp](include/minirender/geometry/displacement.hpp)、[adaptive.hpp](include/minirender/geometry/adaptive.hpp) | [displacement.cpp](src/geometry/displacement.cpp)、[adaptive.cpp](src/geometry/adaptive.cpp) |
