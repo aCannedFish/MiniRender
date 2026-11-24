@@ -106,7 +106,7 @@ float hash_pixel(vec2 p) {
 void main() {
     ivec2 p = ivec2(gl_FragCoord.xy), size = textureSize(depth_image, 0);
     int   mode = int(frame.display.y);
-    if (mode < 13 || mode > 18) {
+    if (mode < 13 || mode > 20) {
         result = vec4(0);
         return;
     }

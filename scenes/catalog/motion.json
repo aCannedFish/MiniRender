@@ -1,18 +1,122 @@
 [
   {
     "path": "catalog/motion_0.exr",
-    "sha256": "d48ab9a7506890d0e3a7e0dd8e0fc63abac4661902b5b001973f03881ef2df41"
+    "sha256": "d48ab9a7506890d0e3a7e0dd8e0fc63abac4661902b5b001973f03881ef2df41",
+    "guides": {
+      "normal": {
+        "path": "catalog/motion_guides/normal_0.exr",
+        "sha256": "862c1ac654a300782747a9e4299def88fdc510dbe9281b0682df2469829f9e0f"
+      },
+      "position": {
+        "path": "catalog/motion_guides/position_0.exr",
+        "sha256": "5554604b1a3415b5fdfe3b4c700a2b02679c6c8e7f30687c6450308b1f8e9660"
+      },
+      "depth": {
+        "path": "catalog/motion_guides/depth_0.exr",
+        "sha256": "c7208c781ef42ca92c419668c641cfd1b47535d5bd7b766e98cc0d367c4980c4"
+      },
+      "ID": {
+        "path": "catalog/motion_guides/ID_0.exr",
+        "sha256": "9af9aebcfa448bfee191e33d705a66aa53fbb953a2d0e3a952898be2f22548f7"
+      },
+      "matrix": {
+        "path": "catalog/motion_guides/matrix_0.mat",
+        "sha256": "3c8ce698654e59107bdf85c101c211dc8ae87672f3fdb90eb0eb8f8fa9f3eced"
+      }
+    },
+    "reference": {
+      "path": "catalog/motion_guides/reference_0.exr",
+      "sha256": "1d9b97adb4edc6e4a86a833b661e89a313ef65362d6bfb3902a7fa1843f0114c"
+    }
   },
   {
     "path": "catalog/motion_1.exr",
-    "sha256": "7d4dde31f714f3a2caec29458b7bb1f91756309d9b6945b495a1e8c53c99b8a1"
+    "sha256": "7d4dde31f714f3a2caec29458b7bb1f91756309d9b6945b495a1e8c53c99b8a1",
+    "guides": {
+      "normal": {
+        "path": "catalog/motion_guides/normal_1.exr",
+        "sha256": "fa58ce21f352d33000cbc20c095fce3f36c6128a04ccc5889b26ebe75ac62c3e"
+      },
+      "position": {
+        "path": "catalog/motion_guides/position_1.exr",
+        "sha256": "de52e00bdea6a35ad3610100c9e991cd9b4a9a90ed865e584a4ab61cca8c3455"
+      },
+      "depth": {
+        "path": "catalog/motion_guides/depth_1.exr",
+        "sha256": "d2cf81bcd79c0e918188dc76b010f122fd5d91ea411370e2512db2019b40fad2"
+      },
+      "ID": {
+        "path": "catalog/motion_guides/ID_1.exr",
+        "sha256": "78990dfa2b0257d13f3beeafeae1109807a9b8907dcb20fc94d9ca2a62f231f0"
+      },
+      "matrix": {
+        "path": "catalog/motion_guides/matrix_1.mat",
+        "sha256": "42d4d02b37bfaa2363ed468b1451776745cee8a03a1cb537e2b9a6f7c69c10f9"
+      }
+    },
+    "reference": {
+      "path": "catalog/motion_guides/reference_1.exr",
+      "sha256": "edaa5ba2435a61fa5268cc415a467bd40e043030a857286d0d15e51e48510dcf"
+    }
   },
   {
     "path": "catalog/motion_2.exr",
-    "sha256": "4079f019d68699faea7904458aa8e92545f5dc024cad1d6ac1c2da50ce8f4264"
+    "sha256": "4079f019d68699faea7904458aa8e92545f5dc024cad1d6ac1c2da50ce8f4264",
+    "guides": {
+      "normal": {
+        "path": "catalog/motion_guides/normal_2.exr",
+        "sha256": "31fb85ed4001b5caaf078c62065a4128bdea79b92728db541f484a60c28689ca"
+      },
+      "position": {
+        "path": "catalog/motion_guides/position_2.exr",
+        "sha256": "4e425be7c90fee9ed7c7d12801fbe5e7345d88e0d8940f9de904f275e2505fa3"
+      },
+      "depth": {
+        "path": "catalog/motion_guides/depth_2.exr",
+        "sha256": "11ff765a8bc9ebcd9ca446d4e79833cfb6fa672c97b6453b2f29af39a7852740"
+      },
+      "ID": {
+        "path": "catalog/motion_guides/ID_2.exr",
+        "sha256": "0cbd92533bf3a60f65bff8e127fb16ad9db3d32c908e4871c186fe36ceae1bd5"
+      },
+      "matrix": {
+        "path": "catalog/motion_guides/matrix_2.mat",
+        "sha256": "46ec27cbbb45bc1b9dce1078d79d67743acaa6ffc275dad7d924dc1b7028f202"
+      }
+    },
+    "reference": {
+      "path": "catalog/motion_guides/reference_2.exr",
+      "sha256": "5dc1e92abd5a01daf7bc2545b54e670cbf699c2d40e89fbfaacb2681de448025"
+    }
   },
   {
     "path": "catalog/motion_3.exr",
-    "sha256": "fff7f9ef8207a666b4d47e244e8090c5bb56a536d2fae235817723961849ffb1"
+    "sha256": "fff7f9ef8207a666b4d47e244e8090c5bb56a536d2fae235817723961849ffb1",
+    "guides": {
+      "normal": {
+        "path": "catalog/motion_guides/normal_3.exr",
+        "sha256": "a0fbb3b7b880b05dbb276d5fb30c3d1efda026f6ccc49aaf44dc0c266fa42752"
+      },
+      "position": {
+        "path": "catalog/motion_guides/position_3.exr",
+        "sha256": "85df0c66336df41eaddf194e317c233d05eafbe68fb4cbb7f5e899182f315955"
+      },
+      "depth": {
+        "path": "catalog/motion_guides/depth_3.exr",
+        "sha256": "08a5b88a7ad8be3de4132c373b3a80f3e533183646fafe16a43e7873c0616ad7"
+      },
+      "ID": {
+        "path": "catalog/motion_guides/ID_3.exr",
+        "sha256": "4c05aaff95ec38dd51a2a06d69e9e788ac9eb529d02b4bbea792f81f2e429a04"
+      },
+      "matrix": {
+        "path": "catalog/motion_guides/matrix_3.mat",
+        "sha256": "8a25d02b2833a9da8edfc49ef83fe0d14f453867dd731f96eec26d541c8a323c"
+      }
+    },
+    "reference": {
+      "path": "catalog/motion_guides/reference_3.exr",
+      "sha256": "ff2c68f29a3d6092c72492cff3ac8fb0d7e403b10a5ab950aa3dfcc3570e0801"
+    }
   }
 ]

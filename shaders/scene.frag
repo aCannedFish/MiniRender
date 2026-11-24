@@ -13,6 +13,7 @@
 #include "rectangle_visibility.glsl"
 
 layout(location = 0) in vec3 world_position;
+layout(location = 9) in vec3 previous_world;
 layout(location = 1) in vec3 world_normal;
 layout(location = 2) in vec3 base_color;
 layout(location = 3) in vec3 emission;
@@ -233,6 +234,21 @@ void main() {
         vec2 visible =
             rectangle_visibility(i, area.lights[i], world_position, n, v, material.x, f0);
         result += diffuse * visible.x + specular * visible.y;
+    }
+    if (int(frame.display.y) == 19 || int(frame.display.y) == 20) {
+        // 诊断模式下复用环境漫反射附件，保存前帧世界位置与八面体编码的法线。
+        vec3 old = n;
+        if (frame.history_settings.y > .5) {
+            Instance item = instances.values[draw_index.instance];
+            old           = normalize(transpose(inverse(mat3(item.previous_model))) *
+                                      transpose(mat3(item.object_to_world)) * n);
+        }
+        vec2 oct = old.xy / (abs(old.x) + abs(old.y) + abs(old.z));
+        if (old.z < 0.0) {
+            oct = (1.0 - abs(oct.yx)) * mix(vec2(-1), vec2(1), greaterThanEqual(oct, vec2(0)));
+        }
+        vec2 encoded   = round((oct * .5 + .5) * 1023.0);
+        ambient_output = vec4(previous_world, encoded.x + encoded.y * 1024.0);
     }
     color = vec4(result, 1.0);
 }

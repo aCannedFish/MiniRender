@@ -2,7 +2,9 @@
 #pragma once
 #include <QList>
 #include <QString>
+#include <array>
 #include <functional>
+#include <optional>
 
 namespace catalog {
 // 文件路径相对于包根目录。摘要对应磁盘上的原始字节。
@@ -11,6 +13,12 @@ struct File {
     QByteArray sha256;
 };
 
+// 引导文件的顺序是法线、位置、深度、物体 ID 和矩阵。旧清单仍可播放 beauty。
+struct Frame {
+    File                               beauty;
+    std::optional<std::array<File, 5>> guides;
+    std::optional<File>                reference;
+};
 enum class Kind { scene, model, sequence };
 
 // 一个可浏览的资源。dependencies 包含场景 JSON 引用的网格和纹理。
@@ -19,7 +27,8 @@ struct Entry {
     Kind        kind = Kind::scene;
     File        file;
     QList<File> dependencies;
-    bool        builtin = false;
+    QList<std::pair<QString, File>> videos;
+    bool                            builtin = false;
 };
 
 // 读取索引及元数据，保留清单顺序。文件内容在用户选择导入时校验。
@@ -30,7 +39,7 @@ QString resolve(const QString& root, const QString& relative);
 void verify(const QString& root, const File& file,
             const std::function<void(qint64)>& advanced = {});
 // 读取帧清单，帧内容在播放或跳转到该帧时加载。
-QList<File> frames(const Entry& entry);
+QList<Frame> frames(const Entry& entry);
 // 校验场景及其直接引用，返回场景路径；清单缺项时在解析模型前报错。
 QString verify_scene(const Entry& entry, const std::function<void(qint64)>& advanced);
 } // namespace catalog

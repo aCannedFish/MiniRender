@@ -122,6 +122,19 @@ class SceneRenderer final : public ViewportRenderer {
     int area_grid() const;
     void draw_shadow_geometry(VkCommandBuffer command, int projection, std::uint32_t resolution,
                               const std::string* emitter = nullptr);
+
+    struct TemporalView {
+        std::shared_ptr<const minirender::SceneSnapshot> scene;
+        minirender::Camera                               camera;
+        glm::mat4                                        vp{1};
+        std::uint64_t                                    epoch = 0;
+        unsigned                                         age   = 0;
+        int                                              frame = -1;
+    };
+
+    std::array<TemporalView, 2>                      histories_;
+    std::shared_ptr<const minirender::SceneSnapshot> current_scene_, prior_scene_;
+    bool                                             rigid_update_ = false;
     // 系数按展平面角上传一次，环境旋转只更新九个帧常量。
     GpuBuffer                                  prt_buffer_;
     std::shared_ptr<const minirender::PrtBake> uploaded_prt_;

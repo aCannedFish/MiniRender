@@ -97,6 +97,7 @@ def main() -> int:
         action="store_true",
         help="Verify single and double sided surfaces",
     )
+    checks.add_argument("--denoise-check",action="store_true",help="Verify frame, offline and live denoising")
     checks.add_argument("--transport-check",action="store_true",help="Verify screen-space ray and indirect light")
     checks.add_argument("--prt-check",action="store_true",help="Verify static SH transport")
     checks.add_argument("--rectangle-check",action="store_true",help="Verify editable rectangle lights and LTC")
@@ -170,6 +171,7 @@ def main() -> int:
         or args.sdf_check
         or args.points_check
         or args.adaptive_check
+        or args.denoise_check
         or args.transport_check
         or args.prt_check
         or args.rectangle_check
@@ -211,6 +213,7 @@ def main() -> int:
         (args.sdf_check, "SDF"),
         (args.points_check, "Points"),
         (args.adaptive_check, "Adaptive"),
+        (args.denoise_check,"Denoise"),
         (args.transport_check,"Transport"),
         (args.prt_check,"Prt"),
         (args.rectangle_check,"Rectangle"),

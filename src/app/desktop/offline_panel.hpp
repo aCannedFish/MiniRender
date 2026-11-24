@@ -50,8 +50,11 @@ class OfflinePanel final : public QWidget {
         minirender::IntegratorSettings integrator;
     };
 
-    std::optional<ImportSettings>                                     imported_settings_;
-    VulkanViewport&                                                   viewport_;
+    std::optional<ImportSettings> imported_settings_;
+    VulkanViewport&               viewport_;
+    // 固定启动时的快照，离线图像与首交点引导总是来自同一次任务。
+    std::shared_ptr<const minirender::SceneSnapshot>                  active_scene_;
+    QPushButton*                                                      denoise_ = nullptr;
     std::function<std::shared_ptr<const minirender::SceneSnapshot>()> snapshot_;
     std::shared_ptr<minirender::RenderSession>                        session_;
     QWidget*                                                          settings_;

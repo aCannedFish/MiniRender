@@ -379,7 +379,7 @@
       "name": "方块运动 · 4 帧",
       "kind": "sequence",
       "path": "catalog/motion.json",
-      "sha256": "795f8b1c272e05517e2380a0bd501280ab09c1ca1911c8a3e014f8f83078438f",
+      "sha256": "afd22c3f45e174ea2ff148ced03b18fd084da96b11635555b4a59c8d91a7e877",
       "thumbnail": "catalog_thumbs/cube.png",
       "description": "逐帧查看自建的低采样 EXR。",
       "source": "MiniRender",

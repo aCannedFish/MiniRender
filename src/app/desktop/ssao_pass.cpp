@@ -27,7 +27,7 @@ void SsaoPass::create(VulkanViewport& viewport, const HdrTargets& targets, VkBuf
                       uniform, bytes, composite_inputs);
 }
 
-void SsaoPass::draw(VulkanViewport& viewport, int mode) {
+void SsaoPass::draw(VulkanViewport& viewport, int mode, bool reference) {
     const bool enabled = mode == VulkanViewport::base_color_preview_mode
                              ? viewport.preview_occlusion()
                              : viewport.ssao_settings().enabled;
@@ -38,7 +38,7 @@ void SsaoPass::draw(VulkanViewport& viewport, int mode) {
         filtered_.draw(viewport, 1);
         initialized_ = true;
     }
-    transport_.draw(viewport, mode);
+    transport_.draw(viewport, mode, reference);
     composite_.draw(viewport);
     was_enabled_ = enabled;
 }

@@ -61,6 +61,18 @@ PRT 使用九个实球谐系数描述环境光。旋转环境、调整环境亮�
 
 课程包另有 cube1、cube2 和洞穴。离线转换保留节点变换、材质分组、UV 及嵌入纹理。物体检查器可导入线性法线贴图、调整强度并反转 Y。实时与离线着色均按 UV 切线方向解码。转换 HW3 资源需要 Python 的 NumPy，脚本读取约定的课程输入。[课程转换脚本](scripts/course_gltf.py)
 
+### 降噪
+
+在资源目录打开帧序列，或在离线面板点击“降噪与原图对照”。查看器可选择原图、联合双边、À-Trous 和参考图，拖动对照线检查物体边缘。滤波参数包括空间半径、层数、颜色与法线权重。支持取消处理并导出当前结果为 PNG 或线性 EXR。
+
+连续播放可使用“时间累积”。查看器用前后帧的物体变换与相机矩阵重投影，用物体 ID、深度和法线拒绝不匹配的历史，再用 7×7 邻域限幅。跳帧会重新开始累积。内置四帧样本含 128 spp 参考，课程 box 和 pink-room 可查看课程视频中的对应帧，也可从“课程视频”打开各步骤的 MP4。
+
+实时视口的“时域间接光”在 GPU 上叠加空间与时间滤波。“重投影有效性”用白色标出复用前帧的像素。实时面板可调节历史权重、限幅和手动重置。相机切换、几何拓扑或照明变化会丢弃过期历史。
+
+```sh
+build/macos-desktop-release/minirender_cli --denoise work/GAMES202/HW5-data/box/input outputs/box 0 20 temporal
+```
+
 ## 构建要求
 
 - Git、CMake 3.25 或更新版本、Ninja，以及支持 C++20 的编译器。
@@ -307,6 +319,7 @@ include/minirender/render/
 ├── cloth_bsdf.hpp  # 布料散射模型的方向求值、混合采样与概率密度
 ├── dipole.hpp  # 均匀半无限介质的 dipole 扩散模型及径向分布
 ├── spherical_harmonics.hpp / prt.hpp  # 环境 SH 投影、旋转、静态传输与烘焙接口
+├── denoiser.hpp  # 首交点引导、空间滤波、重投影与进度回调
 ├── rectangle_light.hpp  # 矩形几何、LTC 拟合表和辐亮度积分的接口
 ├── microfacet_energy.hpp  # 方向反照率、能量表和补偿瓣的数值接口
 ├── ibl.hpp  # 环境光预处理：漫反射卷积、GGX 粗糙度层与 BRDF 积分表
@@ -350,6 +363,7 @@ include/minirender/simulation/
 include/minirender/assets/
 ├── lightfield_io.hpp  # 光场容器的标定、RGB32f 视图数据及有界读取缓存
 ├── point_io.hpp  # PLY 点云的文本及二进制编码读写
+├── denoise_io.hpp  # 引导 EXR 与对象、相机矩阵文件的接口
 ├── scene_io.hpp  # OBJ 加载/写出、JSON 场景读写与保存进度接口
 └── sdf_io.hpp  # 距离场 JSON 文档读写与格式校验
 ```
@@ -464,6 +478,7 @@ src/render/
 ├── dipole.cpp  # 均匀半无限介质的 dipole 扩散模型及径向分布
 ├── spherical_harmonics.cpp  # 经纬图与六面环境投影、球谐旋转
 ├── prt.cpp  # 逐面角可见性、多跳漫反射、缓存依赖与读出
+├── denoiser.cpp  # 几何引导权重、À-Trous 多尺度滤波和时间历史拒绝
 ├── rectangle_light.cpp  # 发光矩形边界、地平线裁剪与球面多边形积分
 ├── microfacet_energy.cpp  # 方向反照率积分、余弦加权平均和 Kulla–Conty 补偿
 ├── ibl.cpp  # 环境光预处理：漫反射卷积、GGX 粗糙度层与 BRDF 积分表
@@ -521,6 +536,7 @@ src/simulation/
 
 ```text
 src/assets/
+├── denoise_io.cpp  # 解码或输出逐帧引导、验证数值与矩阵尺寸
 ├── asset_writer.cpp  # 生成资产的内容标识、复用与安全发布
 ├── asset_writer.hpp  # 接口：生成资产的内容标识、复用与安全发布
 ├── cloth_material_io.cpp  # JSON 中织物经纬参数和切向曲线的转换
@@ -565,6 +581,7 @@ src/external/
 
 ```text
 src/app/
+├── denoise_cli.hpp / .cpp  # 批处理连续帧以及导出场景首交点引导
 ├── cli.cpp  # CPU 命令行入口与场景、图像、渲染子命令分发
 ├── lightfield_cli.cpp  # 命令行光场采集、文件重开与重聚焦
 ├── lightfield_cli.hpp  # 接口：命令行光场采集、文件重开与重聚焦
@@ -685,6 +702,8 @@ src/app/desktop/
 ├── sdf_renderer.cpp  # 距离场图元与 CSG 的 Vulkan 步进显示
 ├── sdf_renderer.hpp  # 接口：距离场图元与 CSG 的 Vulkan 步进显示
 ├── rectangle_shadow.hpp / .cpp  # 分层灯面采样、立方体深度图与几何缓存
+├── temporal_transport.hpp / .cpp  # SSGI 的空间滤波和按对照侧保存的时间历史
+├── denoise_smoke.hpp / .cpp  # 序列与离线降噪、跳帧、视口历史及切镜检查
 ├── screen_transport.hpp / .cpp  # 屏幕空间输入附件、深度金字塔和传输绘制
 ├── screen_transport_smoke.hpp / .cpp  # 检查命中、遍历步数、合成及洞穴贴图
 ├── prt_cache.hpp / .cpp  # 烘焙缓存字节布局、校验与原子发布
@@ -837,6 +856,9 @@ shaders/
 ├── sdf.frag  # Vulkan 距离场步进、CSG 求值、法线、阴影与诊断输出
 ├── sdf.vert  # 距离场全屏覆盖顶点生成
 ├── sdf_display.frag  # 距离场渲染附件的屏幕显示转换
+├── gi_spatial.frag  # 逐层过滤带噪间接光
+├── gi_temporal.frag  # 刚体与相机重投影、历史拒绝和限幅
+├── gi_copy.frag  # 发布历史颜色、标识、法线与深度
 ├── depth_reduce.frag  # 构建屏幕深度区间的五级金字塔
 ├── screen_trace.frag  # 屏幕射线、镜面探针和余弦加权的一次间接光
 ├── rectangle_visibility.glsl  # 漫反射和 GGX 的分层可见性估计
@@ -931,6 +953,18 @@ scenes/catalog/
 
 `resource_catalog.cpp` 按用户选择校验主文件和依赖。`workbench_catalog.cpp` 把模型的纹理、材质、网格和物体作为一次编辑提交。`sequence_viewer.cpp` 按当前帧索引解码 EXR。
 
+### 帧引导
+
+```text
+scenes/catalog/motion_guides/
+├── normal_N.exr / position_N.exr  # 世界法线和世界位置
+├── depth_N.exr / ID_N.exr         # 相机深度与物体编号
+├── matrix_N.mat                   # 物体、相机和投影矩阵
+└── reference_N.exr                # 对应相机的高采样参考
+```
+
+`N` 为 0 至 3。播放器按选中的方法校验并读取引导文件，序列外的课程素材通过本地资源包索引定位。
+
 ### 目录缩略图
 
 ```text
@@ -983,6 +1017,7 @@ tests/
 ├── displacement_tests.cpp  # 实际位移、共享边接缝、退化、预算和取消
 ├── geometry_tests.cpp  # 半边拓扑、Loop 规则、边界和面角属性
 ├── gizmo_tests.cpp  # 操纵器布局、命中、移动旋转与事务历史
+├── denoiser_tests.cpp  # 轮廓保护、运动历史拒绝与低采样图的误差
 ├── normal_map_tests.cpp  # 验证着色法线、几何朝向、贴图 Y 与颜色编码
 ├── prt_tests.cpp  # 立体角、SH 旋转、遮挡、彩色互反射与缓存键
 ├── rectangle_light_tests.cpp  # LTC 与数值面积积分对照，验证矩形识别、变换和朝向

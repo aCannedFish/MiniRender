@@ -191,6 +191,34 @@ void ScreenPass::create(VulkanViewport& viewport, VkFormat format, const char* f
              "screen pipeline");
 }
 
+void ScreenPass::set_image(std::uint32_t binding, ScreenInput input) {
+    const VkDescriptorImageInfo image{sampler_, input.view, input.layout};
+    VkWriteDescriptorSet        write{};
+    write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet          = descriptor_;
+    write.dstBinding      = binding;
+    write.descriptorCount = 1;
+    write.descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    write.pImageInfo      = &image;
+    vkUpdateDescriptorSets(device_, 1, &write, 0, nullptr);
+}
+
+void ScreenPass::clear(VulkanViewport& viewport) {
+    const auto            cmd = viewport.currentCommandBuffer();
+    VkRenderPassBeginInfo begin{};
+    begin.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    begin.renderPass        = pass_;
+    begin.framebuffer       = framebuffer_;
+    begin.renderArea.extent = extent_;
+    vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
+    VkClearAttachment value{};
+    value.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
+    value.colorAttachment = 0;
+    VkClearRect rect{{{0, 0}, extent_}, 0, 1};
+    vkCmdClearAttachments(cmd, 1, &value, 1, &rect);
+    vkCmdEndRenderPass(cmd);
+}
+
 void ScreenPass::draw(VulkanViewport& viewport, std::int32_t mode) {
     const auto            command = viewport.currentCommandBuffer();
     VkRenderPassBeginInfo begin{};

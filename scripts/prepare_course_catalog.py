@@ -233,6 +233,22 @@ def furnace_scene():
     return scene
 
 
+def frame_entry(root, beauty, guides, reference, frame):
+    """登记每一张独立的 EXR 和矩阵，播放器按当前帧及所选滤波方式验证。"""
+
+    def record(file):
+        return dict(path=file.relative_to(root).as_posix(), sha256=digest(file))
+
+    item = record(beauty)
+    item["guides"] = {
+        name: record(guides / f"{name}_{frame}.exr")
+        for name in ("normal", "position", "depth", "ID")
+    }
+    item["guides"]["matrix"] = record(guides / f"matrix_{frame}.mat")
+    item["reference"] = record(reference)
+    return item
+
+
 def builtin_entries(root, cli):
     """渲染内置缩略图，并从同一场景生成可追加模型和四帧测试输入。"""
     result = []
@@ -298,10 +314,41 @@ def builtin_entries(root, cli):
                 check=True,
                 stdout=subprocess.DEVNULL,
             )
+            guidance = meta / "motion_guides"
+            subprocess.run(
+                [cli, "--write-guides", sf, guidance, str(i), "64", "48"],
+                check=True,
+                stdout=subprocess.DEVNULL,
+            )
+            reference = guidance / f"reference_{i}"
+            subprocess.run(
+                [
+                    cli,
+                    "--render",
+                    sf,
+                    reference,
+                    "--width",
+                    "64",
+                    "--height",
+                    "48",
+                    "--spp",
+                    "128",
+                    "--depth",
+                    "3",
+                    "--seed",
+                    "202",
+                ],
+                check=True,
+                stdout=subprocess.DEVNULL,
+            )
+            reference.with_suffix(".png").unlink()
             frames.append(
-                dict(
-                    path=prefix.with_suffix(".exr").relative_to(root).as_posix(),
-                    sha256=digest(prefix.with_suffix(".exr")),
+                frame_entry(
+                    root,
+                    prefix.with_suffix(".exr"),
+                    guidance,
+                    reference.with_suffix(".exr"),
+                    i,
                 )
             )
             prefix.with_suffix(".png").unlink()
@@ -568,8 +615,28 @@ def course_entries(root, cli, meta):
         )
     for name, count in [("box", 20), ("pink-room", 80)]:
         files = [root / f"HW5-data/{name}/input/beauty_{i}.exr" for i in range(count)]
+        refs = meta / (name + "-reference")
+        refs.mkdir(exist_ok=True)
+        video = root / f"HW5-data/{name}/reference/{name.replace('-', '')}-result.mp4"
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-loglevel",
+                "error",
+                "-y",
+                "-i",
+                video,
+                "-start_number",
+                "0",
+                "-frames:v",
+                str(count),
+                refs / "frame_%d.png",
+            ],
+            check=True,
+        )
         frames = [
-            dict(path=f.relative_to(root).as_posix(), sha256=digest(f)) for f in files
+            frame_entry(root, file, file.parent, refs / f"frame_{idx}.png", idx)
+            for idx, file in enumerate(files)
         ]
         f = meta / (name + ".json")
         write_json(f, frames)
@@ -599,11 +666,27 @@ def course_entries(root, cli, meta):
                 "sequence",
                 f,
                 png,
-                "课程光追输入，逐帧查看原始 beauty。",
+                "课程光追输入、引导缓冲、逐帧降噪和课程参考结果。",
                 source + "5",
                 rights,
             )
         )
+        videos = []
+        for key, label in (
+            ("input", "输入"),
+            ("filter", "空间滤波"),
+            ("project", "重投影"),
+            ("result", "完整结果"),
+        ):
+            file = root / f"HW5-data/{name}/reference/{name.replace('-', '')}-{key}.mp4"
+            videos.append(
+                dict(
+                    name=label,
+                    path=file.relative_to(root).as_posix(),
+                    sha256=digest(file),
+                )
+            )
+        result[-1]["videos"] = videos
     return result
 
 
@@ -631,6 +714,16 @@ def build(root, cli, builtin):
             result = course_entries(root, cli, staging)
             dependencies(root, result)
             # 每份内容有独立目录，转换失败或再次运行时仍可使用先前挂载的包。
+            # 帧清单也引用暂存区中的参考图，先规范化这些路径以计算稳定版本号。
+            sequences = []
+            for item in result:
+                if item["kind"] == "sequence":
+                    file = root / item["path"]
+                    template = file.read_text(encoding="utf-8").replace(
+                        staging.name + "/", "@revision@/"
+                    )
+                    sequences.append((item, file, template))
+                    item["sha256"] = hashlib.sha256(template.encode()).hexdigest()
             payload = json.dumps(result, ensure_ascii=False).replace(
                 staging.name + "/", ""
             )
@@ -638,6 +731,11 @@ def build(root, cli, builtin):
             directory = root / "prepared" / revision
             directory.parent.mkdir(exist_ok=True)
             prefix = directory.relative_to(root).as_posix()
+            for item, file, template in sequences:
+                file.write_text(
+                    template.replace("@revision@/", prefix + "/"), encoding="utf-8"
+                )
+                item["sha256"] = digest(file)
             result = json.loads(
                 json.dumps(result, ensure_ascii=False).replace(
                     staging.name + "/", prefix + "/"

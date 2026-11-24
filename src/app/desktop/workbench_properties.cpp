@@ -327,9 +327,11 @@ void Workbench::build_camera_panel() {
     focus_           = spin(camera_panel_, "focus_distance", 0.0001, 100000, 0.1);
     auto* mode       = new QComboBox;
     mode->setObjectName("view_mode");
-    mode->addItems({"光照合成", "法线", "线性深度", "线框", "原始 AO", "滤波 AO", "原色预览",
-                    "Blinn–Phong", "阴影深度", "遮挡物深度", "半影半径", "光源可见性", "PRT 环境光",
-                    "屏幕镜面", "射线命中", "屏幕间接光", "直接与间接光", "线性底色", "射线步数"});
+    mode->addItems({"光照合成",    "法线",         "线性深度",    "线框",     "原始 AO",
+                    "滤波 AO",     "原色预览",     "Blinn–Phong", "阴影深度", "遮挡物深度",
+                    "半影半径",    "光源可见性",   "PRT 环境光",  "屏幕镜面", "射线命中",
+                    "屏幕间接光",  "直接与间接光", "线性底色",    "射线步数", "时域间接光",
+                    "重投影有效性"});
     mode->setItemData(VulkanViewport::base_color_preview_mode,
                       "均匀亮度显示材质和纹理，保留深度与接触遮蔽；不依赖场景光源。",
                       Qt::ToolTipRole);
