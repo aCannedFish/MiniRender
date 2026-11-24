@@ -89,6 +89,10 @@ QList<Entry> read(const QString& root, bool bundled) {
         } else {
             fail("未知资源类型 · " + kind);
         }
+        e.recommended = item.value("recommended").toString();
+        if (e.id == "mary-studio" && e.recommended.isEmpty()) {
+            e.recommended = "blinn-phong";
+        }
         e.builtin = bundled && item.value("builtin").toBool();
         if (e.builtin) {
             const auto& presets = builtin_scenes();

@@ -278,6 +278,23 @@ def builtin_entries(root, cli):
             own,
         )
     )
+    shadow_scene = root / "soft-shadows.json"
+    shadow_image = thumbs / "soft-shadows.png"
+    thumbnail(cli, shadow_scene, shadow_image)
+    result.append(
+        entry(
+            root,
+            "shadow-plates",
+            "接触软阴影",
+            "scene",
+            shadow_scene,
+            shadow_image,
+            "两块离地高度不同的挡板，用于比较接触硬化与固定半径滤波。",
+            src,
+            own,
+            recommended="pcss",
+        )
+    )
     return result
 
 

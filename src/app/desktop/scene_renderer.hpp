@@ -80,9 +80,9 @@ class SceneRenderer final : public ViewportRenderer {
     TextureHandle white_texture_;
     std::map<TextureHandle, std::unique_ptr<GpuTexture>, std::owner_less<TextureHandle>> textures_;
     // 把相机、显示、光源及效果设置打包为本帧 GPU uniform。
-    void update_uniforms(int mode);
+    void update_uniforms(int mode, bool reference);
     // 录制一个显示模式的几何、阴影与屏幕空间处理，结果保留在线性附件中。
-    void render_view(int mode);
+    void render_view(int mode, bool reference);
     // 使用场景与视口参数版本及显示模式判断每侧图像是否需要重绘。
     std::array<std::pair<std::uint64_t, int>, 2> comparison_keys_{};
     // 借用的视口，提供设备、命令缓冲及当前场景状态。
@@ -102,7 +102,8 @@ class SceneRenderer final : public ViewportRenderer {
     // 按场景几何尺度计算的原色接触遮蔽半径，单位为米。
     float preview_radius_ = 0.2F;
     // 下一次绘制是否需要录制线性图像读回。
-    bool                     capture_hdr_ = false;
+    bool                     shadow_depth_ready_ = false;
+    bool                     capture_hdr_        = false;
     std::array<glm::mat4, 8> shadow_matrices_{};
     // 每个场景实例的变换与材质数据缓冲。
     GpuBuffer instances_;

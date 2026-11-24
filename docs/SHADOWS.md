@@ -43,4 +43,11 @@ python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirend
 
 ## 参考
 
-PCF 原始论文：[Reeves、Salesin、Cook，Rendering Antialiased Shadows with Depth Maps，1987](https://graphics.pixar.com/library/ShadowMaps/paper.pdf)。本项目使用固定 3×3 核，不复现原论文全部采样策略。
+PCF 原始论文：[Reeves、Salesin、Cook，Rendering Antialiased Shadows with Depth Maps，1987](https://graphics.pixar.com/library/ShadowMaps/paper.pdf)。默认 PCF 的半径为一纹素，使用 3×3 核。较大半径和 PCSS 使用圆盘采样。
+
+
+## 接触软阴影
+
+在 `shaders/shadow_filter.glsl` 中，`mean_blocker_gap` 对圆盘内通过深度测试的遮挡物求平均间距，`disk_pcf` 用该间距确定过滤半径。方向光使用正交投影。把接收面与遮挡物的深度差还原成世界距离，乘以光源半角的正切，即得世界空间半影半径。用投影矩阵的两条横向基向量把半径转换到纹理空间。对接收面局部深度梯度的校正同时用于搜索和过滤，避免倾斜面遮挡自身。[Fernando 的 PCSS 原文](https://developer.download.nvidia.com/shaderlibrary/docs/shadow_PCSS.pdf)
+
+`shadow_smoke.cpp` 沿地面横截面统计可见性在 15% 到 85% 间的过渡宽度。两个遮挡物保持相同尺寸，只改变离地高度。测试还将方向光逐盏渲染，与全部光源同时打开时的结果对照。查看诊断视图可依次检查原始阴影深度、平均遮挡深度、半影半径与最终可见性。

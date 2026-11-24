@@ -22,6 +22,15 @@ void add_comparison_controls(QFormLayout& layout, QComboBox& mode, VulkanViewpor
     }
     right->setToolTip("左侧使用当前显示模式。按住视口分界线拖动可调整两侧宽度。");
     layout.addRow("右侧对照", right);
+    auto* reference = new QComboBox(panel);
+    reference->addItems({"沿用左侧阴影", "硬阴影", "PCF", "PCSS"});
+    reference->setObjectName("reference_shadow");
+    reference->setEnabled(false);
+    layout.addRow("右侧阴影", reference);
+    QObject::connect(right, &QComboBox::currentIndexChanged, reference,
+                     [reference](int i) { reference->setEnabled(i > 0); });
+    QObject::connect(reference, &QComboBox::currentIndexChanged, panel,
+                     [&viewport](int i) { viewport.set_reference_shadow(i - 1); });
     auto* save = new QPushButton("导出 A/B 图像…");
     save->setEnabled(false);
     layout.addRow(save);

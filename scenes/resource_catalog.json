@@ -384,6 +384,28 @@
       "description": "逐帧查看自建的低采样 EXR。",
       "source": "MiniRender",
       "rights": "MiniRender 自建资源"
+    },
+    {
+      "id": "shadow-plates",
+      "name": "接触软阴影",
+      "kind": "scene",
+      "path": "soft-shadows.json",
+      "sha256": "4d4b9bd49ab3f92fd8c2c7a7bbc9df9ae31e29a95788877d5a4e3c0ca380acb9",
+      "thumbnail": "catalog_thumbs/soft-shadows.png",
+      "description": "两块离地高度不同的挡板，用于比较接触硬化与固定半径滤波。",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "recommended": "pcss",
+      "dependencies": [
+        {
+          "path": "assets/cube.obj",
+          "sha256": "6e912d373134fb1bd0444c7ca3871e54961c18eaee98b303f5194587dfe061b6"
+        },
+        {
+          "path": "assets/plane.obj",
+          "sha256": "5a83f91ef91fd85fbdfc0a924fb3faf58d008a2a0d253761198c117df308674b"
+        }
+      ]
     }
   ]
 }

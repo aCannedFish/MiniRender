@@ -129,6 +129,7 @@ void SceneRenderer::initResources() {
 }
 
 void SceneRenderer::initSwapChainResources() {
+    shadow_depth_ready_ = false;
     comparison_keys_.fill({0, -1});
     targets_.create(*window_);
     for (std::size_t side = 0; side < surface_pipelines_.size(); ++side) {
@@ -247,6 +248,7 @@ VkPipeline SceneRenderer::create_pipeline(Pass pass, VkCullModeFlags cull, VkFro
 }
 
 void SceneRenderer::upload_scene() {
+    shadow_depth_ready_ = false;
     QElapsedTimer timer;
     timer.start();
     const auto& scene = *window_->scene();
@@ -458,7 +460,7 @@ void SceneRenderer::update_ibl_descriptors() {
                            nullptr);
 }
 
-void SceneRenderer::update_uniforms(int mode) {
+void SceneRenderer::update_uniforms(int mode, bool reference) {
     const auto   size   = window_->swapChainImageSize();
     const auto&  camera = window_->camera();
     FrameUniform frame{};
@@ -482,21 +484,24 @@ void SceneRenderer::update_uniforms(int mode) {
     frame.preview_edges = {window_->preview_outline() ? window_->preview_outline_strength() : 0.0F,
                            static_cast<float>(window_->devicePixelRatio()), 0, 0};
     frame.shadow_view_projection = shadow_matrices_;
-    frame.shadow_settings = {window_->shadows_enabled() ? 1.0F : 0.0F, 1.0F / ShadowMap::resolution,
-                             0, 0};
-    frame.viewport        = {1.0F / static_cast<float>(size.width()),
-                             1.0F / static_cast<float>(size.height()), camera.near_plane,
-                             camera.far_plane};
-    frame.view            = camera.view_matrix();
-    frame.projection      = camera.projection_matrix(static_cast<float>(size.width()) /
-                                                     static_cast<float>(size.height()));
-    frame.inverse_projection = glm::inverse(frame.projection);
-    const auto& ao           = window_->ssao_settings();
-    const bool  preview      = mode == VulkanViewport::base_color_preview_mode;
-    const float radius       = preview ? preview_radius_ : ao.radius;
-    frame.ao_settings        = {preview ? (window_->preview_occlusion() ? 1.0F : 0.0F)
-                                        : (ao.enabled ? 1.0F : 0.0F),
-                                radius, preview ? radius * 0.02F : ao.bias, ao.strength};
+    frame.shadow_settings        = {window_->shadows_enabled() ? 1.F : 0.F,
+                                    window_->shadow_filter_radius(),
+                                    static_cast<float>(window_->effective_shadow(reference)),
+                                    std::tan(glm::radians(window_->light_half_angle()))};
+    frame.counts.z               = window_->shadow_debug_light();
+    frame.viewport               = {1.0F / static_cast<float>(size.width()),
+                                    1.0F / static_cast<float>(size.height()), camera.near_plane,
+                                    camera.far_plane};
+    frame.view                   = camera.view_matrix();
+    frame.projection             = camera.projection_matrix(static_cast<float>(size.width()) /
+                                                            static_cast<float>(size.height()));
+    frame.inverse_projection     = glm::inverse(frame.projection);
+    const auto& ao               = window_->ssao_settings();
+    const bool  preview          = mode == VulkanViewport::base_color_preview_mode;
+    const float radius           = preview ? preview_radius_ : ao.radius;
+    frame.ao_settings            = {preview ? (window_->preview_occlusion() ? 1.0F : 0.0F)
+                                            : (ao.enabled ? 1.0F : 0.0F),
+                                    radius, preview ? radius * 0.02F : ao.bias, ao.strength};
     frame.ao_filter = {preview ? 32.0F : static_cast<float>(ao.samples),
                        std::max(radius * 0.25F, 1e-6F), 16, preview || ao.filtered ? 1.0F : 0.0F};
     if (preview) {
@@ -540,6 +545,11 @@ void SceneRenderer::render_shadow_maps(VkCommandBuffer command, int mode) {
                                         mode == VulkanViewport::blinn_phong_mode)) {
         return;
     }
+    // 阴影图按场景修订号缓存。灯光或几何变动由 upload_scene 使缓存失效。
+    if (shadow_depth_ready_) {
+        return;
+    }
+    shadow_depth_ready_ = true;
     const VkViewport viewport{
         0, 0, static_cast<float>(ShadowMap::resolution), static_cast<float>(ShadowMap::resolution),
         0, 1};
@@ -622,7 +632,7 @@ void SceneRenderer::startNextFrame() {
         }
     };
     if (window_->comparison_mode() < 0) {
-        render_view(window_->view_mode());
+        render_view(window_->view_mode(), false);
         if (capture_hdr_) {
             targets_.record_readback(window_->currentCommandBuffer(), ssao_.hdr_image());
         }
@@ -631,13 +641,14 @@ void SceneRenderer::startNextFrame() {
         post_process_.prepare_comparison(*window_);
         const std::array modes{window_->view_mode(), window_->comparison_mode()};
         for (std::size_t side = 0; side < modes.size(); ++side) {
-            const auto key = std::make_pair(window_->comparison_revision(modes[side]), modes[side]);
+            const auto key =
+                std::make_pair(window_->comparison_revision(modes[side], side == 1), modes[side]);
             const bool capture =
                 capture_hdr_ && static_cast<int>(side) == std::max(0, window_->export_side());
             if (comparison_keys_[side] == key && !capture) {
                 continue;
             }
-            render_view(modes[side]);
+            render_view(modes[side], side == 1);
             window_->report_comparison_draw();
             if (capture) {
                 targets_.record_readback(window_->currentCommandBuffer(), ssao_.hdr_image());
@@ -653,8 +664,8 @@ void SceneRenderer::startNextFrame() {
     window_->requestUpdate();
 }
 
-void SceneRenderer::render_view(int mode) {
-    update_uniforms(mode);
+void SceneRenderer::render_view(int mode, bool reference) {
+    update_uniforms(mode, reference);
     render_shadow_maps(window_->currentCommandBuffer(), mode);
     const auto       size = window_->swapChainImageSize();
     const VkExtent2D extent{static_cast<std::uint32_t>(size.width()),

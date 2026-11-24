@@ -15,6 +15,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QSignalBlocker>
+#include <QSpinBox>
 #include <algorithm>
 
 using namespace workbench_detail;
@@ -253,8 +254,8 @@ void Workbench::build_camera_panel() {
     focus_           = spin(camera_panel_, "focus_distance", 0.0001, 100000, 0.1);
     auto* mode       = new QComboBox;
     mode->setObjectName("view_mode");
-    mode->addItems(
-        {"光照合成", "法线", "线性深度", "线框", "原始 AO", "滤波 AO", "原色预览", "Blinn–Phong"});
+    mode->addItems({"光照合成", "法线", "线性深度", "线框", "原始 AO", "滤波 AO", "原色预览",
+                    "Blinn–Phong", "阴影深度", "遮挡物深度", "半影半径", "光源可见性"});
     mode->setItemData(VulkanViewport::base_color_preview_mode,
                       "均匀亮度显示材质和纹理，保留深度与接触遮蔽；不依赖场景光源。",
                       Qt::ToolTipRole);
@@ -280,6 +281,39 @@ void Workbench::build_camera_panel() {
     layout->addRow(shadows);
     connect(shadows, &QCheckBox::toggled, this,
             [this](bool enabled) { viewport_->set_shadows_enabled(enabled); });
+    auto* filter = new QComboBox;
+    filter->setObjectName("shadow_filter");
+    filter->addItems({"硬阴影", "PCF", "PCSS"});
+    filter->setCurrentIndex(static_cast<int>(viewport_->shadow_filter()));
+    auto* angle = spin(camera_panel_, "shadow_half_angle", 0, 15, .25);
+    angle->setValue(viewport_->light_half_angle());
+    auto* radius = spin(camera_panel_, "shadow_filter_radius", 0, 48, .5);
+    radius->setValue(viewport_->shadow_filter_radius());
+    auto* layer = new QSpinBox;
+    layer->setObjectName("shadow_debug_light");
+    layer->setRange(1, 8);
+    layer->setToolTip("与场景方向光的顺序一致，只有阴影诊断视图使用此选择");
+    layout->addRow("阴影过滤", filter);
+    layout->addRow("光源半角 / °", angle);
+    layout->addRow("PCF 半径 / 纹素", radius);
+    layout->addRow("诊断光源", layer);
+    const auto controls = [=] {
+        filter->setEnabled(shadows->isChecked());
+        angle->setEnabled(shadows->isChecked() && filter->currentIndex() == 2);
+        radius->setEnabled(shadows->isChecked() && filter->currentIndex() == 1);
+    };
+    connect(shadows, &QCheckBox::toggled, camera_panel_, controls);
+    connect(filter, &QComboBox::currentIndexChanged, camera_panel_, [this, controls](int i) {
+        viewport_->set_shadow_filter(static_cast<ShadowFilter>(i));
+        controls();
+    });
+    connect(angle, &QDoubleSpinBox::valueChanged, camera_panel_,
+            [this](double v) { viewport_->set_light_half_angle(static_cast<float>(v)); });
+    connect(radius, &QDoubleSpinBox::valueChanged, camera_panel_,
+            [this](double v) { viewport_->set_shadow_filter_radius(static_cast<float>(v)); });
+    connect(layer, &QSpinBox::valueChanged, camera_panel_,
+            [this](int i) { viewport_->set_shadow_debug_light(i - 1); });
+    controls();
     const auto update = [this] {
         if (refreshing_) {
             return;

@@ -41,6 +41,8 @@ struct SceneUploadStatistics {
 // Qt 提供窗口与平台 surface，本类独占 Vulkan device、交换链和帧同步。
 // 首版仅允许一帧在 GPU 执行；呈现完成信号量按交换链图像分配，不能按 CPU 帧号复用。
 // 真正的提交延后到 Qt timer，避免在 macOS 的 CALayer expose/事务回调内等待 drawable。
+enum class ShadowFilter { hard, pcf, pcss };
+
 class VulkanViewport final : public QWindow {
   public:
     VulkanViewport();
@@ -111,6 +113,27 @@ class VulkanViewport final : public QWindow {
     std::uint64_t sdf_uploads() const noexcept;
     // 在 GUI 线程更新方向光阴影开关，并请求视口刷新。
     void set_shadows_enabled(bool enabled);
+    // 固定核用纹素半径，PCSS 用方向光的角半径（度）。
+    ShadowFilter shadow_filter() const noexcept;
+    void set_shadow_filter(ShadowFilter filter);
+    // 右侧为 -1 时跟随相机面板的过滤器。
+    void set_reference_shadow(int filter);
+
+    ShadowFilter effective_shadow(bool reference) const noexcept {
+        return reference && reference_shadow_ >= 0 ? static_cast<ShadowFilter>(reference_shadow_)
+                                                   : shadow_filter_;
+    }
+
+    float light_half_angle() const noexcept;
+    void set_light_half_angle(float degrees);
+    float shadow_filter_radius() const noexcept;
+    void set_shadow_filter_radius(float texels);
+    void set_shadow_debug_light(int light);
+
+    int shadow_debug_light() const noexcept {
+        return shadow_debug_light_;
+    }
+
     // 查询方向光阴影开关。
     bool shadows_enabled() const noexcept;
     // 在 GUI 线程更新最终显示的 FXAA 开关，并请求视口刷新。
@@ -138,8 +161,9 @@ class VulkanViewport final : public QWindow {
     void set_split_position(float value);
 
     // 教学灯光的变化只使使用 Blinn–Phong 的一侧过期。
-    std::uint64_t comparison_revision(int mode) const noexcept {
-        return preview_revision_ + (mode == blinn_phong_mode ? teaching_revision_ : 0);
+    std::uint64_t comparison_revision(int mode, bool reference) const noexcept {
+        return preview_revision_ + (reference ? reference_revision_ : 0) +
+               (mode == blinn_phong_mode ? teaching_revision_ : 0);
     }
 
     std::uint64_t comparison_draws() const noexcept {
@@ -345,23 +369,27 @@ class VulkanViewport final : public QWindow {
     // 已完成 GPU 提交的预览版本。
     std::uint64_t completed_preview_revision_ = 0;
     // 记录等待新预览完成的时间。
-    QElapsedTimer                                     preview_wait_;
-    QString                                           frame_wait_reason_;
-    bool                                              shadows_enabled_   = true;
-    bool                                              fxaa_enabled_      = true;
-    std::uint64_t                                     teaching_revision_ = 0, comparison_draws_ = 0;
-    int                                               comparison_mode_ = -1;
-    int                                               export_side_     = -1;
-    float                                             split_           = 0.5F;
-    bool                                              dragging_split_  = false;
-    glm::vec4                                         teaching_light_{1.5F, 2.5F, 2.0F, 10.F};
-    glm::vec3                                         teaching_surface_{35.F, 0.25F, 1.F};
-    float                                             exposure_                 = 0.0F;
-    int                                               view_mode_                = 0;
-    bool                                              preview_occlusion_        = true;
-    bool                                              preview_outline_          = true;
-    float                                             preview_outline_strength_ = 0.35F;
-    minirender::SsaoSettings                          ssao_;
+    QElapsedTimer            preview_wait_;
+    QString                  frame_wait_reason_;
+    ShadowFilter             shadow_filter_    = ShadowFilter::pcf;
+    float                    light_half_angle_ = 3.F, shadow_filter_radius_ = 1.F;
+    int                      shadow_debug_light_ = 0, reference_shadow_ = -1;
+    std::uint64_t            reference_revision_ = 0;
+    bool                     shadows_enabled_    = true;
+    bool                     fxaa_enabled_       = true;
+    std::uint64_t            teaching_revision_ = 0, comparison_draws_ = 0;
+    int                      comparison_mode_ = -1;
+    int                      export_side_     = -1;
+    float                    split_           = 0.5F;
+    bool                     dragging_split_  = false;
+    glm::vec4                teaching_light_{1.5F, 2.5F, 2.0F, 10.F};
+    glm::vec3                teaching_surface_{35.F, 0.25F, 1.F};
+    float                    exposure_                 = 0.0F;
+    int                      view_mode_                = 0;
+    bool                     preview_occlusion_        = true;
+    bool                     preview_outline_          = true;
+    float                    preview_outline_strength_ = 0.35F;
+    minirender::SsaoSettings ssao_;
     std::shared_ptr<const minirender::IblEnvironment> ibl_maps_;
     std::shared_ptr<const minirender::Image>          ibl_lut_;
     bool                                              environment_background_ = true;

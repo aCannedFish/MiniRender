@@ -3,6 +3,7 @@
 #include "resource_catalog.hpp"
 #include "sequence_viewer.hpp"
 #include "workbench_internal.hpp"
+#include <QCheckBox>
 #include <QComboBox>
 #include <QFileInfo>
 #include <QMessageBox>
@@ -160,9 +161,17 @@ void Workbench::import_resource(const catalog::Entry& entry, bool recommended) {
                         }
                     }
                 } else {
-                    findChild<QComboBox*>("view_mode")
-                        ->setCurrentIndex(recommended ? VulkanViewport::blinn_phong_mode
-                                                      : VulkanViewport::base_color_preview_mode);
+                    int view = VulkanViewport::base_color_preview_mode;
+                    if (recommended && entry.recommended == "blinn-phong") {
+                        view = VulkanViewport::blinn_phong_mode;
+                    }
+                    if (recommended && entry.recommended == "pcss") {
+                        view = 0;
+                        findChild<QCheckBox*>("shadows_enabled")->setChecked(true);
+                        findChild<QComboBox*>("shadow_filter")
+                            ->setCurrentIndex(static_cast<int>(ShadowFilter::pcss));
+                    }
+                    findChild<QComboBox*>("view_mode")->setCurrentIndex(view);
                     if (!source.objects.empty()) {
                         select_object(source.objects.front().id);
                     }

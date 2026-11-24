@@ -97,6 +97,7 @@ def main() -> int:
         action="store_true",
         help="Verify single and double sided surfaces",
     )
+    checks.add_argument("--shadow-check",action="store_true",help="Measure PCF and PCSS penumbrae")
     checks.add_argument("--catalog-check", action="store_true", help="Verify resource import and frame playback")
     checks.add_argument(
         "--presets-check",
@@ -166,6 +167,7 @@ def main() -> int:
         or args.sdf_check
         or args.points_check
         or args.adaptive_check
+        or args.shadow_check
         or args.catalog_check
         or args.presets_check
         or args.sides_check
@@ -203,6 +205,7 @@ def main() -> int:
         (args.sdf_check, "SDF"),
         (args.points_check, "Points"),
         (args.adaptive_check, "Adaptive"),
+        (args.shadow_check,"Shadow"),
         (args.catalog_check,"Catalog"),
         (args.presets_check, "Presets"),
         (args.sides_check, "Sides"),

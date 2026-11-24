@@ -19,7 +19,7 @@ layout(binding = 2) uniform sampler2D base_texture;
 layout(location = 0) out vec4 color;
 layout(location = 1) out vec4 normal_output;
 layout(location = 2) out vec4 ambient_output;
-layout(binding = 1) uniform sampler2DArray shadow_map;
+#include "shadow_filter.glsl"
 const float PI = 3.141592653589793;
 
 // 分布与 Smith G1 参考 Walter et al. 2007，推导与实现差异见 docs/VIEWPORT.md。
@@ -35,46 +35,7 @@ float smith_g1(float nd, float alpha) {
     return 2.0 * nd / max(nd + sqrt(a2 + (1.0 - a2) * nd * nd), 1e-6);
 }
 
-// PCF 参考 Reeves et al. 1987，推导和实现边界见 docs/SHADOWS.md。
-// 对 3×3 深度比较结果平均；偏移量在光空间深度范围内，不改变物体几何。
-float visibility(int light, float ndl, vec3 world_dx, vec3 world_dy) {
-    if (frame.shadow_settings.x < 0.5) {
-        return 1.0;
-    }
-    vec4 clip     = frame.shadow_view_projection[light] * vec4(world_position, 1.0);
-    vec3 position = clip.xyz / clip.w;
-    vec2 uv       = position.xy * 0.5 + 0.5;
-    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))) || position.z < 0.0 ||
-        position.z > 1.0) {
-        return 1.0;
-    }
-    float bias = max(0.0002 * (1.0 - ndl), 0.00005);
-    // 将屏幕空间导数换到阴影 UV，按接收面平面修正每个 PCF 样本的比较深度。
-    // 导数在 main 的统一控制流中计算，避免光照分支影响相邻像素的导数。
-    vec4  clip_dx        = frame.shadow_view_projection[light] * vec4(world_dx, 0.0);
-    vec4  clip_dy        = frame.shadow_view_projection[light] * vec4(world_dy, 0.0);
-    vec3  position_dx    = (clip_dx.xyz - position * clip_dx.w) / clip.w;
-    vec3  position_dy    = (clip_dy.xyz - position * clip_dy.w) / clip.w;
-    vec2  uv_dx          = position_dx.xy * 0.5;
-    vec2  uv_dy          = position_dy.xy * 0.5;
-    float determinant    = uv_dx.x * uv_dy.y - uv_dx.y * uv_dy.x;
-    vec2  depth_gradient = vec2(0.0);
-    if (abs(determinant) > 1e-12) {
-        depth_gradient = vec2(position_dx.z * uv_dy.y - position_dy.z * uv_dx.y,
-                              uv_dx.x * position_dy.z - uv_dy.x * position_dx.z) /
-                         determinant;
-    }
-    float result = 0.0;
-    for (int y = -1; y <= 1; ++y) {
-        for (int x = -1; x <= 1; ++x) {
-            vec2  offset         = vec2(x, y) * frame.shadow_settings.y;
-            float stored_depth   = texture(shadow_map, vec3(uv + offset, float(light))).r;
-            float receiver_depth = position.z + dot(depth_gradient, offset);
-            result += receiver_depth - bias <= stored_depth ? 1.0 : 0.0;
-        }
-    }
-    return result / 9.0;
-}
+
 
 ivec2 repeat_pixel(ivec2 pixel, ivec2 extent) {
     return (pixel % extent + extent) % extent;
@@ -124,6 +85,18 @@ void main() {
     normal_output           = vec4(n, 1.0);
     ClothData cloth         = instances.values[draw_index.instance].cloth;
     bool      cloth_enabled = cloth.counts.y != 0;
+    int mode=int(frame.display.y);
+    if(mode>=8 && mode<=11) {
+        vec3 debug=vec3(0.0);
+        float vis=1.0;
+        if(frame.counts.x>0){
+            int light=clamp(frame.counts.z,0,frame.counts.x-1);
+            float ndl=max(dot(n,-normalize(frame.lights[light].direction.xyz)),0.0);
+            vis=shadow_visibility(light,ndl,world_dx,world_dy,debug);
+        }
+        float value=mode==8?debug.x:mode==9?debug.y:mode==10?debug.z:vis;
+        color=vec4(vec3(value),1.0);ambient_output=vec4(0.0);return;
+    }
     if (int(frame.display.y) == 7) {
         // 点光源采用平方反比衰减。半角向量决定 Blinn–Phong 高光的方向与宽度。
         vec3 to_light = frame.teaching_light.xyz - world_position;
@@ -189,9 +162,11 @@ void main() {
         if (ndl <= 0.0 || ndv <= 0.0) {
             continue;
         }
+        vec3 diagnostic;
+        float visibility=shadow_visibility(i,ndl,world_dx,world_dy,diagnostic);
         if (cloth_enabled) {
             result += cloth_response(cloth, n, cloth_u, cloth_v, v, l, albedo) *
-                      frame.lights[i].radiance.rgb * visibility(i, ndl, world_dx, world_dy);
+                      frame.lights[i].radiance.rgb * visibility;
             continue;
         }
         vec3  h        = normalize(l + v);
@@ -203,7 +178,7 @@ void main() {
         vec3  specular = f * d * g / max(4.0 * ndl * ndv, 1e-6);
         vec3  diffuse  = (vec3(1.0) - f) * (1.0 - metallic) * albedo / PI;
         result += (diffuse + specular) * frame.lights[i].radiance.rgb * ndl *
-                  visibility(i, ndl, world_dx, world_dy);
+                  visibility;
     }
     color = vec4(result, 1.0);
 }
