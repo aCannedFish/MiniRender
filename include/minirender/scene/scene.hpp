@@ -120,6 +120,8 @@ struct MeshAsset {
     std::string           id;
     std::filesystem::path source; // 相对于 asset_directory；导入时可为绝对路径，保存时转换。
     std::shared_ptr<const MeshData> data;
+    // 目录导入的资产随场景保存，可将场景文件夹复制到其他设备。
+    bool package_on_save = false;
 };
 
 struct TextureAsset {
@@ -127,6 +129,8 @@ struct TextureAsset {
     std::filesystem::path          source;
     ColorEncoding                  encoding = ColorEncoding::srgb;
     std::shared_ptr<const Texture> data;
+    // 目录导入的资产随场景保存，可将场景文件夹复制到其他设备。
+    bool package_on_save = false;
 };
 
 struct SceneObject {

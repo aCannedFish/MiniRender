@@ -10,6 +10,11 @@
 #include <QMainWindow>
 #include <minirender/scene/editor.hpp>
 
+struct BuiltinScene;
+
+namespace catalog {
+struct Entry;
+}
 class QTreeWidget;
 class QLineEdit;
 class QDoubleSpinBox;
@@ -64,6 +69,8 @@ class Workbench final : public QMainWindow {
     void open_scene_file(const QString& path, std::function<void()> after_load = {});
     // 按模板标识覆盖导入场景，同时应用预览模式和离线推荐参数。
     void import_builtin_scene(const QString& id);
+    // 根据资源类型覆盖场景、追加物体或打开帧序列。
+    void import_resource(const catalog::Entry& entry);
     // 后台解析 OBJ 并准备渲染数据，完成后创建场景资产和物体。
     void import_object_file(const QString& path);
     // 同步保存文档与生成资产，并记录当前保存路径。
@@ -123,6 +130,8 @@ class Workbench final : public QMainWindow {
     void import_environment_file(const QString& path);
 
   private:
+    // 安装模板后同步默认预览、选中物体及离线参数。
+    void apply_builtin_settings(const BuiltinScene& preset);
     // 创建物体、材质和专用材质编辑控件，并绑定编辑事务。
     void build_object_panel();
     // 创建方向光选择与参数控件，编辑时更新所选光源。

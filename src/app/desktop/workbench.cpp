@@ -2,6 +2,7 @@
 // 本模块接口见 workbench.hpp。
 
 #include "builtin_scenes.hpp"
+#include "catalog_browser.hpp"
 #include "cloth_controller.hpp"
 #include "cloth_panel.hpp"
 #include "editor_theme.hpp"
@@ -83,6 +84,19 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     builtin_button_->setPopupMode(QToolButton::InstantPopup);
     auto* builtin_menu = new QMenu(builtin_button_);
     builtin_menu->setToolTipsVisible(true);
+    auto* browse = builtin_menu->addAction("资源目录…");
+    browse->setObjectName("browse_catalog");
+    connect(browse, &QAction::triggered, this, [this] {
+        try {
+            auto* browser    = new CatalogBrowser(this);
+            browser->on_open = [this](const auto& entry) { import_resource(entry); };
+            browser->setAttribute(Qt::WA_DontShowOnScreen, testAttribute(Qt::WA_DontShowOnScreen));
+            browser->open();
+        } catch (const std::exception& error) {
+            report_error(error);
+        }
+    });
+    builtin_menu->addSeparator();
     builtin_menu->addAction("覆盖当前场景，导入后可继续编辑")->setEnabled(false);
     builtin_menu->addSeparator();
     for (const auto& preset : builtin_scenes()) {

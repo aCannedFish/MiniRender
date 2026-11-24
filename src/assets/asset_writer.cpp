@@ -146,7 +146,8 @@ std::filesystem::path portable_asset_path(const std::filesystem::path& source,
                                           const std::filesystem::path& destination,
                                           std::size_t index, std::size_t count,
                                           CancellationToken        cancellation,
-                                          const SceneSaveCallback& progress) {
+                                          const SceneSaveCallback& progress, bool package,
+                                          const std::filesystem::path& staging) {
     cancellation.check();
     if (!std::filesystem::is_regular_file(source)) {
         const auto utf8 = source.generic_u8string();
@@ -154,8 +155,30 @@ std::filesystem::path portable_asset_path(const std::filesystem::path& source,
                                  std::string(utf8.begin(), utf8.end()));
     }
     const auto relative = std::filesystem::relative(source, destination);
-    if (!relative.empty()) {
+    if (!relative.empty() && (!package || *relative.begin() != "..")) {
         return relative;
+    }
+    if (package) {
+        // 先复制到保存任务的暂存区，发布后的文件与课程包拥有独立内容。
+        const auto    temporary = staging / ("resource-" + std::to_string(index));
+        std::ifstream input(source, std::ios::binary);
+        std::ofstream output(temporary, std::ios::binary);
+        output.exceptions(std::ios::badbit | std::ios::failbit);
+        std::array<char, block_size> block{};
+        std::size_t                  completed = 0;
+        const auto                   total     = std::filesystem::file_size(source);
+        while (input.read(block.data(), block.size()) || input.gcount()) {
+            output.write(block.data(), input.gcount());
+            completed += static_cast<std::size_t>(input.gcount());
+            report(cancellation, progress, SceneSaveStage::copy, index, count, completed, total);
+        }
+        if (!input.eof() || input.bad()) {
+            throw std::runtime_error("Cannot read packaged asset");
+        }
+        output.close();
+        const auto name = content_name(temporary, index, count, cancellation, progress);
+        return publish(temporary, destination, name, source.extension(), index, count, cancellation,
+                       progress);
     }
     return publish(source, destination, "asset", source.extension(), index, count, cancellation,
                    progress);

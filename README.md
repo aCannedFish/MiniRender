@@ -17,6 +17,18 @@ MiniRender 是用于学习图形学的小型渲染引擎，使用 C++20、Qt Wid
 
 离线任务支持实际采样进度、暂停、恢复、取消及 PNG/EXR 导出。工具栏“快速导入”提供 Cornell Box、材质球、雾与光束、玻璃焦散、蜡和大理石、光场棋盘等场景，导入后可继续编辑和另存。
 
+### 资源目录
+
+打开工具栏的“快速导入 → 资源目录”，按名称、类型或作业编号筛选资源。选择场景会覆盖当前文档，选择模型会把物体及其材质追加到当前场景，选择帧序列会打开独立播放器。整组模型可以一次撤销。另存场景时，目录导入的模型与纹理会随 JSON 保存到目标目录，可以一起复制到另一台电脑。
+
+应用内置 14 个场景、一个可追加的单位立方体和四帧 EXR 示例。已准备好的课程包可通过“选择课程包…”挂载，应用会记住路径。Mary 和 Bunny 均提供独立场景与追加模型两种入口。HW5 的 box 与 pink-room 可按帧播放或拖动查看。
+
+从已解压的作业生成课程索引时，准备 Python 3、FFmpeg 和本项目构建的 CLI。下例假定课程目录中已有 `frameworks/HW0`、`frameworks/HW2` 以及 `HW5-data/{box,pink-room}/input`。脚本生成索引后，在资源目录选择包含 `resource_catalog.json` 的文件夹。
+
+```sh
+python3 scripts/prepare_course_catalog.py work/GAMES202 --cli build/macos-desktop-release/minirender_cli
+```
+
 ## 构建要求
 
 - Git、CMake 3.25 或更新版本、Ninja，以及支持 C++20 的编译器。
@@ -534,6 +546,11 @@ src/app/
 ```text
 src/app/desktop/
 ├── CMakeLists.txt  # 桌面目标、Qt/Vulkan 链接、GLSL 编译及样式/场景部署
+├── resource_catalog.hpp / .cpp  # 目录数据、包内路径和流式 SHA-256 校验
+├── catalog_browser.hpp / .cpp  # 搜索、筛选、挂载课程包和选择导入动作
+├── sequence_viewer.hpp / .cpp  # 异步 EXR 解码、播放与跳帧
+├── workbench_catalog.cpp  # 导入事务、资源 ID 重映射、进度与取消
+├── catalog_smoke.hpp / .cpp  # 从菜单验证追加、撤销、便携保存和序列读取
 ├── builtin_scenes.cpp  # 内置场景的菜单信息、资源位置和推荐渲染参数
 ├── builtin_scenes.hpp  # 接口：内置场景的菜单信息、资源位置和推荐渲染参数
 ├── editor.qss  # 深色工作台控件、布局边界、焦点和禁用状态的样式
@@ -789,6 +806,9 @@ shaders/
 
 ```text
 scenes/
+├── resource_catalog.json  # 内置目录及源文件、依赖项的 SHA-256
+├── catalog/               # 可追加模型和序列样本
+├── catalog_thumbs/        # 资源浏览器使用的小图
 ├── cornell-box.json  # 经典红绿墙、两个方块和顶部面积光
 ├── cornell-materials.json  # Cornell 房间中的玻璃与金属球
 ├── cornell-small-light.json  # 小面积光下的采样与噪声对照
@@ -841,6 +861,27 @@ scenes/assets/textures/
 ```
 
 `Image` 按声明的颜色编码读取这些文件，`Texture` 生成线性 mip 链，桌面通过 `GpuTexture` 上传。测试使用这些样本比较文件解码、CPU 过滤与 GPU 采样。
+
+### 目录样本
+
+```text
+scenes/catalog/
+├── cube.json       # 一米蓝色立方体，引用 scenes/assets/cube.obj
+├── motion.json     # 四帧的包内路径与 SHA-256
+└── motion_0.exr … motion_3.exr  # 固定相机下移动物体的线性 RGB
+```
+
+`resource_catalog.cpp` 按用户选择校验主文件和依赖。`workbench_catalog.cpp` 把模型的纹理、材质、网格和物体作为一次编辑提交。`sequence_viewer.cpp` 按当前帧索引解码 EXR。
+
+### 目录缩略图
+
+```text
+scenes/catalog_thumbs/
+├── cornell.png … lightfield.png  # 内置场景，各文件名对应目录条目 ID
+└── cube.png                     # 单位立方体预览
+```
+
+`prepare_course_catalog.py` 调用 MiniRender CLI 生成缩略图。`catalog_browser.cpp` 直接读取这些小图，滚动列表时无需打开模型或解码 EXR。
 
 ### 示例程序
 
@@ -935,6 +976,7 @@ tests/scenes/
 ```text
 scripts/
 ├── check_source_names.py  # 检查自有源码文件名，拒绝带空格的副本名称
+├── prepare_course_catalog.py  # 生成目录缩略图、转换课程模型、建立 EXR 帧索引
 ├── generate_builtin_scenes.py  # 生成内置 JSON 场景及球体、透光孔、光场棋盘资产
 ├── install_macos.py  # 部署 Qt/Vulkan 运行库、验证签名与隐藏渲染、替换正式应用并清理旧包
 ├── prepare_parameter_probe.py  # 生成大网格场景，供参数响应和资源复用检查使用

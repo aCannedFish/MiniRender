@@ -1,0 +1,18 @@
+[
+  {
+    "path": "catalog/motion_0.exr",
+    "sha256": "d48ab9a7506890d0e3a7e0dd8e0fc63abac4661902b5b001973f03881ef2df41"
+  },
+  {
+    "path": "catalog/motion_1.exr",
+    "sha256": "7d4dde31f714f3a2caec29458b7bb1f91756309d9b6945b495a1e8c53c99b8a1"
+  },
+  {
+    "path": "catalog/motion_2.exr",
+    "sha256": "4079f019d68699faea7904458aa8e92545f5dc024cad1d6ac1c2da50ce8f4264"
+  },
+  {
+    "path": "catalog/motion_3.exr",
+    "sha256": "fff7f9ef8207a666b4d47e244e8090c5bb56a536d2fae235817723961849ffb1"
+  }
+]
