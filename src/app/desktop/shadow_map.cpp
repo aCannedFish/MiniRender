@@ -10,7 +10,11 @@ ShadowMap::~ShadowMap() {
     release();
 }
 
-void ShadowMap::create(VulkanViewport& viewport) {
+void ShadowMap::create(VulkanViewport& viewport, std::uint32_t size, std::uint32_t count) {
+    size_  = size;
+    count_ = count;
+    views_.assign(count, VK_NULL_HANDLE);
+    framebuffers_.assign(count, VK_NULL_HANDLE);
     device_ = viewport.device();
     VkFormatProperties properties{};
     vkGetPhysicalDeviceFormatProperties(viewport.physicalDevice(), VK_FORMAT_D32_SFLOAT,
@@ -24,9 +28,9 @@ void ShadowMap::create(VulkanViewport& viewport) {
     image.sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     image.imageType   = VK_IMAGE_TYPE_2D;
     image.format      = VK_FORMAT_D32_SFLOAT;
-    image.extent      = {resolution, resolution, 1};
+    image.extent      = {size_, size_, 1};
     image.mipLevels   = 1;
-    image.arrayLayers = layers;
+    image.arrayLayers = count_;
     image.samples     = VK_SAMPLE_COUNT_1_BIT;
     image.tiling      = VK_IMAGE_TILING_OPTIMAL;
     image.usage       = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -58,9 +62,9 @@ void ShadowMap::create(VulkanViewport& viewport) {
     view.image            = image_;
     view.viewType         = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
     view.format           = VK_FORMAT_D32_SFLOAT;
-    view.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, layers};
+    view.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, count_};
     check_vk(vkCreateImageView(device_, &view, nullptr, &array_view_), "create shadow array view");
-    for (std::uint32_t layer = 0; layer < layers; ++layer) {
+    for (std::uint32_t layer = 0; layer < count_; ++layer) {
         view.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
         view.subresourceRange.baseArrayLayer = layer;
         view.subresourceRange.layerCount     = 1;
@@ -119,14 +123,14 @@ void ShadowMap::create(VulkanViewport& viewport) {
     pass.dependencyCount = static_cast<std::uint32_t>(dependencies.size());
     pass.pDependencies   = dependencies.data();
     check_vk(vkCreateRenderPass(device_, &pass, nullptr, &pass_), "create shadow pass");
-    for (std::uint32_t layer = 0; layer < layers; ++layer) {
+    for (std::uint32_t layer = 0; layer < count_; ++layer) {
         VkFramebufferCreateInfo framebuffer{};
         framebuffer.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebuffer.renderPass      = pass_;
         framebuffer.attachmentCount = 1;
         framebuffer.pAttachments    = &views_[layer];
-        framebuffer.width           = resolution;
-        framebuffer.height          = resolution;
+        framebuffer.width           = size_;
+        framebuffer.height          = size_;
         framebuffer.layers          = 1;
         check_vk(vkCreateFramebuffer(device_, &framebuffer, nullptr, &framebuffers_[layer]),
                  "create shadow framebuffer");
@@ -145,7 +149,7 @@ void ShadowMap::prepare(VkCommandBuffer command) {
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image               = image_;
-    barrier.subresourceRange    = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, layers};
+    barrier.subresourceRange    = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, count_};
     barrier.dstAccessMask       = VK_ACCESS_SHADER_READ_BIT;
     vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1,
@@ -159,7 +163,7 @@ void ShadowMap::begin(VkCommandBuffer command, std::uint32_t layer) {
     begin.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     begin.renderPass        = pass_;
     begin.framebuffer       = framebuffers_.at(layer);
-    begin.renderArea.extent = {resolution, resolution};
+    begin.renderArea.extent = {size_, size_};
     begin.clearValueCount   = 1;
     begin.pClearValues      = &clear;
     vkCmdBeginRenderPass(command, &begin, VK_SUBPASS_CONTENTS_INLINE);
@@ -186,8 +190,8 @@ void ShadowMap::release() {
     array_view_ = VK_NULL_HANDLE;
     sampler_    = VK_NULL_HANDLE;
     pass_       = VK_NULL_HANDLE;
-    views_.fill(VK_NULL_HANDLE);
-    framebuffers_.fill(VK_NULL_HANDLE);
+    views_.clear();
+    framebuffers_.clear();
     initialized_ = false;
 }
 

@@ -141,6 +141,31 @@ class VulkanViewport final : public QWindow {
         return shadow_debug_light_;
     }
 
+    // 面光源阴影在拖动期间使用 2×2 样本，静止时使用 3×3。
+    bool area_shadows() const noexcept {
+        return area_shadows_;
+    }
+
+    void set_area_shadows(bool enabled);
+
+    // 最近一次面光源深度图重建次数与采样布局，供状态检查使用。
+    void report_area_shadow(int grid, std::uint64_t updates) noexcept {
+        area_grid_    = grid;
+        area_updates_ = updates;
+    }
+
+    int area_shadow_grid() const noexcept {
+        return area_grid_;
+    }
+
+    std::uint64_t area_shadow_updates() const noexcept {
+        return area_updates_;
+    }
+
+    bool navigating() const noexcept {
+        return pressed_buttons_ != Qt::NoButton || gizmo_drag_.has_value();
+    }
+
     // 查询方向光阴影开关。
     bool shadows_enabled() const noexcept;
     // 在 GUI 线程更新最终显示的 FXAA 开关，并请求视口刷新。
@@ -378,6 +403,9 @@ class VulkanViewport final : public QWindow {
     // 记录等待新预览完成的时间。
     QElapsedTimer            preview_wait_;
     QString                  frame_wait_reason_;
+    bool                     area_shadows_     = true;
+    int                      area_grid_        = 0;
+    std::uint64_t            area_updates_     = 0;
     ShadowFilter             shadow_filter_    = ShadowFilter::pcf;
     float                    light_half_angle_ = 3.F, shadow_filter_radius_ = 1.F;
     int                      reference_energy_   = -1;

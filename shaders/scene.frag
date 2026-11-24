@@ -7,6 +7,7 @@
 #include "cloth.glsl"
 #include "ibl_sampling.glsl"
 #include "rectangle_light.glsl"
+#include "rectangle_visibility.glsl"
 
 layout(location = 0) in vec3 world_position;
 layout(location = 1) in vec3 world_normal;
@@ -201,7 +202,8 @@ void main() {
     for(int i=0;i<int(frame.area_settings.x);++i){
         vec3 diffuse,specular;
         rectangle_response(area.lights[i],world_position,n,v,albedo,material.x,metallic,diffuse,specular);
-        result+=diffuse+specular;
+        vec2 visible=rectangle_visibility(i,area.lights[i],world_position,n,v,material.x,f0);
+        result+=diffuse*visible.x+specular*visible.y;
     }
     color = vec4(result, 1.0);
 }

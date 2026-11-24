@@ -10,6 +10,7 @@
 #include "gpu_texture.hpp"
 #include "hdr_targets.hpp"
 #include "post_process.hpp"
+#include "rectangle_shadow.hpp"
 #include "shadow_map.hpp"
 #include "ssao_pass.hpp"
 #include "viewport_renderer.hpp"
@@ -113,7 +114,12 @@ class SceneRenderer final : public ViewportRenderer {
     // 本帧相机、光源与效果设置的统一缓冲。
     GpuBuffer uniforms_;
     // 当前环境预处理结果对应的 GPU 数据。
-    GpuIbl             ibl_;
+    GpuIbl          ibl_;
+    RectangleShadow area_shadows_;
+    glm::vec3       minimum_{}, maximum_{};
+    int area_grid() const;
+    void draw_shadow_geometry(VkCommandBuffer command, int projection, std::uint32_t resolution,
+                              const std::string* emitter = nullptr);
     GpuRectangleLights rectangles_;
     // 着色器资源的 binding 与类型声明。
     VkDescriptorSetLayout descriptor_layout_ = VK_NULL_HANDLE;
