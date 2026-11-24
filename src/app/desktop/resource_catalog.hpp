@@ -22,6 +22,14 @@ struct Frame {
 };
 enum class Kind { scene, model, sequence };
 
+// 模式由用户选择。推荐效果随覆盖导入应用，序列在独立查看器中打开。
+enum class ImportAction { append, replace, recommended, open_sequence };
+
+// 优先使用用户挂载的课程包，其次读取本机安装记录或当前仓库的课程包。
+QString course_directory();
+// 用户通过文件选择器成功挂载后，保存课程包路径供下次启动使用。
+void remember_course_directory(const QString& root);
+
 // 一个可浏览的资源。dependencies 包含场景 JSON 引用的网格和纹理。
 struct Entry {
     QString     root, id, name, description, source, rights, thumbnail, recommended;

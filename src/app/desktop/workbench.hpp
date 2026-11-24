@@ -14,7 +14,8 @@ struct BuiltinScene;
 
 namespace catalog {
 struct Entry;
-}
+enum class ImportAction;
+} // namespace catalog
 class QTreeWidget;
 class QLineEdit;
 class QDoubleSpinBox;
@@ -70,7 +71,7 @@ class Workbench final : public QMainWindow {
     // 按模板标识覆盖导入场景，同时应用预览模式和离线推荐参数。
     void import_builtin_scene(const QString& id);
     // 根据资源类型覆盖场景、追加物体或打开帧序列。
-    void import_resource(const catalog::Entry& entry, bool recommended = false);
+    void import_resource(const catalog::Entry& entry, catalog::ImportAction action);
     // 后台解析 OBJ 并准备渲染数据，完成后创建场景资产和物体。
     void import_object_file(const QString& path);
     // 同步保存文档与生成资产，并记录当前保存路径。
@@ -152,7 +153,8 @@ class Workbench final : public QMainWindow {
     // 提交或回滚整次操纵手势，清理预览并同步布料上下文。
     void finish_transform(bool commit);
     // 执行文档编辑事务，更新版本号并同步视口；可复用已校验网格缓存。
-    void perform_edit(const std::function<void(minirender::SceneDocument&)>& edit,
+    // 返回成功后，调用方可选中事务中新建的物体。
+    bool perform_edit(const std::function<void(minirender::SceneDocument&)>& edit,
                       const minirender::MeshValidationCache*                 validated = nullptr);
     // 对选中对象执行属性编辑，复用统一的事务与刷新路径。
     void edit_object_property(const std::function<void(minirender::SceneObject&)>& edit);

@@ -1,7 +1,6 @@
 // Qt 工作台的视口、面板、编辑事务及后台资产任务协调。
 // 本模块接口见 workbench.hpp。
 
-#include "builtin_scenes.hpp"
 #include "catalog_browser.hpp"
 #include "cloth_controller.hpp"
 #include "cloth_panel.hpp"
@@ -11,6 +10,7 @@
 #include "lightfield_panel.hpp"
 #include "offline_panel.hpp"
 #include "point_cloud_panel.hpp"
+#include "quick_import_menu.hpp"
 #include "realtime_panel.hpp"
 #include "sdf_panel.hpp"
 #include "volume_panel.hpp"
@@ -89,8 +89,8 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     connect(browse, &QAction::triggered, this, [this] {
         try {
             auto* browser    = new CatalogBrowser(this);
-            browser->on_open = [this](const auto& entry, bool recommended) {
-                import_resource(entry, recommended);
+            browser->on_open = [this](const auto& entry, catalog::ImportAction action) {
+                import_resource(entry, action);
             };
             browser->setAttribute(Qt::WA_DontShowOnScreen, testAttribute(Qt::WA_DontShowOnScreen));
             browser->open();
@@ -99,20 +99,14 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
         }
     });
     builtin_menu->addSeparator();
-    builtin_menu->addAction("覆盖当前场景，导入后可继续编辑")->setEnabled(false);
-    builtin_menu->addSeparator();
-    for (const auto& preset : builtin_scenes()) {
-        auto* action = builtin_menu->addAction(preset.name);
-        action->setObjectName("builtin_" + preset.id);
-        action->setToolTip(preset.description + " 覆盖当前场景后可继续编辑，离线渲染手动启动。");
-        connect(action, &QAction::triggered, this, [this, id = preset.id] {
-            try {
-                import_builtin_scene(id);
-            } catch (const std::exception& error) {
-                report_error(error);
-            }
-        });
-    }
+    add_quick_import_actions(*builtin_menu,
+                             [this](const auto& entry, catalog::ImportAction action) {
+                                 try {
+                                     import_resource(entry, action);
+                                 } catch (const std::exception& error) {
+                                     report_error(error);
+                                 }
+                             });
     builtin_button_->setMenu(builtin_menu);
     toolbar->addWidget(builtin_button_);
     save_action_ = toolbar->addAction("保存");
@@ -668,7 +662,7 @@ OfflinePanel* Workbench::offline_panel() const noexcept {
     return offline_;
 }
 
-void Workbench::perform_edit(const std::function<void(minirender::SceneDocument&)>& operation,
+bool Workbench::perform_edit(const std::function<void(minirender::SceneDocument&)>& operation,
                              const minirender::MeshValidationCache*                 validated) {
     try {
         if (validated) {
@@ -678,10 +672,12 @@ void Workbench::perform_edit(const std::function<void(minirender::SceneDocument&
         }
         ++document_revision_;
         refresh();
+        return true;
     } catch (const std::exception& error) {
         refresh_properties();
         refresh_camera();
         report_error(error);
+        return false;
     }
 }
 

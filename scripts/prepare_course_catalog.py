@@ -57,7 +57,7 @@ def transform(translation=(0, 0, 0), scale=(1, 1, 1)):
     }
 
 
-def thumbnail(cli, scene, png):
+def thumbnail(cli, scene, png, samples=12):
     """缩略图由项目积分器生成，与场景放在同一个包内。"""
     png.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
@@ -73,7 +73,7 @@ def thumbnail(cli, scene, png):
                 "--height",
                 "72",
                 "--spp",
-                "12",
+                str(samples),
                 "--depth",
                 "4",
                 "--seed",
@@ -249,6 +249,66 @@ def frame_entry(root, beauty, guides, reference, frame):
     return item
 
 
+def classic_models(root, cli):
+    """为随包 OBJ 建立单模型文档，物体贴地摆放，相机对准模型中心。"""
+    models = []
+    for key, name, source, color, scale, base, camera in (
+        (
+            "spot",
+            "Spot 小牛",
+            "Keenan Crane",
+            [1, 1, 1],
+            1,
+            0.736784,
+            [2.6, 1.55, -2.35],
+        ),
+        (
+            "suzanne",
+            "Suzanne 猴头",
+            "Norbert Nopper / UX3D · Khronos",
+            [0.62, 0.64, 0.67],
+            0.75,
+            0.974609375,
+            [0.9, 1.25, 3.3],
+        ),
+    ):
+        scene = base_scene()
+        material = dict(id="surface", name=name, kind="diffuse", base_color=color)
+        if key == "spot":
+            scene["directional_lights"][0]["direction"] = [-1, -2, 1]
+            material["base_color_texture"] = "markings"
+            scene["textures"] = [
+                dict(
+                    id="markings", source="../assets/textures/spot.png", encoding="srgb"
+                )
+            ]
+        scene["camera"].update(position=camera, target=[0, 0.8, 0], vertical_fov=36)
+        scene["materials"] = [material]
+        scene["meshes"] = [dict(id=key, source=f"../assets/{key}.obj")]
+        scene["objects"] = [
+            dict(
+                id=key,
+                name=name,
+                mesh=key,
+                material="surface",
+                transform=transform((0, base * scale, 0), (scale,) * 3),
+            )
+        ]
+        file = root / "catalog" / (key + ".json")
+        image = root / "catalog_thumbs" / (key + ".png")
+        write_json(file, scene)
+        thumbnail(cli, file, image, samples=64)
+        description = (
+            "带原版斑纹贴图的三角网格。"
+            if key == "spot"
+            else "灰色漫反射材质，保留猴头的 UV 和着色法线。"
+        )
+        models.append(
+            entry(root, key, name, "model", file, image, description, source, "CC0 1.0")
+        )
+    return models
+
+
 def builtin_entries(root, cli):
     """渲染内置缩略图，并从同一场景生成可追加模型和四帧测试输入。"""
     result = []
@@ -285,6 +345,7 @@ def builtin_entries(root, cli):
             own,
         )
     )
+    result.extend(classic_models(root, cli))
     # 小序列来自同一自建场景，低采样、固定相机与对象轨迹可在干净安装中复现。
     frames = []
     with tempfile.TemporaryDirectory(dir=meta) as tmp:
@@ -503,26 +564,16 @@ def course_entries(root, cli, meta):
             entry(
                 root,
                 id_,
-                name,
+                name + (" 人物" if id_ == "mary" else " 兔子"),
                 "model",
                 f,
                 png,
-                "按原材质分组追加到当前场景。",
+                "保留人物贴图及两个原始材质组。"
+                if id_ == "mary"
+                else "保留顶点法线的兔子模型。",
                 source + hw,
                 rights,
-            )
-        )
-        result.append(
-            entry(
-                root,
-                id_ + "-studio",
-                name + " · 模型展示",
-                "scene",
-                f,
-                png,
-                "载入独立相机和光源，适合观察模型。",
-                source + hw,
-                rights,
+                recommended="blinn-phong" if id_ == "mary" else "",
             )
         )
     for name in ("Skybox", "Indoor", "GraceCathedral", "CornellBox"):

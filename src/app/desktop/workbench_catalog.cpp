@@ -28,9 +28,22 @@ struct Progress {
     }
 };
 
-// 在同一个 SceneEditor 事务中重命名资源和物体，返回首个新物体供检查器选中。
-std::string append_model(minirender::SceneDocument&       target,
-                         const minirender::SceneDocument& source) {
+// 在候选文档中分配独立 ID 并重写引用。只在整次编辑通过校验后选中首个新物体。
+std::string append_scene_content(minirender::SceneDocument&       target,
+                                 const minirender::SceneDocument& source, catalog::Kind kind) {
+    if (kind == catalog::Kind::scene) {
+        if (target.directional_lights.size() + source.directional_lights.size() > 8) {
+            throw std::runtime_error("直接导入后方向光将超过视口支持的 8 盏");
+        }
+        for (auto light : source.directional_lights) {
+            light.id = unique_id(target.directional_lights, "light_");
+            target.directional_lights.push_back(std::move(light));
+        }
+        for (auto region : source.media) {
+            region.id = unique_id(target.media, "medium_");
+            target.media.push_back(std::move(region));
+        }
+    }
     std::map<std::string, std::string> meshes, materials, textures;
     for (auto texture : source.textures) {
         texture.source = source.asset_directory / texture.source;
@@ -66,14 +79,17 @@ std::string append_model(minirender::SceneDocument&       target,
 }
 } // namespace
 
-void Workbench::import_resource(const catalog::Entry& entry, bool recommended) {
+void Workbench::import_resource(const catalog::Entry& entry, catalog::ImportAction action) {
     if (entry.kind == catalog::Kind::sequence) {
+        if (action != catalog::ImportAction::open_sequence) {
+            return;
+        }
         auto* viewer = new SequenceViewer(entry, this);
         viewer->setAttribute(Qt::WA_DontShowOnScreen, testAttribute(Qt::WA_DontShowOnScreen));
         viewer->show();
         return;
     }
-    if (asset_loading()) {
+    if (asset_loading() || action == catalog::ImportAction::open_sequence) {
         return;
     }
     begin_asset_task("正在导入 " + entry.name);
@@ -118,7 +134,7 @@ void Workbench::import_resource(const catalog::Entry& entry, bool recommended) {
             auto result       = prepare_scene(native_path(path));
             progress->check();
             if (entry.kind == catalog::Kind::model && result.document.objects.empty()) {
-                throw std::runtime_error("模型中没有可追加的物体");
+                throw std::runtime_error("模型中没有物体");
             }
             for (auto& mesh : result.document.meshes) {
                 mesh.package_on_save = true;
@@ -128,7 +144,7 @@ void Workbench::import_resource(const catalog::Entry& entry, bool recommended) {
             }
             return result;
         },
-        [this, entry, progress, feedback, generation, recommended](const auto& result) {
+        [this, entry, progress, feedback, generation, action](const auto& result) {
             const bool cancelled = progress->cancelled.load() || feedback->wasCanceled();
             // 已结束的进度窗口等待 Qt 延迟销毁，先移除任务标识，确保新任务只对应一个取消控件。
             feedback->setObjectName({});
@@ -154,11 +170,26 @@ void Workbench::import_resource(const catalog::Entry& entry, bool recommended) {
                     viewport_->supply_raster_mesh(mesh, raster);
                 }
                 const auto& source = result.value.document;
-                if (entry.kind == catalog::Kind::model) {
-                    perform_edit([&](auto& target) { selected_id_ = append_model(target, source); },
-                                 &result.value.validated);
+                if (action == catalog::ImportAction::append) {
+                    // 模型的灯光用于单独展示；场景模板的方向光与介质随物体一起追加。
+                    std::string first;
+                    const bool  added = perform_edit(
+                        [&](auto& target) {
+                            first = append_scene_content(target, source, entry.kind);
+                        },
+                        &result.value.validated);
+                    if (!added) {
+                        return;
+                    }
+                    if (!first.empty()) {
+                        select_object(first);
+                    }
+                    statusBar()->showMessage(
+                        QString("已添加 %1 个物体 · %2").arg(source.objects.size()).arg(entry.name),
+                        5000);
                     return;
                 }
+                const bool recommended = action == catalog::ImportAction::recommended;
                 install_scene(source, {}, &result.value.validated);
                 if (entry.builtin) {
                     for (const auto& preset : builtin_scenes()) {

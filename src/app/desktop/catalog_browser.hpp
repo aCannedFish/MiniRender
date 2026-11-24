@@ -15,7 +15,7 @@ class CatalogBrowser final : public QDialog {
     explicit CatalogBrowser(QWidget* parent);
     // 成功解析整份索引后才替换当前课程包。
     bool mount(const QString& directory);
-    std::function<void(const catalog::Entry&, bool recommended)> on_open;
+    std::function<void(const catalog::Entry&, catalog::ImportAction)> on_open;
 
   private:
     // 重新应用文本与类型筛选，并选中第一个匹配条目。
@@ -28,6 +28,7 @@ class CatalogBrowser final : public QDialog {
     QListWidget*          list_;
     QLabel*               detail_;
     QLabel*               notice_;
-    QPushButton*          open_;
+    QPushButton*          open_; // 添加资源或打开帧序列，双击使用同一操作。
+    QPushButton*          replace_;
     QPushButton*          recommended_;
 };

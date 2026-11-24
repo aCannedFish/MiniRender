@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "camera": {
+    "position": [
+      2.6,
+      1.55,
+      -2.35
+    ],
+    "target": [
+      0,
+      0.8,
+      0
+    ],
+    "up": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "vertical_fov": 36,
+    "near": 0.05,
+    "far": 100.0
+  },
+  "environment": [
+    0.15,
+    0.15,
+    0.15
+  ],
+  "materials": [
+    {
+      "id": "surface",
+      "name": "Spot 小牛",
+      "kind": "diffuse",
+      "base_color": [
+        1,
+        1,
+        1
+      ],
+      "base_color_texture": "markings"
+    }
+  ],
+  "meshes": [
+    {
+      "id": "spot",
+      "source": "../assets/spot.obj"
+    }
+  ],
+  "objects": [
+    {
+      "id": "spot",
+      "name": "Spot 小牛",
+      "mesh": "spot",
+      "material": "surface",
+      "transform": {
+        "translation": [
+          0,
+          0.736784,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  ],
+  "directional_lights": [
+    {
+      "id": "sun",
+      "direction": [
+        -1,
+        -2,
+        1
+      ],
+      "color": [
+        1,
+        0.95,
+        0.85
+      ],
+      "intensity": 3.0
+    }
+  ],
+  "textures": [
+    {
+      "id": "markings",
+      "source": "../assets/textures/spot.png",
+      "encoding": "srgb"
+    }
+  ]
+}
