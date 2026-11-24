@@ -18,7 +18,8 @@ class ShadowMap {
     static constexpr std::uint32_t resolution = 1024;
     static constexpr std::uint32_t layers     = 8;
     // 创建并绑定本对象所管理的 GPU 资源，失败时通过异常报告 Vulkan 操作。
-    void create(VulkanViewport& viewport);
+    void create(VulkanViewport& viewport, std::uint32_t size = resolution,
+                std::uint32_t count = layers);
     // 释放独占资源并清空句柄；调用前必须结束 GPU 对这些资源的访问。
     void release();
     void prepare(VkCommandBuffer command);
@@ -39,8 +40,9 @@ class ShadowMap {
     // 输入图像所使用的 Vulkan 采样器。
     VkSampler sampler_ = VK_NULL_HANDLE;
     // 本对象输出附件对应的 render pass。
-    VkRenderPass                      pass_ = VK_NULL_HANDLE;
-    std::array<VkImageView, layers>   views_{};
-    std::array<VkFramebuffer, layers> framebuffers_{};
-    bool                              initialized_ = false;
+    VkRenderPass               pass_ = VK_NULL_HANDLE;
+    std::vector<VkImageView>   views_;
+    std::vector<VkFramebuffer> framebuffers_;
+    std::uint32_t              size_ = 0, count_ = 0;
+    bool                       initialized_ = false;
 };

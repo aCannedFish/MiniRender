@@ -317,6 +317,12 @@ void Workbench::build_camera_panel() {
     layout->addRow(shadows);
     connect(shadows, &QCheckBox::toggled, this,
             [this](bool enabled) { viewport_->set_shadows_enabled(enabled); });
+    auto* area_shadow = new QCheckBox("矩形面积光软阴影");
+    area_shadow->setObjectName("area_shadows");
+    area_shadow->setChecked(viewport_->area_shadows());
+    layout->addRow(area_shadow);
+    connect(area_shadow, &QCheckBox::toggled, this,
+            [this](bool enabled) { viewport_->set_area_shadows(enabled); });
     auto* filter = new QComboBox;
     filter->setObjectName("shadow_filter");
     filter->addItems({"硬阴影", "PCF", "PCSS"});

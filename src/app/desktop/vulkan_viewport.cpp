@@ -1458,6 +1458,12 @@ void VulkanViewport::finish_gizmo_drag(bool commit) {
     requestUpdate();
 }
 
+void VulkanViewport::set_area_shadows(bool enabled) {
+    area_shadows_ = enabled;
+    mark_preview_changed();
+    requestUpdate();
+}
+
 void VulkanViewport::set_shadows_enabled(bool enabled) {
     shadows_enabled_ = enabled;
     mark_preview_changed();

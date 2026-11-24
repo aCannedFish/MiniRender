@@ -93,7 +93,7 @@ void SceneRenderer::initResources() {
     shadow_map_.create(*window_);
     ibl_.create(*window_);
     rectangles_.create(*window_);
-    std::array<VkDescriptorSetLayoutBinding, 11> bindings{};
+    std::array<VkDescriptorSetLayoutBinding, 13> bindings{};
     auto&                                        binding = bindings[0];
     binding.binding                                      = 0;
     binding.descriptorType                               = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -113,6 +113,8 @@ void SceneRenderer::initResources() {
     }
     bindings[10]        = {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT,
                            nullptr};
+    bindings[11]        = {11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
+                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     layout.bindingCount = static_cast<std::uint32_t>(bindings.size());
     layout.pBindings    = bindings.data();
     check_vk(vkCreateDescriptorSetLayout(device_, &layout, nullptr, &descriptor_layout_),
@@ -363,8 +365,13 @@ void SceneRenderer::upload_scene() {
                 : minirender::directional_shadow_matrix(minimum, maximum,
                                                         scene.directional_lights[index].direction);
     }
+    minimum_                          = minimum;
+    maximum_                          = maximum;
+    const bool shadow_buffers_changed = area_shadows_.configure(
+        *window_, scene, minimum, maximum, area_grid(), window_->scene_revision());
     const bool rectangle_buffer_changed = rectangles_.update(*window_, scene.rectangles);
-    if (descriptors_changed || rectangle_buffer_changed || descriptor_pool_ == VK_NULL_HANDLE) {
+    if (descriptors_changed || shadow_buffers_changed || rectangle_buffer_changed ||
+        descriptor_pool_ == VK_NULL_HANDLE) {
         rebuild_texture_descriptors();
     }
     scene_revision_ = window_->scene_revision();
@@ -390,8 +397,8 @@ void SceneRenderer::rebuild_texture_descriptors() {
     const auto                                count = static_cast<std::uint32_t>(draws_.size() + 1);
     const std::array<VkDescriptorPoolSize, 3> sizes{
         {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, count},
-         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8 * count},
-         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2 * count}}};
+         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 9 * count},
+         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3 * count}}};
     VkDescriptorPoolCreateInfo pool{};
     pool.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool.maxSets       = count;
@@ -416,21 +423,27 @@ void SceneRenderer::rebuild_texture_descriptors() {
         VkDescriptorBufferInfo               instances{instances_.handle(), 0,
                                                        instance_capacity_ * sizeof(GpuInstance)};
         const auto                           ibl_images = ibl_.descriptors();
-        std::array<VkWriteDescriptorSet, 11> writes{};
+        std::array<VkWriteDescriptorSet, 13> writes{};
         const auto                           rectangle_tables = rectangles_.tables();
         const auto                           rectangle_buffer = rectangles_.buffer();
+        const auto                           projections      = area_shadows_.projections();
+        const auto                           area_depth       = area_shadows_.depth();
         for (std::uint32_t binding = 0; binding < writes.size(); ++binding) {
             writes[binding].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             writes[binding].dstSet          = sets[index];
             writes[binding].dstBinding      = binding;
             writes[binding].descriptorCount = 1;
             writes[binding].descriptorType =
-                binding == 0
-                    ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
-                    : ((binding == 3 || binding == 10) ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
-                                                       : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                binding == 0 ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+                             : ((binding == 3 || binding == 10 || binding == 11)
+                                    ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
+                                    : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
             if (binding == 0) {
                 writes[binding].pBufferInfo = &uniform;
+            } else if (binding == 11) {
+                writes[binding].pBufferInfo = &projections;
+            } else if (binding == 12) {
+                writes[binding].pImageInfo = &area_depth;
             } else if (binding == 10) {
                 writes[binding].pBufferInfo = &rectangle_buffer;
             } else if (binding >= 8) {
@@ -530,7 +543,8 @@ void SceneRenderer::update_uniforms(int mode, bool reference) {
         window_->scene()->environment_strength,
         glm::radians(std::remainder(window_->scene()->environment_rotation_degrees, 360.0F))};
     frame.area_settings =
-        glm::vec4(static_cast<float>(window_->scene()->rectangles.size()), 0, 0, 0);
+        glm::vec4(static_cast<float>(window_->scene()->rectangles.size()),
+                  static_cast<float>(area_shadows_.grid()), 1.F / RectangleShadow::resolution, 0);
     frame.teaching_light   = window_->teaching_light();
     frame.teaching_surface = glm::vec4(window_->teaching_surface(), 0.0F);
     if (window_->comparison_mode() < 0) {
@@ -568,31 +582,46 @@ void SceneRenderer::render_shadow_maps(VkCommandBuffer command, int mode) {
         return;
     }
     shadow_depth_ready_ = true;
-    const VkViewport viewport{
-        0, 0, static_cast<float>(ShadowMap::resolution), static_cast<float>(ShadowMap::resolution),
-        0, 1};
-    const VkRect2D scissor{{0, 0}, {ShadowMap::resolution, ShadowMap::resolution}};
     for (std::int32_t light = 0;
          light < static_cast<std::int32_t>(window_->scene()->directional_lights.size()); ++light) {
         shadow_map_.begin(command, static_cast<std::uint32_t>(light));
-        vkCmdSetViewport(command, 0, 1, &viewport);
-        vkCmdSetScissor(command, 0, 1, &scissor);
-        vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                                &descriptor_, 0, nullptr);
-        for (std::size_t index = 0; index < draws_.size(); ++index) {
-            vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                              shadow_pipelines_[side_pipeline(window_->scene()->instances[index])]);
-            const DrawIndex push{light, static_cast<std::int32_t>(index)};
-            vkCmdPushConstants(command, pipeline_layout_,
-                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                               sizeof(push), &push);
-            const auto&        mesh   = meshes_.at(draws_[index].mesh);
-            const VkDeviceSize offset = 0;
-            const auto         buffer = mesh.vertices.handle();
-            vkCmdBindVertexBuffers(command, 0, 1, &buffer, &offset);
-            vkCmdDraw(command, mesh.count, 1, 0, 0);
-        }
+        draw_shadow_geometry(command, light, ShadowMap::resolution);
         vkCmdEndRenderPass(command);
+    }
+}
+
+int SceneRenderer::area_grid() const {
+    if (!window_->area_shadows() || window_->scene()->rectangles.empty() ||
+        (window_->view_mode() != 0 && window_->comparison_mode() != 0)) {
+        return 0;
+    }
+    return window_->navigating() ? 2 : 3;
+}
+
+void SceneRenderer::draw_shadow_geometry(VkCommandBuffer command, int projection,
+                                         std::uint32_t resolution, const std::string* emitter) {
+    const VkViewport viewport{0, 0, static_cast<float>(resolution), static_cast<float>(resolution),
+                              0, 1};
+    const VkRect2D   scissor{{0, 0}, {resolution, resolution}};
+    vkCmdSetViewport(command, 0, 1, &viewport);
+    vkCmdSetScissor(command, 0, 1, &scissor);
+    vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
+                            &descriptor_, 0, nullptr);
+    for (std::size_t index = 0; index < draws_.size(); ++index) {
+        if (emitter && window_->scene()->instances[index].object_id == *emitter) {
+            continue;
+        }
+        vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          shadow_pipelines_[side_pipeline(window_->scene()->instances[index])]);
+        const DrawIndex push{projection, static_cast<std::int32_t>(index)};
+        vkCmdPushConstants(command, pipeline_layout_,
+                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                           sizeof(push), &push);
+        const auto&        mesh   = meshes_.at(draws_[index].mesh);
+        const VkDeviceSize offset = 0;
+        const auto         buffer = mesh.vertices.handle();
+        vkCmdBindVertexBuffers(command, 0, 1, &buffer, &offset);
+        vkCmdDraw(command, mesh.count, 1, 0, 0);
     }
 }
 
@@ -635,6 +664,11 @@ void SceneRenderer::startNextFrame() {
     if (scene_revision_ != window_->scene_revision()) {
         upload_scene();
     }
+    if (area_shadows_.configure(*window_, *window_->scene(), minimum_, maximum_, area_grid(),
+                                window_->scene_revision())) {
+        rebuild_texture_descriptors();
+        comparison_keys_.fill({0, -1});
+    }
     if (ibl_changed) {
         update_ibl_descriptors();
         window_->report_ibl_update();
@@ -645,6 +679,12 @@ void SceneRenderer::startNextFrame() {
         texture->retire_upload();
         texture->record_upload(window_->currentCommandBuffer());
     }
+    const auto command = window_->currentCommandBuffer();
+    area_shadows_.render(command, [&](std::uint32_t layer, std::size_t source) {
+        draw_shadow_geometry(command, -1 - static_cast<int>(layer), RectangleShadow::resolution,
+                             &window_->scene()->rectangles[source].object_id);
+    });
+    window_->report_area_shadow(area_shadows_.grid(), area_shadows_.updates());
     const auto overlay = [this] {
         if (window_->export_side() < 0) {
             gizmo_.draw(*window_, window_->gizmo_layout(), window_->highlighted_gizmo_handle());
@@ -756,6 +796,7 @@ void SceneRenderer::releaseResources() {
     shadow_map_.release();
     ibl_.release();
     rectangles_.release();
+    area_shadows_.release();
     if (device_ == VK_NULL_HANDLE) {
         return;
     }

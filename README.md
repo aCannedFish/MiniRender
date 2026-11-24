@@ -47,7 +47,7 @@ python3 scripts/prepare_course_catalog.py work/GAMES202 --cli build/macos-deskto
 
 ### 矩形面积光
 
-在 Cornell Box 中切换到“光照合成”，顶部发光面会照亮房间。选中灯具后可用操纵器移动或旋转，物体缩放决定发光面积，材质的发光 RGB 决定辐亮度。也可以在灯光面板点击“添加矩形面积光”。实时漫反射使用余弦多边形积分，金属高光使用 LTC；离线积分器继续采样该物体的发光三角形。
+在 Cornell Box 中切换到“光照合成”，顶部发光面会照亮房间。选中灯具后可用操纵器移动或旋转，物体缩放决定发光面积，材质的发光 RGB 决定辐亮度。也可以在灯光面板点击“添加矩形面积光”。实时漫反射使用余弦多边形积分，金属高光使用 LTC。静止时每个矩形使用 3×3 个分层样本计算遮挡，拖动时切换到 2×2。相机面板可以开关面积光软阴影。离线积分器使用同一物体的发光三角形。
 
 ## 构建要求
 
@@ -669,6 +669,7 @@ src/app/desktop/
 ├── screen_pass.hpp  # 接口：可复用的全屏 Vulkan 渲染附件、描述符与命令录制
 ├── sdf_renderer.cpp  # 距离场图元与 CSG 的 Vulkan 步进显示
 ├── sdf_renderer.hpp  # 接口：距离场图元与 CSG 的 Vulkan 步进显示
+├── rectangle_shadow.hpp / .cpp  # 分层灯面采样、立方体深度图与几何缓存
 ├── gpu_rectangle.hpp / .cpp  # 上传 LTC 表与世界空间矩形光源列表
 ├── rectangle_smoke.hpp / .cpp  # 核对 Cornell 光照和灯具编辑事务
 ├── shadow_smoke.hpp / .cpp  # 离屏测量半影宽度、动态遮挡、多方向光与分屏过滤
@@ -816,6 +817,7 @@ shaders/
 ├── sdf.frag  # Vulkan 距离场步进、CSG 求值、法线、阴影与诊断输出
 ├── sdf.vert  # 距离场全屏覆盖顶点生成
 ├── sdf_display.frag  # 距离场渲染附件的屏幕显示转换
+├── rectangle_visibility.glsl  # 漫反射和 GGX 的分层可见性估计
 ├── rectangle_light.glsl  # 逐像素地平线裁剪与漫反射、GGX 矩形光积分
 ├── shadow_filter.glsl  # 接收面深度梯度、遮挡物搜索、半影半径与 PCF 过滤
 ├── shadow.vert  # 将实例网格变换到指定方向光的阴影裁剪空间
