@@ -111,7 +111,8 @@ class Workbench final : public QMainWindow {
     // 按标识选中物体，结束未完成操纵手势并刷新检查器。
     void select_object(const std::string& id);
     // 按颜色编码后台读取图像并生成 mipmap，目标材质由启动时的选择固定。
-    void import_texture_file(const QString& path, minirender::ColorEncoding encoding);
+    void import_texture_file(const QString& path, minirender::ColorEncoding encoding,
+                             bool normal_map = false);
     // 查询当前任务是否为底色纹理导入。
     bool texture_loading() const noexcept;
     // 查询是否有互斥资产任务正在执行。
@@ -253,7 +254,10 @@ class Workbench final : public QMainWindow {
     // 基础与专用材质类型选择器。
     QComboBox* material_kind_ = nullptr;
     // 材质底色纹理资产选择器。
-    QComboBox* texture_selector_ = nullptr;
+    QComboBox*      normal_selector_  = nullptr;
+    QDoubleSpinBox* normal_strength_  = nullptr;
+    QCheckBox*      normal_flip_      = nullptr;
+    QComboBox*      texture_selector_ = nullptr;
     // 底色纹理的采样过滤方式。
     QComboBox* texture_filter_ = nullptr;
     // 材质双面显示开关。

@@ -7,11 +7,16 @@ layout(binding = 1) uniform sampler2D source_hdr;
 layout(binding = 2) uniform sampler2D ambient_diffuse;
 layout(binding = 3) uniform sampler2D filtered_ao;
 layout(binding = 4) uniform sampler2D raw_ao;
+layout(binding = 5) uniform sampler2D screen_transport;
 layout(location = 0) out vec4 color;
 
 void main() {
     ivec2 pixel = ivec2(gl_FragCoord.xy);
-    color       = texelFetch(source_hdr, pixel, 0);
+    if (int(frame.display.y) >= 13 && int(frame.display.y) <= 18) {
+        color = texelFetch(screen_transport, pixel, 0);
+        return;
+    }
+    color = texelFetch(source_hdr, pixel, 0);
     if (frame.ao_settings.x > 0.5) {
         float ao = frame.ao_filter.w > 0.5 ? texelFetch(filtered_ao, pixel, 0).r
                                            : texelFetch(raw_ao, pixel, 0).r;

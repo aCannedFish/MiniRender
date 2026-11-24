@@ -5,7 +5,7 @@ find_package(Vulkan 1.2 REQUIRED COMPONENTS glslangValidator)
 
 # SPIR-V 随可执行文件嵌入 Qt 资源，运行不依赖源码目录或当前工作目录。
 set(shader_outputs)
-foreach(shader diagnostic.vert diagnostic.frag scene.vert scene.frag shadow.vert
+foreach(shader depth_reduce.frag screen_trace.frag diagnostic.vert diagnostic.frag scene.vert scene.frag shadow.vert
     wire.vert wire.frag post.vert post.frag offline.frag screen.vert ssao.frag ao_filter.frag ao_composite.frag environment.frag
     preview_outline.frag gizmo.vert gizmo.frag point_preview.vert point_preview.frag sdf.vert sdf.frag sdf_display.frag)
     set(source "${PROJECT_SOURCE_DIR}/shaders/${shader}")
@@ -31,6 +31,8 @@ qt_add_executable(minirender_desktop
     resource_catalog.cpp resource_catalog.hpp catalog_browser.cpp catalog_browser.hpp
     comparison_controls.cpp comparison_controls.hpp
     shadow_smoke.cpp shadow_smoke.hpp rectangle_smoke.cpp rectangle_smoke.hpp
+    screen_transport_smoke.cpp screen_transport_smoke.hpp
+    screen_transport.cpp screen_transport.hpp
     prt_smoke.cpp prt_smoke.hpp
     prt_panel.cpp prt_panel.hpp prt_cache.cpp prt_cache.hpp
     rectangle_shadow.cpp rectangle_shadow.hpp

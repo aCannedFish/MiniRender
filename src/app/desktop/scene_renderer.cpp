@@ -9,6 +9,7 @@
 #include <QElapsedTimer>
 
 #include <array>
+#include <bit>
 #include <cmath>
 #include <set>
 #include <stdexcept>
@@ -74,6 +75,7 @@ struct alignas(16) FrameUniform {
     glm::vec4 teaching_light, teaching_surface;
     glm::vec4 area_settings;
     std::array<glm::vec4, 9> prt_light;
+    glm::vec4                screen_trace, screen_options;
 };
 
 static_assert(offsetof(FrameUniform, lights) == 96);
@@ -82,7 +84,7 @@ static_assert(offsetof(FrameUniform, view) == 928);
 static_assert(offsetof(FrameUniform, ao_kernel) == 1152);
 static_assert(offsetof(FrameUniform, ibl) == 2176);
 static_assert(offsetof(FrameUniform, preview_edges) == 2192);
-static_assert(sizeof(FrameUniform) == 2400);
+static_assert(sizeof(FrameUniform) == 2432);
 
 } // namespace
 
@@ -95,7 +97,7 @@ void SceneRenderer::initResources() {
     shadow_map_.create(*window_);
     ibl_.create(*window_);
     rectangles_.create(*window_);
-    std::array<VkDescriptorSetLayoutBinding, 14> bindings{};
+    std::array<VkDescriptorSetLayoutBinding, 15> bindings{};
     auto&                                        binding = bindings[0];
     binding.binding                                      = 0;
     binding.descriptorType                               = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -221,7 +223,7 @@ VkPipeline SceneRenderer::create_pipeline(Pass pass, VkCullModeFlags cull, VkFro
     depth.depthTestEnable  = !background;
     depth.depthWriteEnable = !wire && !background;
     depth.depthCompareOp   = wire ? VK_COMPARE_OP_LESS_OR_EQUAL : VK_COMPARE_OP_LESS;
-    std::array<VkPipelineColorBlendAttachmentState, 3> attachments{};
+    std::array<VkPipelineColorBlendAttachmentState, 4> attachments{};
     for (auto& attachment : attachments) {
         attachment.colorWriteMask = 0xF;
     }
@@ -319,7 +321,8 @@ void SceneRenderer::upload_scene() {
         }
         const auto texture =
             instance.base_color_texture ? instance.base_color_texture : white_texture_;
-        draws.push_back({instance.mesh, texture});
+        draws.push_back({instance.mesh, texture,
+                         instance.normal_texture ? instance.normal_texture : white_texture_});
         const auto& material   = instance.material;
         const bool  subsurface = material.kind == minirender::MaterialKind::subsurface;
         const auto  color = subsurface ? subsurface_previews_.color(material) : material.base_color;
@@ -327,6 +330,10 @@ void SceneRenderer::upload_scene() {
                                        material.kind == minirender::MaterialKind::mirror
                                    ? 1.0F
                                    : 0.0F;
+        const auto  stable   = surface_ids_
+                                   .try_emplace(instance.object_id,
+                                                static_cast<std::uint32_t>(surface_ids_.size() + 1))
+                                   .first->second;
         instances.push_back(
             {instance.object_to_world,
              glm::mat4(instance.normal_to_world),
@@ -338,7 +345,12 @@ void SceneRenderer::upload_scene() {
              {subsurface ? .35F : material.roughness, metallic,
               static_cast<float>(material.texture_filter), material.double_sided ? 1.0F : 0.0F},
              pack_cloth(material),
-             {corner_offset, 0, 0, 0}});
+             {corner_offset, stable,
+              instance.normal_texture
+                  ? std::bit_cast<std::uint32_t>(material.normal_scale *
+                                                 (material.normal_flip_y ? -1.F : 1.F))
+                  : 0U,
+              0}});
         corner_offset += static_cast<std::uint32_t>(instance.mesh->triangles.size() * 3);
     }
     subsurface_previews_.end_scene();
@@ -346,7 +358,9 @@ void SceneRenderer::upload_scene() {
     std::erase_if(meshes_, [&](const auto& entry) { return !used.contains(entry.first); });
     bool descriptors_changed = draws.size() != draws_.size();
     for (std::size_t index = 0; index < std::min(draws.size(), draws_.size()); ++index) {
-        descriptors_changed = descriptors_changed || draws[index].texture != draws_[index].texture;
+        descriptors_changed     = descriptors_changed ||
+                                  draws[index].texture != draws_[index].texture ||
+                                  draws[index].normal_texture != draws_[index].normal_texture;
         draws[index].descriptor = draws_[index].descriptor;
     }
     draws_              = std::move(draws);
@@ -392,6 +406,7 @@ void SceneRenderer::rebuild_texture_descriptors() {
     std::set<TextureHandle, std::owner_less<TextureHandle>> used{white_texture_};
     for (const auto& draw : draws_) {
         used.insert(draw.texture);
+        used.insert(draw.normal_texture);
     }
     std::erase_if(textures_, [&](const auto& entry) { return !used.contains(entry.first); });
     for (const auto& handle : used) {
@@ -404,7 +419,7 @@ void SceneRenderer::rebuild_texture_descriptors() {
     const auto                                count = static_cast<std::uint32_t>(draws_.size() + 1);
     const std::array<VkDescriptorPoolSize, 3> sizes{
         {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, count},
-         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 9 * count},
+         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10 * count},
          {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4 * count}}};
     VkDescriptorPoolCreateInfo pool{};
     pool.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -430,12 +445,14 @@ void SceneRenderer::rebuild_texture_descriptors() {
         VkDescriptorBufferInfo               instances{instances_.handle(), 0,
                                                        instance_capacity_ * sizeof(GpuInstance)};
         const auto                           ibl_images = ibl_.descriptors();
-        std::array<VkWriteDescriptorSet, 14> writes{};
+        std::array<VkWriteDescriptorSet, 15> writes{};
         const auto                           rectangle_tables = rectangles_.tables();
         const auto                           rectangle_buffer = rectangles_.buffer();
         const auto                           projections      = area_shadows_.projections();
         const auto                           area_depth       = area_shadows_.depth();
         const VkDescriptorBufferInfo         prt{prt_buffer_.handle(), 0, VK_WHOLE_SIZE};
+        const auto                           normal_texture =
+            textures_.at(index ? draws_[index - 1].normal_texture : white_texture_)->descriptor();
         for (std::uint32_t binding = 0; binding < writes.size(); ++binding) {
             writes[binding].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             writes[binding].dstSet          = sets[index];
@@ -448,6 +465,8 @@ void SceneRenderer::rebuild_texture_descriptors() {
                                     : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
             if (binding == 0) {
                 writes[binding].pBufferInfo = &uniform;
+            } else if (binding == 14) {
+                writes[binding].pImageInfo = &normal_texture;
             } else if (binding == 13) {
                 writes[binding].pBufferInfo = &prt;
             } else if (binding == 11) {
@@ -556,6 +575,8 @@ void SceneRenderer::update_uniforms(int mode, bool reference) {
         frame.prt_light[k] =
             glm::vec4(glm::vec3(window_->prt_lighting()[k]), uploaded_prt_ ? 1 : 0);
     }
+    frame.screen_trace   = window_->screen_trace();
+    frame.screen_options = {window_->screen_hiz() ? 1.F : 0.F, 0, 0, 0};
     frame.area_settings =
         glm::vec4(static_cast<float>(window_->scene()->rectangles.size()),
                   static_cast<float>(area_shadows_.grid()), 1.F / RectangleShadow::resolution, 0);
@@ -606,7 +627,8 @@ void SceneRenderer::render_shadow_maps(VkCommandBuffer command, int mode) {
 
 int SceneRenderer::area_grid() const {
     if (!window_->area_shadows() || window_->scene()->rectangles.empty() ||
-        (window_->view_mode() != 0 && window_->comparison_mode() != 0)) {
+        (!window_->uses_lighting(window_->view_mode()) &&
+         !window_->uses_lighting(window_->comparison_mode()))) {
         return 0;
     }
     return window_->navigating() ? 2 : 3;

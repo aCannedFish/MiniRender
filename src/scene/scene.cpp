@@ -244,6 +244,8 @@ void Material::validate() const {
             "Material base color must be in [0,1]");
     require(finite(emission) && glm::all(glm::greaterThanEqual(emission, glm::vec3(0))),
             "Material emission must be nonnegative");
+    require(std::isfinite(normal_scale) && normal_scale >= 0 && normal_scale <= 8,
+            "Invalid normal map strength");
     require(std::isfinite(roughness) && roughness >= 0 && roughness <= 1,
             "Roughness must be in [0,1]");
     require(std::isfinite(ior) && ior > 0, "IOR must be positive");
@@ -289,6 +291,13 @@ void SceneDocument::validate(MeshValidationCache* cache, CancellationToken cance
         material.validate();
         if (material.kind == MaterialKind::cloth) {
             cloth_material_ids.insert(material.id);
+        }
+        if (!material.normal_texture.empty()) {
+            const auto tex = std::find_if(textures.begin(), textures.end(), [&](const auto& t) {
+                return t.id == material.normal_texture;
+            });
+            require(tex != textures.end() && tex->encoding == ColorEncoding::linear,
+                    "Normal map must reference a linear texture");
         }
         require(material.base_color_texture.empty() ||
                     texture_ids.contains(material.base_color_texture),
@@ -377,14 +386,17 @@ std::shared_ptr<const SceneSnapshot> make_snapshot(const SceneDocument& document
         const auto material =
             std::find_if(document.materials.begin(), document.materials.end(),
                          [&](const auto& value) { return value.id == object.material_id; });
-        std::shared_ptr<const Texture> texture;
+        std::shared_ptr<const Texture> texture, normal_texture;
         for (const auto& asset : document.textures) {
+            if (asset.id == material->normal_texture) {
+                normal_texture = asset.data;
+            }
             if (asset.id == material->base_color_texture) {
                 texture = asset.data;
             }
         }
         snapshot->instances.push_back({object.id, mesh->data, *material, object.transform.matrix(),
-                                       object.transform.normal_matrix(), texture});
+                                       object.transform.normal_matrix(), texture, normal_texture});
         if (auto rect = rectangle_light(snapshot->instances.back())) {
             snapshot->rectangles.push_back(std::move(*rect));
         }

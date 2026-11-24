@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import tempfile
 from course_cubemap import cubemap_to_latlong
+from course_gltf import convert_hw3
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILTINS = {
@@ -393,6 +394,21 @@ def builtin_entries(root, cli):
             recommended="prt",
         )
     )
+    room = root / "cornell-box.json"
+    result.append(
+        entry(
+            root,
+            "screen-room",
+            "屏幕间接光 · Cornell",
+            "scene",
+            room,
+            thumbs / "cornell.png",
+            "红绿墙和方块，用同一相机比较直接与屏幕间接光。",
+            src,
+            own,
+            recommended="ssgi",
+        )
+    )
     return result
 
 
@@ -513,6 +529,43 @@ def course_entries(root, cli, meta):
             recommended="energy",
         )
     )
+    for name in ("cube1", "cube2", "cave"):
+        folder = "cave" if name == "cave" else "cube"
+        src = fw / "HW3/homework3/assets" / folder / (name + ".gltf")
+        dst = meta / name
+        scene = convert_hw3(src, dst, base_scene())
+        cave = name == "cave"
+        scene["camera"].update(
+            position=[4.18927, 1.0313, 2.07331] if cave else [6, 1, 0],
+            target=[2.92191, 0.98, 1.55037] if cave else [0, 0, 0],
+            vertical_fov=75,
+            near=0.01,
+            far=100.0,
+        )
+        scene["directional_lights"][0].update(
+            direction=[0.39049, -0.89897, 0.19843] if cave else [0.4, -0.9, -0.2],
+            color=[1, 1, 1],
+            intensity=20 if cave else 1,
+        )
+        scene["environment"] = [0.02] * 3
+        file = dst / "scene.json"
+        write_json(file, scene)
+        preview = thumbs / (name + ".png")
+        thumbnail(cli, file, preview)
+        result.append(
+            entry(
+                root,
+                "hw3-" + name,
+                "HW3 · " + name,
+                "scene",
+                file,
+                preview,
+                "场景节点、底色与切线空间法线贴图已转换为可编辑资产。",
+                "GAMES202 HW3",
+                rights,
+                recommended="ssgi",
+            )
+        )
     for name, count in [("box", 20), ("pink-room", 80)]:
         files = [root / f"HW5-data/{name}/input/beauty_{i}.exr" for i in range(count)]
         frames = [

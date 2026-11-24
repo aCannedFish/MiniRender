@@ -129,6 +129,9 @@ bool compatible_prt(const SceneSnapshot& a, const SceneSnapshot& b, PrtMode mode
         }
         if (mode == PrtMode::interreflection &&
             (x.material.base_color != y.material.base_color || x.material.kind != y.material.kind ||
+             x.normal_texture != y.normal_texture ||
+             x.material.normal_scale != y.material.normal_scale ||
+             x.material.normal_flip_y != y.material.normal_flip_y ||
              x.base_color_texture != y.base_color_texture ||
              x.material.texture_filter != y.material.texture_filter)) {
             return false;
@@ -182,16 +185,20 @@ std::uint64_t prt_cache_key(const SceneSnapshot& scene, PrtSettings settings,
             for (int j = 0; j < 3; ++j) {
                 scalar(obj.material.base_color[j]);
             }
-            word(obj.base_color_texture ? 1 : 0);
-            if (obj.base_color_texture) {
-                const auto& image = obj.base_color_texture->level(0);
-                word(image.width());
-                word(image.height());
-                for (std::size_t y = 0; y < image.height(); ++y) {
-                    token.check();
-                    for (std::size_t x = 0; x < image.width(); ++x) {
-                        for (int j = 0; j < 3; ++j) {
-                            scalar(image.at(x, y)[j]);
+            scalar(obj.material.normal_scale);
+            word(obj.material.normal_flip_y);
+            for (const auto& texture : {obj.base_color_texture, obj.normal_texture}) {
+                word(texture ? 1 : 0);
+                if (texture) {
+                    const auto& image = texture->level(0);
+                    word(image.width());
+                    word(image.height());
+                    for (std::size_t y = 0; y < image.height(); ++y) {
+                        token.check();
+                        for (std::size_t x = 0; x < image.width(); ++x) {
+                            for (int j = 0; j < 3; ++j) {
+                                scalar(image.at(x, y)[j]);
+                            }
                         }
                     }
                 }

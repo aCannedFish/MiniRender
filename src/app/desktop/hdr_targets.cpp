@@ -20,7 +20,7 @@ void HdrTargets::create(VulkanViewport& viewport) {
                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
                       VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
                   VK_IMAGE_ASPECT_COLOR_BIT);
-    normal_.create(device_, physical_, extent_, VK_FORMAT_R16G16B16A16_SFLOAT,
+    normal_.create(device_, physical_, extent_, VK_FORMAT_R32G32B32A32_SFLOAT,
                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                    VK_IMAGE_ASPECT_COLOR_BIT);
     depth_.create(device_, physical_, extent_, VK_FORMAT_D32_SFLOAT,
@@ -29,7 +29,10 @@ void HdrTargets::create(VulkanViewport& viewport) {
     ambient_.create(device_, physical_, extent_, VK_FORMAT_R32G32B32A32_SFLOAT,
                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                     VK_IMAGE_ASPECT_COLOR_BIT);
-    std::array<VkAttachmentDescription, 4> attachments{};
+    albedo_.create(device_, physical_, extent_, VK_FORMAT_R16G16B16A16_SFLOAT,
+                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                   VK_IMAGE_ASPECT_COLOR_BIT);
+    std::array<VkAttachmentDescription, 5> attachments{};
     for (auto& attachment : attachments) {
         attachment.samples        = VK_SAMPLE_COUNT_1_BIT;
         attachment.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -40,15 +43,17 @@ void HdrTargets::create(VulkanViewport& viewport) {
         attachment.finalLayout    = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     }
     attachments[0].format      = VK_FORMAT_R32G32B32A32_SFLOAT;
-    attachments[1].format      = VK_FORMAT_R16G16B16A16_SFLOAT;
+    attachments[1].format      = VK_FORMAT_R32G32B32A32_SFLOAT;
     attachments[2].format      = VK_FORMAT_R32G32B32A32_SFLOAT;
-    attachments[3].format      = VK_FORMAT_D32_SFLOAT;
-    attachments[3].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-    const std::array<VkAttachmentReference, 3> colors{
+    attachments[3].format      = VK_FORMAT_R16G16B16A16_SFLOAT;
+    attachments[4].format      = VK_FORMAT_D32_SFLOAT;
+    attachments[4].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    const std::array<VkAttachmentReference, 4> colors{
         {{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
          {1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
-         {2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL}}};
-    const VkAttachmentReference depth{3, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+         {2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
+         {3, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL}}};
+    const VkAttachmentReference depth{4, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
     VkSubpassDescription        subpass{};
     subpass.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount    = static_cast<std::uint32_t>(colors.size());
@@ -83,8 +88,8 @@ void HdrTargets::create(VulkanViewport& viewport) {
     pass.dependencyCount = static_cast<std::uint32_t>(dependencies.size());
     pass.pDependencies   = dependencies.data();
     check_vk(vkCreateRenderPass(device_, &pass, nullptr, &pass_), "create HDR pass");
-    const std::array<VkImageView, 4> views{color_.view(), normal_.view(), ambient_.view(),
-                                           depth_.view()};
+    const std::array<VkImageView, 5> views{color_.view(), normal_.view(), ambient_.view(),
+                                           albedo_.view(), depth_.view()};
     VkFramebufferCreateInfo          framebuffer{};
     framebuffer.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     framebuffer.renderPass      = pass_;
@@ -101,7 +106,7 @@ void HdrTargets::create(VulkanViewport& viewport) {
     std::array<VkAttachmentDescription, 2> wire_attachments{};
     wire_attachments[0]        = attachments[0];
     wire_attachments[0].format = VK_FORMAT_R8G8B8A8_UNORM;
-    wire_attachments[1]        = attachments[3];
+    wire_attachments[1]        = attachments[4];
     wire_attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     // 保留表面深度和 read-only 布局，使背面的边线受已绘制表面遮挡。
     wire_attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
@@ -132,11 +137,11 @@ void HdrTargets::create(VulkanViewport& viewport) {
 }
 
 void HdrTargets::begin(VkCommandBuffer command) {
-    std::array<VkClearValue, 4> clear{};
+    std::array<VkClearValue, 5> clear{};
     clear[0].color        = {{0.012F, 0.018F, 0.028F, 1}};
     clear[1].color        = {{0, 0, 0, 0}};
     clear[2].color        = {{0, 0, 0, 0}};
-    clear[3].depthStencil = {1, 0};
+    clear[4].depthStencil = {1, 0};
     VkRenderPassBeginInfo begin{};
     begin.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     begin.renderPass        = pass_;
@@ -234,6 +239,7 @@ void HdrTargets::release() {
     pass_             = VK_NULL_HANDLE;
     readback_.release();
     color_.release();
+    albedo_.release();
     ambient_.release();
     normal_.release();
     wire_.release();

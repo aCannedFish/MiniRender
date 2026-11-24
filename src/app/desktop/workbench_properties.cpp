@@ -11,6 +11,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
+#include <QFileDialog>
 #include <QFormLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -70,6 +71,42 @@ void Workbench::build_object_panel() {
     layout->addRow("底色纹理", texture_selector_);
     layout->addRow("纹理过滤", texture_filter_);
     layout->addRow("自发光", emission_);
+    normal_selector_    = new QComboBox;
+    auto* import_normal = new QPushButton("导入线性法线贴图…");
+    layout->addRow(import_normal);
+    connect(import_normal, &QPushButton::clicked, this, [this] {
+        if (asset_loading()) {
+            return;
+        }
+        const auto file = QFileDialog::getOpenFileName(this, "导入切线空间法线", {},
+                                                       "Normal maps (*.png *.jpg *.jpeg *.exr)");
+        if (!file.isEmpty()) {
+            import_texture_file(file, minirender::ColorEncoding::linear, true);
+        }
+    });
+    normal_selector_->setObjectName("normal_texture");
+    normal_strength_ = spin(object_panel_, "normal_strength", 0, 8, .1);
+    normal_flip_     = new QCheckBox("反转法线贴图 Y");
+    layout->addRow("法线纹理", normal_selector_);
+    layout->addRow("法线强度", normal_strength_);
+    layout->addRow(normal_flip_);
+    connect(normal_selector_, &QComboBox::currentIndexChanged, this, [this] {
+        if (!refreshing_) {
+            edit_material_property([this](auto& m) {
+                m.normal_texture = normal_selector_->currentData().toString().toStdString();
+            });
+        }
+    });
+    connect(normal_strength_, &QDoubleSpinBox::valueChanged, this, [this](double value) {
+        if (!refreshing_) {
+            edit_material_property([value](auto& m) { m.normal_scale = float(value); });
+        }
+    });
+    connect(normal_flip_, &QCheckBox::toggled, this, [this](bool enabled) {
+        if (!refreshing_) {
+            edit_material_property([enabled](auto& m) { m.normal_flip_y = enabled; });
+        }
+    });
     layout->addRow("粗糙度", roughness_);
     energy_compensation_ = new QCheckBox("补偿多次微面散射");
     energy_compensation_->setObjectName("energy_compensation");
@@ -291,8 +328,8 @@ void Workbench::build_camera_panel() {
     auto* mode       = new QComboBox;
     mode->setObjectName("view_mode");
     mode->addItems({"光照合成", "法线", "线性深度", "线框", "原始 AO", "滤波 AO", "原色预览",
-                    "Blinn–Phong", "阴影深度", "遮挡物深度", "半影半径", "光源可见性",
-                    "PRT 环境光"});
+                    "Blinn–Phong", "阴影深度", "遮挡物深度", "半影半径", "光源可见性", "PRT 环境光",
+                    "屏幕镜面", "射线命中", "屏幕间接光", "直接与间接光", "线性底色", "射线步数"});
     mode->setItemData(VulkanViewport::base_color_preview_mode,
                       "均匀亮度显示材质和纹理，保留深度与接触遮蔽；不依赖场景光源。",
                       Qt::ToolTipRole);
@@ -389,6 +426,13 @@ void Workbench::refresh_properties() {
     const auto object = std::find_if(
         document.objects.begin(), document.objects.end(),
         [&](const minirender::SceneObject& value) { return value.id == selected_id_; });
+    normal_selector_->clear();
+    normal_selector_->addItem("无", QString());
+    for (const auto& t : document.textures) {
+        if (t.encoding == minirender::ColorEncoding::linear) {
+            normal_selector_->addItem(QString::fromStdString(t.id), QString::fromStdString(t.id));
+        }
+    }
     texture_selector_->clear();
     texture_selector_->addItem("无", QString());
     for (const auto& texture : document.textures) {
@@ -435,6 +479,10 @@ void Workbench::refresh_properties() {
                 double_sided_->setChecked(material.double_sided);
                 texture_selector_->setCurrentIndex(texture_selector_->findData(
                     QString::fromStdString(material.base_color_texture)));
+                normal_selector_->setCurrentIndex(
+                    normal_selector_->findData(QString::fromStdString(material.normal_texture)));
+                normal_strength_->setValue(material.normal_scale);
+                normal_flip_->setChecked(material.normal_flip_y);
                 texture_filter_->setCurrentIndex(static_cast<int>(material.texture_filter));
             }
         }

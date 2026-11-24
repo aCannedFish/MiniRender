@@ -30,6 +30,8 @@ layout(binding = 0, std140) uniform Frame {
     vec4             teaching_surface; // 高光指数、镜面系数、纹理开关
     vec4             area_settings; // 可见矩形灯数量和采样参数
     vec4 prt_light[9]; // RGB 为世界空间环境 SH，第一项的 w 表示传输已就绪
+    vec4 screen_trace; // 最大距离、命中厚度、步数、方向样本数
+    vec4 screen_options; // Hi-Z 开关、时间采样序号
 }
 
 frame;

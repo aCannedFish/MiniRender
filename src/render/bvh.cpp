@@ -1,6 +1,7 @@
 // 场景三角形的 SAH BVH 构建、最近命中与遮挡查询。
 // 公开接口与参数约定见 include/minirender/render/bvh.hpp。
 
+#include <minirender/geometry/uv_tangents.hpp>
 #include <minirender/render/bvh.hpp>
 
 #include <algorithm>
@@ -328,6 +329,32 @@ SurfaceHit SceneBvh::surface_hit(const Ray& ray, const PrimitiveHit& hit) const 
         shading = glm::normalize(shading);
         if (glm::dot(shading, geometric) < 0) {
             shading = -shading;
+        }
+    }
+    // 在三角形的 UV 切线基中解码法线。退化 UV 沿用插值法线。
+    if (instance.normal_texture && instance.material.normal_scale > 0) {
+        const std::array<glm::vec2, 3> coords{triangle.corners[0].uv, triangle.corners[1].uv,
+                                              triangle.corners[2].uv};
+        if (const auto axes = uv_tangents(primitive.vertices, coords)) {
+            const auto t0 = axes->u - shading * glm::dot(axes->u, shading);
+            if (glm::dot(t0, t0) > 1e-12) {
+                const auto t = glm::normalize(t0);
+                auto       b = glm::cross(shading, t);
+                if (glm::dot(b, axes->v) < 0) {
+                    b = -b;
+                }
+                auto sample = glm::dvec3(instance.normal_texture->sample(
+                                  uv, 0, instance.material.texture_filter)) *
+                                  2. -
+                              1.;
+                sample.x *= instance.material.normal_scale;
+                sample.y *=
+                    instance.material.normal_scale * (instance.material.normal_flip_y ? -1. : 1.);
+                const auto mapped = t * sample.x + b * sample.y + shading * sample.z;
+                if (glm::dot(mapped, geometric) > 1e-8) {
+                    shading = glm::normalize(mapped);
+                }
+            }
         }
     }
     return {hit.hit.distance,

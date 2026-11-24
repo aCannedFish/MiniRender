@@ -178,7 +178,22 @@ class VulkanViewport final : public QWindow {
     // 查询光照显示曝光 EV。
     float exposure() const noexcept;
     static constexpr int base_color_preview_mode = 6;
-    static constexpr int prt_mode                = 12;
+
+    static bool uses_lighting(int mode) noexcept {
+        return mode == 0 || (mode >= 13 && mode <= 16);
+    }
+
+    // x、y 使用视空间米，z、w 为每条射线的步数上限与每像素的方向数。
+    glm::vec4 screen_trace() const noexcept {
+        return screen_trace_;
+    }
+
+    bool screen_hiz() const noexcept {
+        return screen_hiz_;
+    }
+
+    void set_screen_trace(glm::vec4 settings, bool hiz);
+    static constexpr int prt_mode = 12;
     void set_prt(std::shared_ptr<const minirender::PrtBake> bake, minirender::PrtMode mode);
     void set_prt_lighting(const minirender::ShLight& lighting);
 
@@ -419,9 +434,11 @@ class VulkanViewport final : public QWindow {
     // 记录等待新预览完成的时间。
     QElapsedTimer            preview_wait_;
     QString                  frame_wait_reason_;
-    bool                     area_shadows_     = true;
-    int                      area_grid_        = 0;
-    std::uint64_t            area_updates_     = 0;
+    bool                     area_shadows_ = true;
+    int                      area_grid_    = 0;
+    std::uint64_t            area_updates_ = 0;
+    glm::vec4                screen_trace_{5.F, .03F, 160.F, 8.F};
+    bool                     screen_hiz_       = true;
     ShadowFilter             shadow_filter_    = ShadowFilter::pcf;
     float                    light_half_angle_ = 3.F, shadow_filter_radius_ = 1.F;
     int                      reference_energy_   = -1;
