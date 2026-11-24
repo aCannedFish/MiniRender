@@ -145,7 +145,7 @@ void main() {
     if(int(frame.display.y)>=8 && int(frame.display.y)<=11){
         color=vec4(decode_srgb(clamp(texelFetch(hdr_image,pixel,0).rgb,vec3(0),vec3(1))),1);return;
     }
-    if (base_color_preview() || int(frame.display.y) == 7) {
+    if (base_color_preview() || (int(frame.display.y) == 7 || int(frame.display.y)==12)) {
         vec3 encoded = frame.display.z > 0.5 ? fxaa(uv) : display_texel(pixel);
         color        = vec4(decode_srgb(encoded), 1.0);
         return;

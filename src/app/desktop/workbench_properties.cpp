@@ -291,7 +291,8 @@ void Workbench::build_camera_panel() {
     auto* mode       = new QComboBox;
     mode->setObjectName("view_mode");
     mode->addItems({"光照合成", "法线", "线性深度", "线框", "原始 AO", "滤波 AO", "原色预览",
-                    "Blinn–Phong", "阴影深度", "遮挡物深度", "半影半径", "光源可见性"});
+                    "Blinn–Phong", "阴影深度", "遮挡物深度", "半影半径", "光源可见性",
+                    "PRT 环境光"});
     mode->setItemData(VulkanViewport::base_color_preview_mode,
                       "均匀亮度显示材质和纹理，保留深度与接触遮蔽；不依赖场景光源。",
                       Qt::ToolTipRole);

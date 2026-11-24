@@ -21,7 +21,7 @@ MiniRender 是用于学习图形学的小型渲染引擎，使用 C++20、Qt Wid
 
 打开工具栏的“快速导入 → 资源目录”，按名称、类型或作业编号筛选资源。选择场景会覆盖当前文档，选择模型会把物体及其材质追加到当前场景，选择帧序列会打开独立播放器。整组模型可以一次撤销。另存场景时，目录导入的模型与纹理会随 JSON 保存到目标目录，可以一起复制到另一台电脑。
 
-应用内置 16 个场景、一个可追加的单位立方体和四帧 EXR 示例。已准备好的课程包可通过“选择课程包…”挂载，应用会记住路径。Mary 和 Bunny 均提供独立场景与追加模型两种入口。HW5 的 box 与 pink-room 可按帧播放或拖动查看。
+应用内置 17 个场景、一个可追加的单位立方体和四帧 EXR 示例。已准备好的课程包可通过“选择课程包…”挂载，应用会记住路径。Mary 和 Bunny 均提供独立场景与追加模型两种入口。HW5 的 box 与 pink-room 可按帧播放或拖动查看。
 
 从已解压的作业生成课程索引时，准备 Python 3、FFmpeg 和本项目构建的 CLI。下例假定课程目录中已有 `frameworks/HW0`、`frameworks/HW2` 以及 `HW5-data/{box,pink-room}/input`。脚本生成索引后，在资源目录选择包含 `resource_catalog.json` 的文件夹。
 
@@ -48,6 +48,12 @@ python3 scripts/prepare_course_catalog.py work/GAMES202 --cli build/macos-deskto
 ### 矩形面积光
 
 在 Cornell Box 中切换到“光照合成”，顶部发光面会照亮房间。选中灯具后可用操纵器移动或旋转，物体缩放决定发光面积，材质的发光 RGB 决定辐亮度。也可以在灯光面板点击“添加矩形面积光”。实时漫反射使用余弦多边形积分，金属高光使用 LTC。静止时每个矩形使用 3×3 个分层样本计算遮挡，拖动时切换到 2×2。相机面板可以开关面积光软阴影。离线积分器使用同一物体的发光三角形。
+
+### 球谐预览
+
+打开资源目录中的“球谐传输 · 彩色遮挡”，选择“覆盖并烘焙 PRT”。实时效果面板可以选择无遮挡、静态遮挡和漫反射互反射，设置每顶点的样本数与反弹次数。进度条显示已处理的面角数，再次烘焙相同场景会读取磁盘缓存。
+
+PRT 使用九个实球谐系数描述环境光。旋转环境、调整环境亮度或移动相机可以复用传输数据。移动物体后工作台提示重新烘焙。课程包内的 Bunny 可以分别加载 Skybox、Indoor、GraceCathedral、CornellBox 四组环境。
 
 ## 构建要求
 
@@ -294,6 +300,7 @@ include/minirender/render/
 ├── bvh.hpp  # 场景三角形的 SAH BVH 构建、最近命中与遮挡查询
 ├── cloth_bsdf.hpp  # 布料散射模型的方向求值、混合采样与概率密度
 ├── dipole.hpp  # 均匀半无限介质的 dipole 扩散模型及径向分布
+├── spherical_harmonics.hpp / prt.hpp  # 环境 SH 投影、旋转、静态传输与烘焙接口
 ├── rectangle_light.hpp  # 矩形几何、LTC 拟合表和辐亮度积分的接口
 ├── microfacet_energy.hpp  # 方向反照率、能量表和补偿瓣的数值接口
 ├── ibl.hpp  # 环境光预处理：漫反射卷积、GGX 粗糙度层与 BRDF 积分表
@@ -449,6 +456,8 @@ src/render/
 ├── bvh.cpp  # 场景三角形的 SAH BVH 构建、最近命中与遮挡查询
 ├── cloth_bsdf.cpp  # 布料散射模型的方向求值、混合采样与概率密度
 ├── dipole.cpp  # 均匀半无限介质的 dipole 扩散模型及径向分布
+├── spherical_harmonics.cpp  # 经纬图与六面环境投影、球谐旋转
+├── prt.cpp  # 逐面角可见性、多跳漫反射、缓存依赖与读出
 ├── rectangle_light.cpp  # 发光矩形边界、地平线裁剪与球面多边形积分
 ├── microfacet_energy.cpp  # 方向反照率积分、余弦加权平均和 Kulla–Conty 补偿
 ├── ibl.cpp  # 环境光预处理：漫反射卷积、GGX 粗糙度层与 BRDF 积分表
@@ -670,6 +679,9 @@ src/app/desktop/
 ├── sdf_renderer.cpp  # 距离场图元与 CSG 的 Vulkan 步进显示
 ├── sdf_renderer.hpp  # 接口：距离场图元与 CSG 的 Vulkan 步进显示
 ├── rectangle_shadow.hpp / .cpp  # 分层灯面采样、立方体深度图与几何缓存
+├── prt_cache.hpp / .cpp  # 烘焙缓存字节布局、校验与原子发布
+├── prt_panel.hpp / .cpp  # 后台烘焙、进度取消与环境更新
+├── prt_smoke.hpp / .cpp  # 隐藏窗口比较顶点传输、缓存重载和失效
 ├── gpu_rectangle.hpp / .cpp  # 上传 LTC 表与世界空间矩形光源列表
 ├── rectangle_smoke.hpp / .cpp  # 核对 Cornell 光照和灯具编辑事务
 ├── shadow_smoke.hpp / .cpp  # 离屏测量半影宽度、动态遮挡、多方向光与分屏过滤
@@ -841,6 +853,7 @@ scenes/
 ├── resource_catalog.json  # 内置目录及源文件、依赖项的 SHA-256
 ├── catalog/               # 可追加模型和序列样本
 ├── catalog_thumbs/        # 资源浏览器使用的小图
+├── prt-studio.json  # 密集网格地面与两个彩色遮挡物
 ├── white-furnace.json  # 两排反照率为一的金属球用于白炉检验
 ├── soft-shadows.json  # 用两块不同离地高度的挡板比较半影
 ├── cornell-box.json  # 经典红绿墙、两个方块和顶部面积光
@@ -900,6 +913,7 @@ scenes/assets/textures/
 
 ```text
 scenes/catalog/
+├── prt_grid.obj    # 为顶点传输生成的地面网格
 ├── cube.json       # 一米蓝色立方体，引用 scenes/assets/cube.obj
 ├── motion.json     # 四帧的包内路径与 SHA-256
 └── motion_0.exr … motion_3.exr  # 固定相机下移动物体的线性 RGB
@@ -959,6 +973,7 @@ tests/
 ├── displacement_tests.cpp  # 实际位移、共享边接缝、退化、预算和取消
 ├── geometry_tests.cpp  # 半边拓扑、Loop 规则、边界和面角属性
 ├── gizmo_tests.cpp  # 操纵器布局、命中、移动旋转与事务历史
+├── prt_tests.cpp  # 立体角、SH 旋转、遮挡、彩色互反射与缓存键
 ├── rectangle_light_tests.cpp  # LTC 与数值面积积分对照，验证矩形识别、变换和朝向
 ├── microfacet_energy_tests.cpp  # 白炉积分、采样方法及 MIS 密度一致性
 ├── ibl_tests.cpp  # 环境卷积、粗糙度层、BRDF LUT 与采样对照
@@ -1013,6 +1028,7 @@ tests/scenes/
 ```text
 scripts/
 ├── check_source_names.py  # 检查自有源码文件名，拒绝带空格的副本名称
+├── course_cubemap.py  # 将课程六面环境转为场景使用的经纬图
 ├── prepare_course_catalog.py  # 生成目录缩略图、转换课程模型、建立 EXR 帧索引
 ├── generate_builtin_scenes.py  # 生成内置 JSON 场景及球体、透光孔、光场棋盘资产
 ├── install_macos.py  # 部署 Qt/Vulkan 运行库、验证签名与隐藏渲染、替换正式应用并清理旧包

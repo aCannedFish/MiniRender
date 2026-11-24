@@ -28,15 +28,16 @@ std::size_t side_pipeline(const minirender::RenderInstance& instance) {
 
 // std430 按 16 字节对齐。normal 使用 mat4，避免 CPU mat3 的紧密布局与 GLSL 不一致。
 struct alignas(16) GpuInstance {
-    glm::mat4 object_to_world;
-    glm::mat4 normal_to_world;
-    glm::vec4 base_color;
-    glm::vec4 emission;
-    glm::vec4 surface; // roughness, metallic, texture filter, double sided
-    GpuCloth  cloth;
+    glm::mat4  object_to_world;
+    glm::mat4  normal_to_world;
+    glm::vec4  base_color;
+    glm::vec4  emission;
+    glm::vec4  surface; // roughness, metallic, texture filter, double sided
+    GpuCloth   cloth;
+    glm::uvec4 geometry;
 };
 
-static_assert(sizeof(GpuInstance) == 800);
+static_assert(sizeof(GpuInstance) == 816);
 static_assert(offsetof(GpuInstance, normal_to_world) == 64);
 static_assert(offsetof(GpuInstance, base_color) == 128);
 static_assert(offsetof(GpuInstance, surface) == 160);
@@ -72,6 +73,7 @@ struct alignas(16) FrameUniform {
     glm::vec4 preview_edges; // effective strength, physical pixels per logical pixel, reserved
     glm::vec4 teaching_light, teaching_surface;
     glm::vec4 area_settings;
+    std::array<glm::vec4, 9> prt_light;
 };
 
 static_assert(offsetof(FrameUniform, lights) == 96);
@@ -80,7 +82,7 @@ static_assert(offsetof(FrameUniform, view) == 928);
 static_assert(offsetof(FrameUniform, ao_kernel) == 1152);
 static_assert(offsetof(FrameUniform, ibl) == 2176);
 static_assert(offsetof(FrameUniform, preview_edges) == 2192);
-static_assert(sizeof(FrameUniform) == 2256);
+static_assert(sizeof(FrameUniform) == 2400);
 
 } // namespace
 
@@ -93,7 +95,7 @@ void SceneRenderer::initResources() {
     shadow_map_.create(*window_);
     ibl_.create(*window_);
     rectangles_.create(*window_);
-    std::array<VkDescriptorSetLayoutBinding, 13> bindings{};
+    std::array<VkDescriptorSetLayoutBinding, 14> bindings{};
     auto&                                        binding = bindings[0];
     binding.binding                                      = 0;
     binding.descriptorType                               = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -111,10 +113,11 @@ void SceneRenderer::initResources() {
         bindings[i] = {i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
                        VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     }
-    bindings[10]        = {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT,
-                           nullptr};
-    bindings[11]        = {11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
-                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
+    bindings[10] = {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT,
+                    nullptr};
+    bindings[11] = {11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
+                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
+    bindings[13] = {13, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr};
     layout.bindingCount = static_cast<std::uint32_t>(bindings.size());
     layout.pBindings    = bindings.data();
     check_vk(vkCreateDescriptorSetLayout(device_, &layout, nullptr, &descriptor_layout_),
@@ -265,6 +268,7 @@ void SceneRenderer::upload_scene() {
     glm::vec3 minimum(std::numeric_limits<float>::infinity());
     glm::vec3 maximum(-std::numeric_limits<float>::infinity());
     // 先收集全部可见来源，避免复用仍被另一个实例引用的旧缓冲。
+    std::uint32_t corner_offset = 0;
     for (const auto& instance : scene.instances) {
         used.insert(instance.mesh);
     }
@@ -333,7 +337,9 @@ void SceneRenderer::upload_scene() {
                                               : -1.F),
              {subsurface ? .35F : material.roughness, metallic,
               static_cast<float>(material.texture_filter), material.double_sided ? 1.0F : 0.0F},
-             pack_cloth(material)});
+             pack_cloth(material),
+             {corner_offset, 0, 0, 0}});
+        corner_offset += static_cast<std::uint32_t>(instance.mesh->triangles.size() * 3);
     }
     subsurface_previews_.end_scene();
     // 一帧在途，当前帧开始前 fence 已完成，未引用的网格可以安全回收。
@@ -370,7 +376,8 @@ void SceneRenderer::upload_scene() {
     const bool shadow_buffers_changed = area_shadows_.configure(
         *window_, scene, minimum, maximum, area_grid(), window_->scene_revision());
     const bool rectangle_buffer_changed = rectangles_.update(*window_, scene.rectangles);
-    if (descriptors_changed || shadow_buffers_changed || rectangle_buffer_changed ||
+    const bool prt_changed              = update_prt();
+    if (descriptors_changed || prt_changed || shadow_buffers_changed || rectangle_buffer_changed ||
         descriptor_pool_ == VK_NULL_HANDLE) {
         rebuild_texture_descriptors();
     }
@@ -398,7 +405,7 @@ void SceneRenderer::rebuild_texture_descriptors() {
     const std::array<VkDescriptorPoolSize, 3> sizes{
         {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, count},
          {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 9 * count},
-         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3 * count}}};
+         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4 * count}}};
     VkDescriptorPoolCreateInfo pool{};
     pool.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool.maxSets       = count;
@@ -423,11 +430,12 @@ void SceneRenderer::rebuild_texture_descriptors() {
         VkDescriptorBufferInfo               instances{instances_.handle(), 0,
                                                        instance_capacity_ * sizeof(GpuInstance)};
         const auto                           ibl_images = ibl_.descriptors();
-        std::array<VkWriteDescriptorSet, 13> writes{};
+        std::array<VkWriteDescriptorSet, 14> writes{};
         const auto                           rectangle_tables = rectangles_.tables();
         const auto                           rectangle_buffer = rectangles_.buffer();
         const auto                           projections      = area_shadows_.projections();
         const auto                           area_depth       = area_shadows_.depth();
+        const VkDescriptorBufferInfo         prt{prt_buffer_.handle(), 0, VK_WHOLE_SIZE};
         for (std::uint32_t binding = 0; binding < writes.size(); ++binding) {
             writes[binding].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             writes[binding].dstSet          = sets[index];
@@ -435,11 +443,13 @@ void SceneRenderer::rebuild_texture_descriptors() {
             writes[binding].descriptorCount = 1;
             writes[binding].descriptorType =
                 binding == 0 ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
-                             : ((binding == 3 || binding == 10 || binding == 11)
+                             : ((binding == 3 || binding == 10 || binding == 11 || binding == 13)
                                     ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
                                     : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
             if (binding == 0) {
                 writes[binding].pBufferInfo = &uniform;
+            } else if (binding == 13) {
+                writes[binding].pBufferInfo = &prt;
             } else if (binding == 11) {
                 writes[binding].pBufferInfo = &projections;
             } else if (binding == 12) {
@@ -542,6 +552,10 @@ void SceneRenderer::update_uniforms(int mode, bool reference) {
         window_->ibl_lut() ? 1.0F : 0.0F, window_->ibl_maps() ? 1.0F : 0.0F,
         window_->scene()->environment_strength,
         glm::radians(std::remainder(window_->scene()->environment_rotation_degrees, 360.0F))};
+    for (std::size_t k = 0; k < 9; ++k) {
+        frame.prt_light[k] =
+            glm::vec4(glm::vec3(window_->prt_lighting()[k]), uploaded_prt_ ? 1 : 0);
+    }
     frame.area_settings =
         glm::vec4(static_cast<float>(window_->scene()->rectangles.size()),
                   static_cast<float>(area_shadows_.grid()), 1.F / RectangleShadow::resolution, 0);
@@ -659,10 +673,34 @@ void SceneRenderer::render_wire(VkCommandBuffer command, int mode) {
     vkCmdEndRenderPass(command);
 }
 
+bool SceneRenderer::update_prt() {
+    const auto data = window_->prt();
+    if (prt_buffer_.handle() && uploaded_prt_ == data) {
+        return false;
+    }
+    const auto             count = data ? data->vertices.size() * 9 : 0;
+    std::vector<glm::vec4> packed(std::max<std::size_t>(1, count));
+    if (data) {
+        for (std::size_t i = 0; i < data->vertices.size(); ++i) {
+            for (std::size_t k = 0; k < 9; ++k) {
+                packed[i * 9 + k] = glm::vec4(data->vertices[i][k], 0);
+            }
+        }
+    }
+    prt_buffer_.create(device_, window_->physicalDevice(), packed.size() * sizeof(glm::vec4),
+                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    prt_buffer_.write(packed.data(), packed.size() * sizeof(glm::vec4));
+    uploaded_prt_ = data;
+    return true;
+}
+
 void SceneRenderer::startNextFrame() {
     const bool ibl_changed = ibl_.update(*window_, window_->ibl_maps(), window_->ibl_lut());
     if (scene_revision_ != window_->scene_revision()) {
         upload_scene();
+    }
+    if (update_prt()) {
+        rebuild_texture_descriptors();
     }
     if (area_shadows_.configure(*window_, *window_->scene(), minimum_, maximum_, area_grid(),
                                 window_->scene_revision())) {
@@ -796,6 +834,8 @@ void SceneRenderer::releaseResources() {
     shadow_map_.release();
     ibl_.release();
     rectangles_.release();
+    prt_buffer_.release();
+    uploaded_prt_.reset();
     area_shadows_.release();
     if (device_ == VK_NULL_HANDLE) {
         return;

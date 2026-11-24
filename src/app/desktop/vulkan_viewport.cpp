@@ -796,6 +796,9 @@ void VulkanViewport::set_scene(std::shared_ptr<const minirender::SceneSnapshot> 
     if (!scene_ || !scene || scene_->environment_texture != scene->environment_texture) {
         ibl_maps_.reset();
     }
+    if (prt_ && (!scene || !scene_ || !minirender::compatible_prt(*scene_, *scene, prt_kind_))) {
+        prt_.reset();
+    }
     scene_ = std::move(scene);
     raster_meshes_.retain(scene_ ? std::span<const minirender::RenderInstance>(scene_->instances)
                                  : std::span<const minirender::RenderInstance>{});
@@ -1070,6 +1073,20 @@ void VulkanViewport::set_preview_occlusion(bool enabled) {
 
 bool VulkanViewport::preview_occlusion() const noexcept {
     return preview_occlusion_;
+}
+
+void VulkanViewport::set_prt(std::shared_ptr<const minirender::PrtBake> bake,
+                             minirender::PrtMode                        mode) {
+    prt_      = std::move(bake);
+    prt_kind_ = mode;
+    mark_preview_changed();
+    requestUpdate();
+}
+
+void VulkanViewport::set_prt_lighting(const minirender::ShLight& lighting) {
+    prt_lighting_ = lighting;
+    mark_preview_changed();
+    requestUpdate();
 }
 
 void VulkanViewport::set_teaching(glm::vec4 light, glm::vec3 surface) {

@@ -6,6 +6,7 @@
 #include <minirender/core/image.hpp>
 #include <minirender/render/ibl.hpp>
 #include <minirender/render/point_preview.hpp>
+#include <minirender/render/prt.hpp>
 #include <minirender/render/raster_mesh.hpp>
 #include <minirender/render/sdf_render.hpp>
 #include <minirender/render/ssao.hpp>
@@ -177,7 +178,19 @@ class VulkanViewport final : public QWindow {
     // 查询光照显示曝光 EV。
     float exposure() const noexcept;
     static constexpr int base_color_preview_mode = 6;
-    static constexpr int blinn_phong_mode        = 7;
+    static constexpr int prt_mode                = 12;
+    void set_prt(std::shared_ptr<const minirender::PrtBake> bake, minirender::PrtMode mode);
+    void set_prt_lighting(const minirender::ShLight& lighting);
+
+    const std::shared_ptr<const minirender::PrtBake>& prt() const noexcept {
+        return prt_;
+    }
+
+    const minirender::ShLight& prt_lighting() const noexcept {
+        return prt_lighting_;
+    }
+
+    static constexpr int blinn_phong_mode = 7;
 
     // 右侧模式为 -1 时使用普通视口；分界位置是窗口宽度的比例。
     int comparison_mode() const noexcept {
@@ -384,6 +397,9 @@ class VulkanViewport final : public QWindow {
     minirender::Camera                                  point_camera_;
     bool                                                point_visible_ = false;
     std::uint64_t                                       point_uploads_ = 0;
+    std::shared_ptr<const minirender::PrtBake>          prt_;
+    minirender::PrtMode                                 prt_kind_ = minirender::PrtMode::shadowed;
+    minirender::ShLight                                 prt_lighting_{};
     std::shared_ptr<const minirender::Image>            offline_image_;
     bool                                                offline_visible_  = false;
     std::uint64_t                                       display_revision_ = 0;

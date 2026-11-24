@@ -18,6 +18,7 @@ layout(location = 5) in vec2 mesh_uv;
 layout(location = 6) in vec3 world_tangent_u;
 layout(location = 7) in vec3 world_tangent_v;
 layout(binding = 2) uniform sampler2D base_texture;
+layout(location=8) in vec3 prt_color;
 layout(location = 0) out vec4 color;
 layout(location = 1) out vec4 normal_output;
 layout(location = 2) out vec4 ambient_output;
@@ -88,6 +89,10 @@ void main() {
     ClothData cloth         = instances.values[draw_index.instance].cloth;
     bool      cloth_enabled = cloth.counts.y != 0;
     int mode=int(frame.display.y);
+    if(mode==12){
+        color=vec4(frame.prt_light[0].w>.5?albedo*max(prt_color,vec3(0))+emission:albedo,1);
+        ambient_output=vec4(0);return;
+    }
     if(mode>=8 && mode<=11) {
         vec3 debug=vec3(0.0);
         float vis=1.0;

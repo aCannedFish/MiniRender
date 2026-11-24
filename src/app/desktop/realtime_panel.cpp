@@ -2,6 +2,7 @@
 // 本模块接口见 realtime_panel.hpp。
 
 #include "realtime_panel.hpp"
+#include "prt_panel.hpp"
 #include "vulkan_viewport.hpp"
 
 #include <QCheckBox>
@@ -94,4 +95,5 @@ RealtimePanel::RealtimePanel(VulkanViewport& viewport, QWidget* parent) : QWidge
         connect(spin, &QDoubleSpinBox::valueChanged, this, update);
     }
     connect(samples, &QSpinBox::valueChanged, this, update);
+    layout->addRow(new PrtPanel(viewport, this));
 }

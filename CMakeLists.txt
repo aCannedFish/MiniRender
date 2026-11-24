@@ -99,6 +99,8 @@ add_library(minirender_core
     src/render/medium.cpp
     src/render/render_session.cpp
     src/render/ssao.cpp
+    src/render/prt.cpp
+    src/render/spherical_harmonics.cpp
     src/render/rectangle_light.cpp
     src/render/microfacet_energy.cpp
     src/render/ibl.cpp
@@ -173,7 +175,7 @@ if(BUILD_TESTING)
     target_link_libraries(minirender_lightfield_example PRIVATE minirender_core minirender_warnings)
     add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp
         tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp tests/path_tests.cpp
-        tests/session_tests.cpp tests/ssao_tests.cpp tests/ibl_tests.cpp tests/microfacet_energy_tests.cpp tests/rectangle_light_tests.cpp tests/geometry_tests.cpp
+        tests/session_tests.cpp tests/ssao_tests.cpp tests/ibl_tests.cpp tests/microfacet_energy_tests.cpp tests/rectangle_light_tests.cpp tests/prt_tests.cpp tests/geometry_tests.cpp
         tests/displacement_tests.cpp tests/mesh_io_tests.cpp tests/raster_mesh_tests.cpp
         tests/simplify_tests.cpp tests/gizmo_tests.cpp tests/sided_tests.cpp tests/remesh_tests.cpp
         tests/builtin_scene_tests.cpp tests/adaptive_tests.cpp tests/point_cloud_tests.cpp

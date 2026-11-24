@@ -120,6 +120,10 @@ class SceneRenderer final : public ViewportRenderer {
     int area_grid() const;
     void draw_shadow_geometry(VkCommandBuffer command, int projection, std::uint32_t resolution,
                               const std::string* emitter = nullptr);
+    // 系数按展平面角上传一次，环境旋转只更新九个帧常量。
+    GpuBuffer                                  prt_buffer_;
+    std::shared_ptr<const minirender::PrtBake> uploaded_prt_;
+    bool update_prt();
     GpuRectangleLights rectangles_;
     // 着色器资源的 binding 与类型声明。
     VkDescriptorSetLayout descriptor_layout_ = VK_NULL_HANDLE;

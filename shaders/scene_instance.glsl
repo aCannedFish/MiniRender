@@ -20,6 +20,7 @@ struct Instance {
     vec4      emission;
     vec4      surface;
     ClothData cloth;
+    uvec4 geometry; // x 为该实例的首个 PRT 面角
 };
 
 layout(binding = 3, std430) readonly buffer Instances {
