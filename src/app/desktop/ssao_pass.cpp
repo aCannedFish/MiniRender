@@ -6,7 +6,7 @@
 #include <array>
 
 void SsaoPass::create(VulkanViewport& viewport, const HdrTargets& targets, VkBuffer uniform,
-                      VkDeviceSize bytes) {
+                      VkDeviceSize bytes, VkImageView reference) {
     const ScreenInput normal{targets.normal_view()};
     const ScreenInput depth{targets.depth_view(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL};
     const std::array<ScreenInput, 2> ao_inputs{normal, depth};
@@ -20,9 +20,10 @@ void SsaoPass::create(VulkanViewport& viewport, const HdrTargets& targets, VkBuf
     filtered_.create(viewport, VK_FORMAT_R32_SFLOAT, ":/shaders/ao_filter.frag.spv", uniform, bytes,
                      vertical_inputs);
     transport_.create(viewport, targets, uniform, bytes);
-    const std::array<ScreenInput, 5> composite_inputs{
+    const std::array<ScreenInput, 6> composite_inputs{
         ScreenInput{targets.color_view()}, ScreenInput{targets.ambient_view()},
-        ScreenInput{filtered_.view()}, ScreenInput{raw_.view()}, ScreenInput{transport_.view()}};
+        ScreenInput{filtered_.view()},     ScreenInput{raw_.view()},
+        ScreenInput{transport_.view()},    ScreenInput{reference}};
     composite_.create(viewport, VK_FORMAT_R32G32B32A32_SFLOAT, ":/shaders/ao_composite.frag.spv",
                       uniform, bytes, composite_inputs);
 }

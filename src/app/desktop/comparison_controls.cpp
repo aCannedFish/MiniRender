@@ -1,6 +1,7 @@
 // 构建实时显示比较控件，并按同一时刻的相机导出显示图与线性 HDR。
 #include "comparison_controls.hpp"
 #include "editor_theme.hpp"
+#include "reference_panel.hpp"
 #include "workbench_internal.hpp"
 #include <QCheckBox>
 #include <QComboBox>
@@ -20,6 +21,7 @@ void add_comparison_controls(QFormLayout& layout, QComboBox& mode, VulkanViewpor
     for (int i = 0; i < mode.count(); ++i) {
         right->addItem(mode.itemText(i));
     }
+    right->addItem("路径追踪参考");
     right->setToolTip("左侧使用当前显示模式。按住视口分界线拖动可调整两侧宽度。");
     layout.addRow("右侧对照", right);
     auto* reference = new QComboBox(panel);
@@ -36,6 +38,7 @@ void add_comparison_controls(QFormLayout& layout, QComboBox& mode, VulkanViewpor
     energy->addItems({"沿用材质设置", "单次微面散射", "多次散射补偿"});
     energy->setEnabled(false);
     layout.addRow("右侧金属", energy);
+    layout.addRow(new ReferencePanel(viewport, *right, panel));
     QObject::connect(right, &QComboBox::currentIndexChanged, energy,
                      [energy](int i) { energy->setEnabled(i > 0); });
     QObject::connect(energy, &QComboBox::currentIndexChanged, panel,

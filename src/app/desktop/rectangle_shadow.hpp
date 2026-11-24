@@ -45,8 +45,11 @@ class RectangleShadow {
     std::vector<std::array<glm::vec3, 4>> corners_;
     ShadowMap                             map_;
     GpuBuffer                             matrices_;
-    std::uint32_t                         layers_   = 0;
-    int                                   grid_     = 0;
-    bool                                  dirty_    = false;
-    std::uint64_t                         revision_ = ~std::uint64_t(0), updates_ = 0;
+    std::uint32_t                         layers_ = 0;
+    int                                   grid_   = 0;
+    // 分配容量按 3×3 固定，实际绘制层数按当前交互质量计算。
+    std::uint32_t active_layers_ = 0;
+    int           cached_grid_   = -1;
+    bool          dirty_         = false;
+    std::uint64_t revision_ = ~std::uint64_t(0), updates_ = 0;
 };

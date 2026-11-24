@@ -129,10 +129,13 @@ void Workbench::import_resource(const catalog::Entry& entry, bool recommended) {
             return result;
         },
         [this, entry, progress, feedback, generation, recommended](const auto& result) {
+            const bool cancelled = progress->cancelled.load() || feedback->wasCanceled();
+            // 已结束的进度窗口等待 Qt 延迟销毁，先移除任务标识，确保新任务只对应一个取消控件。
+            feedback->setObjectName({});
             feedback->reset();
             feedback->deleteLater();
             finish_asset_task();
-            if (progress->cancelled || document_generation_ != generation) {
+            if (cancelled || document_generation_ != generation) {
                 return;
             }
             if (!result.error.empty()) {
@@ -169,6 +172,10 @@ void Workbench::import_resource(const catalog::Entry& entry, bool recommended) {
                     if (recommended && entry.recommended == "blinn-phong") {
                         view = VulkanViewport::blinn_phong_mode;
                     }
+                    if (recommended && entry.recommended == "comparison") {
+                        view = 19;
+                        findChild<QCheckBox*>("area_shadows")->setChecked(true);
+                    }
                     if (recommended && entry.recommended == "ssgi") {
                         view = 16;
                     }
@@ -182,6 +189,9 @@ void Workbench::import_resource(const catalog::Entry& entry, bool recommended) {
                             ->setCurrentIndex(static_cast<int>(ShadowFilter::pcss));
                     }
                     findChild<QComboBox*>("view_mode")->setCurrentIndex(view);
+                    if (recommended && entry.recommended == "comparison") {
+                        findChild<QPushButton*>("reference_render")->click();
+                    }
                     if (recommended && entry.recommended == "prt") {
                         findChild<QPushButton*>("prt_bake")->click();
                     }

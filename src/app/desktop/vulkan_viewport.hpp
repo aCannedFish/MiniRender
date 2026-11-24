@@ -212,6 +212,14 @@ class VulkanViewport final : public QWindow {
     }
 
     void set_screen_trace(glm::vec4 settings, bool hiz);
+    static constexpr int offline_reference_mode = 21;
+    // 同一视口相机生成的离线参考。场景几何、相机或纵横比变化使其失效。
+    void set_reference_image(std::shared_ptr<const minirender::Image> image);
+
+    const std::shared_ptr<const minirender::Image>& reference_image() const noexcept {
+        return path_reference_;
+    }
+
     static constexpr int prt_mode = 12;
     void set_prt(std::shared_ptr<const minirender::PrtBake> bake, minirender::PrtMode mode);
     void set_prt_lighting(const minirender::ShLight& lighting);
@@ -451,36 +459,37 @@ class VulkanViewport final : public QWindow {
     // 已完成 GPU 提交的预览版本。
     std::uint64_t completed_preview_revision_ = 0;
     // 记录等待新预览完成的时间。
-    QElapsedTimer            preview_wait_;
-    QString                  frame_wait_reason_;
-    bool                     area_shadows_ = true;
-    int                      area_grid_    = 0;
-    std::uint64_t            area_updates_ = 0;
-    glm::vec2                temporal_{.9F, 1.F};
-    std::uint64_t            history_epoch_ = 0;
-    unsigned                 history_age_   = 0;
-    glm::vec4                screen_trace_{5.F, .03F, 160.F, 8.F};
-    bool                     screen_hiz_       = true;
-    ShadowFilter             shadow_filter_    = ShadowFilter::pcf;
-    float                    light_half_angle_ = 3.F, shadow_filter_radius_ = 1.F;
-    int                      reference_energy_   = -1;
-    int                      shadow_debug_light_ = 0, reference_shadow_ = -1;
-    std::uint64_t            reference_revision_ = 0;
-    bool                     shadows_enabled_    = true;
-    bool                     fxaa_enabled_       = true;
-    std::uint64_t            teaching_revision_ = 0, comparison_draws_ = 0;
-    int                      comparison_mode_ = -1;
-    int                      export_side_     = -1;
-    float                    split_           = 0.5F;
-    bool                     dragging_split_  = false;
-    glm::vec4                teaching_light_{1.5F, 2.5F, 2.0F, 10.F};
-    glm::vec3                teaching_surface_{35.F, 0.25F, 1.F};
-    float                    exposure_                 = 0.0F;
-    int                      view_mode_                = 0;
-    bool                     preview_occlusion_        = true;
-    bool                     preview_outline_          = true;
-    float                    preview_outline_strength_ = 0.35F;
-    minirender::SsaoSettings ssao_;
+    QElapsedTimer                            preview_wait_;
+    QString                                  frame_wait_reason_;
+    bool                                     area_shadows_ = true;
+    int                                      area_grid_    = 0;
+    std::uint64_t                            area_updates_ = 0;
+    std::shared_ptr<const minirender::Image> path_reference_;
+    glm::vec2                                temporal_{.9F, 1.F};
+    std::uint64_t                            history_epoch_ = 0;
+    unsigned                                 history_age_   = 0;
+    glm::vec4                                screen_trace_{5.F, .03F, 160.F, 8.F};
+    bool                                     screen_hiz_       = true;
+    ShadowFilter                             shadow_filter_    = ShadowFilter::pcf;
+    float                                    light_half_angle_ = 3.F, shadow_filter_radius_ = 1.F;
+    int                                      reference_energy_   = -1;
+    int                                      shadow_debug_light_ = 0, reference_shadow_ = -1;
+    std::uint64_t                            reference_revision_ = 0;
+    bool                                     shadows_enabled_    = true;
+    bool                                     fxaa_enabled_       = true;
+    std::uint64_t                            teaching_revision_ = 0, comparison_draws_ = 0;
+    int                                      comparison_mode_ = -1;
+    int                                      export_side_     = -1;
+    float                                    split_           = 0.5F;
+    bool                                     dragging_split_  = false;
+    glm::vec4                                teaching_light_{1.5F, 2.5F, 2.0F, 10.F};
+    glm::vec3                                teaching_surface_{35.F, 0.25F, 1.F};
+    float                                    exposure_                 = 0.0F;
+    int                                      view_mode_                = 0;
+    bool                                     preview_occlusion_        = true;
+    bool                                     preview_outline_          = true;
+    float                                    preview_outline_strength_ = 0.35F;
+    minirender::SsaoSettings                 ssao_;
     std::shared_ptr<const minirender::IblEnvironment> ibl_maps_;
     std::shared_ptr<const minirender::Image>          ibl_lut_;
     bool                                              environment_background_ = true;

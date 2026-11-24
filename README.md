@@ -21,7 +21,7 @@ MiniRender 是用于学习图形学的小型渲染引擎，使用 C++20、Qt Wid
 
 打开工具栏的“快速导入 → 资源目录”，按名称、类型或作业编号筛选资源。选择场景会覆盖当前文档，选择模型会把物体及其材质追加到当前场景，选择帧序列会打开独立播放器。整组模型可以一次撤销。另存场景时，目录导入的模型与纹理会随 JSON 保存到目标目录，可以一起复制到另一台电脑。
 
-应用内置 17 个场景、一个可追加的单位立方体和四帧 EXR 示例。已准备好的课程包可通过“选择课程包…”挂载，应用会记住路径。Mary 和 Bunny 均提供独立场景与追加模型两种入口。HW5 的 box 与 pink-room 可按帧播放或拖动查看。
+随应用提供 19 个场景目录条目（含同一 Cornell Box 的三种预览入口）、一个可追加的单位立方体和四帧 EXR 示例。已准备好的课程包可通过“选择课程包…”挂载，应用会记住路径。Mary 和 Bunny 均提供独立场景与追加模型两种入口。HW5 的 box 与 pink-room 可按帧播放或拖动查看。
 
 从已解压的作业生成课程索引时，准备 Python 3、FFmpeg、NumPy 和本项目构建的 CLI。下例假定课程目录中已有 `frameworks/HW0`、`frameworks/HW2` 以及 `HW5-data/{box,pink-room}/input`。脚本生成索引后，在资源目录选择包含 `resource_catalog.json` 的文件夹。
 
@@ -72,6 +72,14 @@ PRT 使用九个实球谐系数描述环境光。旋转环境、调整环境亮�
 ```sh
 build/macos-desktop-release/minirender_cli --denoise work/GAMES202/HW5-data/box/input outputs/box 0 20 temporal
 ```
+
+### Cornell 对照
+
+打开“快速导入 → 资源目录 → Cornell · 实时与离线对照”，点击“覆盖并生成对照”。左侧使用矩形灯、屏幕空间间接光和时间降噪，右侧在后台用同一相机计算路径追踪参考。拖动分界线比较物体接触处的阴影和墙面颜色渗透。
+
+相机面板可以调整参考图最长边与每像素样本数、取消计算或导出两侧的 PNG 和线性 EXR。更改场景、相机或视口比例后，重新点击“生成路径追踪参考”。当前场景可以继续编辑，另存时会一并打包从目录导入的网格与纹理。
+
+HW4 的原始方向反照率和平均反照率 PNG 可在课程资源目录的“HW4 · GGX 能量表”中逐页查看。
 
 ## 构建要求
 
@@ -169,6 +177,14 @@ build/macos-core-release/minirender_cli --render scenes/cornell-box.json outputs
 输出为 `outputs/cornell.exr` 和 `outputs/cornell.png`。Windows 使用 `build/windows-core-release/minirender_cli.exe`，参数相同。桌面构建目录中也包含 CLI。
 
 CLI 还提供场景检查、法线图、光场采集与重聚焦命令，可通过 `--help` 查看入口。详细参数见[路径追踪](docs/PATH_TRACING.md)、[离线任务](docs/RENDER_SESSION.md)和[光场](docs/LIGHT_FIELD.md)。
+
+### 设备验收
+
+在安装 Vulkan SDK、Qt 和 NVIDIA 驱动的 Windows 机器上完成桌面构建后，在仓库根目录运行以下命令。脚本按顺序使用隐藏窗口检查各作业与 Cornell 综合场景，输出 `results.json`、分项日志和实际渲染图。已准备好课程包时，添加 `--course-root 课程目录` 可同时复验 Mary、Bunny、洞穴和 HW5。GitHub 的 Windows desktop 工作流可独立检查 MSVC、Qt、SPIR-V 与 CPU 测试。
+
+```powershell
+python scripts/verify_games202.py .\build\windows-desktop-release\src\app\desktop\minirender_desktop.exe --require-nvidia --output outputs/windows-games202
+```
 
 ### 开发调试
 
@@ -318,7 +334,8 @@ include/minirender/render/
 ├── bvh.hpp  # 场景三角形的 SAH BVH 构建、最近命中与遮挡查询
 ├── cloth_bsdf.hpp  # 布料散射模型的方向求值、混合采样与概率密度
 ├── dipole.hpp  # 均匀半无限介质的 dipole 扩散模型及径向分布
-├── spherical_harmonics.hpp / prt.hpp  # 环境 SH 投影、旋转、静态传输与烘焙接口
+├── spherical_harmonics.hpp  # 九项环境光系数、投影与旋转接口
+├── prt.hpp  # 静态传输、烘焙参数与缓存依赖接口
 ├── denoiser.hpp  # 首交点引导、空间滤波、重投影与进度回调
 ├── rectangle_light.hpp  # 矩形几何、LTC 拟合表和辐亮度积分的接口
 ├── microfacet_energy.hpp  # 方向反照率、能量表和补偿瓣的数值接口
@@ -581,7 +598,8 @@ src/external/
 
 ```text
 src/app/
-├── denoise_cli.hpp / .cpp  # 批处理连续帧以及导出场景首交点引导
+├── denoise_cli.hpp  # 批处理连续帧以及导出场景首交点引导的接口
+├── denoise_cli.cpp  # 批处理连续帧以及导出场景首交点引导
 ├── cli.cpp  # CPU 命令行入口与场景、图像、渲染子命令分发
 ├── lightfield_cli.cpp  # 命令行光场采集、文件重开与重聚焦
 ├── lightfield_cli.hpp  # 接口：命令行光场采集、文件重开与重聚焦
@@ -602,12 +620,21 @@ src/app/
 ```text
 src/app/desktop/
 ├── CMakeLists.txt  # 桌面目标、Qt/Vulkan 链接、GLSL 编译及样式/场景部署
-├── resource_catalog.hpp / .cpp  # 目录数据、包内路径和流式 SHA-256 校验
-├── comparison_controls.hpp / .cpp  # A/B 选择、教学点光源参数和图像导出
-├── catalog_browser.hpp / .cpp  # 搜索、筛选、挂载课程包和选择导入动作
-├── sequence_viewer.hpp / .cpp  # 异步 EXR 解码、播放与跳帧
+├── resource_catalog.hpp  # 目录数据、包内路径和流式 SHA-256 校验的接口
+├── resource_catalog.cpp  # 目录数据、包内路径和流式 SHA-256 校验
+├── reference_panel.hpp  # 同相机路径追踪参考任务、进度及过期处理的接口
+├── reference_panel.cpp  # 同相机路径追踪参考任务、进度及过期处理
+├── integration_smoke.hpp  # 综合检查 Cornell 参考图、视口与便携保存的接口
+├── integration_smoke.cpp  # 综合检查 Cornell 参考图、视口与便携保存
+├── comparison_controls.hpp  # A/B 选择、教学点光源参数和图像导出的接口
+├── comparison_controls.cpp  # A/B 选择、教学点光源参数和图像导出
+├── catalog_browser.hpp  # 搜索、筛选、挂载课程包和选择导入动作的接口
+├── catalog_browser.cpp  # 搜索、筛选、挂载课程包和选择导入动作
+├── sequence_viewer.hpp  # 异步 EXR 解码、播放与跳帧的接口
+├── sequence_viewer.cpp  # 异步 EXR 解码、播放与跳帧
 ├── workbench_catalog.cpp  # 导入事务、资源 ID 重映射、进度与取消
-├── catalog_smoke.hpp / .cpp  # 从菜单验证追加、撤销、便携保存和序列读取
+├── catalog_smoke.hpp  # 从菜单验证追加、撤销、便携保存和序列读取的接口
+├── catalog_smoke.cpp  # 从菜单验证追加、撤销、便携保存和序列读取
 ├── builtin_scenes.cpp  # 内置场景的菜单信息、资源位置和推荐渲染参数
 ├── builtin_scenes.hpp  # 接口：内置场景的菜单信息、资源位置和推荐渲染参数
 ├── editor.qss  # 深色工作台控件、布局边界、焦点和禁用状态的样式
@@ -701,17 +728,28 @@ src/app/desktop/
 ├── screen_pass.hpp  # 接口：可复用的全屏 Vulkan 渲染附件、描述符与命令录制
 ├── sdf_renderer.cpp  # 距离场图元与 CSG 的 Vulkan 步进显示
 ├── sdf_renderer.hpp  # 接口：距离场图元与 CSG 的 Vulkan 步进显示
-├── rectangle_shadow.hpp / .cpp  # 分层灯面采样、立方体深度图与几何缓存
-├── temporal_transport.hpp / .cpp  # SSGI 的空间滤波和按对照侧保存的时间历史
-├── denoise_smoke.hpp / .cpp  # 序列与离线降噪、跳帧、视口历史及切镜检查
-├── screen_transport.hpp / .cpp  # 屏幕空间输入附件、深度金字塔和传输绘制
-├── screen_transport_smoke.hpp / .cpp  # 检查命中、遍历步数、合成及洞穴贴图
-├── prt_cache.hpp / .cpp  # 烘焙缓存字节布局、校验与原子发布
-├── prt_panel.hpp / .cpp  # 后台烘焙、进度取消与环境更新
-├── prt_smoke.hpp / .cpp  # 隐藏窗口比较顶点传输、缓存重载和失效
-├── gpu_rectangle.hpp / .cpp  # 上传 LTC 表与世界空间矩形光源列表
-├── rectangle_smoke.hpp / .cpp  # 核对 Cornell 光照和灯具编辑事务
-├── shadow_smoke.hpp / .cpp  # 离屏测量半影宽度、动态遮挡、多方向光与分屏过滤
+├── rectangle_shadow.hpp  # 分层灯面采样、立方体深度图与几何缓存的接口
+├── rectangle_shadow.cpp  # 分层灯面采样、立方体深度图与几何缓存
+├── temporal_transport.hpp  # SSGI 的空间滤波和按对照侧保存的时间历史的接口
+├── temporal_transport.cpp  # SSGI 的空间滤波和按对照侧保存的时间历史
+├── denoise_smoke.hpp  # 序列与离线降噪、跳帧、视口历史及切镜检查的接口
+├── denoise_smoke.cpp  # 序列与离线降噪、跳帧、视口历史及切镜检查
+├── screen_transport.hpp  # 屏幕空间输入附件、深度金字塔和传输绘制的接口
+├── screen_transport.cpp  # 屏幕空间输入附件、深度金字塔和传输绘制
+├── screen_transport_smoke.hpp  # 检查命中、遍历步数、合成及洞穴贴图的接口
+├── screen_transport_smoke.cpp  # 检查命中、遍历步数、合成及洞穴贴图
+├── prt_cache.hpp  # 烘焙缓存字节布局、校验与原子发布的接口
+├── prt_cache.cpp  # 烘焙缓存字节布局、校验与原子发布
+├── prt_panel.hpp  # 后台烘焙、进度取消与环境更新的接口
+├── prt_panel.cpp  # 后台烘焙、进度取消与环境更新
+├── prt_smoke.hpp  # 隐藏窗口比较顶点传输、缓存重载和失效的接口
+├── prt_smoke.cpp  # 隐藏窗口比较顶点传输、缓存重载和失效
+├── gpu_rectangle.hpp  # 上传 LTC 表与世界空间矩形光源列表的接口
+├── gpu_rectangle.cpp  # 上传 LTC 表与世界空间矩形光源列表
+├── rectangle_smoke.hpp  # 核对 Cornell 光照和灯具编辑事务的接口
+├── rectangle_smoke.cpp  # 核对 Cornell 光照和灯具编辑事务
+├── shadow_smoke.hpp  # 离屏测量半影宽度、动态遮挡、多方向光与分屏过滤的接口
+├── shadow_smoke.cpp  # 离屏测量半影宽度、动态遮挡、多方向光与分屏过滤
 ├── shadow_map.cpp  # 方向光阴影图数组的分配、布局与逐层渲染
 ├── shadow_map.hpp  # 接口：方向光阴影图数组的分配、布局与逐层渲染
 ├── ssao_pass.cpp  # 屏幕空间遮蔽、双边滤波和环境漫反射合成的 Vulkan pass
@@ -883,8 +921,6 @@ shaders/
 ```text
 scenes/
 ├── resource_catalog.json  # 内置目录及源文件、依赖项的 SHA-256
-├── catalog/               # 可追加模型和序列样本
-├── catalog_thumbs/        # 资源浏览器使用的小图
 ├── prt-studio.json  # 密集网格地面与两个彩色遮挡物
 ├── white-furnace.json  # 两排反照率为一的金属球用于白炉检验
 ├── soft-shadows.json  # 用两块不同离地高度的挡板比较半影
@@ -943,34 +979,79 @@ scenes/assets/textures/
 
 ### 目录样本
 
+目录：[scenes/catalog/](scenes/catalog/)。
+
 ```text
 scenes/catalog/
-├── prt_grid.obj    # 为顶点传输生成的地面网格
-├── cube.json       # 一米蓝色立方体，引用 scenes/assets/cube.obj
-├── motion.json     # 四帧的包内路径与 SHA-256
-└── motion_0.exr … motion_3.exr  # 固定相机下移动物体的线性 RGB
+├── cube.json  # 可追加的单位立方体
+├── motion.json  # 四帧样本的路径与校验值
+├── motion_0.exr  # 线性 RGB 低采样图，第 1 帧
+├── motion_1.exr  # 线性 RGB 低采样图，第 2 帧
+├── motion_2.exr  # 线性 RGB 低采样图，第 3 帧
+├── motion_3.exr  # 线性 RGB 低采样图，第 4 帧
+└── prt_grid.obj  # 顶点传输使用的细分地面
 ```
 
 `resource_catalog.cpp` 按用户选择校验主文件和依赖。`workbench_catalog.cpp` 把模型的纹理、材质、网格和物体作为一次编辑提交。`sequence_viewer.cpp` 按当前帧索引解码 EXR。
 
 ### 帧引导
 
+目录：[scenes/catalog/motion_guides/](scenes/catalog/motion_guides/)。
+
 ```text
 scenes/catalog/motion_guides/
-├── normal_N.exr / position_N.exr  # 世界法线和世界位置
-├── depth_N.exr / ID_N.exr         # 相机深度与物体编号
-├── matrix_N.mat                   # 物体、相机和投影矩阵
-└── reference_N.exr                # 对应相机的高采样参考
+├── ID_0.exr  # 物体编号，第 1 帧
+├── ID_1.exr  # 物体编号，第 2 帧
+├── ID_2.exr  # 物体编号，第 3 帧
+├── ID_3.exr  # 物体编号，第 4 帧
+├── depth_0.exr  # 线性深度，第 1 帧
+├── depth_1.exr  # 线性深度，第 2 帧
+├── depth_2.exr  # 线性深度，第 3 帧
+├── depth_3.exr  # 线性深度，第 4 帧
+├── matrix_0.mat  # 物体与相机矩阵，第 1 帧
+├── matrix_1.mat  # 物体与相机矩阵，第 2 帧
+├── matrix_2.mat  # 物体与相机矩阵，第 3 帧
+├── matrix_3.mat  # 物体与相机矩阵，第 4 帧
+├── normal_0.exr  # 世界法线，第 1 帧
+├── normal_1.exr  # 世界法线，第 2 帧
+├── normal_2.exr  # 世界法线，第 3 帧
+├── normal_3.exr  # 世界法线，第 4 帧
+├── position_0.exr  # 世界位置，第 1 帧
+├── position_1.exr  # 世界位置，第 2 帧
+├── position_2.exr  # 世界位置，第 3 帧
+├── position_3.exr  # 世界位置，第 4 帧
+├── reference_0.exr  # 128 spp 参考，第 1 帧
+├── reference_1.exr  # 128 spp 参考，第 2 帧
+├── reference_2.exr  # 128 spp 参考，第 3 帧
+└── reference_3.exr  # 128 spp 参考，第 4 帧
 ```
 
 `N` 为 0 至 3。播放器按选中的方法校验并读取引导文件，序列外的课程素材通过本地资源包索引定位。
 
 ### 目录缩略图
 
+目录：[scenes/catalog_thumbs/](scenes/catalog_thumbs/)。
+
 ```text
 scenes/catalog_thumbs/
-├── cornell.png … lightfield.png  # 内置场景，各文件名对应目录条目 ID
-└── cube.png                     # 单位立方体预览
+├── bounded_fog.png  # bounded_fog 的资源目录预览
+├── cornell.png  # cornell 的资源目录预览
+├── cornell_fog.png  # cornell_fog 的资源目录预览
+├── cube.png  # cube 的资源目录预览
+├── glass.png  # glass 的资源目录预览
+├── glass_caustic.png  # glass_caustic 的资源目录预览
+├── light_beam.png  # light_beam 的资源目录预览
+├── lightfield.png  # lightfield 的资源目录预览
+├── materials.png  # materials 的资源目录预览
+├── mirror_caustic.png  # mirror_caustic 的资源目录预览
+├── prt-studio.png  # prt-studio 的资源目录预览
+├── small_light.png  # small_light 的资源目录预览
+├── soft-shadows.png  # soft-shadows 的资源目录预览
+├── sss_marble.png  # sss_marble 的资源目录预览
+├── sss_marble_edge.png  # sss_marble_edge 的资源目录预览
+├── sss_wax.png  # sss_wax 的资源目录预览
+├── sss_wax_edge.png  # sss_wax_edge 的资源目录预览
+└── white-furnace.png  # white-furnace 的资源目录预览
 ```
 
 `prepare_course_catalog.py` 调用 MiniRender CLI 生成缩略图。`catalog_browser.cpp` 直接读取这些小图，滚动列表时无需打开模型或解码 EXR。
@@ -1080,6 +1161,7 @@ scripts/
 ├── generate_builtin_scenes.py  # 生成内置 JSON 场景及球体、透光孔、光场棋盘资产
 ├── install_macos.py  # 部署 Qt/Vulkan 运行库、验证签名与隐藏渲染、替换正式应用并清理旧包
 ├── prepare_parameter_probe.py  # 生成大网格场景，供参数响应和资源复用检查使用
+├── verify_games202.py  # 批量运行课程回归并记录实际 Vulkan 设备
 └── verify_gpu.py  # 启动隐藏窗口专项检查、设置验证层、管理超时并检查结果标记
 ```
 
@@ -1091,6 +1173,7 @@ scripts/
 
 ```text
 cmake/
+├── ltc_tables.hpp.in  # 从校验后的半精度数据生成 C++ 编译输入
 └── Dependencies.cmake  # 固定第三方版本与哈希，查找本机依赖或通过 FetchContent 获取
 ```
 
@@ -1116,6 +1199,7 @@ CMake Tools 提供编译参数，`c_cpp_properties.json` 保存编译数据库�
 
 ```text
 .github/workflows/
+├── windows-desktop.yml  # 验证 MSVC、Qt、Vulkan 着色器与核心测试
 └── core.yml  # macOS/Windows 的源码命名、安装器单元测试和 CPU 构建/CTest
 ```
 
@@ -1260,12 +1344,14 @@ docs/baseline/
 
 ### LTC 数据
 
+目录：[third_party/ltc/](third_party/ltc/)。
+
 ```text
 third_party/ltc/
-├── ltc_1.dds  # GGX 的逆变换系数
-├── ltc_2.dds  # 幅度与 Fresnel 拟合项
-├── LICENSE    # 表数据的再分发条款
-└── README.md  # 论文、上游版本与数据布局
+├── LICENSE  # 再分发许可和作者声明
+├── README.md  # 上游版本、文献与数据说明
+├── ltc_1.dds  # 逆矩阵的四个拟合系数
+└── ltc_2.dds  # 幅度与 Fresnel 拟合系数
 ```
 
 `cmake/ltc_tables.hpp.in` 将经过校验的半精度纹素编入核心库，桌面与 CLI 使用相同的数据。矩形发光几何的判断和积分可以从 `src/render/rectangle_light.cpp` 开始阅读。[数据来源](third_party/ltc/README.md)

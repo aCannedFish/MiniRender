@@ -18,6 +18,7 @@ struct Frame {
     File                               beauty;
     std::optional<std::array<File, 5>> guides;
     std::optional<File>                reference;
+    QString                            label;
 };
 enum class Kind { scene, model, sequence };
 

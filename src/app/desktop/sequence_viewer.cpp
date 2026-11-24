@@ -278,7 +278,7 @@ void SequenceViewer::build() {
 }
 
 void SequenceViewer::prepare_controls() {
-    filter_->addItem("原始 beauty", 0);
+    filter_->addItem(entry_.id == "course-energy-lut" ? "线性查找表" : "原始 beauty", 0);
     const bool guides = offline_scene_ || (!frames_.empty() && frames_.front().guides);
     if (guides) {
         filter_->addItem("联合双边", 1);
@@ -343,10 +343,11 @@ void SequenceViewer::request_frame() {
             auto out      = std::make_shared<ViewedFrame>();
             out->index    = index;
             out->method   = method;
-            out->original = same      ? previous->original
-                            : offline ? provider()
-                                      : std::make_shared<const Image>(
-                                            Image::read_exr(checked(root, frame.beauty, token)));
+            out->original = same ? previous->original
+                            : offline
+                                ? provider()
+                                : std::make_shared<const Image>(Image::read(
+                                      checked(root, frame.beauty, token), ColorEncoding::linear));
             if (!out->original) {
                 throw std::runtime_error("离线任务尚无可读图像");
             }
@@ -426,6 +427,9 @@ void SequenceViewer::request_frame() {
                             .arg(current_->after.height());
             if (current_->method == 3) {
                 text += QString("   ·   复用历史 %1 像素").arg(current_->accepted);
+            }
+            if (!frames_.isEmpty() && !frames_.at(current_->index).label.isEmpty()) {
+                text += "   ·   " + frames_.at(current_->index).label;
             }
             status_->setText(text);
         });

@@ -456,6 +456,20 @@ def builtin_entries(root, cli):
             recommended="ssgi",
         )
     )
+    result.append(
+        entry(
+            root,
+            "cornell-comparison",
+            "Cornell · 实时与离线对照",
+            "scene",
+            room,
+            thumbs / "cornell.png",
+            "左侧为动态矩形光与时域间接光，右侧用同一相机生成路径追踪参考。",
+            src,
+            own,
+            recommended="comparison",
+        )
+    )
     return result
 
 
@@ -544,6 +558,34 @@ def course_entries(root, cli, meta):
         )
     # 课程材质球采用半径为一的 OBJ；替换白炉环境后可观察有色反射。
     hw4 = fw / "HW4/homework4/homework4/assets"
+    lut = meta / "hw4-energy.json"
+    charts = []
+    for label, filename in (
+        ("方向反照率 E", "GGX_E_LUT.png"),
+        ("平均反照率 Eavg", "GGX_Eavg_LUT.png"),
+    ):
+        image = hw4 / "sphere" / filename
+        charts.append(
+            dict(
+                path=image.relative_to(root).as_posix(),
+                sha256=digest(image),
+                label=label,
+            )
+        )
+    write_json(lut, charts)
+    result.append(
+        entry(
+            root,
+            "course-energy-lut",
+            "HW4 · GGX 能量表",
+            "sequence",
+            lut,
+            hw4 / "sphere/GGX_E_LUT.png",
+            "按页查看原作业提供的 E 与 Eavg，数值按线性编码读取。",
+            "GAMES202 HW4",
+            rights,
+        )
+    )
     energy = meta / "HW4"
     energy.mkdir(exist_ok=True)
     mesh = export_model(meta, "HW4-sphere", hw4 / "sphere/sphere.obj")
