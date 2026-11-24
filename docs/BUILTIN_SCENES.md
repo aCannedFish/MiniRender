@@ -58,7 +58,7 @@ cmake --preset macos-desktop-release
 cmake --build --preset macos-desktop-release
 ctest --preset macos-desktop-release --output-on-failure
 python3 scripts/verify_gpu.py \
-  build/macos-desktop-release/src/app/desktop/minirender_desktop.app \
+  build/macos-desktop-release/src/app/desktop/RenderBox.app \
   --scene scenes/studio.json --presets-check --sync-validation \
   --output outputs/presets/ui --timeout 180
 ```

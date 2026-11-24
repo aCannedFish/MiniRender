@@ -75,7 +75,7 @@ void add_comparison_controls(QFormLayout& layout, QComboBox& mode, VulkanViewpor
             workbench_detail::run_background(
                 panel,
                 [dir, a, b, raw_a = std::move(raw_a), raw_b = std::move(raw_b)] {
-                    QTemporaryDir folder(dir + "/MiniRender-AB-XXXXXX");
+                    QTemporaryDir folder(dir + "/RenderBox-AB-XXXXXX");
                     if (!folder.isValid() || !a.save(folder.filePath("A.png")) ||
                         !b.save(folder.filePath("B.png"))) {
                         throw std::runtime_error("无法写出对照图像");

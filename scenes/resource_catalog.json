@@ -9,8 +9,8 @@
       "sha256": "5afb912551daa5996a6f98d33361e4984ee5d396530df5933b9297d904268920",
       "thumbnail": "catalog_thumbs/cornell.png",
       "description": "",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "builtin": true,
       "dependencies": [
         {
@@ -35,8 +35,8 @@
       "sha256": "48461e46bc35c75838272f74d67b74985a73fb022b9018ecc9897f4cd0ef7856",
       "thumbnail": "catalog_thumbs/glass.png",
       "description": "",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "builtin": true,
       "dependencies": [
         {
@@ -61,8 +61,8 @@
       "sha256": "ee34caf213e9959a70a2a2dd64deb1b807c810fd4326a219dc38de156d8df1b0",
       "thumbnail": "catalog_thumbs/materials.png",
       "description": "",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "builtin": true,
       "dependencies": [
         {
@@ -87,8 +87,8 @@
       "sha256": "58e5ddd5fbe3c27e636e157c89435679633f831559e38d22ea43c70fa7524456",
       "thumbnail": "catalog_thumbs/small_light.png",
       "description": "",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "builtin": true,
       "dependencies": [
         {
@@ -113,8 +113,8 @@
       "sha256": "071fa5eba038be964691e4f787f0f239e72bbe0ff37fa54feb493f9e03f5f9ae",
       "thumbnail": "catalog_thumbs/bounded_fog.png",
       "description": "",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "builtin": true,
       "dependencies": [
         {
@@ -135,8 +135,8 @@
       "sha256": "eb6dd3cc106b9967cfec116738234b9e0eabfa581328a0089c0b29e59f983eb0",
       "thumbnail": "catalog_thumbs/cornell_fog.png",
       "description": "",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "builtin": true,
       "dependencies": [
         {
@@ -161,8 +161,8 @@
       "sha256": "a94d1215220f56e7cb9fb3029a03915043a67a4183aba5afcf2e7615088dda5e",
       "thumbnail": "catalog_thumbs/light_beam.png",
       "description": "",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "builtin": true,
       "dependencies": [
         {
@@ -187,8 +187,8 @@
       "sha256": "48461e46bc35c75838272f74d67b74985a73fb022b9018ecc9897f4cd0ef7856",
       "thumbnail": "catalog_thumbs/glass_caustic.png",
       "description": "",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "builtin": true,
       "dependencies": [
         {
@@ -213,8 +213,8 @@
       "sha256": "db76826f1558da5a403d17e7eb2b8b654d82cb6116fda07dbf336f0d6955e642",
       "thumbnail": "catalog_thumbs/mirror_caustic.png",
       "description": "",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "builtin": true,
       "dependencies": [
         {
@@ -239,8 +239,8 @@
       "sha256": "674509bb5288d77a5d29edc9c71cde4fa997778e9f84328a157f44eff636071d",
       "thumbnail": "catalog_thumbs/sss_marble.png",
       "description": "",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "builtin": true,
       "dependencies": [
         {
@@ -265,8 +265,8 @@
       "sha256": "794c2209d319d4e40236ca81bfc20a54de176dc8d79f1b1d4bbdfde4ba801cd1",
       "thumbnail": "catalog_thumbs/sss_wax.png",
       "description": "",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "builtin": true,
       "dependencies": [
         {
@@ -291,8 +291,8 @@
       "sha256": "0955c9843c0388e7b40c5b2db83378e1425f692672ce8d40a0ad274b289f8101",
       "thumbnail": "catalog_thumbs/sss_marble_edge.png",
       "description": "",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "builtin": true,
       "dependencies": [
         {
@@ -317,8 +317,8 @@
       "sha256": "ef4886fbac3024ed4436530acb701a29b2c09ea54a646b0bb12692f12b735d3a",
       "thumbnail": "catalog_thumbs/sss_wax_edge.png",
       "description": "",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "builtin": true,
       "dependencies": [
         {
@@ -343,8 +343,8 @@
       "sha256": "74e07d947bd80665a8510b54b10625c63655d0442b23c2c424b8ed9fa02e6d7e",
       "thumbnail": "catalog_thumbs/lightfield.png",
       "description": "",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "builtin": true,
       "dependencies": [
         {
@@ -365,8 +365,8 @@
       "sha256": "5802803776601c4b6940682fbc6866c39f969b24ee3a4a9af019f7138b6e3dae",
       "thumbnail": "catalog_thumbs/cube.png",
       "description": "追加 1 米的可编辑立方体。",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "dependencies": [
         {
           "path": "assets/cube.obj",
@@ -420,8 +420,8 @@
       "sha256": "afd22c3f45e174ea2ff148ced03b18fd084da96b11635555b4a59c8d91a7e877",
       "thumbnail": "catalog_thumbs/cube.png",
       "description": "逐帧查看自建的低采样 EXR。",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源"
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源"
     },
     {
       "id": "shadow-plates",
@@ -431,8 +431,8 @@
       "sha256": "4d4b9bd49ab3f92fd8c2c7a7bbc9df9ae31e29a95788877d5a4e3c0ca380acb9",
       "thumbnail": "catalog_thumbs/soft-shadows.png",
       "description": "两块离地高度不同的挡板，用于比较接触硬化与固定半径滤波。",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "recommended": "pcss",
       "dependencies": [
         {
@@ -453,8 +453,8 @@
       "sha256": "8498029c359992045ce6e1fd80769a31ec3b5e73b75c2fdb9157f79f4127b1b3",
       "thumbnail": "catalog_thumbs/white-furnace.png",
       "description": "上排启用多次散射补偿，下排为单次反射。三列粗糙度从 0.25 增至 1。",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "recommended": "energy",
       "dependencies": [
         {
@@ -471,8 +471,8 @@
       "sha256": "13c490647789dfcb7b7e25a86d9c5eecc71d69fa02237bb271aae4a638f278ff",
       "thumbnail": "catalog_thumbs/prt-studio.png",
       "description": "网格地面上的静态软遮挡与红、蓝物体的间接反射。",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "recommended": "prt",
       "dependencies": [
         {
@@ -493,8 +493,8 @@
       "sha256": "5afb912551daa5996a6f98d33361e4984ee5d396530df5933b9297d904268920",
       "thumbnail": "catalog_thumbs/cornell.png",
       "description": "红绿墙和方块，用同一相机比较直接与屏幕间接光。",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "recommended": "ssgi",
       "dependencies": [
         {
@@ -519,8 +519,8 @@
       "sha256": "5afb912551daa5996a6f98d33361e4984ee5d396530df5933b9297d904268920",
       "thumbnail": "catalog_thumbs/cornell.png",
       "description": "左侧为动态矩形光与时域间接光，右侧用同一相机生成路径追踪参考。",
-      "source": "MiniRender",
-      "rights": "MiniRender 自建资源",
+      "source": "RenderBox",
+      "rights": "RenderBox 自建资源",
       "recommended": "comparison",
       "dependencies": [
         {

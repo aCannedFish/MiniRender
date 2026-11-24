@@ -55,11 +55,11 @@ SSS 需要闭合、连通、朝外绕序的网格。拓扑校验在后台准备�
 cmake --preset macos-desktop-release
 cmake --build --preset macos-desktop-release --parallel 4
 python3 scripts/verify_gpu.py \
-  build/macos-desktop-release/src/app/desktop/minirender_desktop.app \
+  build/macos-desktop-release/src/app/desktop/RenderBox.app \
   --scene scenes/studio.json --subsurface-check --timing-only \
   --output outputs/a7.6/ui --timeout 300
 python3 scripts/verify_gpu.py \
-  build/macos-desktop-release/src/app/desktop/minirender_desktop.app \
+  build/macos-desktop-release/src/app/desktop/RenderBox.app \
   --scene scenes/studio.json --presets-check --sync-validation \
   --output outputs/a7.6/presets --timeout 300
 ```

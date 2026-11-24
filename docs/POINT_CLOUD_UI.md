@@ -68,11 +68,11 @@
 cmake --preset macos-desktop-release
 cmake --build --preset macos-desktop-release
 python3 scripts/verify_gpu.py \
-  build/macos-desktop-release/src/app/desktop/minirender_desktop.app \
+  build/macos-desktop-release/src/app/desktop/RenderBox.app \
   --scene scenes/studio.json --points-check --sync-validation \
   --output outputs/a5.2/full --timeout 500
 python3 scripts/verify_gpu.py \
-  build/macos-desktop-release/src/app/desktop/minirender_desktop.app \
+  build/macos-desktop-release/src/app/desktop/RenderBox.app \
   --scene scenes/studio.json --points-check --timing-only \
   --output outputs/a5.2/timing --timeout 500
 ```

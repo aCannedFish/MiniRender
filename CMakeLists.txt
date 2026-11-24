@@ -1,7 +1,7 @@
 # 构建 CPU 核心、命令行、示例与测试，并按选项接入 Qt/Vulkan 桌面目标。
 
 cmake_minimum_required(VERSION 3.24)
-project(MiniRender VERSION 0.1.0 LANGUAGES C CXX)
+project(RenderBox VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

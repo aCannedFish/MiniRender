@@ -144,7 +144,7 @@ void Workbench::apply_builtin_settings(const BuiltinScene& preset) {
         lightfield_panel_->set_capture_settings(settings);
         panels_->setCurrentIndex(11);
     }
-    setWindowTitle("MiniRender — " + preset.name + "（示例副本）");
+    setWindowTitle(QCoreApplication::applicationName() + " — " + preset.name + "（示例副本）");
     statusBar()->showMessage(preset.name + " 已覆盖导入，当前为原色预览；可编辑后开始离线渲染。",
                              12000);
 }
@@ -187,14 +187,14 @@ void Workbench::install_scene(minirender::SceneDocument document, const QString&
     selected_id_.clear();
     diagnostic_ = false;
     refresh();
-    setWindowTitle("MiniRender — " + QFileInfo(path).fileName() +
+    setWindowTitle(QCoreApplication::applicationName() + " — " + QFileInfo(path).fileName() +
                    (scene_path_.isEmpty() ? "（示例副本）" : ""));
 }
 
 void Workbench::save_scene_file(const QString& path) {
     minirender::save_scene(editor_.document(), native_path(path));
     scene_path_ = path;
-    setWindowTitle("MiniRender — " + QFileInfo(path).fileName());
+    setWindowTitle(QCoreApplication::applicationName() + " — " + QFileInfo(path).fileName());
 }
 
 void Workbench::import_texture() {

@@ -94,19 +94,30 @@ qt_add_executable(minirender_desktop
     workbench_internal.hpp workbench_widgets.cpp workbench_properties.cpp workbench_assets.cpp workbench_geometry.cpp
     scene_smoke.cpp scene_smoke.hpp texture_smoke.cpp texture_smoke.hpp interaction_smoke.cpp interaction_smoke.hpp
     parameter_smoke.cpp parameter_smoke.hpp wire_smoke.cpp wire_smoke.hpp)
-if(APPLE)
+set_target_properties(minirender_desktop PROPERTIES OUTPUT_NAME "${PROJECT_NAME}")
+if(WIN32)
+    enable_language(RC)
+    configure_file(icons/renderbox.rc.in renderbox.rc @ONLY)
+    set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/renderbox.rc" PROPERTIES
+        OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/icons/renderbox.ico")
+    target_sources(minirender_desktop PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/renderbox.rc")
+elseif(APPLE)
+    set_source_files_properties(icons/renderbox.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    target_sources(minirender_desktop PRIVATE icons/renderbox.icns)
     enable_language(OBJCXX)
     target_sources(minirender_desktop PRIVATE regression_activity.mm regression_activity.hpp)
     set_source_files_properties(regression_activity.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     set_property(TARGET minirender_desktop PROPERTY OBJCXX_STANDARD 20)
     set_target_properties(minirender_desktop PROPERTIES
         MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_ICON_FILE "renderbox.icns"
+        # 保留已发布应用的标识，安装器和 Launch Services 继续将更名视为同一应用的更新。
         MACOSX_BUNDLE_GUI_IDENTIFIER "org.minirender.desktop"
-        MACOSX_BUNDLE_BUNDLE_NAME "MiniRender")
+        MACOSX_BUNDLE_BUNDLE_NAME "${PROJECT_NAME}")
 endif()
 qt_add_resources(minirender_desktop diagnostic_shaders
     PREFIX "/shaders" BASE "${CMAKE_CURRENT_BINARY_DIR}" FILES ${shader_outputs})
-qt_add_resources(minirender_desktop editor_styles PREFIX "/editor" FILES editor.qss icons/down.xpm icons/up.xpm icons/check.xpm)
+qt_add_resources(minirender_desktop editor_styles PREFIX "/editor" FILES editor.qss icons/renderbox.png icons/down.xpm icons/up.xpm icons/check.xpm)
 target_link_libraries(minirender_desktop PRIVATE
     minirender_core minirender_warnings Qt6::Widgets Qt6::Concurrent Vulkan::Vulkan)
 

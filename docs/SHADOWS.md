@@ -29,8 +29,8 @@ CPU 测试验证普通、垂直和水平方向光的投影都覆盖场景几何�
 真实 GPU 检查在“相机”面板切换方向光阴影，比较打开/关闭时的图像。多光源测试额外将第一盏灯强度设为零，用 CPU 三角形阴影射线核对第二层深度图。只比较相机可见的地面点，并剔除遮挡边界附近样本，避免二值射线与 PCF 覆盖率产生不合理比较。
 
 ```sh
-python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirender_desktop.app --scene scenes/studio.json --output outputs/a1.3
-python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirender_desktop.app --scene scenes/studio-two-lights.json --output outputs/a1.3-multi
+python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/RenderBox.app --scene scenes/studio.json --output outputs/a1.3
+python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/RenderBox.app --scene scenes/studio-two-lights.json --output outputs/a1.3-multi
 ```
 
 本机记录：第二盏灯 127/127 遮挡点、982/982 受光点与几何射线一致，74,860 像素因阴影变暗。单灯和多灯测试均为 0 个 Vulkan Validation 错误。

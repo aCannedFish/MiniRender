@@ -2,6 +2,7 @@
 
 #include "geometry_panel.hpp"
 #include "workbench_internal.hpp"
+#include <QCoreApplication>
 #include <QFileInfo>
 #include <algorithm>
 #include <minirender/assets/scene_io.hpp>
@@ -177,8 +178,8 @@ void Workbench::save_scene_async(const QString& path) {
                                         if (generation == document_generation_) {
                                             scene_path_        = path;
                                             const bool changed = revision != document_revision_;
-                                            setWindowTitle("MiniRender — " +
-                                                           QFileInfo(path).fileName() +
+                                            setWindowTitle(QCoreApplication::applicationName() +
+                                                           " — " + QFileInfo(path).fileName() +
                                                            (changed ? " *" : ""));
                                             if (changed) {
                                                 geometry_notice_extra_ = " | 当前还有未保存修改";

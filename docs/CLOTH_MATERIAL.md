@@ -85,7 +85,7 @@ GPU 与界面回归：
 
 ```sh
 python3 -B scripts/verify_gpu.py \
-  build/macos-desktop-release/src/app/desktop/minirender_desktop.app \
+  build/macos-desktop-release/src/app/desktop/RenderBox.app \
   --scene scenes/studio.json --cloth-check --sync-validation \
   --output outputs/a6.2/validation --timeout 240
 ```

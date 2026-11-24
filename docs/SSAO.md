@@ -89,7 +89,7 @@ CPU 几何遮挡参考使用半径内的真实遮挡射线。它与 SSAO 的可�
 ```sh
 cmake --build --preset macos-desktop-debug
 ctest --preset macos-desktop-debug
-python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirender_desktop.app --scene scenes/studio.json --ssao-check --sync-validation --output outputs/ssao --timeout 65
+python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/RenderBox.app --scene scenes/studio.json --ssao-check --sync-validation --output outputs/ssao --timeout 65
 ```
 
 回归使用无直接光的灰色场景，逐像素对照 AO 和线性 HDR 合成，检查背景、接触区域与开放平面。它还检查滤波后的相邻像素差、直接光/自发光/金属环境反射隔离、线框 HDR、资源复用、相机变化、缩放和启用 AO 时的 Qt 拖拽。

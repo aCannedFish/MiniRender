@@ -1,6 +1,8 @@
-# MiniRender
+# RenderBox
 
-MiniRender 是用于学习图形学的小型渲染引擎，使用 C++20、Qt Widgets 和 Vulkan，提供交互式场景编辑、实时预览及 CPU 离线渲染。几何处理、布料模拟和光场工具共用场景与资产系统，生成的模型可以继续编辑、保存和渲染。
+<img src="src/app/desktop/icons/renderbox.png" width="96" height="96" alt="RenderBox 应用图标">
+
+RenderBox 是用于学习图形学的小型渲染引擎，使用 C++20、Qt Widgets 和 Vulkan，提供交互式场景编辑、实时预览及 CPU 离线渲染。几何处理、布料模拟和光场工具共用场景与资产系统，生成的模型可以继续编辑、保存和渲染。
 
 ## 功能
 
@@ -94,8 +96,8 @@ GLM、Catch2、JSON、OBJ 和图像解析依赖由 CMake 管理，缺失时下�
 先获取源码，以下命令均在仓库根目录执行：
 
 ```sh
-git clone https://github.com/aCannedFish/MiniRender.git
-cd MiniRender
+git clone https://github.com/aCannedFish/RenderBox.git
+cd RenderBox
 ```
 
 ## macOS
@@ -115,14 +117,14 @@ cmake --build --preset macos-desktop-release --parallel 4
 ctest --preset macos-desktop-release --output-on-failure
 ```
 
-保存场景并退出正在运行的 MiniRender，然后安装：
+保存场景并退出正在运行的 RenderBox，然后安装：
 
 ```sh
 python3 scripts/install_macos.py
-open /Applications/MiniRender.app
+open /Applications/RenderBox.app
 ```
 
-安装器打包 Qt 和 Vulkan 运行库及内置场景，通过隐藏窗口检查后更新 `/Applications/MiniRender.app`，并清理同应用标识的旧安装包和工作树构建包。后续更新重复上述配置、构建和安装命令。
+安装器打包 Qt 和 Vulkan 运行库及内置场景，通过隐藏窗口检查后更新 `/Applications/RenderBox.app`，并清理同应用标识的旧安装包和工作树构建包。后续更新重复上述配置、构建和安装命令。
 
 只使用 CPU 命令行时，选择 core preset：
 
@@ -151,7 +153,7 @@ $env:CMAKE_PREFIX_PATH = $qtPrefix
 $env:PATH = "$qtPrefix/bin;$env:PATH"
 cmake --preset windows-desktop-release
 cmake --build --preset windows-desktop-release --parallel 4
-.\build\windows-desktop-release\src\app\desktop\minirender_desktop.exe
+.\build\windows-desktop-release\src\app\desktop\RenderBox.exe
 ```
 
 桌面依赖配置见[构建文档](docs/BUILD.md#windows)，目标设备验证和安装包进度见 [PLAN.md](PLAN.md#nvidia-阶段)。
@@ -185,7 +187,7 @@ CLI 还提供场景检查、法线图、光场采集与重聚焦命令，可通�
 在安装 Vulkan SDK、Qt 和 NVIDIA 驱动的 Windows 机器上完成桌面构建后，在仓库根目录运行以下命令。脚本按顺序使用隐藏窗口检查各作业与 Cornell 综合场景，输出 `results.json`、分项日志和实际渲染图。已准备好课程包时，添加 `--course-root 课程目录` 可同时复验 Mary、Bunny、洞穴和 HW5。GitHub 的 Windows desktop 工作流可独立检查 MSVC、Qt、SPIR-V 与 CPU 测试。
 
 ```powershell
-python scripts/verify_games202.py .\build\windows-desktop-release\src\app\desktop\minirender_desktop.exe --require-nvidia --output outputs/windows-games202
+python scripts/verify_games202.py .\build\windows-desktop-release\src\app\desktop\RenderBox.exe --require-nvidia --output outputs/windows-games202
 ```
 
 ### 开发调试
@@ -195,7 +197,7 @@ VS Code 打开仓库根目录，安装推荐扩展后选择 `macos-desktop-debug
 GPU 回归默认使用隐藏窗口，例如验证原色预览轮廓：
 
 ```sh
-python3 scripts/verify_gpu.py /Applications/MiniRender.app --scene scenes/studio.json --outline-check --sync-validation --output outputs/outline --timeout 240
+python3 scripts/verify_gpu.py /Applications/RenderBox.app --scene scenes/studio.json --outline-check --sync-validation --output outputs/outline --timeout 240
 ```
 
 ## 文档
@@ -219,7 +221,7 @@ python3 scripts/verify_gpu.py /Applications/MiniRender.app --scene scenes/studio
 ```mermaid
 flowchart TB
     CLI[命令行 minirender_cli] --> CORE[minirender_core]
-    UI[Qt 桌面 minirender_desktop] --> CORE
+    UI[RenderBox 桌面工作台] --> CORE
     EX[示例与核心测试] --> CORE
     UI --> QT[Qt Widgets / Concurrent]
     UI --> VK[Vulkan / MoltenVK]
@@ -856,16 +858,26 @@ src/app/desktop/
 
 #### 图形资源
 
-目录：[src/app/desktop/icons/](src/app/desktop/icons/)。提供复选标记和数值/下拉箭头。
+目录：[src/app/desktop/icons/](src/app/desktop/icons/)。保存应用图标、复选标记和数值/下拉箭头。
 
 ```text
 src/app/desktop/icons/
+├── renderbox.png  # Qt 窗口使用的应用图标母图
+├── renderbox.icns  # Finder 和 Dock 使用的多尺寸图标
+├── renderbox.ico  # Windows 桌面应用的多尺寸图标
+├── renderbox.rc.in  # 将图标、应用名与版本写入 Windows 可执行文件
 ├── check.xpm  # 复选标记图形
 ├── down.xpm  # 下拉与数值减小箭头
 └── up.xpm  # 数值增大箭头
 ```
 
-样式表引用这些 XPM 文件，桌面 CMake 将其嵌入 Qt 资源。工具栏线形图标由 `editor_theme.cpp` 的 QPainter 绘制，因此这一目录只保存样式需要的几个图形。
+样式表引用这些 XPM 文件，桌面 CMake 将其嵌入 Qt 资源。工具栏线形图标由 `editor_theme.cpp` 的 QPainter 绘制，应用图标以 Cornell Box 为主题，Qt、macOS 和 Windows 从本目录读取各自的格式。
+
+<details><summary>图标母图的 ImageGen 提示词</summary>
+
+为桌面渲染器 RenderBox 设计一个正方形应用图标。深墨色圆角方形底板上是一间打开正面的微型 Cornell Box，左墙朱红、右墙青绿，一块象牙白立方体被顶部小矩形面光源照亮。略带俯视的三分之四视角，几何轮廓清晰，克制的柔和反射和接触阴影，像精密制作的建筑模型。构图紧凑居中，主要形状在 32 像素仍然清楚。底板外侧透明，留少量均匀边距，不加字母、文字或水印。
+
+</details>
 
 ### 着色器
 
@@ -1066,7 +1078,7 @@ scenes/catalog_thumbs/
 └── white-furnace.png  # white-furnace 的资源目录预览
 ```
 
-`prepare_course_catalog.py` 调用 MiniRender CLI 生成缩略图。`catalog_browser.cpp` 直接读取这些小图，滚动列表时无需打开模型或解码 EXR。
+`prepare_course_catalog.py` 调用 RenderBox CLI 生成缩略图。`catalog_browser.cpp` 直接读取这些小图，滚动列表时无需打开模型或解码 EXR。
 
 ### 示例程序
 

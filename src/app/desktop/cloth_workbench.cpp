@@ -12,6 +12,7 @@
 
 #include <QAction>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QStatusBar>
 #include <QTreeWidget>
 
@@ -92,7 +93,7 @@ void Workbench::create_cloth_demo(int kind) {
     selected_id_  = "cloth";
     refresh();
     show_cloth_preview();
-    setWindowTitle("MiniRender — 布料示例");
+    setWindowTitle(QCoreApplication::applicationName() + " — 布料示例");
     statusBar()->showMessage("布料示例已载入，可播放、编辑物体或冻结当前帧。", 8000);
 }
 

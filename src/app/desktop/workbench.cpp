@@ -19,6 +19,7 @@
 #include <QActionGroup>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QDockWidget>
 #include <QFileDialog>
 #include <QLabel>
@@ -44,7 +45,7 @@
 using namespace workbench_detail;
 
 Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(diagnostic) {
-    setWindowTitle("MiniRender");
+    setWindowTitle(QCoreApplication::applicationName());
     viewport_ = new VulkanViewport;
     viewport_->setVulkanInstance(instance);
     auto* container = QWidget::createWindowContainer(viewport_, this);
@@ -62,7 +63,7 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     toolbar->setMovable(false);
     toolbar->setIconSize(QSize(16, 16));
     toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    auto* brand = new QLabel("MiniRender", toolbar);
+    auto* brand = new QLabel(QCoreApplication::applicationName(), toolbar);
     brand->setProperty("role", "brand");
     toolbar->addWidget(brand);
     toolbar->addSeparator();

@@ -38,7 +38,7 @@
 ```sh
 cmake --preset macos-desktop-release
 cmake --build --preset macos-desktop-release --parallel 4
-python3 scripts/verify_gpu.py build/macos-desktop-release/src/app/desktop/minirender_desktop.app --scene scenes/studio.json --theme-check --sync-validation --output outputs/editor-theme --timeout 120
+python3 scripts/verify_gpu.py build/macos-desktop-release/src/app/desktop/RenderBox.app --scene scenes/studio.json --theme-check --sync-validation --output outputs/editor-theme --timeout 120
 ```
 
 检查默认使用隐藏窗口。另设 `QT_SCALE_FACTOR=1.5` 可检查分数缩放下的布局；在本机 Retina 屏上对应 3× 像素密度。

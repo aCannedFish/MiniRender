@@ -62,7 +62,7 @@ CPU 在 double 中将逆变换和包围盒移到相机原点，再转为 float �
 cmake --preset macos-desktop-release
 cmake --build --preset macos-desktop-release --parallel 3
 python3 -B scripts/verify_gpu.py \
-  build/macos-desktop-release/src/app/desktop/minirender_desktop.app \
+  build/macos-desktop-release/src/app/desktop/RenderBox.app \
   --scene scenes/studio.json --sdf-check --sync-validation \
   --output outputs/a5.3/validation --timeout 240
 ```

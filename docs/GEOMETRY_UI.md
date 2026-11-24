@@ -81,7 +81,7 @@ flowchart LR
 ```sh
 cmake --build --preset macos-desktop-debug
 python3 scripts/verify_gpu.py \
-  build/macos-desktop-debug/src/app/desktop/minirender_desktop.app \
+  build/macos-desktop-debug/src/app/desktop/RenderBox.app \
   --scene scenes/studio.json --geometry-check \
   --output outputs/a4.3/debug --sync-validation --timeout 400
 ```
@@ -90,7 +90,7 @@ python3 scripts/verify_gpu.py \
 
 ```sh
 python3 scripts/verify_gpu.py \
-  build/macos-desktop-debug/src/app/desktop/minirender_desktop.app \
+  build/macos-desktop-debug/src/app/desktop/RenderBox.app \
   --scene scenes/studio.json --geometry-check --timing-only \
   --output outputs/a4.3/timing --timeout 300
 ```

@@ -30,7 +30,7 @@ void write_obj_content(const MeshData& mesh, std::ostream& stream, CancellationT
     report(0);
     stream.imbue(std::locale::classic());
     stream << std::setprecision(std::numeric_limits<float>::max_digits10);
-    stream << "# MiniRender triangle mesh; shared positions and face-varying attributes\n";
+    stream << "# RenderBox triangle mesh; shared positions and face-varying attributes\n";
     for (const auto p : mesh.positions) {
         stream << "v " << p.x << ' ' << p.y << ' ' << p.z << '\n';
         advance();

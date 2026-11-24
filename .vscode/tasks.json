@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "MiniRender: build active CMake preset",
+      "label": "RenderBox: build active CMake preset",
       "type": "process",
       "command": "cmake",
       "args": ["--build", "${command:cmake.buildDirectory}"],
@@ -10,7 +10,7 @@
       "problemMatcher": ["$gcc", "$msCompile"]
     },
     {
-      "label": "MiniRender: test active CMake preset",
+      "label": "RenderBox: test active CMake preset",
       "type": "process",
       "command": "ctest",
       "args": ["--test-dir", "${command:cmake.buildDirectory}", "--output-on-failure"],

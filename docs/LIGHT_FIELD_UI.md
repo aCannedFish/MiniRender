@@ -38,7 +38,7 @@ EXR 保留当前完整线性图，PNG 使用点击导出时的曝光和显示变
 cmake --preset macos-desktop-release
 cmake --build --preset macos-desktop-release --parallel 4
 python3 scripts/verify_gpu.py \
-  build/macos-desktop-release/src/app/desktop/minirender_desktop.app \
+  build/macos-desktop-release/src/app/desktop/RenderBox.app \
   --scene scenes/studio.json --lightfield-check --timing-only \
   --output outputs/a8.2/ui --timeout 300
 ```

@@ -1,16 +1,16 @@
-# MiniRender 计划
+# RenderBox 计划
 
 更新日期：2026-11-24
 
 ## 目标
 
-MiniRender 是面向图形学学习的小型渲染引擎，集成 GAMES101 大作业选定的 12 个选题。通过 Qt 桌面界面加载场景、处理模型、模拟布料、调整材质与光照、切换渲染算法并比较结果。
+RenderBox 是面向图形学学习的小型渲染引擎，集成 GAMES101 大作业选定的 12 个选题。通过 Qt 桌面界面加载场景、处理模型、模拟布料、调整材质与光照、切换渲染算法并比较结果。
 
 先在当前 Apple M3、24 GB 内存的 Mac 上完成可以实际运行与验证的功能，再切换到 Windows + NVIDIA GPU 完成 OptiX、目标平台适配和最终验收。CPU 算法、Qt 界面与 Vulkan 渲染代码保持同一实现，不维护按平台分叉的算法。
 
 代码可读性与功能一起验收。每个选题交付实现代码、最小场景、测试、参考来源及学习笔记。核心算法自行实现，基础设施允许使用第三方库。项目按长期学习项目推进，不预设缺少工作时间依据的截止日期。
 
-唯一远端仓库：<https://github.com/aCannedFish/MiniRender>。本文件记录目标与验收要求，表格中的“计划”不代表已经实现或测试通过。
+唯一远端仓库：<https://github.com/aCannedFish/RenderBox>。本文件记录目标与验收要求，表格中的“计划”不代表已经实现或测试通过。
 
 ## 平台划分
 
@@ -302,7 +302,7 @@ Windows 阶段不重新组织场景格式和算法模块。确需平台修复时
 
 课程模型和图像保存在用户选择的目录。随应用发布的示例使用项目自建资产及附有许可说明的经典模型。新增算法的公共参数和 CPU 参考放在独立模块，GPU 资源由渲染通道管理。Qt 将逐物体参数放入检查器，全局光照、调试视图和滤波放入渲染设置。后台烘焙、读取和滤波报告进度，取消后保留最近一次完整结果。
 
-各阶段的实现与审查记录见 [资源目录](https://github.com/aCannedFish/MiniRender/pull/52)、[教学预览](https://github.com/aCannedFish/MiniRender/pull/53)、[方向光阴影](https://github.com/aCannedFish/MiniRender/pull/54)、[金属补偿](https://github.com/aCannedFish/MiniRender/pull/55)、[矩形面积光](https://github.com/aCannedFish/MiniRender/pull/56)、[面积光阴影](https://github.com/aCannedFish/MiniRender/pull/57)、[PRT](https://github.com/aCannedFish/MiniRender/pull/58)、[屏幕间接光](https://github.com/aCannedFish/MiniRender/pull/59)、[降噪](https://github.com/aCannedFish/MiniRender/pull/60) 和 [综合验收](https://github.com/aCannedFish/MiniRender/pull/61)。
+各阶段的实现与审查记录见 [资源目录](https://github.com/aCannedFish/RenderBox/pull/52)、[教学预览](https://github.com/aCannedFish/RenderBox/pull/53)、[方向光阴影](https://github.com/aCannedFish/RenderBox/pull/54)、[金属补偿](https://github.com/aCannedFish/RenderBox/pull/55)、[矩形面积光](https://github.com/aCannedFish/RenderBox/pull/56)、[面积光阴影](https://github.com/aCannedFish/RenderBox/pull/57)、[PRT](https://github.com/aCannedFish/RenderBox/pull/58)、[屏幕间接光](https://github.com/aCannedFish/RenderBox/pull/59)、[降噪](https://github.com/aCannedFish/RenderBox/pull/60) 和 [综合验收](https://github.com/aCannedFish/RenderBox/pull/61)。
 
 ### 快速导入
 
@@ -316,6 +316,10 @@ Windows 阶段不重新组织场景格式和算法模块。确需平台修复时
 | Cornell Box | 统一相机的 CPU 参考为 82×96、8 spp。与独立路径追踪积分逐像素一致，3172 个视口采样点的最大 sRGB 显示误差为 0.00325 以内。编辑灯具后旧参考失效，场景文件夹搬移后重载通过。 |
 | HW5 | box 全部 20 帧和 pink-room 全部 80 帧完成。自建四帧以 128 spp 为参考，692 个前景样本的 RGB 平方误差和从 18.408 降至 1.359。 |
 | Windows / NVIDIA | Release 构建采用 Qt 6、MSVC 与 Vulkan。目标设备运行 `scripts/verify_games202.py --require-nvidia`，结果以日志中实际报告的 NVIDIA 设备为准。 |
+
+### 应用标识
+
+桌面应用采用 RenderBox 名称。Qt 窗口、macOS 应用包与 Windows 可执行文件共用 Cornell Box 图标。macOS 沿用原应用标识以识别旧安装，课程目录会读取旧设置域中的挂载路径。
 
 ## 工程维护
 
@@ -372,7 +376,7 @@ README.md 介绍项目功能、使用方式和构建安装步骤。开发计划�
 
 不要提交构建产物、用户 preset、Qt/Vulkan/CUDA/OptiX SDK、机器绝对路径、临时日志、大型模型或长视频。小型可再分发测试资产可入库；大型资产记录来源、许可、下载方式和校验值。仓库不发布本机 PDF 或个人路径。
 
-macOS 每次桌面更新后运行 `scripts/install_macos.py`，固定替换 `/Applications/MiniRender.app`，清理同 bundle ID 的旧安装包和工作树构建包。Windows 发布阶段沿用只保留最新版的要求。
+macOS 每次桌面更新后运行 `scripts/install_macos.py`，固定替换 `/Applications/RenderBox.app`，清理同 bundle ID 的旧安装包和工作树构建包。Windows 发布阶段沿用只保留最新版的要求。
 
 ### 持续集成
 

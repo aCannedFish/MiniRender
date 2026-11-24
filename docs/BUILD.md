@@ -31,7 +31,7 @@ build/macos-core-debug/minirender_cli --test-pattern /tmp/minirender-pattern.ppm
 ```sh
 cmake --preset macos-desktop-debug
 cmake --build --preset macos-desktop-debug
-build/macos-desktop-debug/src/app/desktop/minirender_desktop.app/Contents/MacOS/minirender_desktop --validation
+build/macos-desktop-debug/src/app/desktop/RenderBox.app/Contents/MacOS/RenderBox --validation
 ```
 
 Qt 提供工作台和原生窗口，项目的 `VulkanViewport` 管理设备与交换链。默认打开 studio 场景与编辑工作台，使用方法见 VIEWPORT.md。A0 棋盘/深度诊断仍由 --smoke 参数运行。
@@ -39,7 +39,7 @@ Qt 提供工作台和原生窗口，项目的 `VulkanViewport` 管理设备与�
 GPU 自动验证默认在隐藏窗口下运行离屏 Vulkan 渲染，检查尺寸变化与图像读回：
 
 ```sh
-python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirender_desktop.app
+python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/RenderBox.app
 ```
 
 测试不会激活或置顶窗口。Qt 继续运行布局和事件循环，Vulkan 使用同一套渲染管线，将最终结果写入独立图像。日志记录 `offscreen` 与 `hidden, no activation`，并检查视口未暴露、窗口未激活。人工检查窗口呈现时可以显式传入 `--onscreen`，该模式也不主动激活窗口。
@@ -52,7 +52,7 @@ python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirend
 
 ## 更新应用
 
-本机正式应用固定为 `/Applications/MiniRender.app`，每次更新替换这一份，不保留按版本命名的旧应用。
+本机正式应用固定为 `/Applications/RenderBox.app`，每次更新替换这一份，不保留按版本命名的旧应用。
 
 完成桌面构建和回归后执行：
 
@@ -66,7 +66,7 @@ macOS 示例与纹理放在包内 `Contents/Resources/scenes`。内置示例作�
 
 旧构建包清理后，下次构建先运行 `cmake --preset macos-desktop-release`，再 build 和测试，重新生成应用包元数据。
 
-更新前应退出 MiniRender 并等待相关构建结束。替换失败时恢复原应用；正式包内的 `Contents/Resources/minirender-build.json` 记录提交和安装时间。部署方式参考 [Qt macOS 部署文档](https://doc.qt.io/qt-6/macos-deployment.html)。
+更新前应退出 RenderBox 并等待相关构建结束。替换失败时恢复原应用；正式包内的 `Contents/Resources/renderbox-build.json` 记录提交和安装时间。部署方式参考 [Qt macOS 部署文档](https://doc.qt.io/qt-6/macos-deployment.html)。
 
 ## Windows
 

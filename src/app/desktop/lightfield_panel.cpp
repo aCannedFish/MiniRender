@@ -225,7 +225,7 @@ LightFieldPanel::LightFieldPanel(LightFieldController& controller, VulkanViewpor
         sync();
     });
     connect(open_, &QPushButton::clicked, this, [this] {
-        auto path = QFileDialog::getOpenFileName(this, "打开光场", {}, "MiniRender (*.mrlf)");
+        auto path = QFileDialog::getOpenFileName(this, "打开光场", {}, "RenderBox (*.mrlf)");
         if (!path.isEmpty()) {
             invoke([&] {
                 auto budget = std::uint64_t(memory_->value()) << 20;
@@ -234,7 +234,7 @@ LightFieldPanel::LightFieldPanel(LightFieldController& controller, VulkanViewpor
         }
     });
     connect(save_, &QPushButton::clicked, this, [this] {
-        auto path = QFileDialog::getSaveFileName(this, "保存光场", {}, "MiniRender (*.mrlf)");
+        auto path = QFileDialog::getSaveFileName(this, "保存光场", {}, "RenderBox (*.mrlf)");
         if (!path.isEmpty()) {
             invoke([&] { controller_.save(path); });
         }

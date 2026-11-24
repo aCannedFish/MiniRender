@@ -53,7 +53,7 @@ SSAO 只消减 $C_a$。直接光、自发光、$C_s$ 和环境背景保持原值
 
 ```sh
 cmake --build --preset macos-desktop-debug
-python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirender_desktop.app --scene scenes/studio.json --ibl-check --sync-validation --output outputs/ibl --timeout 180
+python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/RenderBox.app --scene scenes/studio.json --ibl-check --sync-validation --output outputs/ibl --timeout 180
 ```
 
 回归通过专用导入入口和真实 Qt 控件操作任务，检查取消/重试、缓存、连续来源变化、撤销/重做、保存/重开、相机/缩放、背景关闭和活动任务退出。它使用 CPU BVH 求交，独立计算法线、反射与环境查询，对照 HDR 的背景、Lambert 和导体路径。

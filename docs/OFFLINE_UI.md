@@ -49,7 +49,7 @@ $$C_{display}=\frac{\max(C,0)}{\max(C,0)+2^{-EV}}.$$
 
 ```sh
 cmake --build --preset macos-desktop-debug
-python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirender_desktop.app --scene scenes/path-room.json --offline-check --output outputs/offline --timeout 65
+python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/RenderBox.app --scene scenes/path-room.json --offline-check --output outputs/offline --timeout 65
 ```
 
 回归通过真实按钮启动、暂停、恢复和取消任务，检查中间导出、完整导出、窗口缩放、过期提示及切回实时后的资源复用。它还将每个源像素映射到屏幕中的位置，对照 CPU 显示变换。
