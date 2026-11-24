@@ -40,10 +40,10 @@ void PostProcess::create(VulkanViewport& viewport, const HdrTargets& targets,
     check_vk(vkCreateDescriptorSetLayout(device_, &descriptor_layout, nullptr, &descriptor_layout_),
              "post descriptor layout");
     const std::array<VkDescriptorPoolSize, 2> sizes{
-        {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}, {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 7}}};
+        {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2}, {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 14}}};
     VkDescriptorPoolCreateInfo pool{};
     pool.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    pool.maxSets       = 1;
+    pool.maxSets       = 2;
     pool.poolSizeCount = static_cast<std::uint32_t>(sizes.size());
     pool.pPoolSizes    = sizes.data();
     check_vk(vkCreateDescriptorPool(device_, &pool, nullptr, &descriptor_pool_),
@@ -63,6 +63,10 @@ void PostProcess::create(VulkanViewport& viewport, const HdrTargets& targets,
          {sampler_, raw_ao, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
          {sampler_, filtered_ao, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
          {sampler_, outline_.view(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}}};
+    uniform_info_ = buffer;
+    for (std::size_t i = 0; i < images.size(); ++i) {
+        inputs_[i] = {images[i].imageView, images[i].imageLayout};
+    }
     std::array<VkWriteDescriptorSet, 8> writes{};
     for (std::uint32_t i = 0; i < writes.size(); ++i) {
         writes[i].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -83,6 +87,9 @@ void PostProcess::create(VulkanViewport& viewport, const HdrTargets& targets,
     layout.sType          = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     layout.setLayoutCount = 1;
     layout.pSetLayouts    = &descriptor_layout_;
+    const VkPushConstantRange push{VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(std::int32_t)};
+    layout.pushConstantRangeCount = 1;
+    layout.pPushConstantRanges    = &push;
     check_vk(vkCreatePipelineLayout(device_, &layout, nullptr, &layout_), "post pipeline layout");
     GpuShader                                      vertex(device_, ":/shaders/post.vert.spv");
     GpuShader                                      fragment(device_, ":/shaders/post.frag.spv");
@@ -145,13 +152,79 @@ void PostProcess::create(VulkanViewport& viewport, const HdrTargets& targets,
 }
 
 void PostProcess::draw(VulkanViewport& viewport, const std::function<void()>& overlay) {
+    update_outline(viewport, viewport.view_mode());
+    present(viewport, descriptor_, 0, overlay);
+}
+
+void PostProcess::update_outline(VulkanViewport& viewport, int mode) {
     // 首帧使已绑定附件的布局有效；仅在原色轮廓启用时持续计算。
     if (!outline_initialized_ ||
-        (viewport.view_mode() == VulkanViewport::base_color_preview_mode &&
-         viewport.preview_outline() && viewport.preview_outline_strength() > 0)) {
+        (mode == VulkanViewport::base_color_preview_mode && viewport.preview_outline() &&
+         viewport.preview_outline_strength() > 0)) {
         outline_.draw(viewport);
         outline_initialized_ = true;
     }
+}
+
+void PostProcess::prepare_comparison(VulkanViewport& viewport) {
+    if (comparison_set_ != VK_NULL_HANDLE) {
+        return;
+    }
+    for (auto& side : sides_) {
+        side.create(viewport, VK_FORMAT_R16G16B16A16_SFLOAT, ":/shaders/post.frag.spv",
+                    uniform_info_.buffer, uniform_info_.range, inputs_, ":/shaders/post.vert.spv");
+    }
+    VkDescriptorSetAllocateInfo allocate{};
+    allocate.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocate.descriptorPool     = descriptor_pool_;
+    allocate.descriptorSetCount = 1;
+    allocate.pSetLayouts        = &descriptor_layout_;
+    check_vk(vkAllocateDescriptorSets(device_, &allocate, &comparison_set_),
+             "allocate comparison set");
+    // post.frag 的两个分支共用静态描述符布局。复制原套，再将前两张图绑定为缓存。
+    std::array<VkCopyDescriptorSet, 8> copies{};
+    for (std::uint32_t i = 0; i < copies.size(); ++i) {
+        auto& copy      = copies[i];
+        copy.sType      = VK_STRUCTURE_TYPE_COPY_DESCRIPTOR_SET;
+        copy.srcSet     = descriptor_;
+        copy.dstSet     = comparison_set_;
+        copy.srcBinding = copy.dstBinding = i;
+        copy.descriptorCount              = 1;
+    }
+    vkUpdateDescriptorSets(device_, 0, nullptr, static_cast<std::uint32_t>(copies.size()),
+                           copies.data());
+    std::array<VkDescriptorImageInfo, 2> images{};
+    std::array<VkWriteDescriptorSet, 2>  writes{};
+    for (std::uint32_t i = 0; i < 2; ++i) {
+        images[i]        = {sampler_, sides_[i].view(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+        auto& write      = writes[i];
+        write.sType      = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet     = comparison_set_;
+        write.dstBinding = i + 1;
+        write.descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        write.descriptorCount = 1;
+        write.pImageInfo      = &images[i];
+    }
+    vkUpdateDescriptorSets(device_, 2, writes.data(), 0, nullptr);
+}
+
+void PostProcess::store_side(VulkanViewport& viewport, std::size_t side, int mode) {
+    update_outline(viewport, mode);
+    sides_.at(side).draw(viewport);
+}
+
+void PostProcess::present_comparison(VulkanViewport&              viewport,
+                                     const std::function<void()>& overlay) {
+    const int width = viewport.swapChainImageSize().width();
+    const int split =
+        viewport.export_side() >= 0
+            ? -1 - viewport.export_side()
+            : 1 + static_cast<int>(viewport.split_position() * static_cast<float>(width));
+    present(viewport, comparison_set_, split, overlay);
+}
+
+void PostProcess::present(VulkanViewport& viewport, VkDescriptorSet set, int split,
+                          const std::function<void()>& overlay) {
     const auto                  size = viewport.swapChainImageSize();
     const VkExtent2D            extent{static_cast<std::uint32_t>(size.width()),
                                        static_cast<std::uint32_t>(size.height())};
@@ -173,8 +246,9 @@ void PostProcess::draw(VulkanViewport& viewport, const std::function<void()>& ov
     vkCmdSetViewport(command, 0, 1, &screen);
     vkCmdSetScissor(command, 0, 1, &scissor);
     vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
-    vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, layout_, 0, 1, &descriptor_,
-                            0, nullptr);
+    vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, layout_, 0, 1, &set, 0,
+                            nullptr);
+    vkCmdPushConstants(command, layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(split), &split);
     vkCmdDraw(command, 3, 1, 0, 0);
     if (overlay) {
         overlay();
@@ -183,6 +257,10 @@ void PostProcess::draw(VulkanViewport& viewport, const std::function<void()>& ov
 }
 
 void PostProcess::release() {
+    comparison_set_ = VK_NULL_HANDLE;
+    for (auto& side : sides_) {
+        side.release();
+    }
     outline_.release();
     outline_initialized_ = false;
     if (device_ == VK_NULL_HANDLE) {

@@ -124,6 +124,21 @@ void main() {
     normal_output           = vec4(n, 1.0);
     ClothData cloth         = instances.values[draw_index.instance].cloth;
     bool      cloth_enabled = cloth.counts.y != 0;
+    if (int(frame.display.y) == 7) {
+        // 点光源采用平方反比衰减。半角向量决定 Blinn–Phong 高光的方向与宽度。
+        vec3 to_light = frame.teaching_light.xyz - world_position;
+        float distance2 = max(dot(to_light, to_light), 1e-6);
+        vec3 l = to_light * inversesqrt(distance2);
+        vec3 h = l + v;
+        float cosine = max(dot(n, l), 0.0);
+        float highlight = cosine > 0.0 && dot(h,h) > 1e-8
+            ? pow(max(dot(n, normalize(h)), 0.0), frame.teaching_surface.x) : 0.0;
+        vec3 kd = frame.teaching_surface.z > 0.5 ? albedo : base_color;
+        ambient_output = vec4(0.05 * kd, 1.0);
+        color = vec4(ambient_output.rgb + frame.teaching_light.w / distance2
+                     * (kd * cosine + vec3(frame.teaching_surface.y * highlight)), 1.0);
+        return;
+    }
     if (base_color_preview()) {
         // 均匀白色环境只展示原色；不计算直接光、镜面反射、阴影或 IBL。
         if (cloth_enabled) {

@@ -4,6 +4,7 @@
 
 #include "hdr_targets.hpp"
 #include "screen_pass.hpp"
+#include <array>
 #include <functional>
 
 // 独立显示 pass：从线性 HDR、法线、深度生成 swapchain 图像。
@@ -21,10 +22,22 @@ class PostProcess {
     // overlay 在显示变换之后、交换链 renderpass 结束之前执行。
     // 录制该 pass 的绘制命令，输出图像交由后续 pass 或显示阶段使用。
     void draw(VulkanViewport& viewport, const std::function<void()>& overlay = {});
+    // 首次启用时分配两张显示纹理。缓存内容已应用曝光、显示模式与抗锯齿。
+    void prepare_comparison(VulkanViewport& viewport);
+    void store_side(VulkanViewport& viewport, std::size_t side, int mode);
+    void present_comparison(VulkanViewport& viewport, const std::function<void()>& overlay);
     // 释放独占资源并清空句柄；调用前必须结束 GPU 对这些资源的访问。
     void release();
 
   private:
+    // 正常显示和比较共用最终图形管线，push 值决定输出整图、左右区域或单侧导出。
+    void present(VulkanViewport& viewport, VkDescriptorSet set, int split,
+                 const std::function<void()>& overlay);
+    void update_outline(VulkanViewport& viewport, int mode);
+    std::array<ScreenPass, 2>  sides_;
+    std::array<ScreenInput, 7> inputs_{};
+    VkDescriptorBufferInfo     uniform_info_{};
+    VkDescriptorSet            comparison_set_ = VK_NULL_HANDLE;
     // 显示轮廓使用独立附件，HDR 导出继续读取原始合成图。
     // 原色预览的显示轮廓附件与绘制 pass。
     ScreenPass outline_;

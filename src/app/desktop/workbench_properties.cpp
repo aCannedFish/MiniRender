@@ -2,6 +2,7 @@
 
 #include "cloth_collider_panel.hpp"
 #include "cloth_material_panel.hpp"
+#include "comparison_controls.hpp"
 #include "editor_theme.hpp"
 #include "geometry_panel.hpp"
 #include "offline_panel.hpp"
@@ -252,7 +253,8 @@ void Workbench::build_camera_panel() {
     focus_           = spin(camera_panel_, "focus_distance", 0.0001, 100000, 0.1);
     auto* mode       = new QComboBox;
     mode->setObjectName("view_mode");
-    mode->addItems({"光照合成", "法线", "线性深度", "线框", "原始 AO", "滤波 AO", "原色预览"});
+    mode->addItems(
+        {"光照合成", "法线", "线性深度", "线框", "原始 AO", "滤波 AO", "原色预览", "Blinn–Phong"});
     mode->setItemData(VulkanViewport::base_color_preview_mode,
                       "均匀亮度显示材质和纹理，保留深度与接触遮蔽；不依赖场景光源。",
                       Qt::ToolTipRole);
@@ -264,7 +266,8 @@ void Workbench::build_camera_panel() {
     layout->addRow("对焦距离 / m", focus_);
     layout->addRow(editor::section("视口显示", camera_panel_));
     layout->addRow("曝光 / EV", exposure_);
-    layout->addRow("显示", mode);
+    layout->addRow("显示（A）", mode);
+    add_comparison_controls(*layout, *mode, *viewport_);
     auto* fxaa = new QCheckBox("启用 FXAA");
     fxaa->setObjectName("fxaa_enabled");
     fxaa->setChecked(true);

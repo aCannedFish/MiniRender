@@ -40,12 +40,17 @@ CatalogBrowser::CatalogBrowser(QWidget* parent) : QDialog(parent) {
     notice_->setTextFormat(Qt::PlainText);
     notice_->setWordWrap(true);
     layout->addWidget(notice_);
-    open_ = new QPushButton;
-    layout->addWidget(open_, 0, Qt::AlignRight);
+    open_         = new QPushButton;
+    auto* actions = new QHBoxLayout;
+    recommended_  = new QPushButton("覆盖并预览 Blinn–Phong");
+    actions->addStretch();
+    actions->addWidget(recommended_);
+    actions->addWidget(open_);
+    layout->addLayout(actions);
     connect(search_, &QLineEdit::textChanged, this, [this] { filter(); });
     connect(type_, &QComboBox::currentIndexChanged, this, [this] { filter(); });
     connect(list_, &QListWidget::currentRowChanged, this, [this] { describe(); });
-    connect(open_, &QPushButton::clicked, this, [this] {
+    const auto activate = [this](bool recommended) {
         auto* item = list_->currentItem();
         if (!item || !on_open) {
             return;
@@ -54,8 +59,10 @@ CatalogBrowser::CatalogBrowser(QWidget* parent) : QDialog(parent) {
         auto      entry =
             index < builtin_.size() ? builtin_.at(index) : course_.at(index - builtin_.size());
         accept();
-        on_open(entry);
-    });
+        on_open(entry, recommended);
+    };
+    connect(open_, &QPushButton::clicked, this, [activate] { activate(false); });
+    connect(recommended_, &QPushButton::clicked, this, [activate] { activate(true); });
     connect(list_, &QListWidget::itemDoubleClicked, open_, [this] { open_->click(); });
     connect(mount_button, &QPushButton::clicked, this, [this] {
         const auto path =
@@ -110,6 +117,7 @@ void CatalogBrowser::filter() {
 void CatalogBrowser::describe() {
     auto* item = list_->currentItem();
     open_->setEnabled(item != nullptr);
+    recommended_->hide();
     if (!item) {
         detail_->setText("没有匹配的资源");
         open_->setText("打开");
@@ -118,6 +126,7 @@ void CatalogBrowser::describe() {
     int         index = item->data(Qt::UserRole).toInt();
     const auto& e = index < builtin_.size() ? builtin_[index] : course_[index - builtin_.size()];
     const auto  format = e.kind == catalog::Kind::sequence ? "EXR 序列" : "MiniRender JSON";
+    recommended_->setVisible(e.kind == catalog::Kind::scene && e.id == "mary-studio");
     detail_->setText(QString("%1\n%2 · %3 · %4\n%5\nSHA-256  %6")
                          .arg(e.description, e.source, e.rights, format, e.file.path,
                               QString::fromLatin1(e.file.sha256)));

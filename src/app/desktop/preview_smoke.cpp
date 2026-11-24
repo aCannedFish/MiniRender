@@ -15,6 +15,7 @@
 #include <QComboBox>
 #include <QDir>
 #include <QDoubleSpinBox>
+#include <QMouseEvent>
 #include <QTimer>
 
 #include <algorithm>
@@ -136,6 +137,111 @@ void verify_ao(const Image& plain, const Image& shaded) {
     }
     qInfo() << "Preview contact pixels" << darkened;
     require(darkened > 100, "Preview contact occlusion did not darken any surfaces");
+}
+
+// 使用 CPU 最近交点和未贴图的材质底色，独立计算点光源照明参考值。
+void verify_teaching_light(VulkanViewport& viewport, const Image& image) {
+    const auto     scene = viewport.scene();
+    const SceneBvh bvh(scene);
+    const auto&    cam     = viewport.camera();
+    const auto     light   = viewport.teaching_light();
+    const auto     surface = viewport.teaching_surface();
+    std::size_t    used    = 0;
+    for (std::size_t y = 6; y < image.height(); y += 13) {
+        for (std::size_t x = 6; x < image.width(); x += 13) {
+            const auto ray = cam.generate_ray({(double(x) + .5) / double(image.width()),
+                                               (double(y) + .5) / double(image.height())},
+                                              double(image.width()) / double(image.height()));
+            const auto hit = bvh.intersect(ray);
+            if (!hit ||
+                std::min({hit->barycentric.x, hit->barycentric.y, hit->barycentric.z}) < .08) {
+                continue;
+            }
+            const auto& material = scene->instances[hit->instance_index].material;
+            const auto  delta    = glm::vec3(light) - glm::vec3(hit->position);
+            const auto  l        = glm::normalize(delta),
+                        v = glm::normalize(glm::vec3(cam.position) - glm::vec3(hit->position));
+            auto        n = hit->shading_normal;
+            if (glm::dot(n, v) < 0) {
+                n = -n;
+            }
+            const auto cosine = std::max(glm::dot(n, l), 0.F);
+            const auto spec =
+                cosine > 0 ? std::pow(std::max(glm::dot(n, glm::normalize(l + v)), 0.F), surface.x)
+                           : 0.F;
+            const auto expected = .05F * material.base_color +
+                                  light.w / glm::dot(delta, delta) *
+                                      (material.base_color * cosine + glm::vec3(surface.y * spec));
+            require(max_component(glm::abs(expected - image.at(x, y))) < .002F,
+                    "Blinn–Phong does not match CPU point light reference");
+            ++used;
+        }
+    }
+    require(used > 30, "Missing teaching shader reference pixels");
+}
+
+// 用同一相机分别读回两侧和分屏。拖动分割线后，各像素应来自对应的整图缓存。
+void verify_comparison(Workbench& window, const QString& directory) {
+    auto* viewport = window.viewport();
+    auto* mode     = window.findChild<QComboBox*>("view_mode");
+    auto* right    = window.findChild<QComboBox*>("compare_right");
+    mode->setCurrentIndex(VulkanViewport::base_color_preview_mode);
+    right->setCurrentIndex(VulkanViewport::blinn_phong_mode + 1);
+    const auto left  = viewport->grab_comparison_side(0);
+    const auto other = viewport->grab_comparison_side(1);
+    require(!left.isNull() && !other.isNull() && left != other, "Comparison sides are identical");
+    const auto count  = viewport->comparison_draws();
+    const auto height = viewport->height() * 0.5;
+    const auto send   = [&](QEvent::Type type, double x, Qt::MouseButton button,
+                            Qt::MouseButtons buttons) {
+        const QPointF pos(x, height);
+        QMouseEvent   event(type, pos, pos, pos, button, buttons, Qt::NoModifier);
+        QCoreApplication::sendEvent(viewport, &event);
+    };
+    send(QEvent::MouseButtonPress, viewport->width() * .5, Qt::LeftButton, Qt::LeftButton);
+    send(QEvent::MouseMove, viewport->width() * .3, Qt::NoButton, Qt::LeftButton);
+    send(QEvent::MouseButtonRelease, viewport->width() * .3, Qt::LeftButton, Qt::NoButton);
+    const auto composite = viewport->grab();
+    require(std::abs(viewport->split_position() - .3F) < .002F &&
+                viewport->comparison_draws() == count,
+            "Moving divider rerendered scene");
+    int mismatched = 0, total = 0;
+    for (int y = 4; y < composite.height(); y += 11) {
+        for (int x = 4; x < composite.width(); x += 13) {
+            const int split = static_cast<int>(static_cast<float>(composite.width()) * .3F);
+            if (std::abs(x - split) < 4) {
+                continue;
+            }
+            const auto expected = (x < split ? left : other).pixelColor(x, y);
+            const auto actual   = composite.pixelColor(x, y);
+            ++total;
+            if (expected != actual) {
+                ++mismatched;
+            }
+        }
+    }
+    require(mismatched <= total / 100, "Composite differs from source views");
+    auto settings = viewport->teaching_surface();
+    settings.z    = 0.F;
+    viewport->set_teaching(viewport->teaching_light(), settings);
+    window.findChild<QCheckBox*>("ssao_enabled")->setChecked(false);
+    const auto raw = viewport->grab_comparison_hdr(1);
+    verify_teaching_light(*viewport, raw);
+    const auto original = viewport->teaching_light();
+    auto       moved    = original;
+    moved.x += 1.25F;
+    const auto old_draws = viewport->comparison_draws();
+    viewport->set_teaching(moved, viewport->teaching_surface());
+    const auto after = viewport->grab_comparison_side(1);
+    require(after != other && viewport->comparison_draws() == old_draws + 1,
+            "Point light did not update teaching side independently");
+    const auto moved_raw = viewport->grab_comparison_hdr(1);
+    require(difference(raw, moved_raw) > .01, "Point light does not affect HDR");
+    composite.save(directory + "/comparison.png");
+    right->setCurrentIndex(0);
+    mode->setCurrentIndex(VulkanViewport::blinn_phong_mode);
+    require(difference(moved_raw, viewport->grab_hdr()) < 1e-5,
+            "A/B HDR differs from single viewport");
 }
 
 struct State {
@@ -282,6 +388,7 @@ void start_preview_smoke(Workbench& window, const QString& directory) {
                 viewport->grab().save(directory + "/preview-fxaa.png");
                 require(difference(before_fxaa, viewport->grab_hdr()) == 0,
                         "Preview anti-aliasing modified base color HDR data");
+                verify_comparison(window, directory);
                 timer->stop();
                 qInfo() << "Preview smoke PASS: colors, textures, depth visibility, contact AO, "
                            "light isolation, display encoding, defaults and mode switching";

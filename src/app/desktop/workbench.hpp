@@ -70,7 +70,7 @@ class Workbench final : public QMainWindow {
     // 按模板标识覆盖导入场景，同时应用预览模式和离线推荐参数。
     void import_builtin_scene(const QString& id);
     // 根据资源类型覆盖场景、追加物体或打开帧序列。
-    void import_resource(const catalog::Entry& entry);
+    void import_resource(const catalog::Entry& entry, bool recommended = false);
     // 后台解析 OBJ 并准备渲染数据，完成后创建场景资产和物体。
     void import_object_file(const QString& path);
     // 同步保存文档与生成资产，并记录当前保存路径。

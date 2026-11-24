@@ -70,6 +70,7 @@ struct alignas(16) FrameUniform {
     std::array<glm::vec4, minirender::ssao_kernel_size> ao_kernel;
     glm::vec4 ibl;           // BRDF ready, maps ready, strength, rotation/radians
     glm::vec4 preview_edges; // effective strength, physical pixels per logical pixel, reserved
+    glm::vec4 teaching_light, teaching_surface;
 };
 
 static_assert(offsetof(FrameUniform, lights) == 96);
@@ -78,7 +79,7 @@ static_assert(offsetof(FrameUniform, view) == 928);
 static_assert(offsetof(FrameUniform, ao_kernel) == 1152);
 static_assert(offsetof(FrameUniform, ibl) == 2176);
 static_assert(offsetof(FrameUniform, preview_edges) == 2192);
-static_assert(sizeof(FrameUniform) == 2208);
+static_assert(sizeof(FrameUniform) == 2240);
 
 } // namespace
 
@@ -87,7 +88,7 @@ SceneRenderer::SceneRenderer(VulkanViewport* window) : window_(window) {}
 void SceneRenderer::initResources() {
     device_ = window_->device();
     uniforms_.create(device_, window_->physicalDevice(), sizeof(FrameUniform),
-                     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+                     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     shadow_map_.create(*window_);
     ibl_.create(*window_);
     std::array<VkDescriptorSetLayoutBinding, 8> bindings{};
@@ -128,6 +129,7 @@ void SceneRenderer::initResources() {
 }
 
 void SceneRenderer::initSwapChainResources() {
+    comparison_keys_.fill({0, -1});
     targets_.create(*window_);
     for (std::size_t side = 0; side < surface_pipelines_.size(); ++side) {
         const auto cull  = side == 0 ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT;
@@ -456,7 +458,7 @@ void SceneRenderer::update_ibl_descriptors() {
                            nullptr);
 }
 
-void SceneRenderer::update_uniforms() {
+void SceneRenderer::update_uniforms(int mode) {
     const auto   size   = window_->swapChainImageSize();
     const auto&  camera = window_->camera();
     FrameUniform frame{};
@@ -475,7 +477,7 @@ void SceneRenderer::update_uniforms() {
     }
     frame.counts.x      = static_cast<int>(lights.size());
     frame.counts.y      = window_->environment_background() ? 1 : 0;
-    frame.display       = {window_->exposure(), static_cast<float>(window_->view_mode()),
+    frame.display       = {window_->exposure(), static_cast<float>(mode),
                            window_->fxaa_enabled() ? 1.0F : 0.0F, 0};
     frame.preview_edges = {window_->preview_outline() ? window_->preview_outline_strength() : 0.0F,
                            static_cast<float>(window_->devicePixelRatio()), 0, 0};
@@ -490,7 +492,7 @@ void SceneRenderer::update_uniforms() {
                                                      static_cast<float>(size.height()));
     frame.inverse_projection = glm::inverse(frame.projection);
     const auto& ao           = window_->ssao_settings();
-    const bool  preview      = window_->view_mode() == VulkanViewport::base_color_preview_mode;
+    const bool  preview      = mode == VulkanViewport::base_color_preview_mode;
     const float radius       = preview ? preview_radius_ : ao.radius;
     frame.ao_settings        = {preview ? (window_->preview_occlusion() ? 1.0F : 0.0F)
                                         : (ao.enabled ? 1.0F : 0.0F),
@@ -506,13 +508,36 @@ void SceneRenderer::update_uniforms() {
         window_->ibl_lut() ? 1.0F : 0.0F, window_->ibl_maps() ? 1.0F : 0.0F,
         window_->scene()->environment_strength,
         glm::radians(std::remainder(window_->scene()->environment_rotation_degrees, 360.0F))};
-    uniforms_.write(&frame, sizeof(frame));
+    frame.teaching_light   = window_->teaching_light();
+    frame.teaching_surface = glm::vec4(window_->teaching_surface(), 0.0F);
+    if (window_->comparison_mode() < 0) {
+        uniforms_.write(&frame, sizeof(frame));
+        return;
+    }
+    // 两侧在同一个命令缓冲中连续绘制。将参数快照录入命令流，保持共同相机，
+    // 同时让每个绘制读取自己的显示模式。附件复用前等待前一侧读写完成。
+    const auto      cmd = window_->currentCommandBuffer();
+    VkMemoryBarrier before{};
+    before.sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    before.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    before.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1, &before, 0, nullptr, 0, nullptr);
+    vkCmdUpdateBuffer(cmd, uniforms_.handle(), 0, sizeof(frame), &frame);
+    VkMemoryBarrier ready{};
+    ready.sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    ready.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    ready.dstAccessMask = VK_ACCESS_UNIFORM_READ_BIT;
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                         0, 1, &ready, 0, nullptr, 0, nullptr);
 }
 
-void SceneRenderer::render_shadow_maps(VkCommandBuffer command) {
+void SceneRenderer::render_shadow_maps(VkCommandBuffer command, int mode) {
     shadow_map_.prepare(command);
-    if (!window_->shadows_enabled() ||
-        window_->view_mode() == VulkanViewport::base_color_preview_mode) {
+    if (!window_->shadows_enabled() || (mode == VulkanViewport::base_color_preview_mode ||
+                                        mode == VulkanViewport::blinn_phong_mode)) {
         return;
     }
     const VkViewport viewport{
@@ -543,13 +568,13 @@ void SceneRenderer::render_shadow_maps(VkCommandBuffer command) {
     }
 }
 
-void SceneRenderer::render_wire(VkCommandBuffer command) {
+void SceneRenderer::render_wire(VkCommandBuffer command, int mode) {
     // 后处理始终绑定 wire 图像，首次先清除使其布局有效；以后仅在线框模式绘制。
-    if (window_->view_mode() != 3 && targets_.wire_initialized()) {
+    if (mode != 3 && targets_.wire_initialized()) {
         return;
     }
     targets_.begin_wire(command);
-    if (window_->view_mode() == 3) {
+    if (mode == 3) {
         const auto       size = window_->swapChainImageSize();
         const VkViewport viewport{
             0, 0, static_cast<float>(size.width()), static_cast<float>(size.height()), 0, 1};
@@ -591,8 +616,46 @@ void SceneRenderer::startNextFrame() {
         texture->retire_upload();
         texture->record_upload(window_->currentCommandBuffer());
     }
-    update_uniforms();
-    render_shadow_maps(window_->currentCommandBuffer());
+    const auto overlay = [this] {
+        if (window_->export_side() < 0) {
+            gizmo_.draw(*window_, window_->gizmo_layout(), window_->highlighted_gizmo_handle());
+        }
+    };
+    if (window_->comparison_mode() < 0) {
+        render_view(window_->view_mode());
+        if (capture_hdr_) {
+            targets_.record_readback(window_->currentCommandBuffer(), ssao_.hdr_image());
+        }
+        post_process_.draw(*window_, overlay);
+    } else {
+        post_process_.prepare_comparison(*window_);
+        const std::array modes{window_->view_mode(), window_->comparison_mode()};
+        for (std::size_t side = 0; side < modes.size(); ++side) {
+            const auto key = std::make_pair(window_->comparison_revision(modes[side]), modes[side]);
+            const bool capture =
+                capture_hdr_ && static_cast<int>(side) == std::max(0, window_->export_side());
+            if (comparison_keys_[side] == key && !capture) {
+                continue;
+            }
+            render_view(modes[side]);
+            window_->report_comparison_draw();
+            if (capture) {
+                targets_.record_readback(window_->currentCommandBuffer(), ssao_.hdr_image());
+            }
+            post_process_.store_side(*window_, side, modes[side]);
+            comparison_keys_[side] = key;
+        }
+        post_process_.present_comparison(*window_, overlay);
+    }
+    capture_hdr_ = false;
+    window_->report_frame();
+    window_->frameReady();
+    window_->requestUpdate();
+}
+
+void SceneRenderer::render_view(int mode) {
+    update_uniforms(mode);
+    render_shadow_maps(window_->currentCommandBuffer(), mode);
     const auto       size = window_->swapChainImageSize();
     const VkExtent2D extent{static_cast<std::uint32_t>(size.width()),
                             static_cast<std::uint32_t>(size.height())};
@@ -604,7 +667,7 @@ void SceneRenderer::startNextFrame() {
     vkCmdSetViewport(command, 0, 1, &viewport);
     vkCmdSetScissor(command, 0, 1, &scissor);
     if (window_->ibl_maps() && window_->environment_background() &&
-        window_->view_mode() != VulkanViewport::base_color_preview_mode) {
+        mode != VulkanViewport::base_color_preview_mode) {
         vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, background_pipeline_);
         vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                 &descriptor_, 0, nullptr);
@@ -629,18 +692,8 @@ void SceneRenderer::startNextFrame() {
         vkCmdDraw(command, mesh.count, 1, 0, 0);
     }
     vkCmdEndRenderPass(command);
-    render_wire(command);
-    ssao_.draw(*window_);
-    if (capture_hdr_) {
-        targets_.record_readback(command, ssao_.hdr_image());
-        capture_hdr_ = false;
-    }
-    post_process_.draw(*window_, [this] {
-        gizmo_.draw(*window_, window_->gizmo_layout(), window_->highlighted_gizmo_handle());
-    });
-    window_->report_frame();
-    window_->frameReady();
-    window_->requestUpdate();
+    render_wire(command, mode);
+    ssao_.draw(*window_, mode);
 }
 
 void SceneRenderer::releaseSwapChainResources() {
