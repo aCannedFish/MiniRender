@@ -71,6 +71,7 @@ struct alignas(16) FrameUniform {
     glm::vec4 ibl;           // BRDF ready, maps ready, strength, rotation/radians
     glm::vec4 preview_edges; // effective strength, physical pixels per logical pixel, reserved
     glm::vec4 teaching_light, teaching_surface;
+    glm::vec4 area_settings;
 };
 
 static_assert(offsetof(FrameUniform, lights) == 96);
@@ -79,7 +80,7 @@ static_assert(offsetof(FrameUniform, view) == 928);
 static_assert(offsetof(FrameUniform, ao_kernel) == 1152);
 static_assert(offsetof(FrameUniform, ibl) == 2176);
 static_assert(offsetof(FrameUniform, preview_edges) == 2192);
-static_assert(sizeof(FrameUniform) == 2240);
+static_assert(sizeof(FrameUniform) == 2256);
 
 } // namespace
 
@@ -91,11 +92,12 @@ void SceneRenderer::initResources() {
                      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     shadow_map_.create(*window_);
     ibl_.create(*window_);
-    std::array<VkDescriptorSetLayoutBinding, 8> bindings{};
-    auto&                                       binding = bindings[0];
-    binding.binding                                     = 0;
-    binding.descriptorType                              = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    binding.descriptorCount                             = 1;
+    rectangles_.create(*window_);
+    std::array<VkDescriptorSetLayoutBinding, 11> bindings{};
+    auto&                                        binding = bindings[0];
+    binding.binding                                      = 0;
+    binding.descriptorType                               = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    binding.descriptorCount                              = 1;
     binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     VkDescriptorSetLayoutCreateInfo layout{};
     layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -109,6 +111,8 @@ void SceneRenderer::initResources() {
         bindings[i] = {i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
                        VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     }
+    bindings[10]        = {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT,
+                           nullptr};
     layout.bindingCount = static_cast<std::uint32_t>(bindings.size());
     layout.pBindings    = bindings.data();
     check_vk(vkCreateDescriptorSetLayout(device_, &layout, nullptr, &descriptor_layout_),
@@ -359,7 +363,8 @@ void SceneRenderer::upload_scene() {
                 : minirender::directional_shadow_matrix(minimum, maximum,
                                                         scene.directional_lights[index].direction);
     }
-    if (descriptors_changed || descriptor_pool_ == VK_NULL_HANDLE) {
+    const bool rectangle_buffer_changed = rectangles_.update(*window_, scene.rectangles);
+    if (descriptors_changed || rectangle_buffer_changed || descriptor_pool_ == VK_NULL_HANDLE) {
         rebuild_texture_descriptors();
     }
     scene_revision_ = window_->scene_revision();
@@ -385,8 +390,8 @@ void SceneRenderer::rebuild_texture_descriptors() {
     const auto                                count = static_cast<std::uint32_t>(draws_.size() + 1);
     const std::array<VkDescriptorPoolSize, 3> sizes{
         {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, count},
-         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6 * count},
-         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, count}}};
+         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8 * count},
+         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2 * count}}};
     VkDescriptorPoolCreateInfo pool{};
     pool.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool.maxSets       = count;
@@ -408,21 +413,28 @@ void SceneRenderer::rebuild_texture_descriptors() {
         VkDescriptorBufferInfo uniform{uniforms_.handle(), 0, sizeof(FrameUniform)};
         const std::array<VkDescriptorImageInfo, 2> images{shadow_map_.descriptor(),
                                                           textures_.at(handle)->descriptor()};
-        VkDescriptorBufferInfo              instances{instances_.handle(), 0,
-                                                      instance_capacity_ * sizeof(GpuInstance)};
-        const auto                          ibl_images = ibl_.descriptors();
-        std::array<VkWriteDescriptorSet, 8> writes{};
+        VkDescriptorBufferInfo               instances{instances_.handle(), 0,
+                                                       instance_capacity_ * sizeof(GpuInstance)};
+        const auto                           ibl_images = ibl_.descriptors();
+        std::array<VkWriteDescriptorSet, 11> writes{};
+        const auto                           rectangle_tables = rectangles_.tables();
+        const auto                           rectangle_buffer = rectangles_.buffer();
         for (std::uint32_t binding = 0; binding < writes.size(); ++binding) {
             writes[binding].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             writes[binding].dstSet          = sets[index];
             writes[binding].dstBinding      = binding;
             writes[binding].descriptorCount = 1;
             writes[binding].descriptorType =
-                binding == 0 ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
-                             : (binding == 3 ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
-                                             : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                binding == 0
+                    ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+                    : ((binding == 3 || binding == 10) ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
+                                                       : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
             if (binding == 0) {
                 writes[binding].pBufferInfo = &uniform;
+            } else if (binding == 10) {
+                writes[binding].pBufferInfo = &rectangle_buffer;
+            } else if (binding >= 8) {
+                writes[binding].pImageInfo = &rectangle_tables[binding - 8];
             } else if (binding == 3) {
                 writes[binding].pBufferInfo = &instances;
             } else {
@@ -517,6 +529,8 @@ void SceneRenderer::update_uniforms(int mode, bool reference) {
         window_->ibl_lut() ? 1.0F : 0.0F, window_->ibl_maps() ? 1.0F : 0.0F,
         window_->scene()->environment_strength,
         glm::radians(std::remainder(window_->scene()->environment_rotation_degrees, 360.0F))};
+    frame.area_settings =
+        glm::vec4(static_cast<float>(window_->scene()->rectangles.size()), 0, 0, 0);
     frame.teaching_light   = window_->teaching_light();
     frame.teaching_surface = glm::vec4(window_->teaching_surface(), 0.0F);
     if (window_->comparison_mode() < 0) {
@@ -626,6 +640,7 @@ void SceneRenderer::startNextFrame() {
         window_->report_ibl_update();
     }
     ibl_.record_upload(window_->currentCommandBuffer());
+    rectangles_.record_upload(window_->currentCommandBuffer());
     for (auto& [handle, texture] : textures_) {
         texture->retire_upload();
         texture->record_upload(window_->currentCommandBuffer());
@@ -740,6 +755,7 @@ void SceneRenderer::releaseResources() {
     uniforms_.release();
     shadow_map_.release();
     ibl_.release();
+    rectangles_.release();
     if (device_ == VK_NULL_HANDLE) {
         return;
     }

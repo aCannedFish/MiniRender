@@ -5,6 +5,7 @@
 #include "gizmo_renderer.hpp"
 #include "gpu_buffer.hpp"
 #include "gpu_ibl.hpp"
+#include "gpu_rectangle.hpp"
 #include "gpu_subsurface.hpp"
 #include "gpu_texture.hpp"
 #include "hdr_targets.hpp"
@@ -112,7 +113,8 @@ class SceneRenderer final : public ViewportRenderer {
     // 本帧相机、光源与效果设置的统一缓冲。
     GpuBuffer uniforms_;
     // 当前环境预处理结果对应的 GPU 数据。
-    GpuIbl ibl_;
+    GpuIbl             ibl_;
+    GpuRectangleLights rectangles_;
     // 着色器资源的 binding 与类型声明。
     VkDescriptorSetLayout descriptor_layout_ = VK_NULL_HANDLE;
     // 供本管线分配描述符集合的池。

@@ -15,6 +15,7 @@ foreach(shader diagnostic.vert diagnostic.frag scene.vert scene.frag shadow.vert
         DEPENDS "${source}" "${PROJECT_SOURCE_DIR}/shaders/scene_frame.glsl"
                 "${PROJECT_SOURCE_DIR}/shaders/scene_instance.glsl"
                 "${PROJECT_SOURCE_DIR}/shaders/shadow_filter.glsl"
+                "${PROJECT_SOURCE_DIR}/shaders/rectangle_light.glsl"
                 "${PROJECT_SOURCE_DIR}/shaders/screen_position.glsl"
                 "${PROJECT_SOURCE_DIR}/shaders/ibl_sampling.glsl"
                 "${PROJECT_SOURCE_DIR}/shaders/cloth.glsl" VERBATIM)
@@ -28,7 +29,8 @@ qt_add_executable(minirender_desktop
     builtin_scenes.cpp builtin_scenes.hpp
     resource_catalog.cpp resource_catalog.hpp catalog_browser.cpp catalog_browser.hpp
     comparison_controls.cpp comparison_controls.hpp
-    shadow_smoke.cpp shadow_smoke.hpp
+    shadow_smoke.cpp shadow_smoke.hpp rectangle_smoke.cpp rectangle_smoke.hpp
+    gpu_rectangle.cpp gpu_rectangle.hpp
     catalog_smoke.cpp catalog_smoke.hpp
     sequence_viewer.cpp sequence_viewer.hpp workbench_catalog.cpp
     presets_smoke.cpp presets_smoke.hpp
@@ -110,3 +112,10 @@ endif()
 add_custom_command(TARGET minirender_desktop POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${PROJECT_SOURCE_DIR}/scenes" "${scene_destination}")
+
+
+# 表数据随程序分发，保留原作者声明与原始论文引用。
+add_custom_command(TARGET minirender_desktop POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${scene_destination}/licenses"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_SOURCE_DIR}/third_party/ltc/LICENSE"
+            "${scene_destination}/licenses/LTC.txt")

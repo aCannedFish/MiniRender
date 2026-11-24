@@ -1,0 +1,10 @@
+// 由原始 RGBA16F DDS 生成。两张 64×64 拟合表的版权说明见 third_party/ltc/LICENSE。
+#pragma once
+namespace minirender::ltc_data {
+inline constexpr unsigned char matrix[] = {
+@ltc_matrix@
+};
+inline constexpr unsigned char magnitude[] = {
+@ltc_magnitude@
+};
+}
