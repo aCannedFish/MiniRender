@@ -38,6 +38,12 @@ class HdrTargets {
     VkImageView color_view() const noexcept;
     // 返回环境漫反射附件，供 SSAO 独立合成。
     VkImageView ambient_view() const noexcept;
+
+    // 线性底色与有符号粗糙度，负值标记金属。
+    VkImageView albedo_view() const noexcept {
+        return albedo_.view();
+    }
+
     // 返回表面法线附件，供 SSAO、轮廓和诊断显示使用。
     VkImageView normal_view() const noexcept;
     // 返回主场景深度附件的只读视图。
@@ -59,6 +65,7 @@ class HdrTargets {
     GpuImage color_;
     // 单独保存的环境漫反射附件。
     GpuImage ambient_;
+    GpuImage albedo_;
     // 世界空间表面法线与几何有效标记。
     GpuImage normal_;
     // 主场景深度附件。

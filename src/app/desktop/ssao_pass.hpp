@@ -4,6 +4,7 @@
 
 #include "hdr_targets.hpp"
 #include "screen_pass.hpp"
+#include "screen_transport.hpp"
 
 // SSAO 的原始遮蔽、水平/垂直双边滤波及线性 HDR 合成。
 // 背景为 1，只有独立的环境漫反射附件被遮蔽；HDR 导出读取合成后的图像。
@@ -26,7 +27,8 @@ class SsaoPass {
     VkImageView filtered_view() const noexcept;
 
   private:
-    ScreenPass raw_, horizontal_, filtered_, composite_;
-    bool       initialized_ = false;
-    bool       was_enabled_ = false;
+    ScreenTransport transport_;
+    ScreenPass      raw_, horizontal_, filtered_, composite_;
+    bool            initialized_ = false;
+    bool            was_enabled_ = false;
 };

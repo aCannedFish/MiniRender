@@ -38,6 +38,9 @@ std::string append_model(minirender::SceneDocument&       target,
         target.textures.push_back(std::move(texture));
     }
     for (auto material : source.materials) {
+        if (!material.normal_texture.empty()) {
+            material.normal_texture = textures.at(material.normal_texture);
+        }
         if (!material.base_color_texture.empty()) {
             material.base_color_texture = textures.at(material.base_color_texture);
         }
@@ -165,6 +168,9 @@ void Workbench::import_resource(const catalog::Entry& entry, bool recommended) {
                     int view = VulkanViewport::base_color_preview_mode;
                     if (recommended && entry.recommended == "blinn-phong") {
                         view = VulkanViewport::blinn_phong_mode;
+                    }
+                    if (recommended && entry.recommended == "ssgi") {
+                        view = 16;
                     }
                     if (recommended && entry.recommended == "energy") {
                         view = 0;

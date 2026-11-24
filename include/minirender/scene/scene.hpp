@@ -115,6 +115,10 @@ struct Material {
     std::shared_ptr<const SubsurfaceParameters> subsurface{};
     // 粗糙导体使用 Kulla–Conty 补偿多次微面散射，旧场景默认为单次散射。
     bool compensate_energy = false;
+    // 法线纹理使用线性 RGB。flip_y 用于从 glTF 的 UV 约定转换到项目的 OBJ 坐标。
+    std::string normal_texture{};
+    float       normal_scale  = 1.F;
+    bool        normal_flip_y = false;
     void validate() const;
 };
 
@@ -184,6 +188,7 @@ struct RenderInstance {
     glm::mat4                       object_to_world{1.0F};
     glm::mat3                       normal_to_world{1.0F};
     std::shared_ptr<const Texture>  base_color_texture;
+    std::shared_ptr<const Texture>  normal_texture{};
 };
 
 // 实时光源视图从可见发光三角形提取。四角以物体正面绕序排列。

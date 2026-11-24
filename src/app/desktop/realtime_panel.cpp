@@ -95,5 +95,31 @@ RealtimePanel::RealtimePanel(VulkanViewport& viewport, QWidget* parent) : QWidge
         connect(spin, &QDoubleSpinBox::valueChanged, this, update);
     }
     connect(samples, &QSpinBox::valueChanged, this, update);
+    auto* hiz = new QCheckBox("Hi-Z 屏幕射线遍历");
+    hiz->setObjectName("screen_hiz");
+    hiz->setChecked(true);
+    auto* range     = value("screen_range", .01, 10000, 5, .5);
+    auto* thickness = value("screen_thickness", .0001, 10, .03, .005);
+    auto* steps     = new QSpinBox;
+    steps->setRange(8, 1024);
+    steps->setValue(160);
+    auto* rays = new QSpinBox;
+    rays->setRange(1, 64);
+    rays->setValue(8);
+    layout->addRow(hiz);
+    layout->addRow("射线距离 / m", range);
+    layout->addRow("命中厚度 / m", thickness);
+    layout->addRow("最大步数", steps);
+    layout->addRow("间接光方向", rays);
+    const auto trace = [=, &viewport] {
+        viewport.set_screen_trace({float(range->value()), float(thickness->value()),
+                                   float(steps->value()), float(rays->value())},
+                                  hiz->isChecked());
+    };
+    connect(hiz, &QCheckBox::toggled, this, trace);
+    connect(range, &QDoubleSpinBox::valueChanged, this, trace);
+    connect(thickness, &QDoubleSpinBox::valueChanged, this, trace);
+    connect(steps, &QSpinBox::valueChanged, this, trace);
+    connect(rays, &QSpinBox::valueChanged, this, trace);
     layout->addRow(new PrtPanel(viewport, this));
 }

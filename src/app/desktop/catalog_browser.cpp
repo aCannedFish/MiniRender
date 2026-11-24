@@ -127,7 +127,8 @@ void CatalogBrowser::describe() {
     const auto& e = index < builtin_.size() ? builtin_[index] : course_[index - builtin_.size()];
     const auto  format = e.kind == catalog::Kind::sequence ? "EXR 序列" : "MiniRender JSON";
     recommended_->setVisible(e.kind == catalog::Kind::scene && !e.recommended.isEmpty());
-    recommended_->setText(e.recommended == "prt"      ? "覆盖并烘焙 PRT"
+    recommended_->setText(e.recommended == "ssgi"     ? "覆盖并预览屏幕间接光"
+                          : e.recommended == "prt"    ? "覆盖并烘焙 PRT"
                           : e.recommended == "energy" ? "覆盖并预览能量补偿"
                           : e.recommended == "pcss"   ? "覆盖并预览 PCSS"
                                                       : "覆盖并预览 Blinn–Phong");

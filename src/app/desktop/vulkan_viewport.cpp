@@ -1089,6 +1089,13 @@ void VulkanViewport::set_prt_lighting(const minirender::ShLight& lighting) {
     requestUpdate();
 }
 
+void VulkanViewport::set_screen_trace(glm::vec4 settings, bool hiz) {
+    screen_trace_ = settings;
+    screen_hiz_   = hiz;
+    mark_preview_changed();
+    requestUpdate();
+}
+
 void VulkanViewport::set_teaching(glm::vec4 light, glm::vec3 surface) {
     teaching_light_   = light;
     teaching_surface_ = surface;

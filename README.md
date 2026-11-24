@@ -23,7 +23,7 @@ MiniRender 是用于学习图形学的小型渲染引擎，使用 C++20、Qt Wid
 
 应用内置 17 个场景、一个可追加的单位立方体和四帧 EXR 示例。已准备好的课程包可通过“选择课程包…”挂载，应用会记住路径。Mary 和 Bunny 均提供独立场景与追加模型两种入口。HW5 的 box 与 pink-room 可按帧播放或拖动查看。
 
-从已解压的作业生成课程索引时，准备 Python 3、FFmpeg 和本项目构建的 CLI。下例假定课程目录中已有 `frameworks/HW0`、`frameworks/HW2` 以及 `HW5-data/{box,pink-room}/input`。脚本生成索引后，在资源目录选择包含 `resource_catalog.json` 的文件夹。
+从已解压的作业生成课程索引时，准备 Python 3、FFmpeg、NumPy 和本项目构建的 CLI。下例假定课程目录中已有 `frameworks/HW0`、`frameworks/HW2` 以及 `HW5-data/{box,pink-room}/input`。脚本生成索引后，在资源目录选择包含 `resource_catalog.json` 的文件夹。
 
 ```sh
 python3 scripts/prepare_course_catalog.py work/GAMES202 --cli build/macos-desktop-release/minirender_cli
@@ -54,6 +54,12 @@ python3 scripts/prepare_course_catalog.py work/GAMES202 --cli build/macos-deskto
 打开资源目录中的“球谐传输 · 彩色遮挡”，选择“覆盖并烘焙 PRT”。实时效果面板可以选择无遮挡、静态遮挡和漫反射互反射，设置每顶点的样本数与反弹次数。进度条显示已处理的面角数，再次烘焙相同场景会读取磁盘缓存。
 
 PRT 使用九个实球谐系数描述环境光。旋转环境、调整环境亮度或移动相机可以复用传输数据。移动物体后工作台提示重新烘焙。课程包内的 Bunny 可以分别加载 Skybox、Indoor、GraceCathedral、CornellBox 四组环境。
+
+### 屏幕间接光
+
+在“快速导入 → 资源目录”选择“屏幕间接光 · Cornell”。在同一相机下切换屏幕镜面、射线命中、间接光、直接与间接光、线性底色或射线步数。实时效果面板可选择逐像素或 Hi-Z 遍历，并调整最大距离、命中厚度、方向数和步数预算。步数视图的亮度表示已使用的预算比例。镜面射线出屏时使用常量环境色。
+
+课程包另有 cube1、cube2 和洞穴。离线转换保留节点变换、材质分组、UV 及嵌入纹理。物体检查器可导入线性法线贴图、调整强度并反转 Y。实时与离线着色均按 UV 切线方向解码。转换 HW3 资源需要 Python 的 NumPy，脚本读取约定的课程输入。[课程转换脚本](scripts/course_gltf.py)
 
 ## 构建要求
 
@@ -679,6 +685,8 @@ src/app/desktop/
 ├── sdf_renderer.cpp  # 距离场图元与 CSG 的 Vulkan 步进显示
 ├── sdf_renderer.hpp  # 接口：距离场图元与 CSG 的 Vulkan 步进显示
 ├── rectangle_shadow.hpp / .cpp  # 分层灯面采样、立方体深度图与几何缓存
+├── screen_transport.hpp / .cpp  # 屏幕空间输入附件、深度金字塔和传输绘制
+├── screen_transport_smoke.hpp / .cpp  # 检查命中、遍历步数、合成及洞穴贴图
 ├── prt_cache.hpp / .cpp  # 烘焙缓存字节布局、校验与原子发布
 ├── prt_panel.hpp / .cpp  # 后台烘焙、进度取消与环境更新
 ├── prt_smoke.hpp / .cpp  # 隐藏窗口比较顶点传输、缓存重载和失效
@@ -829,6 +837,8 @@ shaders/
 ├── sdf.frag  # Vulkan 距离场步进、CSG 求值、法线、阴影与诊断输出
 ├── sdf.vert  # 距离场全屏覆盖顶点生成
 ├── sdf_display.frag  # 距离场渲染附件的屏幕显示转换
+├── depth_reduce.frag  # 构建屏幕深度区间的五级金字塔
+├── screen_trace.frag  # 屏幕射线、镜面探针和余弦加权的一次间接光
 ├── rectangle_visibility.glsl  # 漫反射和 GGX 的分层可见性估计
 ├── rectangle_light.glsl  # 逐像素地平线裁剪与漫反射、GGX 矩形光积分
 ├── shadow_filter.glsl  # 接收面深度梯度、遮挡物搜索、半影半径与 PCF 过滤
@@ -973,6 +983,7 @@ tests/
 ├── displacement_tests.cpp  # 实际位移、共享边接缝、退化、预算和取消
 ├── geometry_tests.cpp  # 半边拓扑、Loop 规则、边界和面角属性
 ├── gizmo_tests.cpp  # 操纵器布局、命中、移动旋转与事务历史
+├── normal_map_tests.cpp  # 验证着色法线、几何朝向、贴图 Y 与颜色编码
 ├── prt_tests.cpp  # 立体角、SH 旋转、遮挡、彩色互反射与缓存键
 ├── rectangle_light_tests.cpp  # LTC 与数值面积积分对照，验证矩形识别、变换和朝向
 ├── microfacet_energy_tests.cpp  # 白炉积分、采样方法及 MIS 密度一致性
@@ -1028,6 +1039,7 @@ tests/scenes/
 ```text
 scripts/
 ├── check_source_names.py  # 检查自有源码文件名，拒绝带空格的副本名称
+├── course_gltf.py  # 离线解包 HW3 模型、变换和纹理
 ├── course_cubemap.py  # 将课程六面环境转为场景使用的经纬图
 ├── prepare_course_catalog.py  # 生成目录缩略图、转换课程模型、建立 EXR 帧索引
 ├── generate_builtin_scenes.py  # 生成内置 JSON 场景及球体、透光孔、光场棋盘资产

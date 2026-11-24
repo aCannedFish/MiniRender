@@ -209,7 +209,8 @@ void Workbench::import_texture() {
     import_texture_file(path, encoding);
 }
 
-void Workbench::import_texture_file(const QString& path, minirender::ColorEncoding encoding) {
+void Workbench::import_texture_file(const QString& path, minirender::ColorEncoding encoding,
+                                    bool normal_map) {
     begin_asset_task("正在读取纹理并生成 mipmap…");
     std::string material_id;
     for (const auto& object : editor_.document().objects) {
@@ -226,7 +227,7 @@ void Workbench::import_texture_file(const QString& path, minirender::ColorEncodi
             return std::make_shared<const minirender::Texture>(
                 minirender::Image::read(source, encoding));
         },
-        [this, generation, source, encoding, material_id](const auto& result) {
+        [this, generation, source, encoding, material_id, normal_map](const auto& result) {
             finish_asset_task();
             if (generation != document_generation_) {
                 return;
@@ -241,7 +242,9 @@ void Workbench::import_texture_file(const QString& path, minirender::ColorEncodi
                 scene.textures.push_back({id, source, encoding, result.value});
                 for (auto& material : scene.materials) {
                     if (material.id == material_id) {
-                        if (material.kind == minirender::MaterialKind::subsurface) {
+                        if (normal_map) {
+                            material.normal_texture = id;
+                        } else if (material.kind == minirender::MaterialKind::subsurface) {
                             subsurface_target = true;
                         } else {
                             material.base_color_texture = id;

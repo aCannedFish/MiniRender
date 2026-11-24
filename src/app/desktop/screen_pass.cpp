@@ -14,11 +14,14 @@ ScreenPass::~ScreenPass() {
 
 void ScreenPass::create(VulkanViewport& viewport, VkFormat format, const char* fragment,
                         VkBuffer uniform, VkDeviceSize bytes, std::span<const ScreenInput> inputs,
-                        const char* vertex_path, std::uint32_t vertices) {
+                        const char* vertex_path, std::uint32_t vertices, VkExtent2D requested) {
     device_         = viewport.device();
     vertices_       = vertices;
     const auto size = viewport.swapChainImageSize();
     extent_ = {static_cast<std::uint32_t>(size.width()), static_cast<std::uint32_t>(size.height())};
+    if (requested.width && requested.height) {
+        extent_ = requested;
+    }
     target_.create(device_, viewport.physicalDevice(), extent_, format,
                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
                        VK_IMAGE_USAGE_TRANSFER_SRC_BIT,

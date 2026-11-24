@@ -21,7 +21,8 @@ class ScreenPass {
     // 创建并绑定本对象所管理的 GPU 资源，失败时通过异常报告 Vulkan 操作。
     void create(VulkanViewport& viewport, VkFormat format, const char* fragment, VkBuffer uniform,
                 VkDeviceSize bytes, std::span<const ScreenInput> inputs,
-                const char* vertex = ":/shaders/screen.vert.spv", std::uint32_t vertices = 3);
+                const char* vertex = ":/shaders/screen.vert.spv", std::uint32_t vertices = 3,
+                VkExtent2D requested = {});
     // 录制该 pass 的绘制命令，输出图像交由后续 pass 或显示阶段使用。
     void draw(VulkanViewport& viewport, std::int32_t mode = 0);
     // 释放独占资源并清空句柄；调用前必须结束 GPU 对这些资源的访问。

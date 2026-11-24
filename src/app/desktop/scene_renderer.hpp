@@ -68,7 +68,7 @@ class SceneRenderer final : public ViewportRenderer {
 
     struct Draw {
         MeshHandle      mesh;
-        TextureHandle   texture;
+        TextureHandle   texture, normal_texture;
         VkDescriptorSet descriptor = VK_NULL_HANDLE;
     };
 
@@ -76,6 +76,8 @@ class SceneRenderer final : public ViewportRenderer {
     std::map<MeshHandle, Mesh, std::owner_less<MeshHandle>> meshes_;
     // 按场景实例顺序记录的网格和纹理绑定。
     std::vector<Draw> draws_;
+    // 数值 ID 与对象字符串一一对应，用于屏幕命中及时间重投影。
+    std::map<std::string, std::uint32_t> surface_ids_;
     // 次表面材质的实时表面近似缓存。
     SubsurfacePreviewCache subsurface_previews_;
     // 无底色纹理实例共用的白色纹理。

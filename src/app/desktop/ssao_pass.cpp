@@ -19,9 +19,10 @@ void SsaoPass::create(VulkanViewport& viewport, const HdrTargets& targets, VkBuf
                                                      depth};
     filtered_.create(viewport, VK_FORMAT_R32_SFLOAT, ":/shaders/ao_filter.frag.spv", uniform, bytes,
                      vertical_inputs);
-    const std::array<ScreenInput, 4> composite_inputs{
+    transport_.create(viewport, targets, uniform, bytes);
+    const std::array<ScreenInput, 5> composite_inputs{
         ScreenInput{targets.color_view()}, ScreenInput{targets.ambient_view()},
-        ScreenInput{filtered_.view()}, ScreenInput{raw_.view()}};
+        ScreenInput{filtered_.view()}, ScreenInput{raw_.view()}, ScreenInput{transport_.view()}};
     composite_.create(viewport, VK_FORMAT_R32G32B32A32_SFLOAT, ":/shaders/ao_composite.frag.spv",
                       uniform, bytes, composite_inputs);
 }
@@ -37,12 +38,14 @@ void SsaoPass::draw(VulkanViewport& viewport, int mode) {
         filtered_.draw(viewport, 1);
         initialized_ = true;
     }
+    transport_.draw(viewport, mode);
     composite_.draw(viewport);
     was_enabled_ = enabled;
 }
 
 void SsaoPass::release() {
     composite_.release();
+    transport_.release();
     filtered_.release();
     horizontal_.release();
     raw_.release();
