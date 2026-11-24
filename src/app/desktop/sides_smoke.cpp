@@ -189,7 +189,7 @@ void verify(Workbench& window, const Scenario& scenario, int mode, const QImage&
         }
     }
     qInfo() << "Sides" << scenario.name << "mode" << mode << "matched" << matched << "/" << checked
-            << "ground/blue/metal" << object_samples;
+            << "ground/blue/metal" << object_samples[0] << object_samples[1] << object_samples[2];
 }
 
 struct State {

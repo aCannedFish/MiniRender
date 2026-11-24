@@ -31,7 +31,7 @@ jobs:
           version: '1.4.309.0'
           cache: true
       - name: Configure desktop
-        run: cmake -S . -B build/win-ci -G "Visual Studio 17 2022" -A x64 -DMINIRENDER_BUILD_DESKTOP=ON -DMINIRENDER_ENABLE_OPTIX=OFF -DBUILD_TESTING=ON
+        run: cmake -S . -B build/win-ci -G "Visual Studio 17 2022" -A x64 -DMINIRENDER_BUILD_DESKTOP=ON -DMINIRENDER_ENABLE_OPTIX=OFF -DBUILD_TESTING=ON -DCMAKE_CXX_FLAGS=/MP2
       - name: Build Qt application and shaders
         run: cmake --build build/win-ci --config Release --parallel 3
       - name: Test portable rendering core
