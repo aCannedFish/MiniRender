@@ -15,7 +15,7 @@ enum class Kind { scene, model, sequence };
 
 // 一个可浏览的资源。dependencies 包含场景 JSON 引用的网格和纹理。
 struct Entry {
-    QString     root, id, name, description, source, rights, thumbnail;
+    QString     root, id, name, description, source, rights, thumbnail, recommended;
     Kind        kind = Kind::scene;
     File        file;
     QList<File> dependencies;

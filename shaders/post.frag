@@ -142,6 +142,9 @@ void main() {
         if (compare.split > 0 && pixel.x == divider) color = vec4(0.65,0.67,0.7,1.0);
         return;
     }
+    if(int(frame.display.y)>=8 && int(frame.display.y)<=11){
+        color=vec4(decode_srgb(clamp(texelFetch(hdr_image,pixel,0).rgb,vec3(0),vec3(1))),1);return;
+    }
     if (base_color_preview() || int(frame.display.y) == 7) {
         vec3 encoded = frame.display.z > 0.5 ? fxaa(uv) : display_texel(pixel);
         color        = vec4(decode_srgb(encoded), 1.0);

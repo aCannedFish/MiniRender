@@ -126,7 +126,8 @@ void CatalogBrowser::describe() {
     int         index = item->data(Qt::UserRole).toInt();
     const auto& e = index < builtin_.size() ? builtin_[index] : course_[index - builtin_.size()];
     const auto  format = e.kind == catalog::Kind::sequence ? "EXR 序列" : "MiniRender JSON";
-    recommended_->setVisible(e.kind == catalog::Kind::scene && e.id == "mary-studio");
+    recommended_->setVisible(e.kind == catalog::Kind::scene && !e.recommended.isEmpty());
+    recommended_->setText(e.recommended == "pcss" ? "覆盖并预览 PCSS" : "覆盖并预览 Blinn–Phong");
     detail_->setText(QString("%1\n%2 · %3 · %4\n%5\nSHA-256  %6")
                          .arg(e.description, e.source, e.rights, format, e.file.path,
                               QString::fromLatin1(e.file.sha256)));

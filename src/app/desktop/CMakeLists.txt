@@ -14,6 +14,7 @@ foreach(shader diagnostic.vert diagnostic.frag scene.vert scene.frag shadow.vert
         COMMAND Vulkan::glslangValidator --target-env vulkan1.2 -I${PROJECT_SOURCE_DIR}/shaders -V "${source}" -o "${output}"
         DEPENDS "${source}" "${PROJECT_SOURCE_DIR}/shaders/scene_frame.glsl"
                 "${PROJECT_SOURCE_DIR}/shaders/scene_instance.glsl"
+                "${PROJECT_SOURCE_DIR}/shaders/shadow_filter.glsl"
                 "${PROJECT_SOURCE_DIR}/shaders/screen_position.glsl"
                 "${PROJECT_SOURCE_DIR}/shaders/ibl_sampling.glsl"
                 "${PROJECT_SOURCE_DIR}/shaders/cloth.glsl" VERBATIM)
@@ -27,6 +28,7 @@ qt_add_executable(minirender_desktop
     builtin_scenes.cpp builtin_scenes.hpp
     resource_catalog.cpp resource_catalog.hpp catalog_browser.cpp catalog_browser.hpp
     comparison_controls.cpp comparison_controls.hpp
+    shadow_smoke.cpp shadow_smoke.hpp
     catalog_smoke.cpp catalog_smoke.hpp
     sequence_viewer.cpp sequence_viewer.hpp workbench_catalog.cpp
     presets_smoke.cpp presets_smoke.hpp

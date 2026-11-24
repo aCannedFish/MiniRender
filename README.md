@@ -21,7 +21,7 @@ MiniRender 是用于学习图形学的小型渲染引擎，使用 C++20、Qt Wid
 
 打开工具栏的“快速导入 → 资源目录”，按名称、类型或作业编号筛选资源。选择场景会覆盖当前文档，选择模型会把物体及其材质追加到当前场景，选择帧序列会打开独立播放器。整组模型可以一次撤销。另存场景时，目录导入的模型与纹理会随 JSON 保存到目标目录，可以一起复制到另一台电脑。
 
-应用内置 14 个场景、一个可追加的单位立方体和四帧 EXR 示例。已准备好的课程包可通过“选择课程包…”挂载，应用会记住路径。Mary 和 Bunny 均提供独立场景与追加模型两种入口。HW5 的 box 与 pink-room 可按帧播放或拖动查看。
+应用内置 15 个场景、一个可追加的单位立方体和四帧 EXR 示例。已准备好的课程包可通过“选择课程包…”挂载，应用会记住路径。Mary 和 Bunny 均提供独立场景与追加模型两种入口。HW5 的 box 与 pink-room 可按帧播放或拖动查看。
 
 从已解压的作业生成课程索引时，准备 Python 3、FFmpeg 和本项目构建的 CLI。下例假定课程目录中已有 `frameworks/HW0`、`frameworks/HW2` 以及 `HW5-data/{box,pink-room}/input`。脚本生成索引后，在资源目录选择包含 `resource_catalog.json` 的文件夹。
 
@@ -34,6 +34,10 @@ python3 scripts/prepare_course_catalog.py work/GAMES202 --cli build/macos-deskto
 在视口的显示下拉框选择 Blinn–Phong，可以观察教学点光源下的底色、纹理和高光。在相机面板调整点光源位置、强度和高光指数。Mary 展示场景在资源目录中提供对应的预览按钮。
 
 相机面板中的“右侧对照”开启同视口 A/B 比较。两侧共用场景、相机和曝光设置，按各自的显示模式处理颜色。拖动中间竖线改变两侧宽度，其他位置仍然可以拖动相机。“导出 A/B 图像”将两个完整视图的 PNG 和显示变换前的线性光照 EXR 写入新文件夹。
+
+### 方向光阴影
+
+在资源目录选择“接触软阴影 → 覆盖并预览 PCSS”。两个挡板与地面的距离不同，离地较高的挡板投下较宽的半影。相机面板可选择硬阴影、固定半径的 PCF 或随遮挡距离变化的 PCSS，调整光源半角并观察变化。打开右侧对照后，两侧可分别选择阴影算法。“阴影深度”“遮挡物深度”“半影半径”和“光源可见性”显示当前诊断光源在可见表面上的值，半影半径以 64 纹素对应白色。
 
 ## 构建要求
 
@@ -651,6 +655,7 @@ src/app/desktop/
 ├── screen_pass.hpp  # 接口：可复用的全屏 Vulkan 渲染附件、描述符与命令录制
 ├── sdf_renderer.cpp  # 距离场图元与 CSG 的 Vulkan 步进显示
 ├── sdf_renderer.hpp  # 接口：距离场图元与 CSG 的 Vulkan 步进显示
+├── shadow_smoke.hpp / .cpp  # 离屏测量半影宽度、动态遮挡、多方向光与分屏过滤
 ├── shadow_map.cpp  # 方向光阴影图数组的分配、布局与逐层渲染
 ├── shadow_map.hpp  # 接口：方向光阴影图数组的分配、布局与逐层渲染
 ├── ssao_pass.cpp  # 屏幕空间遮蔽、双边滤波和环境漫反射合成的 Vulkan pass
@@ -795,6 +800,7 @@ shaders/
 ├── sdf.frag  # Vulkan 距离场步进、CSG 求值、法线、阴影与诊断输出
 ├── sdf.vert  # 距离场全屏覆盖顶点生成
 ├── sdf_display.frag  # 距离场渲染附件的屏幕显示转换
+├── shadow_filter.glsl  # 接收面深度梯度、遮挡物搜索、半影半径与 PCF 过滤
 ├── shadow.vert  # 将实例网格变换到指定方向光的阴影裁剪空间
 ├── ssao.frag  # 从屏幕深度重建位置，沿旋转半球样本估计局部遮蔽
 ├── wire.frag  # 线框像素的显示颜色
@@ -816,6 +822,7 @@ scenes/
 ├── resource_catalog.json  # 内置目录及源文件、依赖项的 SHA-256
 ├── catalog/               # 可追加模型和序列样本
 ├── catalog_thumbs/        # 资源浏览器使用的小图
+├── soft-shadows.json  # 用两块不同离地高度的挡板比较半影
 ├── cornell-box.json  # 经典红绿墙、两个方块和顶部面积光
 ├── cornell-materials.json  # Cornell 房间中的玻璃与金属球
 ├── cornell-small-light.json  # 小面积光下的采样与噪声对照

@@ -1468,6 +1468,48 @@ bool VulkanViewport::shadows_enabled() const noexcept {
     return shadows_enabled_;
 }
 
+void VulkanViewport::set_shadow_filter(ShadowFilter filter) {
+    shadow_filter_ = filter;
+    mark_preview_changed();
+    requestUpdate();
+}
+
+ShadowFilter VulkanViewport::shadow_filter() const noexcept {
+    return shadow_filter_;
+}
+
+void VulkanViewport::set_light_half_angle(float degrees) {
+    light_half_angle_ = std::clamp(degrees, 0.0F, 15.0F);
+    mark_preview_changed();
+    requestUpdate();
+}
+
+float VulkanViewport::light_half_angle() const noexcept {
+    return light_half_angle_;
+}
+
+void VulkanViewport::set_shadow_filter_radius(float texels) {
+    shadow_filter_radius_ = std::clamp(texels, 0.0F, 48.0F);
+    mark_preview_changed();
+    requestUpdate();
+}
+
+float VulkanViewport::shadow_filter_radius() const noexcept {
+    return shadow_filter_radius_;
+}
+
+void VulkanViewport::set_reference_shadow(int filter) {
+    reference_shadow_ = filter;
+    ++reference_revision_;
+    requestUpdate();
+}
+
+void VulkanViewport::set_shadow_debug_light(int light) {
+    shadow_debug_light_ = std::clamp(light, 0, 7);
+    mark_preview_changed();
+    requestUpdate();
+}
+
 void VulkanViewport::set_fxaa_enabled(bool enabled) {
     fxaa_enabled_ = enabled;
     mark_preview_changed();
