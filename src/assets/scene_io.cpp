@@ -89,6 +89,7 @@ SceneDocument load_scene(const std::filesystem::path& path) {
             if (value.contains("subsurface")) {
                 material.subsurface = detail::read_subsurface(value.at("subsurface"));
             }
+            material.compensate_energy  = value.value("compensate_energy", false);
             material.double_sided       = value.value("double_sided", true);
             material.base_color_texture = value.value("base_color_texture", std::string{});
             material.texture_filter =
@@ -223,6 +224,7 @@ void save_scene(const SceneDocument& document, const std::filesystem::path& path
              {"base_color", vector3(material.base_color)},
              {"emission", vector3(material.emission)},
              {"roughness", material.roughness},
+             {"compensate_energy", material.compensate_energy},
              {"ior", material.ior},
              {"double_sided", material.double_sided},
              {"base_color_texture", material.base_color_texture},

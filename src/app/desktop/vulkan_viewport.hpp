@@ -117,6 +117,13 @@ class VulkanViewport final : public QWindow {
     ShadowFilter shadow_filter() const noexcept;
     void set_shadow_filter(ShadowFilter filter);
     // 右侧为 -1 时跟随相机面板的过滤器。
+    // -1 使用材质自身的设置，0/1 在对照侧关闭或开启粗糙导体补偿。
+    void set_reference_energy(int value);
+
+    int reference_energy() const noexcept {
+        return reference_energy_;
+    }
+
     void set_reference_shadow(int filter);
 
     ShadowFilter effective_shadow(bool reference) const noexcept {
@@ -373,6 +380,7 @@ class VulkanViewport final : public QWindow {
     QString                  frame_wait_reason_;
     ShadowFilter             shadow_filter_    = ShadowFilter::pcf;
     float                    light_half_angle_ = 3.F, shadow_filter_radius_ = 1.F;
+    int                      reference_energy_   = -1;
     int                      shadow_debug_light_ = 0, reference_shadow_ = -1;
     std::uint64_t            reference_revision_ = 0;
     bool                     shadows_enabled_    = true;

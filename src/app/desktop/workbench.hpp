@@ -257,6 +257,7 @@ class Workbench final : public QMainWindow {
     // 底色纹理的采样过滤方式。
     QComboBox* texture_filter_ = nullptr;
     // 材质双面显示开关。
+    QCheckBox*   energy_compensation_   = nullptr;
     QCheckBox*   double_sided_          = nullptr;
     QAction*     import_texture_action_ = nullptr;
     QAction*     import_object_action_  = nullptr;

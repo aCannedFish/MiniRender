@@ -165,6 +165,9 @@ void Workbench::import_resource(const catalog::Entry& entry, bool recommended) {
                     if (recommended && entry.recommended == "blinn-phong") {
                         view = VulkanViewport::blinn_phong_mode;
                     }
+                    if (recommended && entry.recommended == "energy") {
+                        view = 0;
+                    }
                     if (recommended && entry.recommended == "pcss") {
                         view = 0;
                         findChild<QCheckBox*>("shadows_enabled")->setChecked(true);

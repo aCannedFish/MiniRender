@@ -155,6 +155,18 @@ void main() {
         specular_factor = albedo * ab.x + ab.y;
     }
     vec3 result    = emission + ambient_diffuse + metallic * specular_environment * specular_factor;
+    float energy_mode=instances.values[draw_index.instance].emission.w;
+    bool compensated=energy_mode>=0.0 && frame.ibl.x>0.5 &&
+                     (frame.counts.w<0?energy_mode>0.5:frame.counts.w>0);
+    float eo=1.0,average=1.0;
+    vec3 weight=vec3(0);
+    if(compensated){
+        vec3 lut=brdf_energy(ndv,material.x);
+        eo=clamp(lut.r+lut.g,0.0,1.0);average=clamp(lut.b,0.0,1.0);
+        weight=compensation_color(f0,average);
+        // 多次散射瓣近似用余弦卷积环境照明。常量环境下积分为 (1-Eo)。
+        result+=diffuse_environment*weight*(1.0-eo);
+    }
     ambient_output = vec4(ambient_diffuse, 1.0);
     for (int i = 0; i < frame.counts.x; ++i) {
         vec3  l   = -normalize(frame.lights[i].direction.xyz);
@@ -176,6 +188,11 @@ void main() {
         float d        = distribution_ggx(ndh, alpha);
         float g        = smith_g1(ndl, alpha) * smith_g1(ndv, alpha);
         vec3  specular = f * d * g / max(4.0 * ndl * ndv, 1e-6);
+        if(compensated && average<1.0-1e-6){
+            vec3 lookup=brdf_energy(ndl,material.x);
+            float ei=clamp(lookup.r+lookup.g,0.0,1.0);
+            specular+=weight*((1.0-ei)*(1.0-eo)/(PI*(1.0-average)));
+        }
         vec3  diffuse  = (vec3(1.0) - f) * (1.0 - metallic) * albedo / PI;
         result += (diffuse + specular) * frame.lights[i].radiance.rgb * ndl *
                   visibility;

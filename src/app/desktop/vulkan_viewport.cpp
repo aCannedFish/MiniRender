@@ -1498,6 +1498,12 @@ float VulkanViewport::shadow_filter_radius() const noexcept {
     return shadow_filter_radius_;
 }
 
+void VulkanViewport::set_reference_energy(int value) {
+    reference_energy_ = value;
+    ++reference_revision_;
+    requestUpdate();
+}
+
 void VulkanViewport::set_reference_shadow(int filter) {
     reference_shadow_ = filter;
     ++reference_revision_;

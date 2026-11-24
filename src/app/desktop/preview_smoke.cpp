@@ -2,8 +2,10 @@
 // 本模块接口见 preview_smoke.hpp。
 
 #include "preview_smoke.hpp"
+#include "builtin_scenes.hpp"
 #include "geometry_smoke.hpp"
 #include "workbench.hpp"
+#include <minirender/render/microfacet_energy.hpp>
 
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/render/bvh.hpp>
@@ -244,6 +246,57 @@ void verify_comparison(Workbench& window, const QString& directory) {
             "A/B HDR differs from single viewport");
 }
 
+// 两排白色金属球处于单位辐亮度环境。上排的每个可见点应回到白炉参考值。
+void verify_white_furnace(Workbench& window) {
+    auto* viewport = window.viewport();
+    window.load_scene_file(builtin_scene_directory() + "/white-furnace.json");
+    window.findChild<QComboBox*>("view_mode")->setCurrentIndex(0);
+    window.findChild<QCheckBox*>("ssao_enabled")->setChecked(false);
+    const auto     image = viewport->grab_hdr();
+    const auto     scene = viewport->scene();
+    const SceneBvh bvh(scene);
+    const auto&    cam         = viewport->camera();
+    std::size_t    compensated = 0, single = 0;
+    for (std::size_t y = 3; y < image.height(); y += 7) {
+        for (std::size_t x = 3; x < image.width(); x += 7) {
+            const auto ray = cam.generate_ray({(double(x) + .5) / double(image.width()),
+                                               (double(y) + .5) / double(image.height())},
+                                              double(image.width()) / double(image.height()));
+            const auto hit = bvh.intersect(ray);
+            if (!hit ||
+                std::min({hit->barycentric.x, hit->barycentric.y, hit->barycentric.z}) < .035) {
+                continue;
+            }
+            const auto&  m = scene->instances[hit->instance_index].material;
+            const double mu =
+                std::clamp(glm::dot(glm::dvec3(hit->shading_normal), -ray.direction), 0., 1.);
+            const auto e        = sample_energy(conductor_energy_table(), mu, m.roughness);
+            const auto expected = m.compensate_energy ? 1. : e.x;
+            require(std::abs(image.at(x, y).r - expected) < .015,
+                    "GPU white furnace differs from CPU energy table");
+            if (m.compensate_energy) {
+                ++compensated;
+            } else {
+                ++single;
+            }
+        }
+    }
+    require(compensated > 30 && single > 30, "Both rows of furnace spheres must be visible");
+    auto* compare = window.findChild<QComboBox*>("compare_right");
+    compare->setCurrentIndex(1);
+    window.findChild<QComboBox*>("reference_energy")->setCurrentIndex(1);
+    const auto single_side = viewport->grab_comparison_hdr(1);
+    require(difference(single_side, viewport->grab_comparison_hdr(0)) > .35,
+            "Single-scatter reference side did not change");
+    compare->setCurrentIndex(0);
+    window.select_object("ball_1_2");
+    auto* toggle = window.findChild<QCheckBox*>("energy_compensation");
+    require(toggle->isChecked(), "Furnace material inspector lost compensation flag");
+    toggle->setChecked(false);
+    require(difference(image, viewport->grab_hdr()) > .35,
+            "Editing compensation did not update GPU");
+}
+
 struct State {
     int                          stage = 0;
     int                          ticks = 0;
@@ -389,6 +442,7 @@ void start_preview_smoke(Workbench& window, const QString& directory) {
                 require(difference(before_fxaa, viewport->grab_hdr()) == 0,
                         "Preview anti-aliasing modified base color HDR data");
                 verify_comparison(window, directory);
+                verify_white_furnace(window);
                 timer->stop();
                 qInfo() << "Preview smoke PASS: colors, textures, depth visibility, contact AO, "
                            "light isolation, display encoding, defaults and mode switching";

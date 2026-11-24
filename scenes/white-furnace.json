@@ -1,0 +1,255 @@
+{
+  "version": 1,
+  "camera": {
+    "position": [
+      0,
+      1,
+      4.4
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "up": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "vertical_fov": 32,
+    "near": 0.05,
+    "far": 100.0
+  },
+  "environment": [
+    1,
+    1,
+    1
+  ],
+  "materials": [
+    {
+      "id": "ball_0_0",
+      "name": "单次 · r=0.25",
+      "kind": "conductor",
+      "base_color": [
+        1,
+        1,
+        1
+      ],
+      "roughness": 0.25,
+      "compensate_energy": false
+    },
+    {
+      "id": "ball_0_1",
+      "name": "单次 · r=0.65",
+      "kind": "conductor",
+      "base_color": [
+        1,
+        1,
+        1
+      ],
+      "roughness": 0.65,
+      "compensate_energy": false
+    },
+    {
+      "id": "ball_0_2",
+      "name": "单次 · r=1.0",
+      "kind": "conductor",
+      "base_color": [
+        1,
+        1,
+        1
+      ],
+      "roughness": 1.0,
+      "compensate_energy": false
+    },
+    {
+      "id": "ball_1_0",
+      "name": "补偿 · r=0.25",
+      "kind": "conductor",
+      "base_color": [
+        1,
+        1,
+        1
+      ],
+      "roughness": 0.25,
+      "compensate_energy": true
+    },
+    {
+      "id": "ball_1_1",
+      "name": "补偿 · r=0.65",
+      "kind": "conductor",
+      "base_color": [
+        1,
+        1,
+        1
+      ],
+      "roughness": 0.65,
+      "compensate_energy": true
+    },
+    {
+      "id": "ball_1_2",
+      "name": "补偿 · r=1.0",
+      "kind": "conductor",
+      "base_color": [
+        1,
+        1,
+        1
+      ],
+      "roughness": 1.0,
+      "compensate_energy": true
+    }
+  ],
+  "meshes": [
+    {
+      "id": "sphere",
+      "source": "assets/demo-sphere.obj"
+    }
+  ],
+  "objects": [
+    {
+      "id": "ball_0_0",
+      "name": "单次 · r=0.25",
+      "mesh": "sphere",
+      "material": "ball_0_0",
+      "visible": true,
+      "transform": {
+        "translation": [
+          -0.95,
+          0.55,
+          0
+        ],
+        "scale": [
+          0.38,
+          0.38,
+          0.38
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ball_0_1",
+      "name": "单次 · r=0.65",
+      "mesh": "sphere",
+      "material": "ball_0_1",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0.0,
+          0.55,
+          0
+        ],
+        "scale": [
+          0.38,
+          0.38,
+          0.38
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ball_0_2",
+      "name": "单次 · r=1.0",
+      "mesh": "sphere",
+      "material": "ball_0_2",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0.95,
+          0.55,
+          0
+        ],
+        "scale": [
+          0.38,
+          0.38,
+          0.38
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ball_1_0",
+      "name": "补偿 · r=0.25",
+      "mesh": "sphere",
+      "material": "ball_1_0",
+      "visible": true,
+      "transform": {
+        "translation": [
+          -0.95,
+          1.4500000000000002,
+          0
+        ],
+        "scale": [
+          0.38,
+          0.38,
+          0.38
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ball_1_1",
+      "name": "补偿 · r=0.65",
+      "mesh": "sphere",
+      "material": "ball_1_1",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0.0,
+          1.4500000000000002,
+          0
+        ],
+        "scale": [
+          0.38,
+          0.38,
+          0.38
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ball_1_2",
+      "name": "补偿 · r=1.0",
+      "mesh": "sphere",
+      "material": "ball_1_2",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0.95,
+          1.4500000000000002,
+          0
+        ],
+        "scale": [
+          0.38,
+          0.38,
+          0.38
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  ],
+  "directional_lights": []
+}

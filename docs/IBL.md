@@ -77,6 +77,14 @@ $$A=\mathbb E[W(1-F_c)],\qquad B=\mathbb E[WF_c].$$
 
 默认表为 64×64，RGB 存 `(A,B,0)`。x、y 对应参数区间的端点，查询坐标为 $(N\cdot V(W-1),r(H-1))$。它是数据表，不能应用颜色解码或 Reinhard。
 
+## 多次散射
+
+粗糙导体上的光线可能与多个微表面相交。单次 GGX 的方向反照率为 $E(μ,r)=A+B$，其中 $μ$ 是观察余弦，$r$ 是材质粗糙度。先在每一行积分 $E_{avg}=2∫_0^1 μ E(μ,r)\,dμ$，存入同一张表的蓝色通道。
+
+`microfacet_energy.cpp` 中的 `multiple_scattering` 用 $(1-E_i)(1-E_o)/[π(1-E_{avg})]$ 构造补偿瓣。Schlick 的半球平均值为 $F_{avg}=F_0+(1-F_0)/21$，颜色权重为 $F_{avg}^2 E_{avg}/[1-F_{avg}(1-E_{avg})]$。着色器对直接光使用同一函数形式。环境光用漫反射卷积近似补偿瓣受到的照明，在常量环境下得到解析积分权重 $1-E_o$。[Kulla 与 Conty 的原始讲义](https://blog.selfshadow.com/publications/s2017-shading-course/imageworks/s2017_pbs_imageworks_slides_v2.pdf)
+
+CPU `Bsdf` 以夹在 0.05 和 0.95 之间的 $E_o$ 作为单次反射的采样概率，另一分支使用余弦加权半球。返回的权重与 MIS 使用两者的混合概率密度。纯白导体和单位常量环境构成白炉测试，粗糙度为一的球最容易观察到单次模型的能量损失。
+
 ## 进度与取消
 
 `bake_ibl_environment` 和 `bake_ibl_brdf` 是同步函数，调用方应将其放到后台线程。回调也在该线程执行，不直接访问 Qt。`source/diffuse/specular/brdf` 报告本阶段已完成的像素数；`mipmaps` 的 total 为 0，供上层显示忙碌状态。

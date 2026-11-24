@@ -31,6 +31,15 @@ void add_comparison_controls(QFormLayout& layout, QComboBox& mode, VulkanViewpor
                      [reference](int i) { reference->setEnabled(i > 0); });
     QObject::connect(reference, &QComboBox::currentIndexChanged, panel,
                      [&viewport](int i) { viewport.set_reference_shadow(i - 1); });
+    auto* energy = new QComboBox(panel);
+    energy->setObjectName("reference_energy");
+    energy->addItems({"沿用材质设置", "单次微面散射", "多次散射补偿"});
+    energy->setEnabled(false);
+    layout.addRow("右侧金属", energy);
+    QObject::connect(right, &QComboBox::currentIndexChanged, energy,
+                     [energy](int i) { energy->setEnabled(i > 0); });
+    QObject::connect(energy, &QComboBox::currentIndexChanged, panel,
+                     [&viewport](int i) { viewport.set_reference_energy(i - 1); });
     auto* save = new QPushButton("导出 A/B 图像…");
     save->setEnabled(false);
     layout.addRow(save);

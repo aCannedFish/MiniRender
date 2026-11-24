@@ -406,6 +406,24 @@
           "sha256": "5a83f91ef91fd85fbdfc0a924fb3faf58d008a2a0d253761198c117df308674b"
         }
       ]
+    },
+    {
+      "id": "white-furnace",
+      "name": "白炉 · 粗糙金属",
+      "kind": "scene",
+      "path": "white-furnace.json",
+      "sha256": "8498029c359992045ce6e1fd80769a31ec3b5e73b75c2fdb9157f79f4127b1b3",
+      "thumbnail": "catalog_thumbs/white-furnace.png",
+      "description": "上排启用多次散射补偿，下排为单次反射。三列粗糙度从 0.25 增至 1。",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "recommended": "energy",
+      "dependencies": [
+        {
+          "path": "assets/demo-sphere.obj",
+          "sha256": "79ac5b5d1b2c05e3415a7c5b0ca52007ba0374e92b7adddf228acecd2ea91841"
+        }
+      ]
     }
   ]
 }
