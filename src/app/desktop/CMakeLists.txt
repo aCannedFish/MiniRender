@@ -26,6 +26,7 @@ qt_add_executable(minirender_desktop
     editor_theme.cpp editor_theme.hpp workbench_panels.cpp workbench_panels.hpp theme_smoke.cpp theme_smoke.hpp
     builtin_scenes.cpp builtin_scenes.hpp
     resource_catalog.cpp resource_catalog.hpp catalog_browser.cpp catalog_browser.hpp
+    comparison_controls.cpp comparison_controls.hpp
     catalog_smoke.cpp catalog_smoke.hpp
     sequence_viewer.cpp sequence_viewer.hpp workbench_catalog.cpp
     presets_smoke.cpp presets_smoke.hpp

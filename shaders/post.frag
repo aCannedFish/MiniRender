@@ -10,6 +10,8 @@ layout(binding = 4) uniform sampler2D wire_image;
 layout(binding = 5) uniform sampler2D raw_ao_image;
 layout(binding = 6) uniform sampler2D filtered_ao_image;
 layout(binding = 7) uniform sampler2D outlined_image;
+// 正数表示分割线的物理像素位置加一，负值用于分别导出完整的 A、B 图。
+layout(push_constant) uniform Compare { int split; } compare;
 layout(location = 0) in vec2 uv;
 layout(location = 0) out vec4 color;
 
@@ -133,7 +135,14 @@ vec3 fxaa(vec2 coordinate) {
 
 void main() {
     ivec2 pixel = clamp(ivec2(gl_FragCoord.xy), ivec2(0), textureSize(hdr_image, 0) - 1);
-    if (base_color_preview()) {
+    if (compare.split != 0) {
+        int divider = compare.split - 1;
+        bool first = compare.split == -1 || (compare.split > 0 && pixel.x < divider);
+        color = first ? texelFetch(hdr_image, pixel, 0) : texelFetch(normal_image, pixel, 0);
+        if (compare.split > 0 && pixel.x == divider) color = vec4(0.65,0.67,0.7,1.0);
+        return;
+    }
+    if (base_color_preview() || int(frame.display.y) == 7) {
         vec3 encoded = frame.display.z > 0.5 ? fxaa(uv) : display_texel(pixel);
         color        = vec4(decode_srgb(encoded), 1.0);
         return;

@@ -26,12 +26,14 @@ layout(binding = 0, std140) uniform Frame {
     vec4             ao_kernel[64];
     vec4             ibl;
     vec4             preview_edges;
+    vec4             teaching_light; // 点光源世界坐标与强度
+    vec4             teaching_surface; // 高光指数、镜面系数、纹理开关
 }
 
 frame;
 
 // 原色预览保留独立模式号；既有法线、深度和 AO 模式不改变编号。
 bool base_color_preview() {
-    return frame.display.y > 5.5;
+    return int(frame.display.y) == 6;
 }
 #endif

@@ -172,6 +172,9 @@ void Workbench::install_scene(minirender::SceneDocument document, const QString&
     } else {
         editor_.replace(std::move(document));
     }
+    if (auto* right = findChild<QComboBox*>("compare_right")) {
+        right->setCurrentIndex(0);
+    }
     scene_path_ = path;
 #ifdef Q_OS_MACOS
     // 包内示例作为模板打开，首次保存选择用户路径，保持已签名资源不变。

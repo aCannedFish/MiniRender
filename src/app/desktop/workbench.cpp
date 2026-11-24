@@ -89,7 +89,9 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     connect(browse, &QAction::triggered, this, [this] {
         try {
             auto* browser    = new CatalogBrowser(this);
-            browser->on_open = [this](const auto& entry) { import_resource(entry); };
+            browser->on_open = [this](const auto& entry, bool recommended) {
+                import_resource(entry, recommended);
+            };
             browser->setAttribute(Qt::WA_DontShowOnScreen, testAttribute(Qt::WA_DontShowOnScreen));
             browser->open();
         } catch (const std::exception& error) {
@@ -368,6 +370,7 @@ Workbench::Workbench(QVulkanInstance* instance, bool diagnostic) : diagnostic_(d
     // 显示来源变化时同步控件启用状态，避免修改当前不可用的显示参数。
     viewport_->on_display_changed = [this, realtime](bool offline) {
         findChild<QComboBox*>("view_mode")->setEnabled(!offline);
+        findChild<QComboBox*>("compare_right")->setEnabled(!offline);
         if (auto* quick = findChild<QComboBox*>("viewport_view_mode")) {
             quick->setEnabled(!offline);
         }

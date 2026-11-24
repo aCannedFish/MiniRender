@@ -29,6 +29,12 @@ MiniRender 是用于学习图形学的小型渲染引擎，使用 C++20、Qt Wid
 python3 scripts/prepare_course_catalog.py work/GAMES202 --cli build/macos-desktop-release/minirender_cli
 ```
 
+### 视口对照
+
+在视口的显示下拉框选择 Blinn–Phong，可以观察教学点光源下的底色、纹理和高光。在相机面板调整点光源位置、强度和高光指数。Mary 展示场景在资源目录中提供对应的预览按钮。
+
+相机面板中的“右侧对照”开启同视口 A/B 比较。两侧共用场景、相机和曝光设置，按各自的显示模式处理颜色。拖动中间竖线改变两侧宽度，其他位置仍然可以拖动相机。“导出 A/B 图像”将两个完整视图的 PNG 和显示变换前的线性光照 EXR 写入新文件夹。
+
 ## 构建要求
 
 - Git、CMake 3.25 或更新版本、Ninja，以及支持 C++20 的编译器。
@@ -547,6 +553,7 @@ src/app/
 src/app/desktop/
 ├── CMakeLists.txt  # 桌面目标、Qt/Vulkan 链接、GLSL 编译及样式/场景部署
 ├── resource_catalog.hpp / .cpp  # 目录数据、包内路径和流式 SHA-256 校验
+├── comparison_controls.hpp / .cpp  # A/B 选择、教学点光源参数和图像导出
 ├── catalog_browser.hpp / .cpp  # 搜索、筛选、挂载课程包和选择导入动作
 ├── sequence_viewer.hpp / .cpp  # 异步 EXR 解码、播放与跳帧
 ├── workbench_catalog.cpp  # 导入事务、资源 ID 重映射、进度与取消

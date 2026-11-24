@@ -26,8 +26,8 @@ void SsaoPass::create(VulkanViewport& viewport, const HdrTargets& targets, VkBuf
                       uniform, bytes, composite_inputs);
 }
 
-void SsaoPass::draw(VulkanViewport& viewport) {
-    const bool enabled = viewport.view_mode() == VulkanViewport::base_color_preview_mode
+void SsaoPass::draw(VulkanViewport& viewport, int mode) {
+    const bool enabled = mode == VulkanViewport::base_color_preview_mode
                              ? viewport.preview_occlusion()
                              : viewport.ssao_settings().enabled;
     // 首帧建立全部描述符的有效布局；关闭时清成白色一次，后续跳过采样和滤波。

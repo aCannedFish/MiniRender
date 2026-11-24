@@ -13,6 +13,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPlatformSurfaceEvent>
+#include <QScopedValueRollback>
 #include <QTimer>
 #include <QVulkanInstance>
 #include <QWheelEvent>
@@ -643,6 +644,7 @@ bool VulkanViewport::event(QEvent* event) {
     if (event->type() == QEvent::WindowDeactivate || event->type() == QEvent::Hide ||
         event->type() == QEvent::UngrabMouse) {
         finish_gizmo_drag(event->type() == QEvent::UngrabMouse);
+        dragging_split_  = false;
         pressed_buttons_ = Qt::NoButton;
         dragged_         = false;
     }
@@ -1070,11 +1072,44 @@ bool VulkanViewport::preview_occlusion() const noexcept {
     return preview_occlusion_;
 }
 
+void VulkanViewport::set_teaching(glm::vec4 light, glm::vec3 surface) {
+    teaching_light_   = light;
+    teaching_surface_ = surface;
+    ++teaching_revision_;
+    requestUpdate();
+}
+
+void VulkanViewport::set_comparison_mode(int mode) {
+    comparison_mode_ = mode;
+    dragging_split_  = false;
+    requestUpdate();
+}
+
+void VulkanViewport::set_split_position(float value) {
+    split_ = std::clamp(value, 0.0F, 1.0F);
+    requestUpdate();
+}
+
+QImage VulkanViewport::grab_comparison_side(int side) {
+    QScopedValueRollback<int> restore(export_side_, side);
+    return grab();
+}
+
+minirender::Image VulkanViewport::grab_comparison_hdr(int side) {
+    QScopedValueRollback<int> restore(export_side_, side);
+    return grab_hdr();
+}
+
 void VulkanViewport::set_view_mode(int mode) {
     set_sdf_visible(false);
     set_point_preview_visible(false);
+    if (view_mode_ == mode) {
+        return;
+    }
     view_mode_ = mode;
-    mark_preview_changed();
+    if (comparison_mode_ < 0) {
+        mark_preview_changed();
+    }
     requestUpdate();
 }
 
@@ -1179,6 +1214,13 @@ void VulkanViewport::mousePressEvent(QMouseEvent* event) {
         event->accept();
         return;
     }
+    if (comparison_mode_ >= 0 && !point_visible_ && !sdf_visible_ &&
+        event->button() == Qt::LeftButton &&
+        std::abs(event->position().x() - split_ * static_cast<float>(width())) <= 7.0) {
+        dragging_split_ = true;
+        event->accept();
+        return;
+    }
     // 嵌入窗口的焦点由 QWidget 容器管理，避免把子窗口当顶层窗口激活。
     pressed_buttons_ = event->buttons();
     mouse_origin_ = last_mouse_ = event->position();
@@ -1200,6 +1242,14 @@ void VulkanViewport::mousePressEvent(QMouseEvent* event) {
 }
 
 void VulkanViewport::mouseMoveEvent(QMouseEvent* event) {
+    if (dragging_split_) {
+        dragging_split_ = event->buttons().testFlag(Qt::LeftButton);
+        if (dragging_split_ && width() > 0) {
+            set_split_position(static_cast<float>(event->position().x() / width()));
+        }
+        event->accept();
+        return;
+    }
     if (!scene_ || offline_visible_) {
         return;
     }
@@ -1257,6 +1307,11 @@ void VulkanViewport::mouseMoveEvent(QMouseEvent* event) {
 }
 
 void VulkanViewport::mouseReleaseEvent(QMouseEvent* event) {
+    if (dragging_split_ && event->button() == Qt::LeftButton) {
+        dragging_split_ = false;
+        event->accept();
+        return;
+    }
     if (gizmo_drag_ && event->button() == Qt::LeftButton) {
         finish_gizmo_drag(true);
         event->accept();

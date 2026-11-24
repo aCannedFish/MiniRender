@@ -61,7 +61,7 @@ std::string append_model(minirender::SceneDocument&       target,
 }
 } // namespace
 
-void Workbench::import_resource(const catalog::Entry& entry) {
+void Workbench::import_resource(const catalog::Entry& entry, bool recommended) {
     if (entry.kind == catalog::Kind::sequence) {
         auto* viewer = new SequenceViewer(entry, this);
         viewer->setAttribute(Qt::WA_DontShowOnScreen, testAttribute(Qt::WA_DontShowOnScreen));
@@ -123,7 +123,7 @@ void Workbench::import_resource(const catalog::Entry& entry) {
             }
             return result;
         },
-        [this, entry, progress, feedback, generation](const auto& result) {
+        [this, entry, progress, feedback, generation, recommended](const auto& result) {
             feedback->reset();
             feedback->deleteLater();
             finish_asset_task();
@@ -161,7 +161,8 @@ void Workbench::import_resource(const catalog::Entry& entry) {
                     }
                 } else {
                     findChild<QComboBox*>("view_mode")
-                        ->setCurrentIndex(VulkanViewport::base_color_preview_mode);
+                        ->setCurrentIndex(recommended ? VulkanViewport::blinn_phong_mode
+                                                      : VulkanViewport::base_color_preview_mode);
                     if (!source.objects.empty()) {
                         select_object(source.objects.front().id);
                     }

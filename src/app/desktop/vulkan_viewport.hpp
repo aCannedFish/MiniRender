@@ -122,6 +122,52 @@ class VulkanViewport final : public QWindow {
     // 查询光照显示曝光 EV。
     float exposure() const noexcept;
     static constexpr int base_color_preview_mode = 6;
+    static constexpr int blinn_phong_mode        = 7;
+
+    // 右侧模式为 -1 时使用普通视口；分界位置是窗口宽度的比例。
+    int comparison_mode() const noexcept {
+        return comparison_mode_;
+    }
+
+    void set_comparison_mode(int mode);
+
+    float split_position() const noexcept {
+        return split_;
+    }
+
+    void set_split_position(float value);
+
+    // 教学灯光的变化只使使用 Blinn–Phong 的一侧过期。
+    std::uint64_t comparison_revision(int mode) const noexcept {
+        return preview_revision_ + (mode == blinn_phong_mode ? teaching_revision_ : 0);
+    }
+
+    std::uint64_t comparison_draws() const noexcept {
+        return comparison_draws_;
+    }
+
+    void report_comparison_draw() noexcept {
+        ++comparison_draws_;
+    }
+
+    // 点光源位置使用世界坐标，w 存放强度。表面参数为指数、镜面系数和纹理开关。
+    glm::vec4 teaching_light() const noexcept {
+        return teaching_light_;
+    }
+
+    glm::vec3 teaching_surface() const noexcept {
+        return teaching_surface_;
+    }
+
+    void set_teaching(glm::vec4 light, glm::vec3 surface);
+    // 导出使用同一相机的完整显示图或指定侧的原始线性 HDR。
+    QImage grab_comparison_side(int side);
+    minirender::Image grab_comparison_hdr(int side);
+
+    int export_side() const noexcept {
+        return export_side_;
+    }
+
     // 在 GUI 线程更新原色轮廓开关，并请求视口刷新。
     void set_preview_outline(bool enabled);
     // 查询原色轮廓开关。
@@ -301,8 +347,15 @@ class VulkanViewport final : public QWindow {
     // 记录等待新预览完成的时间。
     QElapsedTimer                                     preview_wait_;
     QString                                           frame_wait_reason_;
-    bool                                              shadows_enabled_          = true;
-    bool                                              fxaa_enabled_             = true;
+    bool                                              shadows_enabled_   = true;
+    bool                                              fxaa_enabled_      = true;
+    std::uint64_t                                     teaching_revision_ = 0, comparison_draws_ = 0;
+    int                                               comparison_mode_ = -1;
+    int                                               export_side_     = -1;
+    float                                             split_           = 0.5F;
+    bool                                              dragging_split_  = false;
+    glm::vec4                                         teaching_light_{1.5F, 2.5F, 2.0F, 10.F};
+    glm::vec3                                         teaching_surface_{35.F, 0.25F, 1.F};
     float                                             exposure_                 = 0.0F;
     int                                               view_mode_                = 0;
     bool                                              preview_occlusion_        = true;
