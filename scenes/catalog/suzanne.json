@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "camera": {
+    "position": [
+      0.9,
+      1.25,
+      3.3
+    ],
+    "target": [
+      0,
+      0.8,
+      0
+    ],
+    "up": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "vertical_fov": 36,
+    "near": 0.05,
+    "far": 100.0
+  },
+  "environment": [
+    0.15,
+    0.15,
+    0.15
+  ],
+  "materials": [
+    {
+      "id": "surface",
+      "name": "Suzanne 猴头",
+      "kind": "diffuse",
+      "base_color": [
+        0.62,
+        0.64,
+        0.67
+      ]
+    }
+  ],
+  "meshes": [
+    {
+      "id": "suzanne",
+      "source": "../assets/suzanne.obj"
+    }
+  ],
+  "objects": [
+    {
+      "id": "suzanne",
+      "name": "Suzanne 猴头",
+      "mesh": "suzanne",
+      "material": "surface",
+      "transform": {
+        "translation": [
+          0,
+          0.73095703125,
+          0
+        ],
+        "scale": [
+          0.75,
+          0.75,
+          0.75
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  ],
+  "directional_lights": [
+    {
+      "id": "sun",
+      "direction": [
+        -1,
+        -2,
+        -1
+      ],
+      "color": [
+        1,
+        0.95,
+        0.85
+      ],
+      "intensity": 3.0
+    }
+  ]
+}

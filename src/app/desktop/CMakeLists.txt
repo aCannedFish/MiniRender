@@ -27,7 +27,7 @@ qt_add_executable(minirender_desktop
     preview_smoke.cpp preview_smoke.hpp outline_smoke.cpp outline_smoke.hpp
     main.cpp vulkan_viewport.cpp vulkan_viewport.hpp
     editor_theme.cpp editor_theme.hpp workbench_panels.cpp workbench_panels.hpp theme_smoke.cpp theme_smoke.hpp
-    builtin_scenes.cpp builtin_scenes.hpp
+    builtin_scenes.cpp builtin_scenes.hpp quick_import_menu.cpp quick_import_menu.hpp
     resource_catalog.cpp resource_catalog.hpp catalog_browser.cpp catalog_browser.hpp
     reference_panel.cpp reference_panel.hpp
     comparison_controls.cpp comparison_controls.hpp

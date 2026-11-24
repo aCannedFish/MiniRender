@@ -375,6 +375,44 @@
       ]
     },
     {
+      "id": "spot",
+      "name": "Spot 小牛",
+      "kind": "model",
+      "path": "catalog/spot.json",
+      "sha256": "7a03707ded3494ed55e38afababe1fc49f527fff0e424ca9586acb837510c499",
+      "thumbnail": "catalog_thumbs/spot.png",
+      "description": "带原版斑纹贴图的三角网格。",
+      "source": "Keenan Crane",
+      "rights": "CC0 1.0",
+      "dependencies": [
+        {
+          "path": "assets/spot.obj",
+          "sha256": "0738b5e8608fed74e5e8c7aa8dd0af97b4b74f9f6cbf7aac84cd7e40b2e44a75"
+        },
+        {
+          "path": "assets/textures/spot.png",
+          "sha256": "cddabbae52a666173e7953e238b88340d285044dc20b36f8ed3f1a41db534fa5"
+        }
+      ]
+    },
+    {
+      "id": "suzanne",
+      "name": "Suzanne 猴头",
+      "kind": "model",
+      "path": "catalog/suzanne.json",
+      "sha256": "3f1e0cb64ce011c6e092a8d948145b1fe52771d6999efef7757fc4e5fb94c5b8",
+      "thumbnail": "catalog_thumbs/suzanne.png",
+      "description": "灰色漫反射材质，保留猴头的 UV 和着色法线。",
+      "source": "Norbert Nopper / UX3D · Khronos",
+      "rights": "CC0 1.0",
+      "dependencies": [
+        {
+          "path": "assets/suzanne.obj",
+          "sha256": "aeb18d4cf66263c9291f2a349ff912219f26263d83638f94908d05a6c14ace44"
+        }
+      ]
+    },
+    {
       "id": "motion",
       "name": "方块运动 · 4 帧",
       "kind": "sequence",

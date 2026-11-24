@@ -113,7 +113,7 @@ void Workbench::import_builtin_scene(const QString& id) {
     const auto entries = catalog::read(builtin_scene_directory(), true);
     for (const auto& entry : entries) {
         if (entry.builtin && entry.id == id) {
-            import_resource(entry);
+            import_resource(entry, catalog::ImportAction::replace);
             return;
         }
     }

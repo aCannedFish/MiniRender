@@ -211,16 +211,12 @@ def main() -> int:
         ).strip()
         resources = staged / "Contents/Resources"
         resources.mkdir(exist_ok=True)
+        build_info = {"commit": commit, "installed_at": datetime.now(timezone.utc).isoformat()}
+        course_root = repository / "work" / "GAMES202"
+        if (course_root / "resource_catalog.json").is_file():
+            build_info["course_root"] = str(course_root)
         (resources / "minirender-build.json").write_text(
-            json.dumps(
-                {
-                    "commit": commit,
-                    "installed_at": datetime.now(timezone.utc).isoformat(),
-                },
-                indent=2,
-            )
-            + "\n",
-            encoding="utf-8",
+            json.dumps(build_info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
         # 只部署 Widgets 使用的 Cocoa 和原生样式插件，避免混入其他 Qt 版本的插件。
         qtpaths = str(Path(deploy).with_name("qtpaths"))

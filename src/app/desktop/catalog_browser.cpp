@@ -8,7 +8,6 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QPushButton>
-#include <QSettings>
 #include <QVBoxLayout>
 
 CatalogBrowser::CatalogBrowser(QWidget* parent) : QDialog(parent) {
@@ -40,18 +39,24 @@ CatalogBrowser::CatalogBrowser(QWidget* parent) : QDialog(parent) {
     notice_->setTextFormat(Qt::PlainText);
     notice_->setWordWrap(true);
     layout->addWidget(notice_);
-    open_         = new QPushButton;
+    open_ = new QPushButton;
+    open_->setObjectName("catalog_append_or_open");
+    open_->setDefault(true);
+    replace_ = new QPushButton("覆盖导入");
+    replace_->setObjectName("catalog_replace");
+    replace_->setToolTip("清除当前场景，并用所选资源的相机和灯光打开它");
     auto* actions = new QHBoxLayout;
     recommended_  = new QPushButton("覆盖并预览 Blinn–Phong");
     recommended_->setObjectName("catalog_recommended");
     actions->addStretch();
     actions->addWidget(recommended_);
+    actions->addWidget(replace_);
     actions->addWidget(open_);
     layout->addLayout(actions);
     connect(search_, &QLineEdit::textChanged, this, [this] { filter(); });
     connect(type_, &QComboBox::currentIndexChanged, this, [this] { filter(); });
     connect(list_, &QListWidget::currentRowChanged, this, [this] { describe(); });
-    const auto activate = [this](bool recommended) {
+    const auto activate = [this](catalog::ImportAction action) {
         auto* item = list_->currentItem();
         if (!item || !on_open) {
             return;
@@ -60,20 +65,25 @@ CatalogBrowser::CatalogBrowser(QWidget* parent) : QDialog(parent) {
         auto      entry =
             index < builtin_.size() ? builtin_.at(index) : course_.at(index - builtin_.size());
         accept();
-        on_open(entry, recommended);
+        on_open(entry, entry.kind == catalog::Kind::sequence ? catalog::ImportAction::open_sequence
+                                                             : action);
     };
-    connect(open_, &QPushButton::clicked, this, [activate] { activate(false); });
-    connect(recommended_, &QPushButton::clicked, this, [activate] { activate(true); });
+    connect(open_, &QPushButton::clicked, this,
+            [activate] { activate(catalog::ImportAction::append); });
+    connect(recommended_, &QPushButton::clicked, this,
+            [activate] { activate(catalog::ImportAction::recommended); });
+    connect(replace_, &QPushButton::clicked, this,
+            [activate] { activate(catalog::ImportAction::replace); });
     connect(list_, &QListWidget::itemDoubleClicked, open_, [this] { open_->click(); });
     connect(mount_button, &QPushButton::clicked, this, [this] {
         const auto path =
             QFileDialog::getExistingDirectory(this, "选择包含 resource_catalog.json 的目录");
         if (!path.isEmpty() && mount(path)) {
-            QSettings().setValue("catalog/course_root", path);
+            catalog::remember_course_directory(path);
         }
     });
     builtin_        = catalog::read(builtin_scene_directory(), true);
-    const auto path = QSettings().value("catalog/course_root").toString();
+    const auto path = catalog::course_directory();
     filter();
     if (!path.isEmpty()) {
         mount(path);
@@ -119,6 +129,7 @@ void CatalogBrowser::describe() {
     auto* item = list_->currentItem();
     open_->setEnabled(item != nullptr);
     recommended_->hide();
+    replace_->hide();
     if (!item) {
         detail_->setText("没有匹配的资源");
         open_->setText("打开");
@@ -127,7 +138,7 @@ void CatalogBrowser::describe() {
     int         index = item->data(Qt::UserRole).toInt();
     const auto& e = index < builtin_.size() ? builtin_[index] : course_[index - builtin_.size()];
     const auto  format = e.kind == catalog::Kind::sequence ? "EXR 序列" : "MiniRender JSON";
-    recommended_->setVisible(e.kind == catalog::Kind::scene && !e.recommended.isEmpty());
+    recommended_->setVisible(e.kind != catalog::Kind::sequence && !e.recommended.isEmpty());
     const QString action = e.recommended == "comparison" ? "覆盖并生成对照"
                            : e.recommended == "ssgi"     ? "覆盖并预览屏幕间接光"
                            : e.recommended == "prt"      ? "覆盖并烘焙 PRT"
@@ -139,8 +150,11 @@ void CatalogBrowser::describe() {
     detail_->setText(QString("%1\n%2 · %3 · %4\n%5\nSHA-256  %6")
                          .arg(e.description, e.source, e.rights, table ? "线性 PNG" : format,
                               e.file.path, QString::fromLatin1(e.file.sha256)));
-    open_->setText(e.kind == catalog::Kind::scene   ? "覆盖导入场景"
-                   : e.kind == catalog::Kind::model ? "追加模型"
-                   : table                          ? "查看查找表"
-                                                    : "打开帧序列");
+    const bool geometry = e.kind != catalog::Kind::sequence;
+    replace_->setVisible(geometry);
+    open_->setText(geometry ? "直接导入" : table ? "查看查找表" : "打开帧序列");
+    open_->setToolTip(!geometry ? "在独立窗口中打开"
+                      : e.kind == catalog::Kind::model
+                          ? "将模型、材质和纹理添加到当前场景"
+                          : "添加物体、方向光和介质，沿用当前相机与环境");
 }

@@ -8,6 +8,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSet>
+#include <QSettings>
 #include <stdexcept>
 
 namespace catalog {
@@ -45,6 +46,35 @@ File parse_file(const QJsonObject& object) {
     return result;
 }
 } // namespace
+
+QString course_directory() {
+    const auto mounted =
+        QSettings("MiniRender", "MiniRender").value("catalog/course_root").toString();
+    if (!mounted.isEmpty()) {
+        return mounted;
+    }
+    // 兼容旧版本使用的默认 Qt 设置域。
+    const auto legacy = QSettings().value("catalog/course_root").toString();
+    if (!legacy.isEmpty()) {
+        return legacy;
+    }
+    // 本机安装器记录已有课程包的位置，用户复制应用到其他设备后仍可重新挂载。
+    QFile metadata(QDir(builtin_scene_directory()).filePath("../minirender-build.json"));
+    if (metadata.open(QIODevice::ReadOnly)) {
+        const auto root =
+            QJsonDocument::fromJson(metadata.readAll()).object().value("course_root").toString();
+        if (!root.isEmpty() && QFileInfo(QDir(root).filePath("resource_catalog.json")).isFile()) {
+            return root;
+        }
+    }
+    const auto local = QDir::current().filePath("work/GAMES202");
+    return QFileInfo(QDir(local).filePath("resource_catalog.json")).isFile() ? local : QString{};
+}
+
+void remember_course_directory(const QString& root) {
+    QSettings("MiniRender", "MiniRender")
+        .setValue("catalog/course_root", QFileInfo(root).canonicalFilePath());
+}
 
 QString resolve(const QString& root, const QString& relative) {
     QDir       directory(QFileInfo(root).canonicalFilePath());

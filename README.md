@@ -19,9 +19,11 @@ MiniRender 是用于学习图形学的小型渲染引擎，使用 C++20、Qt Wid
 
 ### 资源目录
 
-打开工具栏的“快速导入 → 资源目录”，按名称、类型或作业编号筛选资源。选择场景会覆盖当前文档，选择模型会把物体及其材质追加到当前场景，选择帧序列会打开独立播放器。整组模型可以一次撤销。另存场景时，目录导入的模型与纹理会随 JSON 保存到目标目录，可以一起复制到另一台电脑。
+工具栏的“快速导入”提供两种操作。选择“直接导入 → Spot 小牛”，会把小牛及斑纹材质加入当前场景，保留已有物体、相机和环境。选择“覆盖导入 → Spot 小牛”，会清除当前场景，按预设相机单独显示小牛。Suzanne 猴头、单位立方体和挂载的课程模型使用相同入口。
 
-随应用提供 19 个场景目录条目（含同一 Cornell Box 的三种预览入口）、一个可追加的单位立方体和四帧 EXR 示例。已准备好的课程包可通过“选择课程包…”挂载，应用会记住路径。Mary 和 Bunny 均提供独立场景与追加模型两种入口。HW5 的 box 与 pink-room 可按帧播放或拖动查看。
+导入场景模板时，“直接导入”还会添加模板中的方向光和介质。一次撤销即可移除本次追加的全部内容。“覆盖导入”会载入模板的完整相机、灯光和环境。也可以打开“资源目录”，搜索名称后使用同名按钮。双击模型或场景会直接添加，双击帧序列会打开播放器。另存场景时，关联的网格和纹理会一起保存。
+
+随应用安装的目录含 19 个场景条目、3 个模型和一组四帧 EXR。**Mary 人物**来自 GAMES202 HW0。挂载课程包后，在“快速导入 → 覆盖导入 → Mary 人物”可单独查看带原始贴图和两个材质分组的人物。首次在其他设备使用时，进入“资源目录 → 选择课程包…”并选择包含 `resource_catalog.json` 的目录。本机 macOS 安装器会识别仓库内已准备好的 `work/GAMES202`，用户手动选择的路径优先。模型来源与许可见[经典模型说明](scenes/assets/MODELS.md)。
 
 从已解压的作业生成课程索引时，准备 Python 3、FFmpeg、NumPy 和本项目构建的 CLI。下例假定课程目录中已有 `frameworks/HW0`、`frameworks/HW2` 以及 `HW5-data/{box,pink-room}/input`。脚本生成索引后，在资源目录选择包含 `resource_catalog.json` 的文件夹。
 
@@ -31,7 +33,7 @@ python3 scripts/prepare_course_catalog.py work/GAMES202 --cli build/macos-deskto
 
 ### 视口对照
 
-在视口的显示下拉框选择 Blinn–Phong，可以观察教学点光源下的底色、纹理和高光。在相机面板调整点光源位置、强度和高光指数。Mary 展示场景在资源目录中提供对应的预览按钮。
+在视口的显示下拉框选择 Blinn–Phong，可以观察教学点光源下的底色、纹理和高光。在相机面板调整点光源位置、强度和高光指数。Mary 人物条目在资源目录中提供对应的预览按钮。
 
 相机面板中的“右侧对照”开启同视口 A/B 比较。两侧共用场景、相机和曝光设置，按各自的显示模式处理颜色。拖动中间竖线改变两侧宽度，其他位置仍然可以拖动相机。“导出 A/B 图像”将两个完整视图的 PNG 和显示变换前的线性光照 EXR 写入新文件夹。
 
@@ -628,6 +630,8 @@ src/app/desktop/
 ├── integration_smoke.cpp  # 综合检查 Cornell 参考图、视口与便携保存
 ├── comparison_controls.hpp  # A/B 选择、教学点光源参数和图像导出的接口
 ├── comparison_controls.cpp  # A/B 选择、教学点光源参数和图像导出
+├── quick_import_menu.hpp  # 两种导入菜单与工作台的回调接口
+├── quick_import_menu.cpp  # 按导入方式列出模型与场景，刷新已挂载的课程包
 ├── catalog_browser.hpp  # 搜索、筛选、挂载课程包和选择导入动作的接口
 ├── catalog_browser.cpp  # 搜索、筛选、挂载课程包和选择导入动作
 ├── sequence_viewer.hpp  # 异步 EXR 解码、播放与跳帧的接口
@@ -952,6 +956,9 @@ scenes/
 
 ```text
 scenes/assets/
+├── MODELS.md  # Spot 与 Suzanne 的来源、许可及转换说明
+├── spot.obj  # Spot 小牛的三角网格与面角 UV
+├── suzanne.obj  # Suzanne 猴头的几何、UV 与法线
 ├── cube.obj  # 共享位置的立方体
 ├── demo-sphere.obj  # 用于材质和光传输示例的球体
 ├── lightfield-card.obj  # 光场棋盘卡片网格
@@ -968,6 +975,7 @@ scenes/assets/
 
 ```text
 scenes/assets/textures/
+├── spot.png  # Spot 小牛原始斑纹底色
 ├── checker.png  # 彩色棋盘纹理
 ├── gray.jpg  # 灰色 JPEG 输入样本
 ├── linear16.png  # 16 位线性图像输入样本
@@ -983,6 +991,8 @@ scenes/assets/textures/
 
 ```text
 scenes/catalog/
+├── spot.json  # 带斑纹材质及展示相机的小牛模型
+├── suzanne.json  # 灰色猴头模型与单独展示的取景
 ├── cube.json  # 可追加的单位立方体
 ├── motion.json  # 四帧样本的路径与校验值
 ├── motion_0.exr  # 线性 RGB 低采样图，第 1 帧
@@ -1034,6 +1044,8 @@ scenes/catalog/motion_guides/
 
 ```text
 scenes/catalog_thumbs/
+├── spot.png  # 小牛模型的目录预览
+├── suzanne.png  # 猴头模型的目录预览
 ├── bounded_fog.png  # bounded_fog 的资源目录预览
 ├── cornell.png  # cornell 的资源目录预览
 ├── cornell_fog.png  # cornell_fog 的资源目录预览

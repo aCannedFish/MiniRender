@@ -1,5 +1,4 @@
-// 回归测试：Built-in offline scenes load complete editable geometry and lighting；Built-in sphere
-// is closed with outward geometry and radial normals。
+// 检查内置场景的可编辑光照、球体拓扑，以及 Spot 和 Suzanne 的单模型几何与材质。
 
 #include <minirender/assets/scene_io.hpp>
 #include <minirender/geometry/halfedge.hpp>
@@ -59,6 +58,29 @@ TEST_CASE("Built-in sphere is closed with outward geometry and radial normals", 
         REQUIRE(glm::dot(glm::cross(b - a, c - a), a + b + c) > 0.0F);
         for (const auto& corner : triangle.corners) {
             REQUIRE(glm::dot(corner.normal, mesh.positions[corner.position]) > 0.999F);
+        }
+    }
+}
+
+TEST_CASE("Classic model presets open as standalone scenes with editable mesh assets",
+          "[presets]") {
+    const auto catalog = std::filesystem::path(MINIRENDER_SOURCE_DIR) / "scenes" / "catalog";
+    for (const std::string id : {"spot", "suzanne"}) {
+        CAPTURE(id);
+        const auto scene = load_scene(catalog / (id + ".json"));
+        scene.validate();
+        REQUIRE(scene.objects.size() == 1);
+        REQUIRE(scene.meshes.size() == 1);
+        REQUIRE(scene.materials.size() == 1);
+        REQUIRE(scene.objects.front().mesh_id == scene.meshes.front().id);
+        REQUIRE(scene.objects.front().material_id == scene.materials.front().id);
+        REQUIRE(scene.meshes.front().data->triangles.size() == (id == "spot" ? 5856 : 3936));
+        if (id == "spot") {
+            REQUIRE(scene.textures.size() == 1);
+            REQUIRE(scene.materials.front().base_color_texture == scene.textures.front().id);
+            REQUIRE(scene.textures.front().encoding == ColorEncoding::srgb);
+        } else {
+            REQUIRE(scene.textures.empty());
         }
     }
 }

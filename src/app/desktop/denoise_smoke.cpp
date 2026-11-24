@@ -94,7 +94,7 @@ void start_denoise_smoke(Workbench& window, const QString& directory) {
                 auto       entry = std::find_if(entries.begin(), entries.end(),
                                                 [id](const auto& e) { return e.id == id; });
                 require(entry != entries.end(), "Denoiser sequence missing");
-                window.import_resource(*entry);
+                window.import_resource(*entry, catalog::ImportAction::open_sequence);
             } else if (state->stage >= 1 && state->stage <= 8) {
                 auto* viewer = window.findChild<QDialog*>("sequence_viewer");
                 require(viewer, "Sequence viewer missing");

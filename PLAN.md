@@ -300,9 +300,13 @@ Windows 阶段不重新组织场景格式和算法模块。确需平台修复时
 | G6.2 时间降噪 | 前帧重投影、历史拒绝、7×7 邻域限幅及时间累积 | box 与 pink-room 连续运动、切镜、跳帧、遮挡解除和 SSGI 历史重置 | HW5 的 box 20 帧、pink-room 80 帧全部完成连续滤波，离线及 GPU 回归覆盖遮挡、刚体运动和切镜；隐藏 Vulkan 同步验证零错误 |
 | G7 综合验证 | Cornell 实时面积光、间接光和降噪，同视口比较离线参考，打包跨设备场景 | macOS 隐藏回归、Windows / NVIDIA 实机渲染、验证层与交互测试 | macOS 综合回归通过。Windows 桌面与 SPIR-V 已在 MSVC/Qt CI 编译，NVIDIA 设备待实测 |
 
-课程模型和图像保存在用户选择的目录。随应用发布的示例使用项目自建资产。新增算法的公共参数和 CPU 参考放在独立模块，GPU 资源由渲染通道管理。Qt 将逐物体参数放入检查器，全局光照、调试视图和滤波放入渲染设置。后台烘焙、读取和滤波报告进度，取消后保留最近一次完整结果。
+课程模型和图像保存在用户选择的目录。随应用发布的示例使用项目自建资产及附有许可说明的经典模型。新增算法的公共参数和 CPU 参考放在独立模块，GPU 资源由渲染通道管理。Qt 将逐物体参数放入检查器，全局光照、调试视图和滤波放入渲染设置。后台烘焙、读取和滤波报告进度，取消后保留最近一次完整结果。
 
 各阶段的实现与审查记录见 [资源目录](https://github.com/aCannedFish/MiniRender/pull/52)、[教学预览](https://github.com/aCannedFish/MiniRender/pull/53)、[方向光阴影](https://github.com/aCannedFish/MiniRender/pull/54)、[金属补偿](https://github.com/aCannedFish/MiniRender/pull/55)、[矩形面积光](https://github.com/aCannedFish/MiniRender/pull/56)、[面积光阴影](https://github.com/aCannedFish/MiniRender/pull/57)、[PRT](https://github.com/aCannedFish/MiniRender/pull/58)、[屏幕间接光](https://github.com/aCannedFish/MiniRender/pull/59)、[降噪](https://github.com/aCannedFish/MiniRender/pull/60) 和 [综合验收](https://github.com/aCannedFish/MiniRender/pull/61)。
+
+### 快速导入
+
+模型与场景共用“直接导入”和“覆盖导入”入口。直接添加场景时合并物体、材质、纹理、方向光和介质，保留当前相机与环境。覆盖导入从已校验的完整文档开始。Spot 小牛和 Suzanne 猴头随应用安装。课程包提供 Mary 人物与 Bunny，Mary 的两个材质分组共用一次导入和撤销。本机 311 项 CTest 和 12 项隐藏窗口回归通过，Vulkan 同步验证零错误。
 
 ### 综合验证
 
