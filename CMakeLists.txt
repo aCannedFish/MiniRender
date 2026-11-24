@@ -27,6 +27,22 @@ else()
         -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
 endif()
 
+# 从固定版本的 DDS 读取半精度纹素。嵌入静态库可让 CLI 和桌面版共用拟合表。
+function(read_ltc_table name output checksum)
+    set(source "${CMAKE_CURRENT_SOURCE_DIR}/third_party/ltc/${name}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${source}")
+    file(SHA256 "${source}" actual)
+    if(NOT actual STREQUAL checksum)
+        message(FATAL_ERROR "Unexpected LTC fit table contents: ${name}")
+    endif()
+    file(READ "${source}" bytes OFFSET 128 HEX)
+    string(REGEX REPLACE "(..)(..)(..)(..)(..)(..)(..)(..)" "0x\\1,0x\\2,0x\\3,0x\\4,0x\\5,0x\\6,0x\\7,0x\\8,\n" rows "${bytes}")
+    set(${output} "${rows}" PARENT_SCOPE)
+endfunction()
+read_ltc_table(ltc_1.dds ltc_matrix 6aa389c6c0403a408cf6bb23dcdc543ad3e97f0fdc49e60f034b6a85682ee18d)
+read_ltc_table(ltc_2.dds ltc_magnitude 2ff4f03b10d73e25985216d73a58aa57375f0c775dee0e1bde075d44e2b07200)
+configure_file(cmake/ltc_tables.hpp.in generated/ltc_tables.hpp @ONLY)
+
 add_library(minirender_core
     src/core/image.cpp
     src/core/texture.cpp
@@ -83,6 +99,7 @@ add_library(minirender_core
     src/render/medium.cpp
     src/render/render_session.cpp
     src/render/ssao.cpp
+    src/render/rectangle_light.cpp
     src/render/microfacet_energy.cpp
     src/render/ibl.cpp
     src/render/raster_mesh.cpp
@@ -100,13 +117,18 @@ add_library(minirender_core
     src/assets/lightfield_io.cpp
     src/assets/medium_io.cpp
     src/assets/cloth_simulation_io.cpp)
-target_include_directories(minirender_core PUBLIC include)
+target_include_directories(minirender_core PUBLIC include PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(minirender_core PUBLIC glm::glm Threads::Threads PRIVATE minirender_warnings nlohmann_json::nlohmann_json tinyobjloader minirender_exr_codec minirender_raster_codec)
 target_compile_definitions(minirender_core PUBLIC
     GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
 add_executable(minirender_cli src/app/cli.cpp src/app/render_cli.cpp src/app/lightfield_cli.cpp)
 target_link_libraries(minirender_cli PRIVATE minirender_core minirender_warnings)
+add_custom_command(TARGET minirender_cli POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:minirender_cli>/licenses"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_SOURCE_DIR}/third_party/ltc/LICENSE"
+            "$<TARGET_FILE_DIR:minirender_cli>/licenses/LTC.txt")
+
 
 if(BUILD_TESTING)
     # 教学示例独立运行，较慢的图像生成不加入每次 CTest。
@@ -151,7 +173,7 @@ if(BUILD_TESTING)
     target_link_libraries(minirender_lightfield_example PRIVATE minirender_core minirender_warnings)
     add_executable(minirender_tests tests/core_tests.cpp tests/scene_tests.cpp tests/texture_tests.cpp
         tests/intersection_tests.cpp tests/sampling_tests.cpp tests/light_tests.cpp tests/path_tests.cpp
-        tests/session_tests.cpp tests/ssao_tests.cpp tests/ibl_tests.cpp tests/microfacet_energy_tests.cpp tests/geometry_tests.cpp
+        tests/session_tests.cpp tests/ssao_tests.cpp tests/ibl_tests.cpp tests/microfacet_energy_tests.cpp tests/rectangle_light_tests.cpp tests/geometry_tests.cpp
         tests/displacement_tests.cpp tests/mesh_io_tests.cpp tests/raster_mesh_tests.cpp
         tests/simplify_tests.cpp tests/gizmo_tests.cpp tests/sided_tests.cpp tests/remesh_tests.cpp
         tests/builtin_scene_tests.cpp tests/adaptive_tests.cpp tests/point_cloud_tests.cpp

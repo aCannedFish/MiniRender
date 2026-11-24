@@ -6,6 +6,7 @@
 #include "scene_instance.glsl"
 #include "cloth.glsl"
 #include "ibl_sampling.glsl"
+#include "rectangle_light.glsl"
 
 layout(location = 0) in vec3 world_position;
 layout(location = 1) in vec3 world_normal;
@@ -196,6 +197,11 @@ void main() {
         vec3  diffuse  = (vec3(1.0) - f) * (1.0 - metallic) * albedo / PI;
         result += (diffuse + specular) * frame.lights[i].radiance.rgb * ndl *
                   visibility;
+    }
+    for(int i=0;i<int(frame.area_settings.x);++i){
+        vec3 diffuse,specular;
+        rectangle_response(area.lights[i],world_position,n,v,albedo,material.x,metallic,diffuse,specular);
+        result+=diffuse+specular;
     }
     color = vec4(result, 1.0);
 }

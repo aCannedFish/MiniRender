@@ -3,6 +3,7 @@
 
 #include <minirender/core/sampling.hpp>
 #include <minirender/geometry/uv_tangents.hpp>
+#include <minirender/render/rectangle_light.hpp>
 #include <minirender/scene/scene.hpp>
 #include <minirender/simulation/cloth_component.hpp>
 
@@ -384,6 +385,9 @@ std::shared_ptr<const SceneSnapshot> make_snapshot(const SceneDocument& document
         }
         snapshot->instances.push_back({object.id, mesh->data, *material, object.transform.matrix(),
                                        object.transform.normal_matrix(), texture});
+        if (auto rect = rectangle_light(snapshot->instances.back())) {
+            snapshot->rectangles.push_back(std::move(*rect));
+        }
     }
     return snapshot;
 }

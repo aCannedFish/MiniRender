@@ -186,6 +186,14 @@ struct RenderInstance {
     std::shared_ptr<const Texture>  base_color_texture;
 };
 
+// 实时光源视图从可见发光三角形提取。四角以物体正面绕序排列。
+struct RectangleLight {
+    std::array<glm::vec3, 4> corners;
+    glm::vec3                radiance;
+    bool                     double_sided;
+    std::string              object_id;
+};
+
 struct SceneSnapshot {
     Camera                         camera;
     glm::vec3                      environment;
@@ -194,6 +202,7 @@ struct SceneSnapshot {
     std::shared_ptr<const Texture> environment_texture;
     float                          environment_strength         = 1;
     float                          environment_rotation_degrees = 0;
+    std::vector<RectangleLight>    rectangles;
     std::vector<MediumRegion>      media{};
 };
 

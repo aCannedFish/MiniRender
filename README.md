@@ -45,6 +45,10 @@ python3 scripts/prepare_course_catalog.py work/GAMES202 --cli build/macos-deskto
 
 `minirender_energy_example 输出目录 [分辨率] [每格样本数]` 分别使用均匀半球、GGX 可见法线和 split-sum 积分生成 EXR 表。红色通道为方向反照率，蓝色通道为该粗糙度的余弦加权平均。公式与采样方法见 [IBL 文档](docs/IBL.md)。
 
+### 矩形面积光
+
+在 Cornell Box 中切换到“光照合成”，顶部发光面会照亮房间。选中灯具后可用操纵器移动或旋转，物体缩放决定发光面积，材质的发光 RGB 决定辐亮度。也可以在灯光面板点击“添加矩形面积光”。实时漫反射使用余弦多边形积分，金属高光使用 LTC；离线积分器继续采样该物体的发光三角形。
+
 ## 构建要求
 
 - Git、CMake 3.25 或更新版本、Ninja，以及支持 C++20 的编译器。
@@ -290,6 +294,7 @@ include/minirender/render/
 ├── bvh.hpp  # 场景三角形的 SAH BVH 构建、最近命中与遮挡查询
 ├── cloth_bsdf.hpp  # 布料散射模型的方向求值、混合采样与概率密度
 ├── dipole.hpp  # 均匀半无限介质的 dipole 扩散模型及径向分布
+├── rectangle_light.hpp  # 矩形几何、LTC 拟合表和辐亮度积分的接口
 ├── microfacet_energy.hpp  # 方向反照率、能量表和补偿瓣的数值接口
 ├── ibl.hpp  # 环境光预处理：漫反射卷积、GGX 粗糙度层与 BRDF 积分表
 ├── intersection.hpp  # 射线区间、包围盒与三角形求交的数值约定
@@ -444,6 +449,7 @@ src/render/
 ├── bvh.cpp  # 场景三角形的 SAH BVH 构建、最近命中与遮挡查询
 ├── cloth_bsdf.cpp  # 布料散射模型的方向求值、混合采样与概率密度
 ├── dipole.cpp  # 均匀半无限介质的 dipole 扩散模型及径向分布
+├── rectangle_light.cpp  # 发光矩形边界、地平线裁剪与球面多边形积分
 ├── microfacet_energy.cpp  # 方向反照率积分、余弦加权平均和 Kulla–Conty 补偿
 ├── ibl.cpp  # 环境光预处理：漫反射卷积、GGX 粗糙度层与 BRDF 积分表
 ├── intersection.cpp  # 射线区间、包围盒与三角形求交的数值约定
@@ -663,6 +669,8 @@ src/app/desktop/
 ├── screen_pass.hpp  # 接口：可复用的全屏 Vulkan 渲染附件、描述符与命令录制
 ├── sdf_renderer.cpp  # 距离场图元与 CSG 的 Vulkan 步进显示
 ├── sdf_renderer.hpp  # 接口：距离场图元与 CSG 的 Vulkan 步进显示
+├── gpu_rectangle.hpp / .cpp  # 上传 LTC 表与世界空间矩形光源列表
+├── rectangle_smoke.hpp / .cpp  # 核对 Cornell 光照和灯具编辑事务
 ├── shadow_smoke.hpp / .cpp  # 离屏测量半影宽度、动态遮挡、多方向光与分屏过滤
 ├── shadow_map.cpp  # 方向光阴影图数组的分配、布局与逐层渲染
 ├── shadow_map.hpp  # 接口：方向光阴影图数组的分配、布局与逐层渲染
@@ -808,6 +816,7 @@ shaders/
 ├── sdf.frag  # Vulkan 距离场步进、CSG 求值、法线、阴影与诊断输出
 ├── sdf.vert  # 距离场全屏覆盖顶点生成
 ├── sdf_display.frag  # 距离场渲染附件的屏幕显示转换
+├── rectangle_light.glsl  # 逐像素地平线裁剪与漫反射、GGX 矩形光积分
 ├── shadow_filter.glsl  # 接收面深度梯度、遮挡物搜索、半影半径与 PCF 过滤
 ├── shadow.vert  # 将实例网格变换到指定方向光的阴影裁剪空间
 ├── ssao.frag  # 从屏幕深度重建位置，沿旋转半球样本估计局部遮蔽
@@ -948,6 +957,7 @@ tests/
 ├── displacement_tests.cpp  # 实际位移、共享边接缝、退化、预算和取消
 ├── geometry_tests.cpp  # 半边拓扑、Loop 规则、边界和面角属性
 ├── gizmo_tests.cpp  # 操纵器布局、命中、移动旋转与事务历史
+├── rectangle_light_tests.cpp  # LTC 与数值面积积分对照，验证矩形识别、变换和朝向
 ├── microfacet_energy_tests.cpp  # 白炉积分、采样方法及 MIS 密度一致性
 ├── ibl_tests.cpp  # 环境卷积、粗糙度层、BRDF LUT 与采样对照
 ├── intersection_tests.cpp  # 包围盒、三角形、BVH 和独立求交对照
@@ -1181,3 +1191,16 @@ docs/baseline/
 - 实时显示：`VulkanViewport → SceneRenderer → HdrTargets / SsaoPass → PostProcess`，按调用点进入同名 GLSL 程序。
 
 更多算法的公式、参数约定与示例见[学习路线](docs/LEARNING.md)。
+
+
+### LTC 数据
+
+```text
+third_party/ltc/
+├── ltc_1.dds  # GGX 的逆变换系数
+├── ltc_2.dds  # 幅度与 Fresnel 拟合项
+├── LICENSE    # 表数据的再分发条款
+└── README.md  # 论文、上游版本与数据布局
+```
+
+`cmake/ltc_tables.hpp.in` 将经过校验的半精度纹素编入核心库，桌面与 CLI 使用相同的数据。矩形发光几何的判断和积分可以从 `src/render/rectangle_light.cpp` 开始阅读。[数据来源](third_party/ltc/README.md)

@@ -14,9 +14,11 @@
 #include <QFormLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPushButton>
 #include <QSignalBlocker>
 #include <QSpinBox>
 #include <algorithm>
+#include <minirender/render/rectangle_light.hpp>
 
 using namespace workbench_detail;
 
@@ -230,6 +232,31 @@ void Workbench::build_light_panel() {
     layout->addRow("传播方向", light_direction_);
     layout->addRow("颜色", light_color_);
     layout->addRow("强度", light_intensity_);
+    auto* rectangle = new QPushButton("添加矩形面积光");
+    rectangle->setObjectName("add_rectangle");
+    layout->addRow(rectangle);
+    connect(rectangle, &QPushButton::clicked, this, [this] {
+        perform_edit([this](auto& scene) {
+            const auto           mesh_id     = unique_id(scene.meshes, "rectangle_");
+            const auto           material_id = unique_id(scene.materials, "emitter_");
+            minirender::Material material{material_id, "面积光", minirender::MaterialKind::diffuse,
+                                          glm::vec3(0)};
+            material.emission     = glm::vec3(8);
+            material.double_sided = false;
+            scene.materials.push_back(std::move(material));
+            scene.meshes.push_back({mesh_id, {}, minirender::make_emitter_quad()});
+            const auto distance =
+                std::max(.01F, glm::length(scene.camera.position - scene.camera.target));
+            minirender::Transform transform;
+            transform.translation        = scene.camera.target + glm::vec3(0, .35F * distance, 0);
+            transform.rotation_degrees.x = 180;
+            transform.scale              = {.2F * distance, 1, .2F * distance};
+            selected_id_                 = unique_id(scene.objects, "light_");
+            scene.objects.push_back(
+                {selected_id_, "矩形面积光", mesh_id, material_id, transform, true});
+        });
+        panels_->setCurrentIndex(0);
+    });
     connect(light_selector_, &QComboBox::currentIndexChanged, this, [this] {
         if (!refreshing_) {
             refresh_properties();

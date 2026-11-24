@@ -28,6 +28,7 @@ layout(binding = 0, std140) uniform Frame {
     vec4             preview_edges;
     vec4             teaching_light; // 点光源世界坐标与强度
     vec4             teaching_surface; // 高光指数、镜面系数、纹理开关
+    vec4             area_settings; // 可见矩形灯数量和采样参数
 }
 
 frame;
