@@ -1,0 +1,38 @@
+# 构建 Qt/MSVC 与 SPIR-V，并运行不依赖显示设备的回归。
+name: Windows desktop
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/windows-desktop.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt 6.8
+        uses: jurplel/install-qt-action@b344308e4483fc892e0d27b3cd1b173ebdd95f06
+        with:
+          version: '6.8.3'
+          arch: win64_msvc2022_64
+          cache: true
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@30ba978f977e81b72d091fc8888feb1fb26f9aff
+        with:
+          version: '1.4.309.0'
+          cache: true
+      - name: Configure desktop
+        run: cmake -S . -B build/win-ci -G "Visual Studio 17 2022" -A x64 -DMINIRENDER_BUILD_DESKTOP=ON -DMINIRENDER_ENABLE_OPTIX=OFF -DBUILD_TESTING=ON
+      - name: Build Qt application and shaders
+        run: cmake --build build/win-ci --config Release --parallel 3
+      - name: Test portable rendering core
+        run: ctest --test-dir build/win-ci -C Release --output-on-failure -j 3
