@@ -59,6 +59,9 @@ void install(Workbench& window, const minirender::SceneDocument& source, const Q
     scene.camera.position = scenario.position;
     scene.camera.target   = {0, 0.3F, 0};
     for (auto& material : scene.materials) {
+        // 零反照率漫反射面仅显示自发光，颜色直接标识可见物体。
+        // 金属的掠射反射会额外引入矩形地面的辐亮度。
+        material.kind       = minirender::MaterialKind::diffuse;
         material.base_color = glm::vec3(0);
         material.base_color_texture.clear();
         material.double_sided = false;
