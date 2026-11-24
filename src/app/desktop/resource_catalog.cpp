@@ -111,6 +111,10 @@ QList<Entry> read(const QString& root, bool bundled) {
         for (auto dep : item.value("dependencies").toArray()) {
             e.dependencies.push_back(parse_file(dep.toObject()));
         }
+        for (auto record : item.value("videos").toArray()) {
+            const auto video = record.toObject();
+            e.videos.emplaceBack(field(video, "name"), parse_file(video));
+        }
         entries.push_back(std::move(e));
     }
     if (entries.empty()) {
@@ -166,11 +170,23 @@ QString verify_scene(const Entry& entry, const std::function<void(qint64)>& adva
     return scene;
 }
 
-QList<File> frames(const Entry& entry) {
+QList<Frame> frames(const Entry& entry) {
     verify(entry.root, entry.file);
-    QList<File> result;
+    QList<Frame> result;
     for (auto value : json(resolve(entry.root, entry.file.path)).array()) {
-        result.push_back(parse_file(value.toObject()));
+        const auto item = value.toObject();
+        Frame      frame{parse_file(item), {}, {}};
+        if (item.contains("guides")) {
+            const auto g = item.value("guides").toObject();
+            frame.guides = std::array<File, 5>{
+                parse_file(g.value("normal").toObject()),
+                parse_file(g.value("position").toObject()), parse_file(g.value("depth").toObject()),
+                parse_file(g.value("ID").toObject()), parse_file(g.value("matrix").toObject())};
+        }
+        if (item.contains("reference")) {
+            frame.reference = parse_file(item.value("reference").toObject());
+        }
+        result.push_back(std::move(frame));
     }
     if (result.empty()) {
         fail("序列中缺少帧");

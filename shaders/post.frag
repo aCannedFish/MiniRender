@@ -149,11 +149,15 @@ void main() {
         }
         return;
     }
+    if (int(frame.display.y) == 20) {
+        color = texelFetch(hdr_image, pixel, 0);
+        return;
+    }
     if (int(frame.display.y) == 14 || int(frame.display.y) == 17 || int(frame.display.y) == 18) {
         color = texelFetch(hdr_image, pixel, 0);
         return;
     }
-    if (int(frame.display.y) >= 13 && int(frame.display.y) <= 16) {
+    if (int(frame.display.y) >= 13 && int(frame.display.y) <= 16 || int(frame.display.y) == 19) {
         vec3 encoded = frame.display.z > 0.5 ? fxaa(uv) : display_texel(pixel);
         color        = vec4(decode_srgb(encoded), 1);
         return;

@@ -12,6 +12,15 @@ layout(location = 0) out vec4 color;
 
 void main() {
     ivec2 pixel = ivec2(gl_FragCoord.xy);
+    if (int(frame.display.y) == 20) {
+        color = vec4(vec3(texelFetch(screen_transport, pixel, 0).a > 0.0 ? 1.0 : 0.0), 1);
+        return;
+    }
+    if (int(frame.display.y) == 19) {
+        color = vec4(
+            texelFetch(source_hdr, pixel, 0).rgb + texelFetch(screen_transport, pixel, 0).rgb, 1);
+        return;
+    }
     if (int(frame.display.y) >= 13 && int(frame.display.y) <= 18) {
         color = texelFetch(screen_transport, pixel, 0);
         return;

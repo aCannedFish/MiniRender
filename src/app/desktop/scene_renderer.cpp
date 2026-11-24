@@ -36,9 +36,10 @@ struct alignas(16) GpuInstance {
     glm::vec4  surface; // roughness, metallic, texture filter, double sided
     GpuCloth   cloth;
     glm::uvec4 geometry;
+    glm::mat4  previous_model;
 };
 
-static_assert(sizeof(GpuInstance) == 816);
+static_assert(sizeof(GpuInstance) == 880);
 static_assert(offsetof(GpuInstance, normal_to_world) == 64);
 static_assert(offsetof(GpuInstance, base_color) == 128);
 static_assert(offsetof(GpuInstance, surface) == 160);
@@ -76,6 +77,8 @@ struct alignas(16) FrameUniform {
     glm::vec4 area_settings;
     std::array<glm::vec4, 9> prt_light;
     glm::vec4                screen_trace, screen_options;
+    glm::mat4                previous_vp;
+    glm::vec4                history_settings;
 };
 
 static_assert(offsetof(FrameUniform, lights) == 96);
@@ -84,7 +87,7 @@ static_assert(offsetof(FrameUniform, view) == 928);
 static_assert(offsetof(FrameUniform, ao_kernel) == 1152);
 static_assert(offsetof(FrameUniform, ibl) == 2176);
 static_assert(offsetof(FrameUniform, preview_edges) == 2192);
-static_assert(sizeof(FrameUniform) == 2432);
+static_assert(sizeof(FrameUniform) == 2512);
 
 } // namespace
 
@@ -141,6 +144,7 @@ void SceneRenderer::initResources() {
 
 void SceneRenderer::initSwapChainResources() {
     shadow_depth_ready_ = false;
+    histories_          = {};
     comparison_keys_.fill({0, -1});
     targets_.create(*window_);
     for (std::size_t side = 0; side < surface_pipelines_.size(); ++side) {
@@ -270,6 +274,24 @@ void SceneRenderer::upload_scene() {
     glm::vec3 minimum(std::numeric_limits<float>::infinity());
     glm::vec3 maximum(-std::numeric_limits<float>::infinity());
     // 先收集全部可见来源，避免复用仍被另一个实例引用的旧缓冲。
+    prior_scene_   = current_scene_;
+    current_scene_ = window_->scene();
+    rigid_update_ =
+        prior_scene_ && prior_scene_->instances.size() == scene.instances.size() &&
+        prior_scene_->environment == scene.environment &&
+        prior_scene_->environment_texture == scene.environment_texture &&
+        prior_scene_->environment_strength == scene.environment_strength &&
+        prior_scene_->environment_rotation_degrees == scene.environment_rotation_degrees &&
+        prior_scene_->directional_lights.size() == scene.directional_lights.size();
+    if (rigid_update_) {
+        for (std::size_t i = 0; i < scene.directional_lights.size(); ++i) {
+            const auto& a = prior_scene_->directional_lights[i];
+            const auto& b = scene.directional_lights[i];
+            if (a.direction != b.direction || a.color != b.color || a.intensity != b.intensity) {
+                rigid_update_ = false;
+            }
+        }
+    }
     std::uint32_t corner_offset = 0;
     for (const auto& instance : scene.instances) {
         used.insert(instance.mesh);
@@ -334,6 +356,24 @@ void SceneRenderer::upload_scene() {
                                    .try_emplace(instance.object_id,
                                                 static_cast<std::uint32_t>(surface_ids_.size() + 1))
                                    .first->second;
+        auto        previous_model = instance.object_to_world;
+        if (rigid_update_) {
+            const auto& prev = prior_scene_->instances[instances.size()];
+            rigid_update_    = prev.object_id == instance.object_id && prev.mesh == instance.mesh &&
+                               prev.material.base_color == material.base_color &&
+                               prev.material.emission == material.emission &&
+                               prev.material.kind == material.kind &&
+                               prev.material.roughness == material.roughness &&
+                               prev.material.compensate_energy == material.compensate_energy &&
+                               prev.base_color_texture == instance.base_color_texture &&
+                               prev.normal_texture == instance.normal_texture &&
+                               prev.material.normal_scale == material.normal_scale &&
+                               prev.material.normal_flip_y == material.normal_flip_y &&
+                               prev.material.double_sided == material.double_sided &&
+                               (glm::length(material.emission) == 0 ||
+                                prev.object_to_world == instance.object_to_world);
+            previous_model   = prev.object_to_world;
+        }
         instances.push_back(
             {instance.object_to_world,
              glm::mat4(instance.normal_to_world),
@@ -350,7 +390,8 @@ void SceneRenderer::upload_scene() {
                   ? std::bit_cast<std::uint32_t>(material.normal_scale *
                                                  (material.normal_flip_y ? -1.F : 1.F))
                   : 0U,
-              0}});
+              0},
+             previous_model});
         corner_offset += static_cast<std::uint32_t>(instance.mesh->triangles.size() * 3);
     }
     subsurface_previews_.end_scene();
@@ -577,6 +618,36 @@ void SceneRenderer::update_uniforms(int mode, bool reference) {
     }
     frame.screen_trace   = window_->screen_trace();
     frame.screen_options = {window_->screen_hiz() ? 1.F : 0.F, 0, 0, 0};
+    auto& history        = histories_[reference ? 1 : 0];
+    if (mode == 19 || mode == 20) {
+        const auto forward = glm::normalize(camera.target - camera.position);
+        const auto previous =
+            history.age ? glm::normalize(history.camera.target - history.camera.position) : forward;
+        const bool cut =
+            history.age && (glm::dot(forward, previous) < .75F ||
+                            glm::length(camera.position - history.camera.position) >
+                                .5F * std::max(.1F, glm::length(camera.target - camera.position)) ||
+                            camera.vertical_fov_degrees != history.camera.vertical_fov_degrees);
+        const bool moved   = history.scene != current_scene_;
+        const bool valid   = history.age && history.epoch == window_->history_epoch() && !cut &&
+                             (!moved || (rigid_update_ && history.scene == prior_scene_)) &&
+                             (history.frame + 1 >= window_->rendered_frames() || history.age >= 32);
+        const auto options = window_->temporal_settings();
+        frame.previous_vp  = history.vp;
+        frame.history_settings = {valid ? 1.F : 0.F, valid && moved ? 1.F : 0.F, options.x,
+                                  options.y};
+        history.age            = valid ? std::min(32U, history.age + 1) : 1;
+        frame.screen_options.y = float(window_->rendered_frames() % 4093);
+        history.epoch          = window_->history_epoch();
+        history.camera         = camera;
+        history.vp             = frame.view_projection;
+        history.scene          = current_scene_;
+        history.frame          = window_->rendered_frames();
+        window_->report_history(history.age);
+    } else {
+        history.age = 0;
+        history.scene.reset();
+    }
     frame.area_settings =
         glm::vec4(static_cast<float>(window_->scene()->rectangles.size()),
                   static_cast<float>(area_shadows_.grid()), 1.F / RectangleShadow::resolution, 0);
@@ -717,6 +788,10 @@ bool SceneRenderer::update_prt() {
 }
 
 void SceneRenderer::startNextFrame() {
+    if ((window_->view_mode() >= 19 && window_->view_mode() <= 20) ||
+        (window_->comparison_mode() >= 19 && window_->comparison_mode() <= 20)) {
+        ssao_.prepare_temporal(*window_);
+    }
     const bool ibl_changed = ibl_.update(*window_, window_->ibl_maps(), window_->ibl_lut());
     if (scene_revision_ != window_->scene_revision()) {
         upload_scene();
@@ -764,7 +839,8 @@ void SceneRenderer::startNextFrame() {
                 std::make_pair(window_->comparison_revision(modes[side], side == 1), modes[side]);
             const bool capture =
                 capture_hdr_ && static_cast<int>(side) == std::max(0, window_->export_side());
-            if (comparison_keys_[side] == key && !capture) {
+            if (comparison_keys_[side] == key && !capture &&
+                ((modes[side] != 19 && modes[side] != 20) || histories_[side].age >= 32)) {
                 continue;
             }
             render_view(modes[side], side == 1);
@@ -823,7 +899,7 @@ void SceneRenderer::render_view(int mode, bool reference) {
     }
     vkCmdEndRenderPass(command);
     render_wire(command, mode);
-    ssao_.draw(*window_, mode);
+    ssao_.draw(*window_, mode, reference);
 }
 
 void SceneRenderer::releaseSwapChainResources() {

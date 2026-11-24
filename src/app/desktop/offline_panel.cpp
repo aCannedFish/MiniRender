@@ -2,6 +2,7 @@
 // 本模块接口见 offline_panel.hpp。
 
 #include "offline_panel.hpp"
+#include "sequence_viewer.hpp"
 #include "vulkan_viewport.hpp"
 
 #include <QCheckBox>
@@ -186,6 +187,28 @@ OfflinePanel::OfflinePanel(
     buttons->addWidget(cancel_, 1, 1);
     buttons->addWidget(save_exr_, 2, 0);
     buttons->addWidget(save_png_, 2, 1);
+    denoise_ = new QPushButton("降噪与原图对照…");
+    denoise_->setObjectName("offline_denoise");
+    buttons->addWidget(denoise_, 3, 0, 1, 2);
+    connect(denoise_, &QPushButton::clicked, this, [this] {
+        if (!active_scene_) {
+            return;
+        }
+        const auto job    = session_->progress().job_id;
+        auto*      viewer = new SequenceViewer(
+            [session = session_, job] {
+                const auto image = session->preview(0);
+                if (image.job_id != job) {
+                    throw std::runtime_error("离线任务已改变，请重新打开降噪");
+                }
+                return image.image;
+            },
+            active_scene_, this);
+        viewer->setAttribute(Qt::WA_DontShowOnScreen,
+                             window()->testAttribute(Qt::WA_DontShowOnScreen));
+        viewer->show();
+    });
+
     layout->addLayout(buttons);
     show_ = new QCheckBox("查看离线结果（取消勾选返回实时预览）", this);
     show_->setObjectName("offline_show");
@@ -383,6 +406,7 @@ void OfflinePanel::start() {
             }
         }
         session_->start(snapshot, render, integrator, settings);
+        active_scene_     = snapshot;
         job_iterations_   = render.samples_per_pixel;
         stale_            = false;
         preview_samples_  = 0;
@@ -423,6 +447,7 @@ void OfflinePanel::poll() {
     pause_->setText(p.state == RenderState::paused || p.state == RenderState::pausing ? "恢复"
                                                                                       : "暂停");
     cancel_->setEnabled(!terminal && p.state != RenderState::cancelling);
+    denoise_->setEnabled(p.recorded_samples > 0 && bool(active_scene_));
     save_exr_->setEnabled(p.recorded_samples > 0 && !exporting_);
     save_png_->setEnabled(p.recorded_samples > 0 && !exporting_);
     show_->setEnabled(p.job_id != 0);

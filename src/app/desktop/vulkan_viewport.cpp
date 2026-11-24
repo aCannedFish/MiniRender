@@ -1089,7 +1089,19 @@ void VulkanViewport::set_prt_lighting(const minirender::ShLight& lighting) {
     requestUpdate();
 }
 
+void VulkanViewport::reset_history() {
+    ++history_epoch_;
+    mark_preview_changed();
+    requestUpdate();
+}
+
+void VulkanViewport::set_temporal_settings(glm::vec2 value) {
+    temporal_ = value;
+    reset_history();
+}
+
 void VulkanViewport::set_screen_trace(glm::vec4 settings, bool hiz) {
+    ++history_epoch_;
     screen_trace_ = settings;
     screen_hiz_   = hiz;
     mark_preview_changed();
@@ -1157,6 +1169,7 @@ void VulkanViewport::set_ibl_data(std::shared_ptr<const minirender::IblEnvironme
     if (maps == ibl_maps_ && lut == ibl_lut_) {
         return;
     }
+    ++history_epoch_;
     ibl_maps_ = std::move(maps);
     ibl_lut_  = std::move(lut);
     mark_preview_changed();
@@ -1483,12 +1496,14 @@ void VulkanViewport::finish_gizmo_drag(bool commit) {
 }
 
 void VulkanViewport::set_area_shadows(bool enabled) {
+    ++history_epoch_;
     area_shadows_ = enabled;
     mark_preview_changed();
     requestUpdate();
 }
 
 void VulkanViewport::set_shadows_enabled(bool enabled) {
+    ++history_epoch_;
     shadows_enabled_ = enabled;
     mark_preview_changed();
     requestUpdate();
@@ -1499,6 +1514,7 @@ bool VulkanViewport::shadows_enabled() const noexcept {
 }
 
 void VulkanViewport::set_shadow_filter(ShadowFilter filter) {
+    ++history_epoch_;
     shadow_filter_ = filter;
     mark_preview_changed();
     requestUpdate();
@@ -1509,6 +1525,7 @@ ShadowFilter VulkanViewport::shadow_filter() const noexcept {
 }
 
 void VulkanViewport::set_light_half_angle(float degrees) {
+    ++history_epoch_;
     light_half_angle_ = std::clamp(degrees, 0.0F, 15.0F);
     mark_preview_changed();
     requestUpdate();
@@ -1519,6 +1536,7 @@ float VulkanViewport::light_half_angle() const noexcept {
 }
 
 void VulkanViewport::set_shadow_filter_radius(float texels) {
+    ++history_epoch_;
     shadow_filter_radius_ = std::clamp(texels, 0.0F, 48.0F);
     mark_preview_changed();
     requestUpdate();
@@ -1529,12 +1547,14 @@ float VulkanViewport::shadow_filter_radius() const noexcept {
 }
 
 void VulkanViewport::set_reference_energy(int value) {
+    ++history_epoch_;
     reference_energy_ = value;
     ++reference_revision_;
     requestUpdate();
 }
 
 void VulkanViewport::set_reference_shadow(int filter) {
+    ++history_epoch_;
     reference_shadow_ = filter;
     ++reference_revision_;
     requestUpdate();

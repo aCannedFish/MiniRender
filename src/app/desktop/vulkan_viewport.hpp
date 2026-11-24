@@ -180,7 +180,7 @@ class VulkanViewport final : public QWindow {
     static constexpr int base_color_preview_mode = 6;
 
     static bool uses_lighting(int mode) noexcept {
-        return mode == 0 || (mode >= 13 && mode <= 16);
+        return mode == 0 || (mode >= 13 && mode <= 16) || mode == 19 || mode == 20;
     }
 
     // x、y 使用视空间米，z、w 为每条射线的步数上限与每像素的方向数。
@@ -190,6 +190,25 @@ class VulkanViewport final : public QWindow {
 
     bool screen_hiz() const noexcept {
         return screen_hiz_;
+    }
+
+    glm::vec2 temporal_settings() const noexcept {
+        return temporal_;
+    }
+
+    std::uint64_t history_epoch() const noexcept {
+        return history_epoch_;
+    }
+
+    void set_temporal_settings(glm::vec2 value);
+    void reset_history();
+
+    void report_history(unsigned age) noexcept {
+        history_age_ = age;
+    }
+
+    unsigned history_age() const noexcept {
+        return history_age_;
     }
 
     void set_screen_trace(glm::vec4 settings, bool hiz);
@@ -437,6 +456,9 @@ class VulkanViewport final : public QWindow {
     bool                     area_shadows_ = true;
     int                      area_grid_    = 0;
     std::uint64_t            area_updates_ = 0;
+    glm::vec2                temporal_{.9F, 1.F};
+    std::uint64_t            history_epoch_ = 0;
+    unsigned                 history_age_   = 0;
     glm::vec4                screen_trace_{5.F, .03F, 160.F, 8.F};
     bool                     screen_hiz_       = true;
     ShadowFilter             shadow_filter_    = ShadowFilter::pcf;

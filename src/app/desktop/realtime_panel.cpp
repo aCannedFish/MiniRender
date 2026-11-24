@@ -9,6 +9,7 @@
 #include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QLabel>
+#include <QPushButton>
 #include <QSignalBlocker>
 #include <QSpinBox>
 
@@ -121,5 +122,18 @@ RealtimePanel::RealtimePanel(VulkanViewport& viewport, QWidget* parent) : QWidge
     connect(thickness, &QDoubleSpinBox::valueChanged, this, trace);
     connect(steps, &QSpinBox::valueChanged, this, trace);
     connect(rays, &QSpinBox::valueChanged, this, trace);
+    auto* history = value("temporal_weight", 0, 1, .9, .05);
+    auto* clamp   = value("temporal_clamp", 0, 8, 1, .25);
+    layout->addRow("时域历史权重", history);
+    layout->addRow("邻域限幅 / σ", clamp);
+    auto* reset = new QPushButton("清除间接光历史");
+    reset->setObjectName("reset_gi_history");
+    layout->addRow(reset);
+    const auto temporal = [=, &viewport] {
+        viewport.set_temporal_settings({float(history->value()), float(clamp->value())});
+    };
+    connect(history, &QDoubleSpinBox::valueChanged, this, temporal);
+    connect(clamp, &QDoubleSpinBox::valueChanged, this, temporal);
+    connect(reset, &QPushButton::clicked, this, [&viewport] { viewport.reset_history(); });
     layout->addRow(new PrtPanel(viewport, this));
 }

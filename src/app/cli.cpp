@@ -1,5 +1,6 @@
 // CPU 命令行入口与场景、图像、渲染子命令分发。
 
+#include "denoise_cli.hpp"
 #include "lightfield_cli.hpp"
 #include "render_cli.hpp"
 #include <minirender/assets/scene_io.hpp>
@@ -20,6 +21,10 @@ std::filesystem::path native_path(std::string_view text) {
 // 无窗口入口，仅依赖 core。后续算法在此提供与 UI 相同的场景/任务接口。
 int run_cli(int argc, char** argv) {
     try {
+        if (argc >= 2 && (std::string_view(argv[1]) == "--denoise" ||
+                          std::string_view(argv[1]) == "--write-guides")) {
+            return run_denoise_cli(argc - 1, argv + 1);
+        }
         if (argc >= 2 && (std::string_view(argv[1]) == "--capture-lightfield" ||
                           std::string_view(argv[1]) == "--refocus")) {
             return run_lightfield_cli(argc - 2, argv + 2,
@@ -90,6 +95,8 @@ int run_cli(int argc, char** argv) {
                       << "\ntriangle tests: " << queries.triangle_tests << '\n';
             return 0;
         }
+        std::cout << "Denoising: --denoise INPUT OUTPUT FIRST COUNT bilateral|atrous|temporal\n"
+                     "Guides: --write-guides SCENE DIRECTORY FRAME WIDTH HEIGHT\n";
         std::cout << "Usage: minirender_cli --capabilities | --test-pattern output.ppm | --inspect "
                      "scene.json | --trace-normals scene.json output.png | --render scene.json "
                      "output-prefix [options] | --capture-lightfield scene.json output.mrlf "

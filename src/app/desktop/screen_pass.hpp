@@ -25,6 +25,9 @@ class ScreenPass {
                 VkExtent2D requested = {});
     // 录制该 pass 的绘制命令，输出图像交由后续 pass 或显示阶段使用。
     void draw(VulkanViewport& viewport, std::int32_t mode = 0);
+    // 在上一帧 fence 完成后绑定历史图像；首次读取前用 clear 建立有效布局。
+    void set_image(std::uint32_t binding, ScreenInput input);
+    void clear(VulkanViewport& viewport);
     // 释放独占资源并清空句柄；调用前必须结束 GPU 对这些资源的访问。
     void release();
     // 返回输出 VkImage 的借用句柄，用于后续命令或读回。
