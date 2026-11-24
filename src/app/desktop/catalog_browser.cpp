@@ -43,6 +43,7 @@ CatalogBrowser::CatalogBrowser(QWidget* parent) : QDialog(parent) {
     open_         = new QPushButton;
     auto* actions = new QHBoxLayout;
     recommended_  = new QPushButton("覆盖并预览 Blinn–Phong");
+    recommended_->setObjectName("catalog_recommended");
     actions->addStretch();
     actions->addWidget(recommended_);
     actions->addWidget(open_);
@@ -127,15 +128,19 @@ void CatalogBrowser::describe() {
     const auto& e = index < builtin_.size() ? builtin_[index] : course_[index - builtin_.size()];
     const auto  format = e.kind == catalog::Kind::sequence ? "EXR 序列" : "MiniRender JSON";
     recommended_->setVisible(e.kind == catalog::Kind::scene && !e.recommended.isEmpty());
-    recommended_->setText(e.recommended == "ssgi"     ? "覆盖并预览屏幕间接光"
-                          : e.recommended == "prt"    ? "覆盖并烘焙 PRT"
-                          : e.recommended == "energy" ? "覆盖并预览能量补偿"
-                          : e.recommended == "pcss"   ? "覆盖并预览 PCSS"
-                                                      : "覆盖并预览 Blinn–Phong");
+    const QString action = e.recommended == "comparison" ? "覆盖并生成对照"
+                           : e.recommended == "ssgi"     ? "覆盖并预览屏幕间接光"
+                           : e.recommended == "prt"      ? "覆盖并烘焙 PRT"
+                           : e.recommended == "energy"   ? "覆盖并预览能量补偿"
+                           : e.recommended == "pcss"     ? "覆盖并预览 PCSS"
+                                                         : "覆盖并预览 Blinn–Phong";
+    recommended_->setText(action);
+    const bool table = e.id == "course-energy-lut";
     detail_->setText(QString("%1\n%2 · %3 · %4\n%5\nSHA-256  %6")
-                         .arg(e.description, e.source, e.rights, format, e.file.path,
-                              QString::fromLatin1(e.file.sha256)));
+                         .arg(e.description, e.source, e.rights, table ? "线性 PNG" : format,
+                              e.file.path, QString::fromLatin1(e.file.sha256)));
     open_->setText(e.kind == catalog::Kind::scene   ? "覆盖导入场景"
                    : e.kind == catalog::Kind::model ? "追加模型"
+                   : table                          ? "查看查找表"
                                                     : "打开帧序列");
 }

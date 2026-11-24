@@ -139,7 +139,9 @@ class SceneRenderer final : public ViewportRenderer {
     GpuBuffer                                  prt_buffer_;
     std::shared_ptr<const minirender::PrtBake> uploaded_prt_;
     bool update_prt();
-    GpuRectangleLights rectangles_;
+    GpuFloatTexture                          reference_texture_;
+    std::shared_ptr<const minirender::Image> uploaded_reference_;
+    GpuRectangleLights                       rectangles_;
     // 着色器资源的 binding 与类型声明。
     VkDescriptorSetLayout descriptor_layout_ = VK_NULL_HANDLE;
     // 供本管线分配描述符集合的池。

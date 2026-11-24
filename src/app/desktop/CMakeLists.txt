@@ -29,8 +29,10 @@ qt_add_executable(minirender_desktop
     editor_theme.cpp editor_theme.hpp workbench_panels.cpp workbench_panels.hpp theme_smoke.cpp theme_smoke.hpp
     builtin_scenes.cpp builtin_scenes.hpp
     resource_catalog.cpp resource_catalog.hpp catalog_browser.cpp catalog_browser.hpp
+    reference_panel.cpp reference_panel.hpp
     comparison_controls.cpp comparison_controls.hpp
     shadow_smoke.cpp shadow_smoke.hpp rectangle_smoke.cpp rectangle_smoke.hpp
+    integration_smoke.cpp integration_smoke.hpp
     denoise_smoke.cpp denoise_smoke.hpp
     temporal_transport.cpp temporal_transport.hpp
     screen_transport_smoke.cpp screen_transport_smoke.hpp

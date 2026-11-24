@@ -472,6 +472,32 @@
           "sha256": "79ac5b5d1b2c05e3415a7c5b0ca52007ba0374e92b7adddf228acecd2ea91841"
         }
       ]
+    },
+    {
+      "id": "cornell-comparison",
+      "name": "Cornell · 实时与离线对照",
+      "kind": "scene",
+      "path": "cornell-box.json",
+      "sha256": "5afb912551daa5996a6f98d33361e4984ee5d396530df5933b9297d904268920",
+      "thumbnail": "catalog_thumbs/cornell.png",
+      "description": "左侧为动态矩形光与时域间接光，右侧用同一相机生成路径追踪参考。",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "recommended": "comparison",
+      "dependencies": [
+        {
+          "path": "assets/plane.obj",
+          "sha256": "5a83f91ef91fd85fbdfc0a924fb3faf58d008a2a0d253761198c117df308674b"
+        },
+        {
+          "path": "assets/cube.obj",
+          "sha256": "6e912d373134fb1bd0444c7ca3871e54961c18eaee98b303f5194587dfe061b6"
+        },
+        {
+          "path": "assets/demo-sphere.obj",
+          "sha256": "79ac5b5d1b2c05e3415a7c5b0ca52007ba0374e92b7adddf228acecd2ea91841"
+        }
+      ]
     }
   ]
 }

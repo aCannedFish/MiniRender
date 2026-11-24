@@ -157,7 +157,7 @@ void main() {
         color = texelFetch(hdr_image, pixel, 0);
         return;
     }
-    if (int(frame.display.y) >= 13 && int(frame.display.y) <= 16 || int(frame.display.y) == 19) {
+    if (int(frame.display.y) >= 13 && int(frame.display.y) <= 16 || int(frame.display.y) >= 19 && int(frame.display.y)<=21) {
         vec3 encoded = frame.display.z > 0.5 ? fxaa(uv) : display_texel(pixel);
         color        = vec4(decode_srgb(encoded), 1);
         return;

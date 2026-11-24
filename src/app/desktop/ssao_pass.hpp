@@ -12,7 +12,7 @@ class SsaoPass {
   public:
     // 创建并绑定本对象所管理的 GPU 资源，失败时通过异常报告 Vulkan 操作。
     void create(VulkanViewport& viewport, const HdrTargets& targets, VkBuffer uniform,
-                VkDeviceSize bytes);
+                VkDeviceSize bytes, VkImageView reference);
     // 录制该 pass 的绘制命令，输出图像交由后续 pass 或显示阶段使用。
     void draw(VulkanViewport& viewport, int mode, bool reference);
 
@@ -21,6 +21,10 @@ class SsaoPass {
     }
 
     // 释放独占资源并清空句柄；调用前必须结束 GPU 对这些资源的访问。
+    void set_reference(VkImageView view) {
+        composite_.set_image(6, {view});
+    }
+
     void release();
     // 返回线性合成图像，作为实时 HDR 导出的数据来源。
     VkImage hdr_image() const noexcept;

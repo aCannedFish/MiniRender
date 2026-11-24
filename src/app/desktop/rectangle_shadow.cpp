@@ -20,15 +20,17 @@ bool RectangleShadow::configure(VulkanViewport& viewport, const minirender::Scen
             corners.push_back(lamp.corners);
         }
         const bool same = casters == casters_ && corners == corners_;
-        casters_        = std::move(casters);
-        corners_        = std::move(corners);
+        if (!same) {
+            cached_grid_ = -1;
+        }
+        casters_ = std::move(casters);
+        corners_ = std::move(corners);
         if (same && grid_ == grid && layers_) {
             revision_ = revision;
             return false;
         }
     }
-    const std::size_t          faces = 6U * static_cast<std::size_t>(grid * grid);
-    const auto                 count = std::max<std::size_t>(1, scene.rectangles.size() * faces);
+    const auto                 count = std::max<std::size_t>(1, scene.rectangles.size() * 54U);
     VkPhysicalDeviceProperties limits{};
     vkGetPhysicalDeviceProperties(viewport.physicalDevice(), &limits);
     if (count > limits.limits.maxImageArrayLayers) {
@@ -42,6 +44,15 @@ bool RectangleShadow::configure(VulkanViewport& viewport, const minirender::Scen
         matrices_.create(viewport.device(), viewport.physicalDevice(), sizeof(glm::mat4) * count,
                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     }
+    grid_     = grid;
+    revision_ = revision;
+    if (allocate) {
+        cached_grid_ = -1;
+    }
+    if (!grid || cached_grid_ == grid) {
+        return allocate;
+    }
+    cached_grid_ = grid;
     std::vector<glm::mat4>         projections(count, glm::mat4(1));
     const std::array<glm::vec3, 6> axes{
         {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}}};
@@ -68,6 +79,7 @@ bool RectangleShadow::configure(VulkanViewport& viewport, const minirender::Scen
             }
         }
     }
+    active_layers_ = static_cast<std::uint32_t>(layer);
     matrices_.write(projections.data(), projections.size() * sizeof(glm::mat4));
     revision_ = revision;
     grid_     = grid;
@@ -78,10 +90,10 @@ bool RectangleShadow::configure(VulkanViewport& viewport, const minirender::Scen
 void RectangleShadow::render(VkCommandBuffer                                        command,
                              const std::function<void(std::uint32_t, std::size_t)>& draw) {
     map_.prepare(command);
-    if (!dirty_) {
+    if (!dirty_ || !grid_) {
         return;
     }
-    for (std::uint32_t layer = 0; layer < layers_; ++layer) {
+    for (std::uint32_t layer = 0; layer < active_layers_; ++layer) {
         map_.begin(command, layer);
         draw(layer, layer / static_cast<std::uint32_t>(6 * grid_ * grid_));
         vkCmdEndRenderPass(command);
@@ -95,8 +107,10 @@ void RectangleShadow::release() {
     matrices_.release();
     casters_.clear();
     corners_.clear();
-    layers_   = 0;
-    grid_     = 0;
-    dirty_    = false;
-    revision_ = ~std::uint64_t(0);
+    cached_grid_   = -1;
+    active_layers_ = 0;
+    layers_        = 0;
+    grid_          = 0;
+    dirty_         = false;
+    revision_      = ~std::uint64_t(0);
 }

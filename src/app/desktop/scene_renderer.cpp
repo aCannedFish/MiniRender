@@ -99,6 +99,8 @@ void SceneRenderer::initResources() {
                      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     shadow_map_.create(*window_);
     ibl_.create(*window_);
+    const minirender::Image empty_reference(1, 1);
+    reference_texture_.create(*window_, {&empty_reference, 1});
     rectangles_.create(*window_);
     std::array<VkDescriptorSetLayoutBinding, 15> bindings{};
     auto&                                        binding = bindings[0];
@@ -155,7 +157,8 @@ void SceneRenderer::initSwapChainResources() {
     }
     wire_pipeline_       = create_pipeline(Pass::wire);
     background_pipeline_ = create_pipeline(Pass::background);
-    ssao_.create(*window_, targets_, uniforms_.handle(), sizeof(FrameUniform));
+    ssao_.create(*window_, targets_, uniforms_.handle(), sizeof(FrameUniform),
+                 reference_texture_.descriptor().imageView);
     post_process_.create(*window_, targets_, uniforms_.handle(), sizeof(FrameUniform),
                          ssao_.hdr_view(), ssao_.raw_view(), ssao_.filtered_view());
     gizmo_.create(*window_);
@@ -792,12 +795,24 @@ void SceneRenderer::startNextFrame() {
         (window_->comparison_mode() >= 19 && window_->comparison_mode() <= 20)) {
         ssao_.prepare_temporal(*window_);
     }
+    if (uploaded_reference_ != window_->reference_image()) {
+        uploaded_reference_ = window_->reference_image();
+        const minirender::Image black(1, 1);
+        reference_texture_.create(*window_,
+                                  {uploaded_reference_ ? uploaded_reference_.get() : &black, 1});
+        ssao_.set_reference(reference_texture_.descriptor().imageView);
+    }
+    reference_texture_.retire_upload();
+    reference_texture_.record_upload(window_->currentCommandBuffer());
     const bool ibl_changed = ibl_.update(*window_, window_->ibl_maps(), window_->ibl_lut());
     if (scene_revision_ != window_->scene_revision()) {
         upload_scene();
     }
     if (update_prt()) {
         rebuild_texture_descriptors();
+    }
+    if (area_shadows_.grid() != area_grid()) {
+        comparison_keys_.fill({0, -1});
     }
     if (area_shadows_.configure(*window_, *window_->scene(), minimum_, maximum_, area_grid(),
                                 window_->scene_revision())) {
@@ -931,6 +946,8 @@ void SceneRenderer::releaseResources() {
     uniforms_.release();
     shadow_map_.release();
     ibl_.release();
+    reference_texture_.release();
+    uploaded_reference_.reset();
     rectangles_.release();
     prt_buffer_.release();
     uploaded_prt_.reset();

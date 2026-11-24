@@ -175,7 +175,8 @@ QList<Frame> frames(const Entry& entry) {
     QList<Frame> result;
     for (auto value : json(resolve(entry.root, entry.file.path)).array()) {
         const auto item = value.toObject();
-        Frame      frame{parse_file(item), {}, {}};
+        Frame      frame{parse_file(item), {}, {}, {}};
+        frame.label = item.value("label").toString();
         if (item.contains("guides")) {
             const auto g = item.value("guides").toObject();
             frame.guides = std::array<File, 5>{

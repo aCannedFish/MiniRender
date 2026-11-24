@@ -676,6 +676,12 @@ void VulkanViewport::exposeEvent(QExposeEvent*) {
 }
 
 void VulkanViewport::resizeEvent(QResizeEvent* event) {
+    const auto a = event->oldSize(), b = event->size();
+    if (path_reference_ && a.height() > 0 && b.height() > 0 &&
+        std::abs(double(a.width()) / a.height() - double(b.width()) / b.height()) > .001) {
+        set_reference_image({});
+    }
+
     finish_gizmo_drag(true);
     dirty_ = dirty_ || event->size() != event->oldSize();
     rebuild_gizmo();
@@ -799,6 +805,9 @@ void VulkanViewport::set_scene(std::shared_ptr<const minirender::SceneSnapshot> 
     if (prt_ && (!scene || !scene_ || !minirender::compatible_prt(*scene_, *scene, prt_kind_))) {
         prt_.reset();
     }
+    if (path_reference_ && scene != scene_) {
+        set_reference_image({});
+    }
     scene_ = std::move(scene);
     raster_meshes_.retain(scene_ ? std::span<const minirender::RenderInstance>(scene_->instances)
                                  : std::span<const minirender::RenderInstance>{});
@@ -841,6 +850,14 @@ const minirender::Camera& VulkanViewport::camera() const noexcept {
 void VulkanViewport::set_camera(const minirender::Camera& camera) {
     camera.validate();
     finish_gizmo_drag(true);
+    if (path_reference_ &&
+        (camera.position != camera_.position || camera.target != camera_.target ||
+         camera.up != camera_.up || camera.vertical_fov_degrees != camera_.vertical_fov_degrees ||
+         camera.aperture_radius != camera_.aperture_radius ||
+         camera.focus_distance != camera_.focus_distance ||
+         camera.near_plane != camera_.near_plane || camera.far_plane != camera_.far_plane)) {
+        set_reference_image({});
+    }
     camera_ = camera;
     rebuild_gizmo();
     mark_preview_changed();
@@ -1132,6 +1149,9 @@ QImage VulkanViewport::grab_comparison_side(int side) {
 }
 
 minirender::Image VulkanViewport::grab_comparison_hdr(int side) {
+    if (side == 1 && comparison_mode_ == offline_reference_mode && path_reference_) {
+        return *path_reference_;
+    }
     QScopedValueRollback<int> restore(export_side_, side);
     return grab_hdr();
 }
@@ -1544,6 +1564,12 @@ void VulkanViewport::set_shadow_filter_radius(float texels) {
 
 float VulkanViewport::shadow_filter_radius() const noexcept {
     return shadow_filter_radius_;
+}
+
+void VulkanViewport::set_reference_image(std::shared_ptr<const minirender::Image> image) {
+    path_reference_ = std::move(image);
+    ++reference_revision_;
+    requestUpdate();
 }
 
 void VulkanViewport::set_reference_energy(int value) {
