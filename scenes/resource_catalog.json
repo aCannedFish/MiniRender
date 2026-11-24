@@ -1,0 +1,389 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "cornell",
+      "name": "cornell-box",
+      "kind": "scene",
+      "path": "cornell-box.json",
+      "sha256": "5afb912551daa5996a6f98d33361e4984ee5d396530df5933b9297d904268920",
+      "thumbnail": "catalog_thumbs/cornell.png",
+      "description": "",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "builtin": true,
+      "dependencies": [
+        {
+          "path": "assets/plane.obj",
+          "sha256": "5a83f91ef91fd85fbdfc0a924fb3faf58d008a2a0d253761198c117df308674b"
+        },
+        {
+          "path": "assets/cube.obj",
+          "sha256": "6e912d373134fb1bd0444c7ca3871e54961c18eaee98b303f5194587dfe061b6"
+        },
+        {
+          "path": "assets/demo-sphere.obj",
+          "sha256": "79ac5b5d1b2c05e3415a7c5b0ca52007ba0374e92b7adddf228acecd2ea91841"
+        }
+      ]
+    },
+    {
+      "id": "glass",
+      "name": "cornell-materials",
+      "kind": "scene",
+      "path": "cornell-materials.json",
+      "sha256": "48461e46bc35c75838272f74d67b74985a73fb022b9018ecc9897f4cd0ef7856",
+      "thumbnail": "catalog_thumbs/glass.png",
+      "description": "",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "builtin": true,
+      "dependencies": [
+        {
+          "path": "assets/plane.obj",
+          "sha256": "5a83f91ef91fd85fbdfc0a924fb3faf58d008a2a0d253761198c117df308674b"
+        },
+        {
+          "path": "assets/cube.obj",
+          "sha256": "6e912d373134fb1bd0444c7ca3871e54961c18eaee98b303f5194587dfe061b6"
+        },
+        {
+          "path": "assets/demo-sphere.obj",
+          "sha256": "79ac5b5d1b2c05e3415a7c5b0ca52007ba0374e92b7adddf228acecd2ea91841"
+        }
+      ]
+    },
+    {
+      "id": "materials",
+      "name": "material-balls",
+      "kind": "scene",
+      "path": "material-balls.json",
+      "sha256": "ee34caf213e9959a70a2a2dd64deb1b807c810fd4326a219dc38de156d8df1b0",
+      "thumbnail": "catalog_thumbs/materials.png",
+      "description": "",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "builtin": true,
+      "dependencies": [
+        {
+          "path": "assets/plane.obj",
+          "sha256": "5a83f91ef91fd85fbdfc0a924fb3faf58d008a2a0d253761198c117df308674b"
+        },
+        {
+          "path": "assets/cube.obj",
+          "sha256": "6e912d373134fb1bd0444c7ca3871e54961c18eaee98b303f5194587dfe061b6"
+        },
+        {
+          "path": "assets/demo-sphere.obj",
+          "sha256": "79ac5b5d1b2c05e3415a7c5b0ca52007ba0374e92b7adddf228acecd2ea91841"
+        }
+      ]
+    },
+    {
+      "id": "small_light",
+      "name": "cornell-small-light",
+      "kind": "scene",
+      "path": "cornell-small-light.json",
+      "sha256": "58e5ddd5fbe3c27e636e157c89435679633f831559e38d22ea43c70fa7524456",
+      "thumbnail": "catalog_thumbs/small_light.png",
+      "description": "",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "builtin": true,
+      "dependencies": [
+        {
+          "path": "assets/plane.obj",
+          "sha256": "5a83f91ef91fd85fbdfc0a924fb3faf58d008a2a0d253761198c117df308674b"
+        },
+        {
+          "path": "assets/cube.obj",
+          "sha256": "6e912d373134fb1bd0444c7ca3871e54961c18eaee98b303f5194587dfe061b6"
+        },
+        {
+          "path": "assets/demo-sphere.obj",
+          "sha256": "79ac5b5d1b2c05e3415a7c5b0ca52007ba0374e92b7adddf228acecd2ea91841"
+        }
+      ]
+    },
+    {
+      "id": "bounded_fog",
+      "name": "volume-bounded",
+      "kind": "scene",
+      "path": "volume-bounded.json",
+      "sha256": "071fa5eba038be964691e4f787f0f239e72bbe0ff37fa54feb493f9e03f5f9ae",
+      "thumbnail": "catalog_thumbs/bounded_fog.png",
+      "description": "",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "builtin": true,
+      "dependencies": [
+        {
+          "path": "assets/cube.obj",
+          "sha256": "6e912d373134fb1bd0444c7ca3871e54961c18eaee98b303f5194587dfe061b6"
+        },
+        {
+          "path": "assets/plane.obj",
+          "sha256": "5a83f91ef91fd85fbdfc0a924fb3faf58d008a2a0d253761198c117df308674b"
+        }
+      ]
+    },
+    {
+      "id": "cornell_fog",
+      "name": "volume-cornell",
+      "kind": "scene",
+      "path": "volume-cornell.json",
+      "sha256": "eb6dd3cc106b9967cfec116738234b9e0eabfa581328a0089c0b29e59f983eb0",
+      "thumbnail": "catalog_thumbs/cornell_fog.png",
+      "description": "",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "builtin": true,
+      "dependencies": [
+        {
+          "path": "assets/plane.obj",
+          "sha256": "5a83f91ef91fd85fbdfc0a924fb3faf58d008a2a0d253761198c117df308674b"
+        },
+        {
+          "path": "assets/cube.obj",
+          "sha256": "6e912d373134fb1bd0444c7ca3871e54961c18eaee98b303f5194587dfe061b6"
+        },
+        {
+          "path": "assets/demo-sphere.obj",
+          "sha256": "79ac5b5d1b2c05e3415a7c5b0ca52007ba0374e92b7adddf228acecd2ea91841"
+        }
+      ]
+    },
+    {
+      "id": "light_beam",
+      "name": "volume-beam",
+      "kind": "scene",
+      "path": "volume-beam.json",
+      "sha256": "a94d1215220f56e7cb9fb3029a03915043a67a4183aba5afcf2e7615088dda5e",
+      "thumbnail": "catalog_thumbs/light_beam.png",
+      "description": "",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "builtin": true,
+      "dependencies": [
+        {
+          "path": "assets/cube.obj",
+          "sha256": "6e912d373134fb1bd0444c7ca3871e54961c18eaee98b303f5194587dfe061b6"
+        },
+        {
+          "path": "assets/plane.obj",
+          "sha256": "5a83f91ef91fd85fbdfc0a924fb3faf58d008a2a0d253761198c117df308674b"
+        },
+        {
+          "path": "assets/volume-aperture.obj",
+          "sha256": "2d27ba6803d9796116817843856ca12c1097d6103cc0a86b4f439297f0d6a6f7"
+        }
+      ]
+    },
+    {
+      "id": "glass_caustic",
+      "name": "sppm-glass",
+      "kind": "scene",
+      "path": "sppm-glass.json",
+      "sha256": "48461e46bc35c75838272f74d67b74985a73fb022b9018ecc9897f4cd0ef7856",
+      "thumbnail": "catalog_thumbs/glass_caustic.png",
+      "description": "",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "builtin": true,
+      "dependencies": [
+        {
+          "path": "assets/plane.obj",
+          "sha256": "5a83f91ef91fd85fbdfc0a924fb3faf58d008a2a0d253761198c117df308674b"
+        },
+        {
+          "path": "assets/cube.obj",
+          "sha256": "6e912d373134fb1bd0444c7ca3871e54961c18eaee98b303f5194587dfe061b6"
+        },
+        {
+          "path": "assets/demo-sphere.obj",
+          "sha256": "79ac5b5d1b2c05e3415a7c5b0ca52007ba0374e92b7adddf228acecd2ea91841"
+        }
+      ]
+    },
+    {
+      "id": "mirror_caustic",
+      "name": "sppm-mirror",
+      "kind": "scene",
+      "path": "sppm-mirror.json",
+      "sha256": "db76826f1558da5a403d17e7eb2b8b654d82cb6116fda07dbf336f0d6955e642",
+      "thumbnail": "catalog_thumbs/mirror_caustic.png",
+      "description": "",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "builtin": true,
+      "dependencies": [
+        {
+          "path": "assets/plane.obj",
+          "sha256": "5a83f91ef91fd85fbdfc0a924fb3faf58d008a2a0d253761198c117df308674b"
+        },
+        {
+          "path": "assets/cube.obj",
+          "sha256": "6e912d373134fb1bd0444c7ca3871e54961c18eaee98b303f5194587dfe061b6"
+        },
+        {
+          "path": "assets/demo-sphere.obj",
+          "sha256": "79ac5b5d1b2c05e3415a7c5b0ca52007ba0374e92b7adddf228acecd2ea91841"
+        }
+      ]
+    },
+    {
+      "id": "sss_marble",
+      "name": "sss-marble",
+      "kind": "scene",
+      "path": "sss-marble.json",
+      "sha256": "674509bb5288d77a5d29edc9c71cde4fa997778e9f84328a157f44eff636071d",
+      "thumbnail": "catalog_thumbs/sss_marble.png",
+      "description": "",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "builtin": true,
+      "dependencies": [
+        {
+          "path": "assets/plane.obj",
+          "sha256": "5a83f91ef91fd85fbdfc0a924fb3faf58d008a2a0d253761198c117df308674b"
+        },
+        {
+          "path": "assets/cube.obj",
+          "sha256": "6e912d373134fb1bd0444c7ca3871e54961c18eaee98b303f5194587dfe061b6"
+        },
+        {
+          "path": "assets/demo-sphere.obj",
+          "sha256": "79ac5b5d1b2c05e3415a7c5b0ca52007ba0374e92b7adddf228acecd2ea91841"
+        }
+      ]
+    },
+    {
+      "id": "sss_wax",
+      "name": "sss-wax",
+      "kind": "scene",
+      "path": "sss-wax.json",
+      "sha256": "794c2209d319d4e40236ca81bfc20a54de176dc8d79f1b1d4bbdfde4ba801cd1",
+      "thumbnail": "catalog_thumbs/sss_wax.png",
+      "description": "",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "builtin": true,
+      "dependencies": [
+        {
+          "path": "assets/plane.obj",
+          "sha256": "5a83f91ef91fd85fbdfc0a924fb3faf58d008a2a0d253761198c117df308674b"
+        },
+        {
+          "path": "assets/cube.obj",
+          "sha256": "6e912d373134fb1bd0444c7ca3871e54961c18eaee98b303f5194587dfe061b6"
+        },
+        {
+          "path": "assets/demo-sphere.obj",
+          "sha256": "79ac5b5d1b2c05e3415a7c5b0ca52007ba0374e92b7adddf228acecd2ea91841"
+        }
+      ]
+    },
+    {
+      "id": "sss_marble_edge",
+      "name": "sss-marble-edge",
+      "kind": "scene",
+      "path": "sss-marble-edge.json",
+      "sha256": "0955c9843c0388e7b40c5b2db83378e1425f692672ce8d40a0ad274b289f8101",
+      "thumbnail": "catalog_thumbs/sss_marble_edge.png",
+      "description": "",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "builtin": true,
+      "dependencies": [
+        {
+          "path": "assets/plane.obj",
+          "sha256": "5a83f91ef91fd85fbdfc0a924fb3faf58d008a2a0d253761198c117df308674b"
+        },
+        {
+          "path": "assets/cube.obj",
+          "sha256": "6e912d373134fb1bd0444c7ca3871e54961c18eaee98b303f5194587dfe061b6"
+        },
+        {
+          "path": "assets/demo-sphere.obj",
+          "sha256": "79ac5b5d1b2c05e3415a7c5b0ca52007ba0374e92b7adddf228acecd2ea91841"
+        }
+      ]
+    },
+    {
+      "id": "sss_wax_edge",
+      "name": "sss-wax-edge",
+      "kind": "scene",
+      "path": "sss-wax-edge.json",
+      "sha256": "ef4886fbac3024ed4436530acb701a29b2c09ea54a646b0bb12692f12b735d3a",
+      "thumbnail": "catalog_thumbs/sss_wax_edge.png",
+      "description": "",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "builtin": true,
+      "dependencies": [
+        {
+          "path": "assets/plane.obj",
+          "sha256": "5a83f91ef91fd85fbdfc0a924fb3faf58d008a2a0d253761198c117df308674b"
+        },
+        {
+          "path": "assets/cube.obj",
+          "sha256": "6e912d373134fb1bd0444c7ca3871e54961c18eaee98b303f5194587dfe061b6"
+        },
+        {
+          "path": "assets/demo-sphere.obj",
+          "sha256": "79ac5b5d1b2c05e3415a7c5b0ca52007ba0374e92b7adddf228acecd2ea91841"
+        }
+      ]
+    },
+    {
+      "id": "lightfield",
+      "name": "lightfield-charts",
+      "kind": "scene",
+      "path": "lightfield-charts.json",
+      "sha256": "74e07d947bd80665a8510b54b10625c63655d0442b23c2c424b8ed9fa02e6d7e",
+      "thumbnail": "catalog_thumbs/lightfield.png",
+      "description": "",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "builtin": true,
+      "dependencies": [
+        {
+          "path": "assets/lightfield-card.obj",
+          "sha256": "6995c0f64661cf937b7ea8082beb133826e6930b5e37ef08c02c9bb90bea1190"
+        },
+        {
+          "path": "assets/lightfield-checker.png",
+          "sha256": "8b6979974b6d55e095e80a6e98282f465b9f582839daae4a8ffbe516d0a1ce10"
+        }
+      ]
+    },
+    {
+      "id": "unit-cube",
+      "name": "单位立方体",
+      "kind": "model",
+      "path": "catalog/cube.json",
+      "sha256": "5802803776601c4b6940682fbc6866c39f969b24ee3a4a9af019f7138b6e3dae",
+      "thumbnail": "catalog_thumbs/cube.png",
+      "description": "追加 1 米的可编辑立方体。",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "dependencies": [
+        {
+          "path": "assets/cube.obj",
+          "sha256": "6e912d373134fb1bd0444c7ca3871e54961c18eaee98b303f5194587dfe061b6"
+        }
+      ]
+    },
+    {
+      "id": "motion",
+      "name": "方块运动 · 4 帧",
+      "kind": "sequence",
+      "path": "catalog/motion.json",
+      "sha256": "795f8b1c272e05517e2380a0bd501280ab09c1ca1911c8a3e014f8f83078438f",
+      "thumbnail": "catalog_thumbs/cube.png",
+      "description": "逐帧查看自建的低采样 EXR。",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源"
+    }
+  ]
+}

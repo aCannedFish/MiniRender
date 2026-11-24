@@ -6,6 +6,7 @@
 #include "lightfield_panel.hpp"
 #include "offline_panel.hpp"
 #include "point_cloud_panel.hpp"
+#include "resource_catalog.hpp"
 #include "workbench_internal.hpp"
 #include <QComboBox>
 #include <QCoreApplication>
@@ -19,6 +20,21 @@
 #include <minirender/assets/scene_io.hpp>
 
 using namespace workbench_detail;
+
+LoadedScene workbench_detail::prepare_scene(const std::filesystem::path& source) {
+    LoadedScene result;
+    result.document = minirender::load_scene(source);
+    result.document.validate(&result.validated);
+    for (const auto& mesh : result.document.meshes) {
+        const bool visible =
+            std::any_of(result.document.objects.begin(), result.document.objects.end(),
+                        [&](const auto& item) { return item.visible && item.mesh_id == mesh.id; });
+        if (visible) {
+            result.raster.emplace_back(mesh.data, minirender::prepare_raster_mesh(*mesh.data));
+        }
+    }
+    return result;
+}
 
 void Workbench::import_object_file(const QString& path) {
     begin_asset_task("正在读取并校验网格…");
@@ -69,22 +85,7 @@ void Workbench::open_scene_file(const QString& path, std::function<void()> after
     const auto source     = native_path(path);
     const auto generation = ++document_generation_;
     run_background(
-        this,
-        [source] {
-            LoadedScene result;
-            result.document = minirender::load_scene(source);
-            result.document.validate(&result.validated);
-            for (const auto& mesh : result.document.meshes) {
-                const bool visible = std::any_of(
-                    result.document.objects.begin(), result.document.objects.end(),
-                    [&](const auto& item) { return item.visible && item.mesh_id == mesh.id; });
-                if (visible) {
-                    result.raster.emplace_back(mesh.data,
-                                               minirender::prepare_raster_mesh(*mesh.data));
-                }
-            }
-            return result;
-        },
+        this, [source] { return prepare_scene(source); },
         [this, path, generation, after_load = std::move(after_load)](const auto& result) {
             finish_asset_task();
             if (generation != document_generation_) {
@@ -109,42 +110,43 @@ void Workbench::open_scene_file(const QString& path, std::function<void()> after
 }
 
 void Workbench::import_builtin_scene(const QString& id) {
-    const auto& scenes = builtin_scenes();
-    const auto  found =
-        std::find_if(scenes.begin(), scenes.end(), [&](const auto& item) { return item.id == id; });
-    if (found == scenes.end()) {
-        throw std::invalid_argument("Unknown built-in scene");
+    const auto entries = catalog::read(builtin_scene_directory(), true);
+    for (const auto& entry : entries) {
+        if (entry.builtin && entry.id == id) {
+            import_resource(entry);
+            return;
+        }
     }
-    const auto preset = *found;
-    open_scene_file(builtin_scene_directory() + "/" + preset.filename, [this, preset] {
-        scene_path_.clear();
-        findChild<QDoubleSpinBox*>("exposure")->setValue(0);
-        lightfield_->cancel();
-        offline_->prepare_import(preset.render, preset.integrator);
-        select_object(preset.selected_object);
-        findChild<QComboBox*>("view_mode")
-            ->setCurrentIndex(VulkanViewport::base_color_preview_mode);
-        if (!editor_.document().media.empty()) {
-            panels_->setCurrentIndex(10);
+    throw std::invalid_argument("Unknown built-in scene");
+}
+
+void Workbench::apply_builtin_settings(const BuiltinScene& preset) {
+    scene_path_.clear();
+    findChild<QDoubleSpinBox*>("exposure")->setValue(0);
+    lightfield_->cancel();
+    offline_->prepare_import(preset.render, preset.integrator);
+    select_object(preset.selected_object);
+    findChild<QComboBox*>("view_mode")->setCurrentIndex(VulkanViewport::base_color_preview_mode);
+    if (!editor_.document().media.empty()) {
+        panels_->setCurrentIndex(10);
+    }
+    for (const auto& material : editor_.document().materials) {
+        if (material.kind == minirender::MaterialKind::subsurface) {
+            panels_->setCurrentIndex(0);
+            break;
         }
-        for (const auto& material : editor_.document().materials) {
-            if (material.kind == minirender::MaterialKind::subsurface) {
-                panels_->setCurrentIndex(0);
-                break;
-            }
-        }
-        if (preset.id == "lightfield") {
-            minirender::LightFieldCaptureSettings settings;
-            settings.render          = preset.render;
-            settings.reference_focus = 4;
-            settings.aperture_radius = .2;
-            lightfield_panel_->set_capture_settings(settings);
-            panels_->setCurrentIndex(11);
-        }
-        setWindowTitle("MiniRender — " + preset.name + "（示例副本）");
-        statusBar()->showMessage(
-            preset.name + " 已覆盖导入，当前为原色预览；可编辑后开始离线渲染。", 12000);
-    });
+    }
+    if (preset.id == "lightfield") {
+        minirender::LightFieldCaptureSettings settings;
+        settings.render          = preset.render;
+        settings.reference_focus = 4;
+        settings.aperture_radius = .2;
+        lightfield_panel_->set_capture_settings(settings);
+        panels_->setCurrentIndex(11);
+    }
+    setWindowTitle("MiniRender — " + preset.name + "（示例副本）");
+    statusBar()->showMessage(preset.name + " 已覆盖导入，当前为原色预览；可编辑后开始离线渲染。",
+                             12000);
 }
 
 void Workbench::load_scene_file(const QString& path) {

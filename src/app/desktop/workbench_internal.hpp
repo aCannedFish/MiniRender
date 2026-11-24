@@ -44,6 +44,9 @@ struct LoadedScene {
         raster;
 };
 
+// 解析场景、校验网格并准备可见物体的光栅数据，供普通打开和资源目录共用。
+LoadedScene prepare_scene(const std::filesystem::path& source);
+
 // work 在工作线程执行，done 只在 owner 存活时由 GUI 线程处理结果或错误。
 template <typename Work, typename Done> void run_background(QObject* owner, Work work, Done done) {
     using Result  = TaskResult<decltype(work())>;

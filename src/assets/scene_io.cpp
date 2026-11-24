@@ -97,17 +97,19 @@ SceneDocument load_scene(const std::filesystem::path& path) {
         }
         for (const auto& value : json.at("meshes")) {
             MeshAsset mesh;
-            mesh.id     = value.at("id").get<std::string>();
-            mesh.source = path_from_utf8(value.at("source").get<std::string>());
+            mesh.id              = value.at("id").get<std::string>();
+            mesh.source          = path_from_utf8(value.at("source").get<std::string>());
+            mesh.package_on_save = value.value("packaged", false);
             mesh.data =
                 std::make_shared<const MeshData>(load_obj(scene.asset_directory / mesh.source));
             scene.meshes.push_back(std::move(mesh));
         }
         for (const auto& value : json.value("textures", Json::array())) {
             TextureAsset texture;
-            texture.id          = value.at("id").get<std::string>();
-            texture.source      = path_from_utf8(value.at("source").get<std::string>());
-            const auto encoding = value.value("encoding", std::string("srgb"));
+            texture.id              = value.at("id").get<std::string>();
+            texture.package_on_save = value.value("packaged", false);
+            texture.source          = path_from_utf8(value.at("source").get<std::string>());
+            const auto encoding     = value.value("encoding", std::string("srgb"));
             if (encoding != "srgb" && encoding != "linear") {
                 throw std::invalid_argument("Unknown texture encoding");
             }
@@ -243,19 +245,23 @@ void save_scene(const SceneDocument& document, const std::filesystem::path& path
                                                 cancellation, progress)
                 : detail::portable_asset_path(document.asset_directory / mesh.source,
                                               destination_directory, asset_index, asset_count,
-                                              cancellation, progress);
-        json["meshes"].push_back({{"id", mesh.id}, {"source", path_to_utf8(relative)}});
+                                              cancellation, progress, mesh.package_on_save,
+                                              staged.directory());
+        json["meshes"].push_back({{"id", mesh.id},
+                                  {"source", path_to_utf8(relative)},
+                                  {"packaged", mesh.package_on_save}});
         ++asset_index;
     }
     for (const auto& texture : document.textures) {
         if (texture.source.empty()) {
             throw std::invalid_argument("Texture must have a source before saving");
         }
-        const auto relative = detail::portable_asset_path(document.asset_directory / texture.source,
-                                                          destination_directory, asset_index++,
-                                                          asset_count, cancellation, progress);
+        const auto relative = detail::portable_asset_path(
+            document.asset_directory / texture.source, destination_directory, asset_index++,
+            asset_count, cancellation, progress, texture.package_on_save, staged.directory());
         json["textures"].push_back(
             {{"id", texture.id},
+             {"packaged", texture.package_on_save},
              {"source", path_to_utf8(relative)},
              {"encoding", texture.encoding == ColorEncoding::srgb ? "srgb" : "linear"}});
     }
