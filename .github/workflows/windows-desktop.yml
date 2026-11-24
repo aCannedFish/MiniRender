@@ -37,5 +37,19 @@ jobs:
         env:
           CL: /MP2
         run: cmake --build build/win-ci --config Release --parallel 3
+      - name: Verify Windows application name and icon
+        shell: pwsh
+        run: |
+          $exe = Get-Item build/win-ci/src/app/desktop/Release/RenderBox.exe
+          if ($exe.VersionInfo.ProductName -cne 'RenderBox' -or $exe.VersionInfo.FileDescription -cne 'RenderBox') {
+              throw "Unexpected product name in $exe"
+          }
+          Add-Type -Namespace RenderBoxChecks -Name Icons -MemberDefinition @'
+          [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet=System.Runtime.InteropServices.CharSet.Unicode)]
+          public static extern uint ExtractIconEx(string file, int index, System.IntPtr large, System.IntPtr small, uint count);
+          '@
+          if ([RenderBoxChecks.Icons]::ExtractIconEx($exe.FullName, -1, [IntPtr]::Zero, [IntPtr]::Zero, 0) -ne 1) {
+              throw "Expected one application icon group in $exe"
+          }
       - name: Test portable rendering core
         run: ctest --test-dir build/win-ci -C Release --output-on-failure -j 3

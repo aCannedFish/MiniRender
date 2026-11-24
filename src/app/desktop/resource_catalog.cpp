@@ -1,6 +1,7 @@
 // 解析资源目录，限制文件在包内，并在后台导入时检查内容完整性。
 #include "resource_catalog.hpp"
 #include "builtin_scenes.hpp"
+#include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFileInfo>
@@ -49,17 +50,21 @@ File parse_file(const QJsonObject& object) {
 
 QString course_directory() {
     const auto mounted =
-        QSettings("MiniRender", "MiniRender").value("catalog/course_root").toString();
+        QSettings("RenderBox", "RenderBox").value("catalog/course_root").toString();
     if (!mounted.isEmpty()) {
         return mounted;
     }
-    // 兼容旧版本使用的默认 Qt 设置域。
-    const auto legacy = QSettings().value("catalog/course_root").toString();
-    if (!legacy.isEmpty()) {
-        return legacy;
+    // 已安装的旧版本可能使用显式设置域，也可能只设置了应用名。
+    for (const QString& organization :
+         {QStringLiteral("MiniRender"), QCoreApplication::organizationName()}) {
+        const auto previous =
+            QSettings(organization, "MiniRender").value("catalog/course_root").toString();
+        if (!previous.isEmpty()) {
+            return previous;
+        }
     }
     // 本机安装器记录已有课程包的位置，用户复制应用到其他设备后仍可重新挂载。
-    QFile metadata(QDir(builtin_scene_directory()).filePath("../minirender-build.json"));
+    QFile metadata(QDir(builtin_scene_directory()).filePath("../renderbox-build.json"));
     if (metadata.open(QIODevice::ReadOnly)) {
         const auto root =
             QJsonDocument::fromJson(metadata.readAll()).object().value("course_root").toString();
@@ -72,7 +77,7 @@ QString course_directory() {
 }
 
 void remember_course_directory(const QString& root) {
-    QSettings("MiniRender", "MiniRender")
+    QSettings("RenderBox", "RenderBox")
         .setValue("catalog/course_root", QFileInfo(root).canonicalFilePath());
 }
 

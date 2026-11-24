@@ -137,7 +137,7 @@ void CatalogBrowser::describe() {
     }
     int         index = item->data(Qt::UserRole).toInt();
     const auto& e = index < builtin_.size() ? builtin_[index] : course_[index - builtin_.size()];
-    const auto  format = e.kind == catalog::Kind::sequence ? "EXR 序列" : "MiniRender JSON";
+    const auto  format = e.kind == catalog::Kind::sequence ? "EXR 序列" : "RenderBox JSON";
     recommended_->setVisible(e.kind != catalog::Kind::sequence && !e.recommended.isEmpty());
     const QString action = e.recommended == "comparison" ? "覆盖并生成对照"
                            : e.recommended == "ssgi"     ? "覆盖并预览屏幕间接光"

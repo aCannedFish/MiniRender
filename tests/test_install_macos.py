@@ -17,16 +17,16 @@ spec.loader.exec_module(installer)
 
 
 def make_bundle(
-    path: Path, identifier: str = installer.BUNDLE_ID, content: bytes = b"old"
+    path: Path, identifier: str = installer.BUNDLE_ID, content: bytes = b"old", executable: str = "RenderBox"
 ) -> Path:
     """构造最小应用包；不同二进制内容用于检查替换与恢复。"""
     (path / "Contents/MacOS").mkdir(parents=True)
-    (path / "Contents/MacOS/minirender").write_bytes(content)
+    (path / "Contents/MacOS" / executable).write_bytes(content)
     (path / "Contents/Info.plist").write_bytes(
         plistlib.dumps(
             {
                 "CFBundleIdentifier": identifier,
-                "CFBundleExecutable": "minirender",
+                "CFBundleExecutable": executable,
             }
         )
     )
@@ -41,7 +41,7 @@ class InstallerTests(unittest.TestCase):
             root = Path(temporary)
             old = make_bundle(root / "build/debug/src/app/desktop/old.app")
             foreign = make_bundle(
-                root / "Applications/MiniRender.app", "other.application"
+                root / "Applications/RenderBox.app", "other.application"
             )
             unrelated = root / "models.obj"
             unrelated.write_text("model", encoding="utf-8")
@@ -73,7 +73,7 @@ class InstallerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             bundle = make_bundle(root / "build/debug/src/app/desktop/partial.app")
-            (bundle / "Contents/MacOS/minirender").unlink()
+            (bundle / "Contents/MacOS/RenderBox").unlink()
             self.assertEqual(installer.old_bundles([root], []), [bundle])
             installer.remove_bundle(bundle)
             self.assertFalse(bundle.exists())
@@ -110,7 +110,7 @@ class InstallerTests(unittest.TestCase):
                 installer.subprocess, "check_output", side_effect=prefixes
             ):
                 self.assertEqual(len(installer.deploy_vulkan(staged)), 2)
-            destination = root / "MiniRender.app"
+            destination = root / "RenderBox.app"
             staged.rename(destination)
             for manifest in (destination / "Contents/Resources/vulkan").glob(
                 "*/*.json"
@@ -142,22 +142,25 @@ class InstallerTests(unittest.TestCase):
             backup = root / "previous.app"
             installer.publish_bundle(staged, destination, backup)
             self.assertEqual(
-                (destination / "Contents/MacOS/minirender").read_bytes(), b"new"
+                (destination / "Contents/MacOS/RenderBox").read_bytes(), b"new"
             )
             self.assertFalse(backup.exists())
             self.assertFalse(staged.exists())
 
     def test_running_application_prevents_update(self):
         with tempfile.TemporaryDirectory() as temporary:
-            bundle = make_bundle(Path(temporary) / "MiniRender.app")
-            executable = bundle / "Contents/MacOS/minirender"
+            root = Path(temporary)
+            bundle = make_bundle(root / "MiniRender.app", executable="minirender_desktop")
+            current = make_bundle(root / "RenderBox.app")
+            self.assertCountEqual(installer.old_bundles([], [root]), [bundle, current])
+            executable = bundle / "Contents/MacOS/minirender_desktop"
             with patch.object(
                 installer.subprocess,
                 "check_output",
                 return_value=str(executable) + "\n",
             ):
                 with self.assertRaises(RuntimeError):
-                    installer.require_stopped([bundle])
+                    installer.require_stopped([current, bundle])
             self.assertTrue(bundle.exists())
 
     def test_active_worktree_build_prevents_cleanup(self):
@@ -192,7 +195,7 @@ class InstallerTests(unittest.TestCase):
                 with self.assertRaises(OSError):
                     installer.publish_bundle(staged, destination, backup)
             self.assertEqual(
-                (destination / "Contents/MacOS/minirender").read_bytes(), b"old"
+                (destination / "Contents/MacOS/RenderBox").read_bytes(), b"old"
             )
             self.assertTrue(staged.exists())
             self.assertFalse(backup.exists())

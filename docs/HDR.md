@@ -53,7 +53,7 @@ TinyEXR/miniz 以固定 URL 与 SHA256 获取三个必要源码文件，保留�
 ## 验证
 
 ```sh
-python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirender_desktop.app --scene scenes/studio-two-lights.json --output outputs/a1.4 --timeout 60
+python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/RenderBox.app --scene scenes/studio-two-lights.json --output outputs/a1.4 --timeout 60
 ```
 
 端到端测试将一个物体设置为已知自发光值 (8,2,0.5)，关闭其他光照，再检查 GPU HDR、EXR 往返和显示编码。曝光增加两档后，整幅原始 HDR 的最大差异必须为零，但显示图像应变亮。

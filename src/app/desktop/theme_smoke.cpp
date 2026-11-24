@@ -91,6 +91,12 @@ struct State {
 
 void start_theme_smoke(Workbench& window, const QString& directory) {
     require(QDir().mkpath(directory), "Cannot create theme capture directory");
+    // 从实际窗口核对嵌入的图标与品牌，覆盖命令行直接打开场景的启动路径。
+    require(QApplication::applicationName() == "RenderBox" &&
+                QApplication::applicationDisplayName() == "RenderBox" &&
+                window.windowTitle().startsWith("RenderBox"),
+            "Application or window shows an incorrect product name");
+    require(!window.windowIcon().pixmap(32, 32).isNull(), "Application icon is missing");
     window.select_object("blue_cube");
     auto  state = std::make_shared<State>();
     auto* timer = new QTimer(&window);

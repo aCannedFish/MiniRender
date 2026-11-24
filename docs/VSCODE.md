@@ -2,7 +2,7 @@
 
 ## 打开工程
 
-用 VS Code 打开 MiniRender 仓库根目录，安装工作区推荐的 Microsoft C/C++ 与 CMake Tools 扩展。执行 `CMake: Select Configure Preset`，本机选择 `macos-desktop-debug`，Windows 选择 `windows-desktop-debug`，然后执行 `CMake: Configure` 和构建。
+用 VS Code 打开 RenderBox 仓库根目录，安装工作区推荐的 Microsoft C/C++ 与 CMake Tools 扩展。执行 `CMake: Select Configure Preset`，本机选择 `macos-desktop-debug`，Windows 选择 `windows-desktop-debug`，然后执行 `CMake: Configure` 和构建。
 
 工程依赖必须先安装或由 CMake 下载。桌面配置包含所有核心目标及 Qt/Vulkan 源文件；如果只选 core 配置，CMake Tools 不会提供桌面目标的编译信息。
 

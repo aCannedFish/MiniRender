@@ -5,6 +5,7 @@
 #include "workbench_internal.hpp"
 #include <QCheckBox>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QFileInfo>
 #include <QMessageBox>
 #include <QProgressDialog>
@@ -229,7 +230,8 @@ void Workbench::import_resource(const catalog::Entry& entry, catalog::ImportActi
                     if (!source.objects.empty()) {
                         select_object(source.objects.front().id);
                     }
-                    setWindowTitle("MiniRender — " + entry.name + "（示例副本）");
+                    setWindowTitle(QCoreApplication::applicationName() + " — " + entry.name +
+                                   "（示例副本）");
                 }
             } catch (const std::exception& error) {
                 report_error(error);

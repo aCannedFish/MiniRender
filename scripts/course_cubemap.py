@@ -1,4 +1,4 @@
-"""把 HW2 六张 sRGB 立方体面转换为 MiniRender 使用的经纬图。"""
+"""把 HW2 六张 sRGB 立方体面转换为 RenderBox 使用的经纬图。"""
 
 import math
 from pathlib import Path

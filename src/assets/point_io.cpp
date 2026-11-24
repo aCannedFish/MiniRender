@@ -422,7 +422,7 @@ void save_point_cloud(const PointCloud& cloud, const std::filesystem::path& path
     const char* encoding = format == PlyFormat::ascii           ? "ascii"
                            : format == PlyFormat::little_endian ? "binary_little_endian"
                                                                 : "binary_big_endian";
-    stream << "ply\nformat " << encoding << " 1.0\ncomment MiniRender point cloud\n"
+    stream << "ply\nformat " << encoding << " 1.0\ncomment RenderBox point cloud\n"
            << "element vertex " << cloud.positions.size() << "\n"
            << "property float x\nproperty float y\nproperty float z\n";
     if (!cloud.normals.empty()) {

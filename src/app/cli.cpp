@@ -34,7 +34,7 @@ int run_cli(int argc, char** argv) {
             return run_render_cli(argc - 2, argv + 2);
         }
         if (argc == 2 && std::string_view(argv[1]) == "--capabilities") {
-            std::cout << "MiniRender 0.1\nimage: linear RGB\nvolume: homogeneous RGB\n"
+            std::cout << "RenderBox 0.1\nimage: linear RGB\nvolume: homogeneous RGB\n"
                          "lightfield: streamed RGB32f capture/refocus\n"
                          "optix: unavailable (B2 pending)\n";
             return 0;

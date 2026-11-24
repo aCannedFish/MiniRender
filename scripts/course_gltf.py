@@ -1,4 +1,4 @@
-"""将 HW3 的 cube1、cube2 和 cave 离线转换为可编辑的 MiniRender 网格与材质。"""
+"""将 HW3 的 cube1、cube2 和 cave 离线转换为可编辑的 RenderBox 网格与材质。"""
 
 import base64
 import json

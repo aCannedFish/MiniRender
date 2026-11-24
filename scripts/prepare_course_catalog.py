@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""把 GAMES202 本地作业包整理成 MiniRender 可挂载的课程目录。"""
+"""把 GAMES202 本地作业包整理成 RenderBox 可挂载的课程目录。"""
 
 import argparse
 import hashlib
@@ -314,7 +314,7 @@ def builtin_entries(root, cli):
     result = []
     meta = root / "catalog"
     thumbs = root / "catalog_thumbs"
-    src, own = "MiniRender", "MiniRender 自建资源"
+    src, own = "RenderBox", "RenderBox 自建资源"
     for id_, stem in BUILTINS.items():
         f = root / (stem + ".json")
         png = thumbs / (id_ + ".png")

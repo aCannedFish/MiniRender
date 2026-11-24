@@ -1,0 +1,27 @@
+// Windows 资源管理器使用多尺寸图标，文件属性中的版本号来自 CMake 项目版本。
+#include <winver.h>
+
+1 ICON "@CMAKE_CURRENT_SOURCE_DIR@/icons/renderbox.ico"
+
+1 VERSIONINFO
+FILEVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+PRODUCTVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "FileDescription", "@PROJECT_NAME@\0"
+            VALUE "FileVersion", "@PROJECT_VERSION@\0"
+            VALUE "OriginalFilename", "@PROJECT_NAME@.exe\0"
+            VALUE "ProductName", "@PROJECT_NAME@\0"
+            VALUE "ProductVersion", "@PROJECT_VERSION@\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END

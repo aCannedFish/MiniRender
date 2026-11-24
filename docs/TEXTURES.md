@@ -38,7 +38,7 @@ SceneRenderer 为各绘制实例绑定 descriptor set，不要求动态纹理数
 ## 验证
 
 ```sh
-python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirender_desktop.app --scene scenes/studio.json --texture-check --output outputs/a1.5 --timeout 60
+python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/RenderBox.app --scene scenes/studio.json --texture-check --output outputs/a1.5 --timeout 60
 ```
 
 测试依次验证异步导入、绑定产生图像变化、undo/redo 与重载一致，再在顶视平面上对照 CPU/GPU 采样。GPU 值直接取自线性 HDR，避免色调映射和 FXAA 掩盖数值差异。

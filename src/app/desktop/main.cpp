@@ -44,6 +44,7 @@
 #include <QEvent>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QIcon>
 #include <QLabel>
 #include <QMainWindow>
 #include <QMessageBox>
@@ -162,9 +163,11 @@ int main(int argc, char** argv) {
         qputenv("VK_LAYER_PATH", layer_directory.toUtf8());
     }
 #endif
-    QApplication::setApplicationName("MiniRender");
+    application.setApplicationName("RenderBox");
+    application.setApplicationDisplayName(application.applicationName());
+    application.setWindowIcon(QIcon(":/editor/icons/renderbox.png"));
     QCommandLineParser parser;
-    parser.setApplicationDescription("MiniRender — Vulkan scene workbench");
+    parser.setApplicationDescription(application.applicationName() + " — Vulkan scene workbench");
     parser.addHelpOption();
     parser.addOption({"smoke", "Run resize/readback checks and save a PNG.", "output"});
     parser.addOption({"validation", "Require Vulkan Validation Layers."});

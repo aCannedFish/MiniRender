@@ -73,7 +73,7 @@ cmake --build --preset macos-core-release
 build/macos-core-release/minirender_tests '[gizmo],[gesture]'
 cmake --build --preset macos-desktop-release
 python3 scripts/verify_gpu.py \
-  build/macos-desktop-release/src/app/desktop/minirender_desktop.app \
+  build/macos-desktop-release/src/app/desktop/RenderBox.app \
   --scene scenes/studio.json --gizmo-check --sync-validation \
   --output outputs/ui3/sync --timeout 150
 ```

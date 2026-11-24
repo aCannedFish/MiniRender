@@ -5,7 +5,7 @@
 构建 desktop preset 后，macOS 生成应用包，可从 Finder 打开，或执行：
 
 ```sh
-open build/macos-desktop-debug/src/app/desktop/minirender_desktop.app
+open build/macos-desktop-debug/src/app/desktop/RenderBox.app
 ```
 
 应用旁附带 studio 示例，不依赖源码目录。通过“打开”加载其他 JSON 场景，或用“导入 OBJ”添加模型。窗口左侧显示物体、资源和独立的场景设置，右侧检查器编辑选中物体。灯光和相机位于“场景与渲染”面板，布局与控件说明见[编辑器界面](EDITOR_UI.md)。
@@ -46,7 +46,7 @@ FrameUniform 按 std140 排列，包含 view-projection、相机位置、环境�
 ## 验证
 
 ```sh
-python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/minirender_desktop.app --scene scenes/studio.json --output outputs/a1.2
+python3 scripts/verify_gpu.py build/macos-desktop-debug/src/app/desktop/RenderBox.app --scene scenes/studio.json --output outputs/a1.2
 ```
 
 测试保存 baseline、edited、undo、redo、reloaded、normals、dolly 和 final 图像，检查物体编辑改变像素，撤销/重做及保存重载恢复对应图像。它还发送 Qt 输入事件验证滚轮和键盘相机，并执行复制/删除动作。程序关闭后仍要求 Validation 错误数为 0。

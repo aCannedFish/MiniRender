@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""将通过测试的桌面程序更新到固定位置，并清理旧 MiniRender 应用包。
+"""将通过测试的桌面程序更新到固定位置，并清理旧 RenderBox 应用包。
 
 先在临时目录部署依赖和执行离屏 GPU 检查，再替换正式应用。
 清理范围限于应用目录和本仓库工作树中的构建产物，按 bundle ID 确认归属。
@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 
+# 新旧版本共用此标识，以便识别旧安装并保护运行中的场景。
 BUNDLE_ID = "org.minirender.desktop"
 LSREGISTER = Path(
     "/System/Library/Frameworks/CoreServices.framework/Frameworks/"
@@ -26,7 +27,7 @@ def bundle_info(bundle: Path, require_executable: bool = True) -> dict:
     """读取并校验本项目应用包，避免覆盖或删除同名的其他应用。"""
     info = plistlib.loads((bundle / "Contents/Info.plist").read_bytes())
     if info.get("CFBundleIdentifier") != BUNDLE_ID:
-        raise ValueError(f"Bundle does not belong to MiniRender: {bundle}")
+        raise ValueError(f"Bundle does not belong to RenderBox: {bundle}")
     executable = info.get("CFBundleExecutable", "")
     if not executable or Path(executable).name != executable:
         raise ValueError(f"Invalid bundle executable: {bundle}")
@@ -102,7 +103,7 @@ def require_stopped(bundles: list[Path]) -> None:
             / bundle_info(bundle, require_executable=False)["CFBundleExecutable"]
         )
         if str(executable) in processes or str(executable.resolve()) in processes:
-            raise RuntimeError(f"Close MiniRender before updating: {bundle}")
+            raise RuntimeError(f"Save your scene and close {bundle.name} before updating")
 
 
 def require_idle_builds(roots: list[Path]) -> None:
@@ -167,11 +168,11 @@ def main() -> int:
         type=Path,
         nargs="?",
         default=Path(
-            "build/macos-desktop-release/src/app/desktop/minirender_desktop.app"
+            "build/macos-desktop-release/src/app/desktop/RenderBox.app"
         ),
     )
     parser.add_argument(
-        "--destination", type=Path, default=Path("/Applications/MiniRender.app")
+        "--destination", type=Path, default=Path("/Applications/RenderBox.app")
     )
     args = parser.parse_args()
     if sys.platform != "darwin":
@@ -201,10 +202,10 @@ def main() -> int:
     require_stopped(previous)
     destination.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
-        prefix=".minirender-update-", dir=destination.parent
+        prefix=".renderbox-update-", dir=destination.parent
     ) as temporary:
         staging = Path(temporary)
-        staged = staging / "MiniRender.app"
+        staged = staging / "RenderBox.app"
         shutil.copytree(source, staged, symlinks=True)
         commit = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=repository, text=True
@@ -215,7 +216,7 @@ def main() -> int:
         course_root = repository / "work" / "GAMES202"
         if (course_root / "resource_catalog.json").is_file():
             build_info["course_root"] = str(course_root)
-        (resources / "minirender-build.json").write_text(
+        (resources / "renderbox-build.json").write_text(
             json.dumps(build_info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
         # 只部署 Widgets 使用的 Cocoa 和原生样式插件，避免混入其他 Qt 版本的插件。
@@ -310,7 +311,7 @@ def main() -> int:
         remove_bundle(bundle)
         print(f"Removed old bundle: {bundle}", flush=True)
     subprocess.run([str(LSREGISTER), "-f", str(destination)], check=True)
-    print("MiniRender installation updated. Previous application bundles removed.")
+    print("RenderBox installation updated. Previous application bundles removed.")
     return 0
 
 
@@ -318,5 +319,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except (OSError, ValueError, RuntimeError, subprocess.CalledProcessError) as error:
-        print(f"MiniRender installation failed: {error}", file=sys.stderr)
+        print(f"RenderBox installation failed: {error}", file=sys.stderr)
         raise SystemExit(1) from error

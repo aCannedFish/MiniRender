@@ -8,7 +8,7 @@ RegressionActivity::RegressionActivity(bool enabled) {
     if (enabled) {
         id token = [[NSProcessInfo processInfo]
             beginActivityWithOptions:NSActivityUserInitiatedAllowingIdleSystemSleep
-                              reason:@"MiniRender automated regression"];
+                              reason:@"RenderBox automated regression"];
         token_   = (__bridge_retained void*)token;
     }
 }

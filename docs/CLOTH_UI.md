@@ -79,7 +79,7 @@ build/macos-core-release/minirender_tests '[cloth-component]'
 cmake --preset macos-desktop-release
 cmake --build --preset macos-desktop-release --parallel 4
 python3 scripts/verify_gpu.py \
-  build/macos-desktop-release/src/app/desktop/minirender_desktop.app \
+  build/macos-desktop-release/src/app/desktop/RenderBox.app \
   --scene scenes/studio.json --simulation-check --timing-only \
   --output outputs/a6.3/timing --timeout 240
 ```
