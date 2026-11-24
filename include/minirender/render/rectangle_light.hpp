@@ -14,6 +14,8 @@ struct RectangleResponse {
     glm::dvec3 diffuse{0}, specular{0};
 };
 
+// point、normal、outgoing 位于世界空间，outgoing 从表面指向观察者。
+// 漫反射使用余弦边积分，导体使用粗糙度和观察余弦选取 LTC 拟合；背面判断沿用灯具的绕序。
 RectangleResponse evaluate_rectangle(const RectangleLight& light, glm::dvec3 point,
                                      glm::dvec3 normal, glm::dvec3 outgoing, glm::dvec3 albedo,
                                      double roughness, bool conductor);

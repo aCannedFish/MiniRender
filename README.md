@@ -1342,6 +1342,18 @@ docs/baseline/
 更多算法的公式、参数约定与示例见[学习路线](docs/LEARNING.md)。
 
 
+### 课程算法
+
+| 要读的实现 | 从哪里开始 | 如何核对结果 |
+| --- | --- | --- |
+| HW0 教学着色与分屏 | 点光源、高光指数和半角向量在 [scene.frag](shaders/scene.frag)。同相机分屏的显示缓存由 [post_process.cpp](src/app/desktop/post_process.cpp) 管理。 | [preview_smoke.cpp](src/app/desktop/preview_smoke.cpp) 按独立 CPU 交点验证颜色，也检查拖动分界线时两侧的绘制次数。 |
+| HW1 方向光软阴影 | 遮挡物搜索和半影半径都在 [shadow_filter.glsl](shaders/shadow_filter.glsl)。每个光源的深度图由 [shadow_map.cpp](src/app/desktop/shadow_map.cpp) 管理。 | [shadow_smoke.cpp](src/app/desktop/shadow_smoke.cpp) 测量不同离地高度与光源角半径下的地面半影。 |
+| HW2 预计算传输 | [prt.cpp](src/render/prt.cpp) 从面角发射射线并积累传输系数。[spherical_harmonics.cpp](src/render/spherical_harmonics.cpp) 计算九项实球谐、环境投影和旋转。 | [prt_tests.cpp](tests/prt_tests.cpp) 含常量环境与红色挡板的解析和数值对照。 |
+| HW3 屏幕间接光 | [screen_trace.frag](shaders/screen_trace.frag) 中的 `trace_ray` 用同一套厚度与命中测试实现逐像素与 Hi-Z 遍历。[depth_reduce.frag](shaders/depth_reduce.frag) 建立深度区间。 | [screen_transport_smoke.cpp](src/app/desktop/screen_transport_smoke.cpp) 对照命中、遍历步数与间接辐亮度。 |
+| HW4 粗糙金属 | [microfacet_energy.cpp](src/render/microfacet_energy.cpp) 计算方向反照率和 Kulla–Conty 补偿。[bsdf.cpp](src/render/bsdf.cpp) 将 GGX 与补偿瓣的采样密度用于 MIS。 | [microfacet_energy_tests.cpp](tests/microfacet_energy_tests.cpp) 积分白炉响应并核对采样权重。 |
+| HW5 降噪 | [denoiser.cpp](src/render/denoiser.cpp) 中的 `filter_spatial` 和 `filter_temporal` 可独立阅读。实时重投影使用 [gi_temporal.frag](shaders/gi_temporal.frag)。 | [denoiser_tests.cpp](tests/denoiser_tests.cpp) 验证边缘、刚体移动、遮挡解除和参考图像误差。 |
+| 矩形灯与遮挡 | [rectangle_light.cpp](src/render/rectangle_light.cpp) 给出余弦与 LTC 边积分的 CPU 实现。[rectangle_visibility.glsl](shaders/rectangle_visibility.glsl) 对灯面样本计算可见性。 | [rectangle_light_tests.cpp](tests/rectangle_light_tests.cpp) 使用独立面积数值积分作为参考。 |
+
 ### LTC 数据
 
 目录：[third_party/ltc/](third_party/ltc/)。
