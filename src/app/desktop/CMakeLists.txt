@@ -31,6 +31,8 @@ qt_add_executable(minirender_desktop
     resource_catalog.cpp resource_catalog.hpp catalog_browser.cpp catalog_browser.hpp
     comparison_controls.cpp comparison_controls.hpp
     shadow_smoke.cpp shadow_smoke.hpp rectangle_smoke.cpp rectangle_smoke.hpp
+    prt_smoke.cpp prt_smoke.hpp
+    prt_panel.cpp prt_panel.hpp prt_cache.cpp prt_cache.hpp
     rectangle_shadow.cpp rectangle_shadow.hpp
     gpu_rectangle.cpp gpu_rectangle.hpp
     catalog_smoke.cpp catalog_smoke.hpp

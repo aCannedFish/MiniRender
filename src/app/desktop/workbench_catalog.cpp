@@ -8,6 +8,7 @@
 #include <QFileInfo>
 #include <QMessageBox>
 #include <QProgressDialog>
+#include <QPushButton>
 #include <QStatusBar>
 #include <QTimer>
 #include <atomic>
@@ -175,6 +176,9 @@ void Workbench::import_resource(const catalog::Entry& entry, bool recommended) {
                             ->setCurrentIndex(static_cast<int>(ShadowFilter::pcss));
                     }
                     findChild<QComboBox*>("view_mode")->setCurrentIndex(view);
+                    if (recommended && entry.recommended == "prt") {
+                        findChild<QPushButton*>("prt_bake")->click();
+                    }
                     if (!source.objects.empty()) {
                         select_object(source.objects.front().id);
                     }

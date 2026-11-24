@@ -424,6 +424,28 @@
           "sha256": "79ac5b5d1b2c05e3415a7c5b0ca52007ba0374e92b7adddf228acecd2ea91841"
         }
       ]
+    },
+    {
+      "id": "prt-studio",
+      "name": "球谐传输 · 彩色遮挡",
+      "kind": "scene",
+      "path": "prt-studio.json",
+      "sha256": "13c490647789dfcb7b7e25a86d9c5eecc71d69fa02237bb271aae4a638f278ff",
+      "thumbnail": "catalog_thumbs/prt-studio.png",
+      "description": "网格地面上的静态软遮挡与红、蓝物体的间接反射。",
+      "source": "MiniRender",
+      "rights": "MiniRender 自建资源",
+      "recommended": "prt",
+      "dependencies": [
+        {
+          "path": "assets/cube.obj",
+          "sha256": "6e912d373134fb1bd0444c7ca3871e54961c18eaee98b303f5194587dfe061b6"
+        },
+        {
+          "path": "catalog/prt_grid.obj",
+          "sha256": "10315fb3c84c4d99df4adea71fe1d1fa03924f839323fecd6fcbd73eb9e2e670"
+        }
+      ]
     }
   ]
 }

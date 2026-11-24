@@ -8,6 +8,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+from course_cubemap import cubemap_to_latlong
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILTINS = {
@@ -353,6 +354,45 @@ def builtin_entries(root, cli):
             recommended="energy",
         )
     )
+    # 地面有足够的顶点插值局部遮挡，两个色块可向附近地面反射不同颜色。
+    plane = meta / "prt_grid.obj"
+    grid = 24
+    rows = [
+        f"v {2 * x / grid - 1} 0 {2 * z / grid - 1}"
+        for z in range(grid + 1)
+        for x in range(grid + 1)
+    ]
+    for z in range(grid):
+        for x in range(grid):
+            a = 1 + z * (grid + 1) + x
+            rows.append(f"f {a} {a + grid + 1} {a + grid + 2} {a + 1}")
+    plane.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    demo = base_scene()
+    for mesh in demo["meshes"]:
+        if mesh["id"] == "plane":
+            mesh["source"] = "catalog/prt_grid.obj"
+    demo["environment"] = [0.8, 0.8, 0.8]
+    demo["directional_lights"] = []
+    demo["materials"][-1].update(kind="diffuse", base_color=[0.9, 0.15, 0.06])
+    demo["objects"][-1]["name"] = "红色挡板"
+    file = root / "prt-studio.json"
+    write_json(file, demo)
+    preview = thumbs / "prt-studio.png"
+    thumbnail(cli, file, preview)
+    result.append(
+        entry(
+            root,
+            "prt-studio",
+            "球谐传输 · 彩色遮挡",
+            "scene",
+            file,
+            preview,
+            "网格地面上的静态软遮挡与红、蓝物体的间接反射。",
+            src,
+            own,
+            recommended="prt",
+        )
+    )
     return result
 
 
@@ -406,6 +446,37 @@ def course_entries(root, cli, meta):
                 "载入独立相机和光源，适合观察模型。",
                 source + hw,
                 rights,
+            )
+        )
+    for name in ("Skybox", "Indoor", "GraceCathedral", "CornellBox"):
+        model = meta / "Bunny"
+        original = json.loads((model / "model.json").read_text(encoding="utf-8"))
+        env = model / (name + ".png")
+        cubemap_to_latlong(fw / "HW2/Assignment2/homework2/assets/cubemap" / name, env)
+        original["textures"] = [
+            dict(id="environment", source=env.name, encoding="srgb")
+        ]
+        original["environment_map"] = dict(
+            texture="environment", strength=1, rotation_degrees=0
+        )
+        original["environment"] = [0, 0, 0]
+        original["directional_lights"] = []
+        file = model / (name + ".json")
+        write_json(file, original)
+        preview = thumbs / ("bunny-" + name + ".png")
+        thumbnail(cli, file, preview)
+        result.append(
+            entry(
+                root,
+                "prt-" + name,
+                "Bunny · " + name,
+                "scene",
+                file,
+                preview,
+                "课程六面环境贴图，适合观察 PRT 烘焙和环境旋转。",
+                "GAMES202 HW2",
+                rights,
+                recommended="prt",
             )
         )
     # 课程材质球采用半径为一的 OBJ；替换白炉环境后可观察有色反射。
