@@ -65,6 +65,10 @@ class Bsdf {
   private:
     glm::dvec3 evaluate_normalized(glm::dvec3 wo, glm::dvec3 wi) const;
     double pdf_normalized(glm::dvec3 wo, glm::dvec3 wi) const;
+    // 补偿瓣采样选择余弦半球，单次瓣仍按 GGX 可见法线采样。
+    double single_probability(double cosine) const;
+    const Image*             energy_    = nullptr;
+    double                   roughness_ = 0;
     MaterialKind             kind_;
     glm::dvec3               color_;
     double                   alpha_;

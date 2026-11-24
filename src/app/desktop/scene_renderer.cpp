@@ -321,7 +321,10 @@ void SceneRenderer::upload_scene() {
             {instance.object_to_world,
              glm::mat4(instance.normal_to_world),
              glm::vec4(color, 1),
-             glm::vec4(material.emission, 0),
+             glm::vec4(material.emission, material.kind == minirender::MaterialKind::conductor &&
+                                                  material.roughness > .001F
+                                              ? (material.compensate_energy ? 1.F : 0.F)
+                                              : -1.F),
              {subsurface ? .35F : material.roughness, metallic,
               static_cast<float>(material.texture_filter), material.double_sided ? 1.0F : 0.0F},
              pack_cloth(material)});
@@ -489,6 +492,7 @@ void SceneRenderer::update_uniforms(int mode, bool reference) {
                                     static_cast<float>(window_->effective_shadow(reference)),
                                     std::tan(glm::radians(window_->light_half_angle()))};
     frame.counts.z               = window_->shadow_debug_light();
+    frame.counts.w               = reference ? window_->reference_energy() : -1;
     frame.viewport               = {1.0F / static_cast<float>(size.width()),
                                     1.0F / static_cast<float>(size.height()), camera.near_plane,
                                     camera.far_plane};

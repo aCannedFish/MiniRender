@@ -191,6 +191,46 @@ def export_model(directory, name, obj, texture=None):
     return path
 
 
+def furnace_scene():
+    """六个同半径的测试球，按行切换补偿，按列增大粗糙度。"""
+    scene = base_scene()
+    scene.update(
+        environment=[1, 1, 1],
+        directional_lights=[],
+        meshes=[dict(id="sphere", source="assets/demo-sphere.obj")],
+        objects=[],
+        materials=[],
+    )
+    scene["camera"].update(position=[0, 1, 4.4], target=[0, 1, 0], vertical_fov=32)
+    for row in range(2):
+        for column, roughness in enumerate((0.25, 0.65, 1.0)):
+            key = f"ball_{row}_{column}"
+            label = f"{'补偿' if row else '单次'} · r={roughness}"
+            scene["materials"].append(
+                dict(
+                    id=key,
+                    name=label,
+                    kind="conductor",
+                    base_color=[1, 1, 1],
+                    roughness=roughness,
+                    compensate_energy=bool(row),
+                )
+            )
+            scene["objects"].append(
+                dict(
+                    id=key,
+                    name=label,
+                    mesh="sphere",
+                    material=key,
+                    visible=True,
+                    transform=transform(
+                        ((column - 1) * 0.95, 0.55 + row * 0.9, 0), [0.38] * 3
+                    ),
+                )
+            )
+    return scene
+
+
 def builtin_entries(root, cli):
     """渲染内置缩略图，并从同一场景生成可追加模型和四帧测试输入。"""
     result = []
@@ -295,6 +335,24 @@ def builtin_entries(root, cli):
             recommended="pcss",
         )
     )
+    furnace = root / "white-furnace.json"
+    write_json(furnace, furnace_scene())
+    preview = thumbs / "white-furnace.png"
+    thumbnail(cli, furnace, preview)
+    result.append(
+        entry(
+            root,
+            "white-furnace",
+            "白炉 · 粗糙金属",
+            "scene",
+            furnace,
+            preview,
+            "上排启用多次散射补偿，下排为单次反射。三列粗糙度从 0.25 增至 1。",
+            src,
+            own,
+            recommended="energy",
+        )
+    )
     return result
 
 
@@ -350,6 +408,40 @@ def course_entries(root, cli, meta):
                 rights,
             )
         )
+    # 课程材质球采用半径为一的 OBJ；替换白炉环境后可观察有色反射。
+    hw4 = fw / "HW4/homework4/homework4/assets"
+    energy = meta / "HW4"
+    energy.mkdir(exist_ok=True)
+    mesh = export_model(meta, "HW4-sphere", hw4 / "sphere/sphere.obj")
+    prepared = json.loads(mesh.read_text(encoding="utf-8"))
+    scene = furnace_scene()
+    scene["meshes"][0]["source"] = "../HW4-sphere/" + prepared["meshes"][0]["source"]
+    scene["environment"] = [0, 0, 0]
+    shutil.copyfile(hw4 / "winter_sky_1k.hdr", energy / "winter.hdr")
+    scene["textures"] = [dict(id="winter", encoding="linear", source="winter.hdr")]
+    scene["environment_map"] = dict(texture="winter", strength=1, rotation_degrees=0)
+    for i, m in enumerate(scene["materials"]):
+        m["base_color"] = [[0.95, 0.64, 0.54], [1, 0.78, 0.34], [0.91, 0.92, 0.92]][
+            i % 3
+        ]
+    file = energy / "metals.json"
+    write_json(file, scene)
+    image = thumbs / "winter-metals.png"
+    thumbnail(cli, file, image)
+    result.append(
+        entry(
+            root,
+            "winter-metals",
+            "冬日环境 · 金属材质球",
+            "scene",
+            file,
+            image,
+            "HW4 模型和 HDR 环境。上排启用补偿，下排为单次反射。",
+            "GAMES202 HW4",
+            rights,
+            recommended="energy",
+        )
+    )
     for name, count in [("box", 20), ("pink-room", 80)]:
         files = [root / f"HW5-data/{name}/input/beauty_{i}.exr" for i in range(count)]
         frames = [

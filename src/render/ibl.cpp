@@ -3,6 +3,7 @@
 
 #include <minirender/render/bsdf.hpp>
 #include <minirender/render/ibl.hpp>
+#include <minirender/render/microfacet_energy.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -292,6 +293,7 @@ std::shared_ptr<const Image> bake_ibl_brdf(IblBrdfSettings settings, Cancellatio
                 cancellation);
             lut.at(x, y) = {static_cast<float>(value.x), static_cast<float>(value.y), 0};
         }
+        store_average_energy(lut, y);
         report(progress, IblStage::brdf, (y + 1) * settings.resolution, total, cancellation);
     }
     report(progress, IblStage::complete, 1, 1, cancellation);

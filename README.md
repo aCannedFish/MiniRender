@@ -21,7 +21,7 @@ MiniRender 是用于学习图形学的小型渲染引擎，使用 C++20、Qt Wid
 
 打开工具栏的“快速导入 → 资源目录”，按名称、类型或作业编号筛选资源。选择场景会覆盖当前文档，选择模型会把物体及其材质追加到当前场景，选择帧序列会打开独立播放器。整组模型可以一次撤销。另存场景时，目录导入的模型与纹理会随 JSON 保存到目标目录，可以一起复制到另一台电脑。
 
-应用内置 15 个场景、一个可追加的单位立方体和四帧 EXR 示例。已准备好的课程包可通过“选择课程包…”挂载，应用会记住路径。Mary 和 Bunny 均提供独立场景与追加模型两种入口。HW5 的 box 与 pink-room 可按帧播放或拖动查看。
+应用内置 16 个场景、一个可追加的单位立方体和四帧 EXR 示例。已准备好的课程包可通过“选择课程包…”挂载，应用会记住路径。Mary 和 Bunny 均提供独立场景与追加模型两种入口。HW5 的 box 与 pink-room 可按帧播放或拖动查看。
 
 从已解压的作业生成课程索引时，准备 Python 3、FFmpeg 和本项目构建的 CLI。下例假定课程目录中已有 `frameworks/HW0`、`frameworks/HW2` 以及 `HW5-data/{box,pink-room}/input`。脚本生成索引后，在资源目录选择包含 `resource_catalog.json` 的文件夹。
 
@@ -38,6 +38,12 @@ python3 scripts/prepare_course_catalog.py work/GAMES202 --cli build/macos-deskto
 ### 方向光阴影
 
 在资源目录选择“接触软阴影 → 覆盖并预览 PCSS”。两个挡板与地面的距离不同，离地较高的挡板投下较宽的半影。相机面板可选择硬阴影、固定半径的 PCF 或随遮挡距离变化的 PCSS，调整光源半角并观察变化。打开右侧对照后，两侧可分别选择阴影算法。“阴影深度”“遮挡物深度”“半影半径”和“光源可见性”显示当前诊断光源在可见表面上的值，半影半径以 64 纹素对应白色。
+
+### 金属补偿
+
+选择“白炉 · 粗糙金属 → 覆盖并预览能量补偿”，比较均匀白光下两排金属球的亮度。上排材质启用了 Kulla–Conty 多次散射补偿。对象检查器中的“补偿多次微面散射”同时控制 Vulkan 预览和 CPU 路径追踪。相机面板的“右侧金属”可以让同一个物体在分屏两侧使用不同模型。本地课程包另提供 HW4 球体与冬季 HDR 环境，可观察金、铜等有色反射。
+
+`minirender_energy_example 输出目录 [分辨率] [每格样本数]` 分别使用均匀半球、GGX 可见法线和 split-sum 积分生成 EXR 表。红色通道为方向反照率，蓝色通道为该粗糙度的余弦加权平均。公式与采样方法见 [IBL 文档](docs/IBL.md)。
 
 ## 构建要求
 
@@ -284,6 +290,7 @@ include/minirender/render/
 ├── bvh.hpp  # 场景三角形的 SAH BVH 构建、最近命中与遮挡查询
 ├── cloth_bsdf.hpp  # 布料散射模型的方向求值、混合采样与概率密度
 ├── dipole.hpp  # 均匀半无限介质的 dipole 扩散模型及径向分布
+├── microfacet_energy.hpp  # 方向反照率、能量表和补偿瓣的数值接口
 ├── ibl.hpp  # 环境光预处理：漫反射卷积、GGX 粗糙度层与 BRDF 积分表
 ├── intersection.hpp  # 射线区间、包围盒与三角形求交的数值约定
 ├── light.hpp  # 面积光、方向光、环境光及光子发射的采样类型与接口
@@ -437,6 +444,7 @@ src/render/
 ├── bvh.cpp  # 场景三角形的 SAH BVH 构建、最近命中与遮挡查询
 ├── cloth_bsdf.cpp  # 布料散射模型的方向求值、混合采样与概率密度
 ├── dipole.cpp  # 均匀半无限介质的 dipole 扩散模型及径向分布
+├── microfacet_energy.cpp  # 方向反照率积分、余弦加权平均和 Kulla–Conty 补偿
 ├── ibl.cpp  # 环境光预处理：漫反射卷积、GGX 粗糙度层与 BRDF 积分表
 ├── intersection.cpp  # 射线区间、包围盒与三角形求交的数值约定
 ├── light.cpp  # 场景发光三角形、方向光和环境光的统一采样
@@ -822,6 +830,7 @@ scenes/
 ├── resource_catalog.json  # 内置目录及源文件、依赖项的 SHA-256
 ├── catalog/               # 可追加模型和序列样本
 ├── catalog_thumbs/        # 资源浏览器使用的小图
+├── white-furnace.json  # 两排反照率为一的金属球用于白炉检验
 ├── soft-shadows.json  # 用两块不同离地高度的挡板比较半影
 ├── cornell-box.json  # 经典红绿墙、两个方块和顶部面积光
 ├── cornell-materials.json  # Cornell 房间中的玻璃与金属球
@@ -903,6 +912,7 @@ scenes/catalog_thumbs/
 
 ```text
 examples/
+├── microfacet_energy.cpp  # 生成三种采样方法的 E 和 Eavg 参考表
 ├── adaptive.cpp  # 可运行示例：由几何或投影误差控制的自适应细分与层级平衡
 ├── cloth.cpp  # 可运行示例：质量弹簧布料的状态、固定子步积分、风力与约束
 ├── cloth_material.cpp  # 可运行示例：微圆柱经纬织物参数、切向曲线与预置
@@ -938,6 +948,7 @@ tests/
 ├── displacement_tests.cpp  # 实际位移、共享边接缝、退化、预算和取消
 ├── geometry_tests.cpp  # 半边拓扑、Loop 规则、边界和面角属性
 ├── gizmo_tests.cpp  # 操纵器布局、命中、移动旋转与事务历史
+├── microfacet_energy_tests.cpp  # 白炉积分、采样方法及 MIS 密度一致性
 ├── ibl_tests.cpp  # 环境卷积、粗糙度层、BRDF LUT 与采样对照
 ├── intersection_tests.cpp  # 包围盒、三角形、BVH 和独立求交对照
 ├── light_tests.cpp  # 面积光、方向光、环境图采样与概率

@@ -113,6 +113,8 @@ struct Material {
     bool                                        double_sided = true;
     std::shared_ptr<const ClothAppearance>      cloth{};
     std::shared_ptr<const SubsurfaceParameters> subsurface{};
+    // 粗糙导体使用 Kulla–Conty 补偿多次微面散射，旧场景默认为单次散射。
+    bool compensate_energy = false;
     void validate() const;
 };
 

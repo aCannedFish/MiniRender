@@ -69,6 +69,15 @@ void Workbench::build_object_panel() {
     layout->addRow("纹理过滤", texture_filter_);
     layout->addRow("自发光", emission_);
     layout->addRow("粗糙度", roughness_);
+    energy_compensation_ = new QCheckBox("补偿多次微面散射");
+    energy_compensation_->setObjectName("energy_compensation");
+    layout->addRow(energy_compensation_);
+    connect(energy_compensation_, &QCheckBox::toggled, this, [this](bool enabled) {
+        if (!refreshing_) {
+            edit_material_property(
+                [enabled](auto& material) { material.compensate_energy = enabled; });
+        }
+    });
     layout->addRow("折射率", ior_);
     auto* hint = new QLabel("同一材质的参数会同时影响引用它的物体。");
     hint->setWordWrap(true);
@@ -377,6 +386,9 @@ void Workbench::refresh_properties() {
                 material_kind_->setCurrentIndex(static_cast<int>(material.kind));
                 const bool cloth      = material.kind == minirender::MaterialKind::cloth;
                 const bool subsurface = material.kind == minirender::MaterialKind::subsurface;
+                energy_compensation_->setVisible(material.kind ==
+                                                 minirender::MaterialKind::conductor);
+                energy_compensation_->setChecked(material.compensate_energy);
                 roughness_->setEnabled(!cloth && !subsurface);
                 base_color_->setEnabled(!subsurface);
                 texture_selector_->setEnabled(!subsurface);

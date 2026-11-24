@@ -3,6 +3,7 @@
 
 #include <minirender/core/sampling.hpp>
 #include <minirender/render/bsdf.hpp>
+#include <minirender/render/microfacet_energy.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -119,11 +120,14 @@ double fresnel_dielectric(double cosine, double eta_i, double eta_t) {
 }
 
 Bsdf::Bsdf(const Material& material, bool front_face, glm::vec3 texture_color, ClothAxes cloth_axes)
-    : kind_(material.kind),
+    : roughness_(material.roughness), kind_(material.kind),
       color_(glm::dvec3(material.base_color) * glm::clamp(glm::dvec3(texture_color), 0.0, 1.0)),
       alpha_(static_cast<double>(material.roughness) * material.roughness),
       eta_i_(front_face ? 1 : material.ior), eta_t_(front_face ? material.ior : 1) {
     material.validate();
+    if (kind_ == MaterialKind::conductor && material.compensate_energy && !is_delta()) {
+        energy_ = &conductor_energy_table();
+    }
     if (kind_ == MaterialKind::subsurface) {
         throw std::invalid_argument(
             "Subsurface transport requires a BSSRDF surface position sample");
@@ -153,8 +157,18 @@ glm::dvec3 Bsdf::evaluate_normalized(glm::dvec3 wo, glm::dvec3 wi) const {
     }
     const auto m = glm::normalize(wo + wi);
     // 约去 G1 中的余弦，避免掠射角下先计算极小乘积再相除。
-    return schlick(color_, glm::dot(wo, m)) * distribution(m, alpha_) *
-           smith_g1_over_cosine(wo, alpha_) * smith_g1_over_cosine(wi, alpha_) / 4.0;
+    const auto single = schlick(color_, glm::dot(wo, m)) * distribution(m, alpha_) *
+                        smith_g1_over_cosine(wo, alpha_) * smith_g1_over_cosine(wi, alpha_) / 4.0;
+    if (!energy_) {
+        return single;
+    }
+    const auto outgoing = sample_energy(*energy_, wo.z, roughness_);
+    const auto incoming = sample_energy(*energy_, wi.z, roughness_);
+    return single + multiple_scattering(color_, incoming.x, outgoing.x, outgoing.y);
+}
+
+double Bsdf::single_probability(double cosine) const {
+    return energy_ ? std::clamp(sample_energy(*energy_, cosine, roughness_).x, .05, .95) : 1.;
 }
 
 double Bsdf::pdf_normalized(glm::dvec3 wo, glm::dvec3 wi) const {
@@ -169,7 +183,12 @@ double Bsdf::pdf_normalized(glm::dvec3 wo, glm::dvec3 wi) const {
     }
     const auto m = glm::normalize(wo + wi);
     // p_m = D(m) G1(wo) |wo.m| / cos(wo)；反射 Jacobian 为 1/(4 |wo.m|)。
-    return distribution(m, alpha_) * smith_g1_over_cosine(wo, alpha_) / 4;
+    const double glossy = distribution(m, alpha_) * smith_g1_over_cosine(wo, alpha_) / 4;
+    if (!energy_) {
+        return glossy;
+    }
+    const auto weight = single_probability(wo.z);
+    return weight * glossy + (1 - weight) * cosine_hemisphere_pdf(wi);
 }
 
 glm::dvec3 Bsdf::evaluate(glm::dvec3 wo, glm::dvec3 wi) const {
@@ -235,7 +254,7 @@ std::optional<BsdfSample> Bsdf::sample(glm::dvec3 wo, double component, glm::dve
             reflected, weight, 1, SampleMeasure::discrete, ScatteringEvent::specular_reflection, 1};
     }
     glm::dvec3 wi;
-    if (kind_ == MaterialKind::diffuse) {
+    if (kind_ == MaterialKind::diffuse || (energy_ && component >= single_probability(wo.z))) {
         wi = sample_cosine_hemisphere(u);
     } else {
         const auto m = sample_visible_normal(wo, u, alpha_);
