@@ -15,7 +15,9 @@ struct HomogeneousMedium {
     glm::dvec3 absorption{0};
     glm::dvec3 scattering{0};
     double     anisotropy = 0;
+    // 逐通道求吸收与散射系数之和，作为 Beer–Lambert 指数的消光系数。
     glm::dvec3 extinction() const noexcept;
+    // 检查 RGB 吸收、散射与相函数各向异性系数。
     void validate() const;
     bool operator==(const HomogeneousMedium&) const = default;
 };
@@ -29,6 +31,7 @@ struct MediumRegion {
     glm::dvec3        maximum{1};
     HomogeneousMedium medium;
     bool              enabled = true;
+    // 检查区域标识、世界包围盒以及区域内的光学介质。
     void validate() const;
     bool operator==(const MediumRegion&) const = default;
 };

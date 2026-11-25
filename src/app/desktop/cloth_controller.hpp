@@ -27,6 +27,7 @@ struct ClothRuntimeContext {
     minirender::ClothEnvironment environment;
 };
 
+// 将完成计算的布料帧与来源版本、光栅数据关联，供工作台核对后发布。
 struct ClothRuntimeFrame {
     ClothRuntimeContext                               source;
     minirender::ClothPreparedFrame                    frame;
@@ -37,6 +38,7 @@ struct ClothRuntimeFrame {
     bool history = false;
 };
 
+// 向 UI 提供绑定状态、播放请求与当前模拟进度的快照。
 struct ClothRuntimeStatus {
     // 当前是否绑定可模拟的布料目标。
     bool bound = false;
@@ -85,6 +87,7 @@ class ClothController final : public QObject {
   private:
     enum class Operation { advance, reset, configure };
 
+    // 工作线程接收的模拟操作及固定输入，避免读取正在编辑的控件。
     struct Request {
         Operation                                          operation = Operation::advance;
         std::shared_ptr<const minirender::ClothDefinition> definition;
@@ -92,6 +95,7 @@ class ClothController final : public QObject {
         bool                                               reset_geometry = false;
     };
 
+    // 用互斥锁保护阶段名称与进度计数，供 GUI 定时轮询。
     struct Progress {
         mutable std::mutex mutex;
         QString            stage;
@@ -99,6 +103,7 @@ class ClothController final : public QObject {
         std::size_t        total     = 0;
     };
 
+    // 将后台求解器和完整帧一起交还控制器，供下一次推进复用。
     struct Result {
         std::unique_ptr<minirender::ClothSimulation> simulation;
         ClothRuntimeFrame                            value;

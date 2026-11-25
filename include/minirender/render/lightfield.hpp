@@ -49,6 +49,7 @@ Ray lightfield_ray(const LightFieldCalibration& calibration, std::size_t view, g
 glm::dvec2 lightfield_shift(const LightFieldCalibration& calibration, std::size_t view,
                             double focus);
 
+// 指定焦面距离与有效孔径，决定哪些瞳孔样本参与重建。
 struct LightFieldRefocusSettings {
     // 重聚焦目标焦面的前向距离，单位为米。
     double focus_distance = 4;
@@ -58,6 +59,7 @@ struct LightFieldRefocusSettings {
     std::uint64_t memory_budget_bytes = 256ULL * 1024 * 1024;
 };
 
+// 报告正在处理的子视图及当前阶段的工作量。
 struct LightFieldWork {
     // 当前工作或预览对应的子视图索引。
     std::size_t   view      = 0;
@@ -69,6 +71,7 @@ using LightFieldCallback = std::function<void(LightFieldWork)>;
 
 class LightFieldReader;
 
+// 拥有重建图像及逐像素覆盖数据，供检查孔径边缘的采样支持。
 struct LightFieldReconstruction {
     explicit LightFieldReconstruction(std::size_t width, std::size_t height)
         : image(width, height), coverage(width * height, 0) {}

@@ -3,10 +3,9 @@
 #extension GL_GOOGLE_include_directive : require
 #include "scene_frame.glsl"
 layout(binding = 1) uniform sampler2D spatial;
-layout(binding = 2) uniform sampler2D normals;
-layout(binding = 3) uniform sampler2D motion;
-layout(binding = 4) uniform sampler2D history;
-layout(binding = 5) uniform sampler2D previous_guides;
+layout(binding = 2) uniform sampler2D motion;
+layout(binding = 3) uniform sampler2D history;
+layout(binding = 4) uniform sampler2D previous_guides;
 layout(location = 0) out vec4 color;
 
 vec3 decode_normal(float packed) {

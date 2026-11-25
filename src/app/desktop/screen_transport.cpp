@@ -40,7 +40,7 @@ void ScreenTransport::prepare_temporal(VulkanViewport& viewport) {
 }
 
 void ScreenTransport::draw(VulkanViewport& viewport, int mode, bool reference) {
-    const bool enabled = mode >= 13 && mode <= 20;
+    const bool enabled = mode >= VIEW_MIRROR && mode <= VIEW_HISTORY_MASK;
     if (!initialized_ || (enabled && viewport.screen_hiz())) {
         for (std::size_t i = 0; i < levels_.size(); ++i) {
             levels_[i].draw(viewport, i == 0 ? 1 : 0);
@@ -49,17 +49,17 @@ void ScreenTransport::draw(VulkanViewport& viewport, int mode, bool reference) {
     if (!initialized_ || enabled) {
         transport_.draw(viewport);
     }
-    if (temporal_ready_ && !temporal_initialized_ && mode < 19) {
-        // 分屏先绘制普通一侧时，绑定的新历史附件也必须经过布局转换。
+    const bool temporal = VulkanViewport::uses_history(mode);
+    if (temporal_ready_) {
+        // 任一侧绑定了历史附件后，首次采样前必须初始化两侧的图像布局。
         temporal_.initialize(viewport);
-        temporal_initialized_ = true;
     }
-    if (mode >= 19) {
+    if (temporal) {
         temporal_.draw(viewport, reference ? 1U : 0U);
-        temporal_initialized_ = true;
     }
     if (!initialized_ || enabled) {
-        resolved_.draw(viewport, mode >= 19 ? (reference ? 2 : 1) : 0);
+        const int source = temporal ? (reference ? 2 : 1) : 0;
+        resolved_.draw(viewport, source);
     }
     initialized_ = true;
 }
@@ -67,7 +67,7 @@ void ScreenTransport::draw(VulkanViewport& viewport, int mode, bool reference) {
 void ScreenTransport::release() {
     resolved_.release();
     temporal_.release();
-    temporal_ready_ = temporal_initialized_ = false;
+    temporal_ready_ = false;
     transport_.release();
     for (auto& level : levels_) {
         level.release();

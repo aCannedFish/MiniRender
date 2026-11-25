@@ -19,6 +19,7 @@ struct PrtSettings {
 // 一个面角在九个实球谐基上的 RGB 响应。
 using PrtTransfer = std::array<glm::vec3, 9>;
 
+// 按实例记录起始面角；顶点系数与光栅顶点的顺序一致。
 struct PrtBake {
     // 对应 GPU 展平后的实例、三角形和面角。offsets[i] 是实例 i 的首个顶点。
     std::vector<std::uint32_t> offsets;

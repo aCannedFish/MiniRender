@@ -115,7 +115,7 @@ float shadow_visibility(int light, float ndl, vec3 world_dx, vec3 world_dy, out 
     vec2           texel    = 1.0 / vec2(size);
     diagnostic.x            = stored_depth(light, ivec2(floor(uv * vec2(size))), size);
     int mode                = int(frame.shadow_settings.z);
-    if (int(frame.display.y) == 9 || int(frame.display.y) == 10) {
+    if (int(frame.display.y) == VIEW_BLOCKER_DEPTH || int(frame.display.y) == VIEW_PENUMBRA) {
         mode = SHADOW_PCSS;
     }
     float fixed_radius = frame.shadow_settings.y;

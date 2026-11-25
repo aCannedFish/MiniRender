@@ -22,6 +22,7 @@ struct IblProgress {
 
 using IblProgressCallback = std::function<void(const IblProgress&)>;
 
+// 指定源环境缩放、卷积输出尺寸与预过滤采样预算。
 struct IblEnvironmentSettings {
     std::size_t   source_maximum_dimension = 1024;
     std::size_t   diffuse_width            = 32; // latlong 2:1
@@ -30,13 +31,16 @@ struct IblEnvironmentSettings {
     std::uint32_t diffuse_samples          = 256;
     std::uint32_t specular_samples         = 256;
     std::uint64_t seed                     = 101;
+    // 校验经纬图分辨率、粗糙度层数与卷积样本数。
     void validate() const;
 };
 
+// 定义 GGX 双通道积分表的分辨率、每格采样数和种子。
 struct IblBrdfSettings {
     std::size_t   resolution = 64;
     std::uint32_t samples    = 512;
     std::uint64_t seed       = 101;
+    // 检查 LUT 网格和每个方向的积分样本预算。
     void validate() const;
 };
 

@@ -3,6 +3,7 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "scene_frame.glsl"
+#include "screen_position.glsl"
 layout(binding = 1) uniform sampler2D hdr_image;
 layout(binding = 2) uniform sampler2D normal_image;
 layout(binding = 3) uniform sampler2D depth_image;
@@ -149,52 +150,42 @@ void main() {
         }
         return;
     }
-    if (int(frame.display.y) == 20) {
+    // 调试视图直接读取相应附件；其余模式共用曝光、显示编码和 FXAA。
+    switch (int(frame.display.y)) {
+    case VIEW_HISTORY_MASK:
+    case VIEW_RAY_HIT:
+    case VIEW_ALBEDO:
+    case VIEW_TRACE_STEPS:
         color = texelFetch(hdr_image, pixel, 0);
         return;
-    }
-    if (int(frame.display.y) == 14 || int(frame.display.y) == 17 || int(frame.display.y) == 18) {
-        color = texelFetch(hdr_image, pixel, 0);
-        return;
-    }
-    if (int(frame.display.y) >= 13 && int(frame.display.y) <= 16 || int(frame.display.y) >= 19 && int(frame.display.y)<=21) {
-        vec3 encoded = frame.display.z > 0.5 ? fxaa(uv) : display_texel(pixel);
-        color        = vec4(decode_srgb(encoded), 1);
-        return;
-    }
-    if (int(frame.display.y) >= 8 && int(frame.display.y) <= 11) {
+    case VIEW_SHADOW_DEPTH:
+    case VIEW_BLOCKER_DEPTH:
+    case VIEW_PENUMBRA:
+    case VIEW_VISIBILITY:
         color = vec4(decode_srgb(clamp(texelFetch(hdr_image, pixel, 0).rgb, vec3(0), vec3(1))), 1);
         return;
-    }
-    if (base_color_preview() || (int(frame.display.y) == 7 || int(frame.display.y) == 12)) {
-        vec3 encoded = frame.display.z > 0.5 ? fxaa(uv) : display_texel(pixel);
-        color        = vec4(decode_srgb(encoded), 1.0);
+    case VIEW_AO_RAW:
+    case VIEW_AO_FILTERED: {
+        float ao = int(frame.display.y) == VIEW_AO_FILTERED
+                       ? texelFetch(filtered_ao_image, pixel, 0).r
+                       : texelFetch(raw_ao_image, pixel, 0).r;
+        color    = vec4(decode_srgb(vec3(ao)), 1);
         return;
     }
-    if (frame.display.y > 3.5) {
-        float ao = frame.display.y > 4.5 ? texelFetch(filtered_ao_image, pixel, 0).r
-                                         : texelFetch(raw_ao_image, pixel, 0).r;
-        // AO 调试值直接显示为灰度，不应用曝光、Reinhard 或第二次 sRGB 编码。
-        color = vec4(decode_srgb(vec3(ao)), 1.0);
-        return;
-    }
-    if (frame.display.y > 2.5) {
+    case VIEW_WIRE:
         color = texelFetch(wire_image, pixel, 0);
         return;
-    }
-    if (frame.display.y > 1.5) {
-        float depth      = texelFetch(depth_image, pixel, 0).r;
-        float near_plane = frame.viewport.z;
-        float far_plane  = frame.viewport.w;
-        float linear_depth =
-            near_plane * far_plane / (far_plane - depth * (far_plane - near_plane));
-        color = vec4(vec3(depth < 1.0 ? 1.0 / (1.0 + linear_depth) : 0.0), 1.0);
+    case VIEW_DEPTH: {
+        float depth        = texelFetch(depth_image, pixel, 0).r;
+        float linear_depth = view_depth(depth);
+        color              = vec4(vec3(depth < 1.0 ? 1.0 / (1.0 + linear_depth) : 0.0), 1);
         return;
     }
-    if (frame.display.y > 0.5) {
+    case VIEW_NORMAL: {
         vec4 normal = texelFetch(normal_image, pixel, 0);
-        color       = vec4(normal.a > 0.5 ? normalize(normal.xyz) * 0.5 + 0.5 : vec3(0.0), 1.0);
+        color       = vec4(normal.a > 0.5 ? normalize(normal.xyz) * 0.5 + 0.5 : vec3(0), 1);
         return;
+    }
     }
     vec3 encoded = frame.display.z > 0.5 ? fxaa(uv) : display_texel(pixel);
     // SRGB swapchain 会重新编码；先解码避免双重 gamma。

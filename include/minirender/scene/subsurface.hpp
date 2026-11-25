@@ -15,10 +15,12 @@ struct SubsurfaceParameters {
     glm::dvec3 absorption{2.1, 4.1, 7.1};
     glm::dvec3 reduced_scattering{2190, 2620, 3000};
     double     density = 1;
+    // 检查吸收和约化散射系数及介质密度。
     void validate() const;
     bool operator==(const SubsurfaceParameters&) const = default;
 };
 
+// 将预设名称与测量的光学参数和折射率配对。
 struct SubsurfacePreset {
     std::string                                 id;
     double                                      ior;

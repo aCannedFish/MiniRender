@@ -2,6 +2,7 @@
 // 本模块接口见 gpu_texture.hpp。
 
 #include "gpu_texture.hpp"
+#include "vulkan_utils.hpp"
 
 #include <vector>
 

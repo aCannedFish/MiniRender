@@ -4,6 +4,7 @@
 #include "shadow_map.hpp"
 #include <minirender/scene/scene.hpp>
 
+// 持有分层灯面样本的深度附件，按几何和采样布局复用静态阴影。
 class RectangleShadow {
   public:
     // 更新光源样本位置与场景包围盒对应的投影，返回是否更换了 GPU 资源句柄。

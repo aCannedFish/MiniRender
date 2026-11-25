@@ -13,6 +13,7 @@ struct BallPivotSettings {
     std::size_t         maximum_triangles       = 2000000;
     std::size_t         maximum_neighbors       = 4096;
     std::size_t         maximum_candidate_tests = 20000000;
+    // 检查各轮球半径及约束参数，使重建可以按给定顺序推进。
     void validate() const;
 };
 
@@ -27,6 +28,7 @@ enum class BallPivotStage {
     complete
 };
 
+// 记录滚球重建所在阶段与阶段内进度，供可取消的后台任务报告。
 struct BallPivotProgress {
     BallPivotStage stage;
     std::size_t    completed;
@@ -39,6 +41,7 @@ struct BallPivotProgress {
 
 using BallPivotCallback = std::function<void(const BallPivotProgress&)>;
 
+// 单个球半径的重建统计，用于区分本轮新增面数与累计面数。
 struct BallPivotPass {
     double      radius          = 0;
     std::size_t new_triangles   = 0;

@@ -196,12 +196,12 @@ double EnvironmentLight::luminance_integral() const noexcept {
 
 LightSampler::LightSampler(std::shared_ptr<const SceneSnapshot> scene,
                            CancellationToken                    cancellation)
-    : scene_(std::move(scene)), environment_(checked_scene(scene_), cancellation) {
+    : environment_(checked_scene(scene), cancellation) {
     cancellation.check();
     Bounds3             bounds;
     std::vector<double> weights;
-    for (std::size_t index = 0; index < scene_->instances.size(); ++index) {
-        const auto& instance = scene_->instances[index];
+    for (std::size_t index = 0; index < scene->instances.size(); ++index) {
+        const auto& instance = scene->instances[index];
         const auto  radiance = glm::dvec3(instance.material.emission);
         for (std::size_t face = 0; face < instance.mesh->triangles.size(); ++face) {
             if ((face & 255U) == 0) {
@@ -247,7 +247,7 @@ LightSampler::LightSampler(std::shared_ptr<const SceneSnapshot> scene,
     if (!bounds.empty()) {
         emission_center_ = glm::dvec3(bounds.minimum) + extent * .5;
     }
-    for (const auto& light : scene_->directional_lights) {
+    for (const auto& light : scene->directional_lights) {
         const auto radiance = glm::dvec3(light.color) * static_cast<double>(light.intensity);
         if (luminance(radiance) > 0) {
             choices_.push_back({LightKind::directional, directional_.size()});

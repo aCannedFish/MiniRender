@@ -64,17 +64,18 @@ vec3 ibl_specular(vec3 r, float roughness) {
 }
 
 vec3 brdf_energy(float mu, float roughness) {
-    vec2 size = vec2(textureSize(ibl_brdf_map,0)-1);
-    return ibl_bilinear(ibl_brdf_map,clamp(vec2(mu,roughness),vec2(0),vec2(1))*size,false);
+    vec2 size = vec2(textureSize(ibl_brdf_map, 0) - 1);
+    return ibl_bilinear(ibl_brdf_map, clamp(vec2(mu, roughness), vec2(0), vec2(1)) * size, false);
 }
+
 vec2 ibl_brdf(float ndv, float roughness) {
-    return brdf_energy(ndv,roughness).rg;
+    return brdf_energy(ndv, roughness).rg;
 }
 
 // 白色 Fresnel 的 E=A+B。蓝色通道保存同一粗糙度行的余弦加权平均。
-vec3 compensation_color(vec3 f0,float average) {
-    vec3 f = f0+(1.0-f0)/21.0;
-    return f*f*average/max(1.0-f*(1.0-average),vec3(1e-8));
+vec3 compensation_color(vec3 f0, float average) {
+    vec3 f = f0 + (1.0 - f0) / 21.0;
+    return f * f * average / max(1.0 - f * (1.0 - average), vec3(1e-8));
 }
 
 vec3 ibl_source(vec3 direction) {

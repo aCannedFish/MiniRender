@@ -33,6 +33,7 @@ enum class SimplifyStage {
     complete
 };
 
+// 区分简化的输入检查、边折叠与输出整理阶段。
 struct SimplifyProgress {
     // 当前执行阶段，completed 和 total 在阶段内解释。
     SimplifyStage stage = SimplifyStage::input_topology;
@@ -45,6 +46,7 @@ struct SimplifyProgress {
 
 using SimplifyProgressCallback = std::function<void(const SimplifyProgress&)>;
 
+// 简化后的不可变网格及其拓扑、误差与折叠统计。
 struct SimplifyResult {
     // 成功结果的共享只读网格，调用方可以直接保存或交给渲染器。
     std::shared_ptr<const MeshData> mesh;

@@ -18,6 +18,7 @@ struct ClothGrid {
     glm::dvec3                 span_u{2, 0, 0};
     glm::dvec3                 span_v{0, 0, -2};
     std::vector<std::uint32_t> pinned;
+    // 检查网格维数、张成向量与固定粒子索引。
     void validate() const;
 };
 
@@ -33,6 +34,7 @@ struct ClothParameters {
     double        thickness            = .006;
     double        frame_seconds        = 1.0 / 60;
     std::uint32_t substeps             = 64;
+    // 检查面密度、弹簧刚度、阻尼和时间步预算。
     void validate() const;
 };
 
@@ -44,6 +46,7 @@ struct ClothPlane {
     bool operator==(const ClothPlane&) const = default;
 };
 
+// 球形碰撞体的世界中心、半径及切向摩擦系数。
 struct ClothSphere {
     glm::dvec3 center{0, .65, 0};
     double     radius                         = .65;
@@ -60,6 +63,7 @@ struct ClothEnvironment {
     double                   drag_coefficient = .8;
     std::vector<ClothPlane>  planes;
     std::vector<ClothSphere> spheres;
+    // 检查外力参数和每个碰撞体的几何与摩擦设置。
     void validate() const;
     bool operator==(const ClothEnvironment&) const = default;
 };
@@ -116,23 +120,37 @@ using ClothProgress = std::function<void(std::size_t completed, std::size_t tota
 // 固定拓扑、质量和参数在构造时建立。forces/statistics 供数值检查与界面诊断读取。
 class ClothSimulation final {
   public:
+    // 从静止网格建立质量和弹簧连接，将运动状态初始化为第零帧。
     explicit ClothSimulation(ClothGrid grid = {}, ClothParameters parameters = {},
                              ClothEnvironment  environment  = {},
                              CancellationToken cancellation = {});
+    // 读取构造时的网格尺寸、跨度与固定点。
     const ClothGrid& grid() const noexcept;
+    // 读取当前求解器采用的材质和时间积分参数。
     const ClothParameters& parameters() const noexcept;
+    // 借用当前风场、重力及碰撞体配置。
     const ClothEnvironment& environment() const noexcept;
+    // 读取最近一次完整提交的粒子位置、速度和帧号。
     const ClothState& state() const noexcept;
+    // 按粒子索引借用质量表，单位为千克。
     std::span<const double> masses() const noexcept;
+    // 借用结构、剪切和弯曲弹簧的端点与静止长度。
     std::span<const ClothSpring> springs() const noexcept;
+    // 按渲染绕序借用静止拓扑的三角形索引。
     std::span<const std::array<std::uint32_t, 3>> triangles() const noexcept;
     // 线性弹簧和阻尼行和估计出的保守步数，供参数界面解释过大的时间步。
     std::uint32_t minimum_substeps() const noexcept;
+    // 恢复网格初始位置、零速度与第零帧。
     void reset();
+    // 校验粒子数组和固定点约束后替换当前状态。
     void set_state(ClothState state, CancellationToken cancellation = {});
+    // 验证并替换外力与碰撞设置，保留当前粒子运动状态。
     void set_environment(ClothEnvironment environment);
+    // 求当前状态下每个粒子的合力，供诊断或积分使用。
     std::vector<glm::dvec3> forces(CancellationToken cancellation = {}) const;
+    // 汇总当前帧的动能、弹性能、动量和最大伸长比。
     ClothStatistics statistics(CancellationToken cancellation = {}) const;
+    // 按设定子步推进给定帧数，返回本次推进的接触与步数统计。
     ClothStepReport advance(std::uint32_t frames = 1, CancellationToken cancellation = {},
                             ClothProgress progress = {});
     // 网格坐标减去 grid.origin，随返回的平移变换恢复世界位置，保留 float 局部细节。

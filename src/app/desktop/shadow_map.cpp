@@ -2,7 +2,7 @@
 // 本模块接口见 shadow_map.hpp。
 
 #include "shadow_map.hpp"
-#include "gpu_buffer.hpp"
+#include "vulkan_utils.hpp"
 
 #include <stdexcept>
 
@@ -37,24 +37,12 @@ void ShadowMap::create(VulkanViewport& viewport, std::uint32_t size, std::uint32
     check_vk(vkCreateImage(device_, &image, nullptr, &image_), "create shadow array");
     VkMemoryRequirements requirements{};
     vkGetImageMemoryRequirements(device_, image_, &requirements);
-    VkPhysicalDeviceMemoryProperties memory_properties{};
-    vkGetPhysicalDeviceMemoryProperties(viewport.physicalDevice(), &memory_properties);
-    std::uint32_t memory_type = memory_properties.memoryTypeCount;
-    for (std::uint32_t index = 0; index < memory_properties.memoryTypeCount; ++index) {
-        if ((requirements.memoryTypeBits & (1U << index)) != 0 &&
-            (memory_properties.memoryTypes[index].propertyFlags &
-             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0) {
-            memory_type = index;
-            break;
-        }
-    }
-    if (memory_type == memory_properties.memoryTypeCount) {
-        throw std::runtime_error("No shadow memory type");
-    }
     VkMemoryAllocateInfo allocate{};
-    allocate.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocate.allocationSize  = requirements.size;
-    allocate.memoryTypeIndex = memory_type;
+    allocate.sType          = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocate.allocationSize = requirements.size;
+    allocate.memoryTypeIndex =
+        find_memory_type(viewport.physicalDevice(), requirements.memoryTypeBits,
+                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     check_vk(vkAllocateMemory(device_, &allocate, nullptr, &memory_), "allocate shadow map");
     check_vk(vkBindImageMemory(device_, image_, memory_, 0), "bind shadow map");
     VkImageViewCreateInfo view{};

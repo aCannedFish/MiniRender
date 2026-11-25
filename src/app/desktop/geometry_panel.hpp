@@ -14,6 +14,7 @@ class QPushButton;
 class QSpinBox;
 class QFormLayout;
 
+// 从面板读取的一组几何参数，后台作业获得其副本。
 struct GeometryParameters {
     minirender::LoopSettings                        loop;
     std::optional<minirender::DisplacementSettings> displacement;

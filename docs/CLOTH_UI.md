@@ -67,7 +67,7 @@
 | `src/app/desktop/cloth_controller.cpp` | 单任务所有权、取消与结果验证 |
 | `src/app/desktop/cloth_panel.cpp` | 草稿、实际子步、进度与操作按钮 |
 | `src/app/desktop/cloth_workbench.cpp` | 示例、场景编辑、冻结与离线快照 |
-| `src/app/desktop/scene_renderer.cpp` | 活跃所有者集合与动态缓冲复用 |
+| `src/app/desktop/scene_upload.cpp` | 活跃所有者集合与动态缓冲复用 |
 
 ## 复验
 

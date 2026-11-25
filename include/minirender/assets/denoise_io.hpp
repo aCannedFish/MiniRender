@@ -3,6 +3,7 @@
 #include <minirender/render/denoiser.hpp>
 
 namespace minirender {
+// 同一帧的四张几何引导图和矩阵记录路径，按 HW5 约定成组读取。
 struct GuideFiles {
     std::filesystem::path normal, position, depth, object, matrix;
 };

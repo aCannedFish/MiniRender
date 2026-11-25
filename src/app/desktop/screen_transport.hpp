@@ -34,7 +34,7 @@ class ScreenTransport {
     const HdrTargets* targets_ = nullptr;
     VkBuffer          uniform_{};
     VkDeviceSize      bytes_ = 0;
-    // 分别判断历史附件是否已分配、是否已转到可采样布局。
-    bool temporal_ready_ = false, temporal_initialized_ = false;
-    bool initialized_ = false;
+    // 历史附件按需分配；其首次布局转换由 TemporalTransport 管理。
+    bool temporal_ready_ = false;
+    bool initialized_    = false;
 };

@@ -35,6 +35,7 @@ struct PointPreviewSettings {
     bool  normal_colors   = false;
     bool  show_normals    = false;
     bool  show_boundaries = true;
+    // 检查点大小、法线显示与预览参数的取值范围。
     void validate() const;
 };
 

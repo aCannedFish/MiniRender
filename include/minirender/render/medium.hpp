@@ -13,6 +13,7 @@ namespace minirender {
 // wo/wi 均为离开散射点的单位方向。正 g 的峰值位于 wi=-wo，密度为 sr^-1。
 double henyey_greenstein(glm::dvec3 wo, glm::dvec3 wi, double g);
 
+// 一次介质相函数采样的方向与立体角密度。
 struct PhaseSample {
     glm::dvec3 direction{0};
     double     probability = 0;
@@ -24,6 +25,7 @@ PhaseSample sample_henyey_greenstein(glm::dvec3 wo, double g, glm::dvec2 u);
 // Beer–Lambert 的逐通道透射率。distance 为非负米数，允许正无穷。
 glm::dvec3 medium_transmittance(const HomogeneousMedium& medium, double distance);
 
+// 自由程采样结果，weight 包含散射或逃逸事件的透射率与概率修正。
 struct MediumDistanceSample {
     bool       scattered = false;
     double     distance  = 0;
@@ -35,6 +37,7 @@ struct MediumDistanceSample {
 MediumDistanceSample sample_medium_distance(const HomogeneousMedium& medium, double length,
                                             double channel_u, double distance_u);
 
+// 射线与一个有界介质相交的参数区间，region 指向该介质。
 struct MediumSegment {
     std::size_t region = 0;
     RayInterval interval;
@@ -46,6 +49,7 @@ struct MediumSegments {
     std::size_t                                       count = 0;
 };
 
+// 保存体散射点、到射线起点的距离、相函数参数与介质索引。
 struct MediumInteraction {
     glm::dvec3  position{0};
     double      distance   = 0;
@@ -53,6 +57,7 @@ struct MediumInteraction {
     std::size_t region     = 0;
 };
 
+// 组合入射段的传输权重与可选散射点，空交互表示光线穿过该段。
 struct MediumSample {
     glm::dvec3                       weight{1};
     std::optional<MediumInteraction> interaction;

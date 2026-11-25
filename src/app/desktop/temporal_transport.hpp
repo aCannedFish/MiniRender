@@ -26,9 +26,10 @@ class TemporalTransport {
     // 一侧的输出、前帧累积和前帧法线/深度保存在独立附件中。
     struct Side {
         ScreenPass filtered, history, guides;
-        bool       initialized = false;
     };
 
+    // 两侧附件在同一批命令中清空并进入可采样布局。
+    bool initialized_ = false;
     // 按一、二、四个纹素的步长滤波。
     std::array<ScreenPass, 3> spatial_;
     std::array<Side, 2>       sides_;

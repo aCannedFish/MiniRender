@@ -44,12 +44,16 @@ std::shared_ptr<const RasterMeshData> prepare_raster_mesh(const MeshData&    mes
 // 生产线程只构造 RasterMeshData，完成后由界面线程供给缓存。
 class RasterMeshCache {
   public:
+    // 把后台准备完成的面角数据与源网格关联。
     void supply(const std::shared_ptr<const MeshData>& mesh,
                 std::shared_ptr<const RasterMeshData>  prepared);
+    // 命中时更新使用顺序并返回共享数据；缺失时返回空指针。
     std::shared_ptr<const RasterMeshData> find(const std::shared_ptr<const MeshData>& mesh);
+    // 保留当前实例所需的项，按使用顺序裁剪其余缓存。
     void retain(std::span<const RenderInstance> instances);
 
   private:
+    // 缓存保留的展开网格，used 记录最近一次使用的逻辑时刻。
     struct Entry {
         std::shared_ptr<const RasterMeshData> data;
         std::uint64_t                         used = 0;

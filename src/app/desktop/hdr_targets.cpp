@@ -2,6 +2,7 @@
 // 本模块接口见 hdr_targets.hpp。
 
 #include "hdr_targets.hpp"
+#include "vulkan_utils.hpp"
 
 #include <array>
 #include <stdexcept>

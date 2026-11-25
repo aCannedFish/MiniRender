@@ -2,8 +2,8 @@
 // 本模块接口见 screen_pass.hpp。
 
 #include "screen_pass.hpp"
-#include "gpu_buffer.hpp"
 #include "gpu_shader.hpp"
+#include "vulkan_utils.hpp"
 
 #include <array>
 #include <vector>

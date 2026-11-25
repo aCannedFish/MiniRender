@@ -36,6 +36,7 @@ struct DisplacementProgress {
 
 using DisplacementProgressCallback = std::function<void(const DisplacementProgress&)>;
 
+// 记录位移后的真实几何及输出拓扑，用于后续渲染与误差检查。
 struct DisplacementResult {
     // 成功结果的共享只读网格，调用方可以直接保存或交给渲染器。
     std::shared_ptr<const MeshData> mesh;

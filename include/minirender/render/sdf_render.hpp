@@ -11,6 +11,7 @@ namespace minirender {
 
 enum class SdfView { surface, normals, depth, steps };
 
+// 固定本次 SDF 输出的尺寸、观察模式与步进设置。
 struct SdfRenderOptions {
     std::size_t width   = 128;
     std::size_t height  = 128;

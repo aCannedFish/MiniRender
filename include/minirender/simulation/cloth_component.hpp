@@ -13,6 +13,7 @@ struct ClothDefinition {
     ClothParameters  parameters;
     ClothEnvironment environment;
     bool             use_scene_colliders = true;
+    // 联合校验初始网格、求解参数与碰撞环境。
     void validate() const;
 };
 
@@ -42,6 +43,7 @@ std::unique_ptr<ClothSimulation> make_cloth_simulation(const ClothComponent& com
                                                        ClothEnvironment      environment,
                                                        CancellationToken     cancellation = {});
 
+// 一起交付新布料组件、运动统计和实际子步数，便于原子替换物体状态。
 struct ClothPreparedFrame {
     std::shared_ptr<const ClothComponent> component;
     ClothStatistics                       statistics;

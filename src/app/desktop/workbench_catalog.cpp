@@ -205,17 +205,17 @@ void Workbench::import_resource(const catalog::Entry& entry, catalog::ImportActi
                         view = VulkanViewport::blinn_phong_mode;
                     }
                     if (recommended && entry.recommended == "comparison") {
-                        view = 19;
+                        view = VIEW_TEMPORAL;
                         findChild<QCheckBox*>("area_shadows")->setChecked(true);
                     }
                     if (recommended && entry.recommended == "ssgi") {
-                        view = 16;
+                        view = VIEW_COMBINED;
                     }
                     if (recommended && entry.recommended == "energy") {
-                        view = 0;
+                        view = VIEW_LIGHTING;
                     }
                     if (recommended && entry.recommended == "pcss") {
-                        view = 0;
+                        view = VIEW_LIGHTING;
                         findChild<QCheckBox*>("shadows_enabled")->setChecked(true);
                         findChild<QComboBox*>("shadow_filter")
                             ->setCurrentIndex(static_cast<int>(ShadowFilter::pcss));

@@ -187,7 +187,7 @@ void verify(Workbench& window, const QString& directory) {
         float      min = 1.F, max = 0.F;
         for (std::size_t row = 0; row < debug.height(); row += 3) {
             for (std::size_t column = 0; column < debug.width(); column += 3) {
-                const auto v = debug.at(column,row).r;
+                const auto v = debug.at(column, row).r;
                 require(std::isfinite(v) && v >= 0 && v <= 1, "Invalid shadow diagnostic value");
                 min = std::min(min, v);
                 max = std::max(max, v);

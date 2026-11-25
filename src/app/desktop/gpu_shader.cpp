@@ -2,7 +2,7 @@
 // 本模块接口见 gpu_shader.hpp。
 
 #include "gpu_shader.hpp"
-#include "gpu_buffer.hpp"
+#include "vulkan_utils.hpp"
 
 #include <QFile>
 

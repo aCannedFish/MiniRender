@@ -29,7 +29,6 @@ class DiagnosticRenderer final : public ViewportRenderer {
     // 按 pass 类型、剔除方式和正面绕序创建 Vulkan 图形管线。
     void create_pipeline();
     void record_texture_upload(VkCommandBuffer command);
-    std::uint32_t memory_type(std::uint32_t bits, VkMemoryPropertyFlags flags) const;
 
     // 借用的视口，提供设备、命令缓冲及当前场景状态。
     VulkanViewport* window_;

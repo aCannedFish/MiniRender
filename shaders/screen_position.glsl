@@ -9,4 +9,10 @@ vec3 view_position(ivec2 pixel, float depth, ivec2 size) {
     vec4 position = frame.inverse_projection * vec4(uv * 2.0 - 1.0, depth, 1.0);
     return position.xyz / position.w;
 }
+
+// 将窗口深度反解为正的相机空间距离，供遍历、历史深度与诊断显示共用。
+float view_depth(float z) {
+    return frame.viewport.z * frame.viewport.w /
+           (frame.viewport.w - z * (frame.viewport.w - frame.viewport.z));
+}
 #endif

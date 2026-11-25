@@ -81,9 +81,7 @@ bool RectangleShadow::configure(VulkanViewport& viewport, const minirender::Scen
     }
     active_layers_ = static_cast<std::uint32_t>(layer);
     matrices_.write(projections.data(), projections.size() * sizeof(glm::mat4));
-    revision_ = revision;
-    grid_     = grid;
-    dirty_    = layer > 0;
+    dirty_ = layer > 0;
     return allocate;
 }
 

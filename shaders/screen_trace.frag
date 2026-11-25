@@ -33,11 +33,6 @@ vec2 depths(ivec2 cell, int level) {
     return texelFetch(mip5, cell, 0).rg;
 }
 
-float view_depth(float z) {
-    return frame.viewport.z * frame.viewport.w /
-           (frame.viewport.w - z * (frame.viewport.w - frame.viewport.z));
-}
-
 // 每次前进到当前单元的下一条边。投影后的射线在屏幕像素与 NDC 深度空间都是直线。
 bool trace_ray(vec3 origin, vec3 direction, ivec2 start, out ivec2 hit, out int iterations) {
     iterations   = 0;
@@ -106,19 +101,19 @@ float hash_pixel(vec2 p) {
 void main() {
     ivec2 p = ivec2(gl_FragCoord.xy), size = textureSize(depth_image, 0);
     int   mode = int(frame.display.y);
-    if (mode < 13 || mode > 20) {
+    if (mode < VIEW_MIRROR || mode > VIEW_HISTORY_MASK) {
         result = vec4(0);
         return;
     }
     float depth  = texelFetch(depth_image, p, 0).r;
     vec3  direct = texelFetch(direct_image, p, 0).rgb;
     vec3  kd     = texelFetch(albedo_image, p, 0).rgb;
-    if (mode == 17) {
+    if (mode == VIEW_ALBEDO) {
         result = vec4(kd, 1);
         return;
     }
     if (depth >= 1.0) {
-        result = vec4(mode == 16 ? direct : vec3(0), 1);
+        result = vec4(mode == VIEW_COMBINED ? direct : vec3(0), 1);
         return;
     }
     vec3  position   = view_position(p, depth, size);
@@ -126,11 +121,11 @@ void main() {
     vec3  origin     = position + n * max(.002, frame.screen_trace.y * .6);
     ivec2 hit        = ivec2(0);
     int   iterations = 0;
-    if (mode == 13 || mode == 14 || mode == 18) {
+    if (mode == VIEW_MIRROR || mode == VIEW_RAY_HIT || mode == VIEW_TRACE_STEPS) {
         bool valid = trace_ray(origin, reflect(normalize(position), n), p, hit, iterations);
-        if (mode == 18) {
+        if (mode == VIEW_TRACE_STEPS) {
             result = vec4(vec3(float(iterations) / frame.screen_trace.z), 1);
-        } else if (mode == 14) {
+        } else if (mode == VIEW_RAY_HIT) {
             result = vec4(valid ? vec3((vec2(hit) + .5) / vec2(size), 1) : vec3(0), 1);
         } else {
             result = vec4(valid ? texelFetch(direct_image, hit, 0).rgb : frame.environment.rgb, 1);
@@ -150,5 +145,5 @@ void main() {
         }
     }
     indirect *= kd / float(samples);
-    result = vec4(mode == 16 ? direct + indirect : indirect, 1);
+    result = vec4(mode == VIEW_COMBINED ? direct + indirect : indirect, 1);
 }

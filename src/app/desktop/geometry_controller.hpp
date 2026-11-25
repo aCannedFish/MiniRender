@@ -46,6 +46,7 @@ struct PointNormalCache {
     }
 };
 
+// 固定点云及与该点集对应的法线缓存，供后台重建使用。
 struct PointReconstructionInput {
     std::shared_ptr<const minirender::PointCloud> cloud;
     std::shared_ptr<const PointNormalCache>       cached_normals;
@@ -73,6 +74,7 @@ struct GeometryTaskInput {
     std::string                                     target_name;
 };
 
+// 携带几何任务输出的不可变资产与统计，由工作台在成功后提交。
 struct GeometryTaskResult {
     std::shared_ptr<const minirender::MeshData>         mesh;
     std::shared_ptr<const minirender::Texture>          height;
@@ -94,6 +96,7 @@ struct GeometryTaskResult {
     bool                                                file_committed = false;
 };
 
+// 几何作业状态、任务类型及最近一次进度，用于驱动按钮和进度条。
 struct GeometryTaskStatus {
     GeometryTaskState    state = GeometryTaskState::idle;
     GeometryTaskKind     kind  = GeometryTaskKind::mesh;
@@ -136,6 +139,7 @@ class GeometryController final : public QObject {
     using Reporter = std::function<void(GeometryTaskProgress)>;
     using Work = std::function<GeometryTaskResult(minirender::CancellationToken, const Reporter&)>;
 
+    // 后台任务和 GUI 共享的进度快照，由互斥锁保护。
     struct Progress {
         std::mutex           mutex;
         GeometryTaskProgress value;

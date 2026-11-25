@@ -1,6 +1,7 @@
 // Vulkan 窗口生命周期、输入交互、渲染调度与图像读回。
 
 #pragma once
+#include "view_modes.h"
 
 #include "gpu_image.hpp"
 #include <minirender/core/image.hpp>
@@ -39,11 +40,13 @@ struct SceneUploadStatistics {
     double        last_update_ms       = 0;
 };
 
+// 方向光阴影过滤方法，依次对应硬阴影、固定核和接触硬化。
+enum class ShadowFilter { hard, pcf, pcss };
+
 // Qt 提供窗口与平台 surface，本类独占 Vulkan device、交换链和帧同步。
 // 首版仅允许一帧在 GPU 执行；呈现完成信号量按交换链图像分配，不能按 CPU 帧号复用。
 // 真正的提交延后到 Qt timer，避免在 macOS 的 CALayer expose/事务回调内等待 drawable。
-enum class ShadowFilter { hard, pcf, pcss };
-
+// 持有设备与帧同步资源，并将 Qt 导航事件转换为相机或场景编辑操作。
 class VulkanViewport final : public QWindow {
   public:
     VulkanViewport();
@@ -177,10 +180,16 @@ class VulkanViewport final : public QWindow {
     void set_exposure(float value);
     // 查询光照显示曝光 EV。
     float exposure() const noexcept;
-    static constexpr int base_color_preview_mode = 6;
+    static constexpr int base_color_preview_mode = VIEW_BASE_COLOR;
+
+    // 只有间接光累积和历史掩码使用前帧图像。离线参考共用显示通道。
+    static bool uses_history(int mode) noexcept {
+        return mode == VIEW_TEMPORAL || mode == VIEW_HISTORY_MASK;
+    }
 
     static bool uses_lighting(int mode) noexcept {
-        return mode == 0 || (mode >= 13 && mode <= 16) || mode == 19 || mode == 20;
+        return mode == VIEW_LIGHTING || (mode >= VIEW_MIRROR && mode <= VIEW_COMBINED) ||
+               uses_history(mode);
     }
 
     // x、y 使用视空间米，z、w 为每条射线的步数上限与每像素的方向数。
@@ -212,7 +221,7 @@ class VulkanViewport final : public QWindow {
     }
 
     void set_screen_trace(glm::vec4 settings, bool hiz);
-    static constexpr int offline_reference_mode = 21;
+    static constexpr int offline_reference_mode = VIEW_REFERENCE;
     // 同一视口相机生成的离线参考。场景几何、相机或纵横比变化使其失效。
     void set_reference_image(std::shared_ptr<const minirender::Image> image);
 
@@ -220,7 +229,7 @@ class VulkanViewport final : public QWindow {
         return path_reference_;
     }
 
-    static constexpr int prt_mode = 12;
+    static constexpr int prt_mode = VIEW_PRT;
     void set_prt(std::shared_ptr<const minirender::PrtBake> bake, minirender::PrtMode mode);
     void set_prt_lighting(const minirender::ShLight& lighting);
 
@@ -232,7 +241,7 @@ class VulkanViewport final : public QWindow {
         return prt_lighting_;
     }
 
-    static constexpr int blinn_phong_mode = 7;
+    static constexpr int blinn_phong_mode = VIEW_BLINN_PHONG;
 
     // 右侧模式为 -1 时使用普通视口；分界位置是窗口宽度的比例。
     int comparison_mode() const noexcept {
@@ -420,8 +429,6 @@ class VulkanViewport final : public QWindow {
     void mark_preview_changed();
     // 根据当前相机、对象和模式重新计算操纵器布局。
     void rebuild_gizmo();
-    // 查找满足内存类型掩码和属性要求的设备内存索引。
-    std::uint32_t memory_type(std::uint32_t bits, VkMemoryPropertyFlags flags) const;
 
     std::unique_ptr<ViewportRenderer>                   renderer_;
     std::unique_ptr<ViewportRenderer>                   offline_renderer_;

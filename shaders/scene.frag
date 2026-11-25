@@ -105,13 +105,13 @@ void main() {
     ClothData cloth         = instances.values[draw_index.instance].cloth;
     bool      cloth_enabled = cloth.counts.y != 0;
     int       mode          = int(frame.display.y);
-    if (mode == 12) {
+    if (mode == VIEW_PRT) {
         color = vec4(
             frame.prt_light[0].w > .5 ? albedo * max(prt_color, vec3(0)) + emission : albedo, 1);
         ambient_output = vec4(0);
         return;
     }
-    if (mode >= 8 && mode <= 11) {
+    if (mode >= VIEW_SHADOW_DEPTH && mode <= VIEW_VISIBILITY) {
         vec3  debug = vec3(0.0);
         float vis   = 1.0;
         if (frame.counts.x > 0) {
@@ -119,12 +119,15 @@ void main() {
             float ndl   = max(dot(n, -normalize(frame.lights[light].direction.xyz)), 0.0);
             vis         = shadow_visibility(light, ndl, world_dx, world_dy, debug);
         }
-        float value    = mode == 8 ? debug.x : mode == 9 ? debug.y : mode == 10 ? debug.z : vis;
+        float value    = mode == VIEW_SHADOW_DEPTH    ? debug.x
+                         : mode == VIEW_BLOCKER_DEPTH ? debug.y
+                         : mode == VIEW_PENUMBRA      ? debug.z
+                                                      : vis;
         color          = vec4(vec3(value), 1.0);
         ambient_output = vec4(0.0);
         return;
     }
-    if (int(frame.display.y) == 7) {
+    if (int(frame.display.y) == VIEW_BLINN_PHONG) {
         // 点光源采用平方反比衰减。半角向量决定 Blinn–Phong 高光的方向与宽度。
         vec3  to_light  = frame.teaching_light.xyz - world_position;
         float distance2 = max(dot(to_light, to_light), 1e-6);
@@ -235,7 +238,7 @@ void main() {
             rectangle_visibility(i, area.lights[i], world_position, n, v, material.x, f0);
         result += diffuse * visible.x + specular * visible.y;
     }
-    if (int(frame.display.y) == 19 || int(frame.display.y) == 20) {
+    if (int(frame.display.y) == VIEW_TEMPORAL || int(frame.display.y) == VIEW_HISTORY_MASK) {
         // 诊断模式下复用环境漫反射附件，保存前帧世界位置与八面体编码的法线。
         vec3 old = n;
         if (frame.history_settings.y > .5) {

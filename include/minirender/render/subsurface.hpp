@@ -10,6 +10,7 @@
 
 namespace minirender {
 
+// 跨表面位置采样结果，surface 指定下一处表面交互的位置。
 struct SubsurfaceSample {
     SurfaceHit surface;
     glm::dvec3 weight;      // Rd(|pi-po|) / p_A(pi)，未包含外侧方向核。

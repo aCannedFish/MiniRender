@@ -18,6 +18,7 @@
 
 #include <limits>
 #include <map>
+#include <set>
 
 // 三角网格的实时表面光照管线。使用场景快照，UI 修改通过 revision 发布。
 // 分开记录环境漫反射，经 SSAO 合成为线性 HDR，再执行显示变换。
@@ -40,6 +41,7 @@ class SceneRenderer final : public ViewportRenderer {
     minirender::Image read_hdr_capture() override;
 
   private:
+    // 四种图形管线共用实例缓冲；阴影和线框使用各自的渲染附件。
     enum class Pass { surface, shadow, wire, background };
     // 按 pass 类型、剔除方式和正面绕序创建 Vulkan 图形管线。
     VkPipeline create_pipeline(Pass pass, VkCullModeFlags cull = VK_CULL_MODE_NONE,
@@ -66,11 +68,16 @@ class SceneRenderer final : public ViewportRenderer {
         glm::vec3     maximum{0};
     };
 
+    // 一个可见实例的绘制绑定。其描述符引用同一行保存的底色和法线纹理。
     struct Draw {
         MeshHandle      mesh;
         TextureHandle   texture, normal_texture;
         VkDescriptorSet descriptor = VK_NULL_HANDLE;
     };
+
+    using MeshSet = std::set<MeshHandle, std::owner_less<MeshHandle>>;
+    // 查找或上传单个网格。used 包含整份快照引用的网格，返回值由 meshes_ 持有。
+    const Mesh& upload_mesh(const MeshHandle& source, const MeshSet& used);
 
     // 按共享网格所有权索引的 GPU 网格缓存。
     std::map<MeshHandle, Mesh, std::owner_less<MeshHandle>> meshes_;
@@ -105,9 +112,10 @@ class SceneRenderer final : public ViewportRenderer {
     GizmoRenderer gizmo_;
     // 按场景几何尺度计算的原色接触遮蔽半径，单位为米。
     float preview_radius_ = 0.2F;
+    // 方向光阴影图是否已经过本次场景更新后的首次绘制。
+    bool shadow_depth_ready_ = false;
     // 下一次绘制是否需要录制线性图像读回。
-    bool                     shadow_depth_ready_ = false;
-    bool                     capture_hdr_        = false;
+    bool                     capture_hdr_ = false;
     std::array<glm::mat4, 8> shadow_matrices_{};
     // 每个场景实例的变换与材质数据缓冲。
     GpuBuffer instances_;
@@ -119,25 +127,31 @@ class SceneRenderer final : public ViewportRenderer {
     GpuIbl          ibl_;
     RectangleShadow area_shadows_;
     glm::vec3       minimum_{}, maximum_{};
+    // 按当前视图和导航状态选择矩形灯采样网格，零表示关闭。
     int area_grid() const;
+    // 使用深度管线绘制遮挡物，发光面可按对象 ID 排除自身。
     void draw_shadow_geometry(VkCommandBuffer command, int projection, std::uint32_t resolution,
                               const std::string* emitter = nullptr);
 
+    // 单侧最后一次可用于重投影的相机、快照与帧号，age 为已累计帧数。
     struct TemporalView {
         std::shared_ptr<const minirender::SceneSnapshot> scene;
         minirender::Camera                               camera;
         glm::mat4                                        vp{1};
-        std::uint64_t                                    epoch = 0;
-        unsigned                                         age   = 0;
-        int                                              frame = -1;
+        // 重置世代，用于丢弃参数改变前的历史。
+        std::uint64_t epoch = 0;
+        unsigned      age   = 0;
+        int           frame = -1;
     };
 
     std::array<TemporalView, 2>                      histories_;
     std::shared_ptr<const minirender::SceneSnapshot> current_scene_, prior_scene_;
-    bool                                             rigid_update_ = false;
+    // 只有材质、光照和拓扑兼容时，刚体移动才可沿用上一帧。
+    bool rigid_update_ = false;
     // 系数按展平面角上传一次，环境旋转只更新九个帧常量。
     GpuBuffer                                  prt_buffer_;
     std::shared_ptr<const minirender::PrtBake> uploaded_prt_;
+    // 上传新的面角系数，返回是否更换 SSBO 并需要重建描述符。
     bool update_prt();
     GpuFloatTexture                          reference_texture_;
     std::shared_ptr<const minirender::Image> uploaded_reference_;

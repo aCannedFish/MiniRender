@@ -116,6 +116,21 @@ void start_integration_smoke(Workbench& window, const QString& directory) {
                 return;
             }
             if (*stage == 0) {
+                // 在任何时域通道创建之前读取右侧参考图，验证参考模式只走普通合成。
+                auto* viewport = window.viewport();
+                viewport->set_view_mode(VIEW_LIGHTING);
+                auto reference      = std::make_shared<minirender::Image>(1, 1);
+                reference->at(0, 0) = {1, 0, 0};
+                viewport->set_reference_image(reference);
+                viewport->set_comparison_mode(VIEW_REFERENCE);
+                const auto probe = viewport->grab_comparison_side(1);
+                require(!probe.isNull(),
+                        "Could not display an offline reference before temporal initialization");
+                const auto center = probe.pixelColor(probe.width() / 2, probe.height() / 2);
+                require(center.red() > 100 && center.green() < 5 && center.blue() < 5,
+                        "Offline reference entered the temporal filter");
+                viewport->set_comparison_mode(-1);
+                viewport->set_reference_image({});
                 window.findChild<QCheckBox*>("fxaa_enabled")->setChecked(false);
                 window.findChild<QSpinBox*>("reference_size")->setValue(96);
                 window.findChild<QSpinBox*>("reference_spp")->setValue(8);

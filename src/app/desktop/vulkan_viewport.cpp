@@ -1,4 +1,4 @@
-// Vulkan 窗口生命周期、输入交互、渲染调度与图像读回。
+// Vulkan 设备与窗口生命周期、帧提交、交换链重建与图像读回。
 // 本模块接口见 vulkan_viewport.hpp。
 
 #include "vulkan_viewport.hpp"
@@ -7,16 +7,12 @@
 #include "point_preview_renderer.hpp"
 #include "scene_renderer.hpp"
 #include "sdf_renderer.hpp"
-#include <minirender/scene/editor.hpp>
+#include "vulkan_utils.hpp"
 
 #include <QDebug>
-#include <QKeyEvent>
-#include <QMouseEvent>
 #include <QPlatformSurfaceEvent>
-#include <QScopedValueRollback>
 #include <QTimer>
 #include <QVulkanInstance>
-#include <QWheelEvent>
 
 #include <algorithm>
 #include <array>
@@ -25,16 +21,6 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
-
-namespace {
-
-void check(VkResult result, const char* operation) {
-    if (result != VK_SUCCESS) {
-        throw std::runtime_error(std::string(operation) + ": " + std::to_string(result));
-    }
-}
-
-} // namespace
 
 VulkanViewport::VulkanViewport() {
     setSurfaceType(QSurface::VulkanSurface);
@@ -67,10 +53,11 @@ void VulkanViewport::initialize() {
         }
     }
     std::uint32_t count = 0;
-    check(vkEnumeratePhysicalDevices(vulkanInstance()->vkInstance(), &count, nullptr), "list GPUs");
+    check_vk(vkEnumeratePhysicalDevices(vulkanInstance()->vkInstance(), &count, nullptr),
+             "list GPUs");
     std::vector<VkPhysicalDevice> devices(count);
-    check(vkEnumeratePhysicalDevices(vulkanInstance()->vkInstance(), &count, devices.data()),
-          "get GPUs");
+    check_vk(vkEnumeratePhysicalDevices(vulkanInstance()->vkInstance(), &count, devices.data()),
+             "get GPUs");
     for (const auto candidate : devices) {
         std::uint32_t families = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(candidate, &families, nullptr);
@@ -79,8 +66,8 @@ void VulkanViewport::initialize() {
         for (std::uint32_t index = 0; index < families; ++index) {
             VkBool32 present = offscreen_ ? VK_TRUE : VK_FALSE;
             if (!offscreen_) {
-                check(vkGetPhysicalDeviceSurfaceSupportKHR(candidate, index, surface_, &present),
-                      "present support");
+                check_vk(vkGetPhysicalDeviceSurfaceSupportKHR(candidate, index, surface_, &present),
+                         "present support");
             }
             if (present && (properties[index].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
                 physical_     = candidate;
@@ -97,11 +84,11 @@ void VulkanViewport::initialize() {
     }
     vkGetPhysicalDeviceProperties(physical_, &properties_);
     qInfo() << "Vulkan device:" << properties_.deviceName;
-    check(vkEnumerateDeviceExtensionProperties(physical_, nullptr, &count, nullptr),
-          "list extensions");
+    check_vk(vkEnumerateDeviceExtensionProperties(physical_, nullptr, &count, nullptr),
+             "list extensions");
     std::vector<VkExtensionProperties> extensions(count);
-    check(vkEnumerateDeviceExtensionProperties(physical_, nullptr, &count, extensions.data()),
-          "get extensions");
+    check_vk(vkEnumerateDeviceExtensionProperties(physical_, nullptr, &count, extensions.data()),
+             "get extensions");
     std::vector<const char*> enabled;
     if (!offscreen_) {
         enabled.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -123,27 +110,28 @@ void VulkanViewport::initialize() {
     device_info.pQueueCreateInfos       = &queue_info;
     device_info.enabledExtensionCount   = static_cast<std::uint32_t>(enabled.size());
     device_info.ppEnabledExtensionNames = enabled.data();
-    check(vkCreateDevice(physical_, &device_info, nullptr, &device_), "create device");
+    check_vk(vkCreateDevice(physical_, &device_info, nullptr, &device_), "create device");
     vkGetDeviceQueue(device_, queue_family_, 0, &queue_);
 
     VkCommandPoolCreateInfo pool{};
     pool.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     pool.queueFamilyIndex = queue_family_;
     pool.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    check(vkCreateCommandPool(device_, &pool, nullptr, &command_pool_), "create command pool");
+    check_vk(vkCreateCommandPool(device_, &pool, nullptr, &command_pool_), "create command pool");
     VkCommandBufferAllocateInfo allocate{};
     allocate.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocate.commandPool        = command_pool_;
     allocate.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocate.commandBufferCount = 1;
-    check(vkAllocateCommandBuffers(device_, &allocate, &command_), "allocate command buffer");
+    check_vk(vkAllocateCommandBuffers(device_, &allocate, &command_), "allocate command buffer");
     VkFenceCreateInfo fence{};
     fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fence.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    check(vkCreateFence(device_, &fence, nullptr, &frame_fence_), "create frame fence");
+    check_vk(vkCreateFence(device_, &fence, nullptr, &frame_fence_), "create frame fence");
     VkSemaphoreCreateInfo semaphore{};
     semaphore.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    check(vkCreateSemaphore(device_, &semaphore, nullptr, &acquired_), "create acquire semaphore");
+    check_vk(vkCreateSemaphore(device_, &semaphore, nullptr, &acquired_),
+             "create acquire semaphore");
     if (scene_) {
         renderer_ = std::make_unique<SceneRenderer>(this);
     } else {
@@ -158,20 +146,8 @@ void VulkanViewport::initialize() {
     sdf_renderer_->initResources();
 }
 
-std::uint32_t VulkanViewport::memory_type(std::uint32_t bits, VkMemoryPropertyFlags flags) const {
-    VkPhysicalDeviceMemoryProperties properties{};
-    vkGetPhysicalDeviceMemoryProperties(physical_, &properties);
-    for (std::uint32_t index = 0; index < properties.memoryTypeCount; ++index) {
-        if ((bits & (1U << index)) != 0 &&
-            (properties.memoryTypes[index].propertyFlags & flags) == flags) {
-            return index;
-        }
-    }
-    throw std::runtime_error("Required memory type is unavailable");
-}
-
 void VulkanViewport::recreate_swapchain() {
-    check(vkDeviceWaitIdle(device_), "wait before swapchain recreation");
+    check_vk(vkDeviceWaitIdle(device_), "wait before swapchain recreation");
     release_swapchain();
     if (offscreen_) {
         extent_ = {static_cast<std::uint32_t>(std::max(1, qRound(width() * devicePixelRatio()))),
@@ -185,14 +161,14 @@ void VulkanViewport::recreate_swapchain() {
         can_grab_ = true;
     } else {
         VkSurfaceCapabilitiesKHR capabilities{};
-        check(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_, surface_, &capabilities),
-              "surface capabilities");
+        check_vk(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_, surface_, &capabilities),
+                 "surface capabilities");
         std::uint32_t count = 0;
-        check(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_, surface_, &count, nullptr),
-              "surface formats");
+        check_vk(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_, surface_, &count, nullptr),
+                 "surface formats");
         std::vector<VkSurfaceFormatKHR> formats(count);
-        check(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_, surface_, &count, formats.data()),
-              "get formats");
+        check_vk(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_, surface_, &count, formats.data()),
+                 "get formats");
         const auto found = std::find_if(formats.begin(), formats.end(), [](const auto& format) {
             return (format.format == VK_FORMAT_B8G8R8A8_SRGB ||
                     format.format == VK_FORMAT_R8G8B8A8_SRGB) &&
@@ -242,12 +218,12 @@ void VulkanViewport::recreate_swapchain() {
         create.compositeAlpha   = alpha;
         create.presentMode      = VK_PRESENT_MODE_FIFO_KHR;
         create.clipped          = VK_TRUE;
-        check(vkCreateSwapchainKHR(device_, &create, nullptr, &swapchain_), "create swapchain");
-        check(vkGetSwapchainImagesKHR(device_, swapchain_, &count, nullptr),
-              "count swapchain images");
+        check_vk(vkCreateSwapchainKHR(device_, &create, nullptr, &swapchain_), "create swapchain");
+        check_vk(vkGetSwapchainImagesKHR(device_, swapchain_, &count, nullptr),
+                 "count swapchain images");
         images_.resize(count);
-        check(vkGetSwapchainImagesKHR(device_, swapchain_, &count, images_.data()),
-              "get swapchain images");
+        check_vk(vkGetSwapchainImagesKHR(device_, swapchain_, &count, images_.data()),
+                 "get swapchain images");
     }
     views_.resize(images_.size(), VK_NULL_HANDLE);
     rendered_.resize(images_.size(), VK_NULL_HANDLE);
@@ -262,11 +238,12 @@ void VulkanViewport::recreate_swapchain() {
         view.viewType         = VK_IMAGE_VIEW_TYPE_2D;
         view.format           = color_format_;
         view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        check(vkCreateImageView(device_, &view, nullptr, &views_[index]), "create swapchain view");
+        check_vk(vkCreateImageView(device_, &view, nullptr, &views_[index]),
+                 "create swapchain view");
         VkSemaphoreCreateInfo semaphore{};
         semaphore.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-        check(vkCreateSemaphore(device_, &semaphore, nullptr, &rendered_[index]),
-              "create image semaphore");
+        check_vk(vkCreateSemaphore(device_, &semaphore, nullptr, &rendered_[index]),
+                 "create image semaphore");
     }
 
     depth_format_ = VK_FORMAT_UNDEFINED;
@@ -292,23 +269,23 @@ void VulkanViewport::recreate_swapchain() {
     depth_info.samples     = VK_SAMPLE_COUNT_1_BIT;
     depth_info.tiling      = VK_IMAGE_TILING_OPTIMAL;
     depth_info.usage       = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    check(vkCreateImage(device_, &depth_info, nullptr, &depth_), "create depth image");
+    check_vk(vkCreateImage(device_, &depth_info, nullptr, &depth_), "create depth image");
     VkMemoryRequirements requirements{};
     vkGetImageMemoryRequirements(device_, depth_, &requirements);
     VkMemoryAllocateInfo memory{};
-    memory.sType          = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    memory.allocationSize = requirements.size;
-    memory.memoryTypeIndex =
-        memory_type(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    check(vkAllocateMemory(device_, &memory, nullptr, &depth_memory_), "allocate depth memory");
-    check(vkBindImageMemory(device_, depth_, depth_memory_, 0), "bind depth memory");
+    memory.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    memory.allocationSize  = requirements.size;
+    memory.memoryTypeIndex = find_memory_type(physical_, requirements.memoryTypeBits,
+                                              VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    check_vk(vkAllocateMemory(device_, &memory, nullptr, &depth_memory_), "allocate depth memory");
+    check_vk(vkBindImageMemory(device_, depth_, depth_memory_, 0), "bind depth memory");
     VkImageViewCreateInfo view{};
     view.sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     view.image            = depth_;
     view.viewType         = VK_IMAGE_VIEW_TYPE_2D;
     view.format           = depth_format_;
     view.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
-    check(vkCreateImageView(device_, &view, nullptr, &depth_view_), "create depth view");
+    check_vk(vkCreateImageView(device_, &view, nullptr, &depth_view_), "create depth view");
 
     std::array<VkAttachmentDescription, 2> attachments{};
     attachments[0].format         = color_format_;
@@ -346,7 +323,7 @@ void VulkanViewport::recreate_swapchain() {
     pass.pSubpasses      = &subpass;
     pass.dependencyCount = 1;
     pass.pDependencies   = &dependency;
-    check(vkCreateRenderPass(device_, &pass, nullptr, &render_pass_), "create render pass");
+    check_vk(vkCreateRenderPass(device_, &pass, nullptr, &render_pass_), "create render pass");
     framebuffers_.resize(images_.size(), VK_NULL_HANDLE);
     for (std::size_t index = 0; index < images_.size(); ++index) {
         std::array<VkImageView, 2> attachment_views{views_[index], depth_view_};
@@ -358,8 +335,8 @@ void VulkanViewport::recreate_swapchain() {
         framebuffer.width           = extent_.width;
         framebuffer.height          = extent_.height;
         framebuffer.layers          = 1;
-        check(vkCreateFramebuffer(device_, &framebuffer, nullptr, &framebuffers_[index]),
-              "create framebuffer");
+        check_vk(vkCreateFramebuffer(device_, &framebuffer, nullptr, &framebuffers_[index]),
+                 "create framebuffer");
     }
     renderer_->initSwapChainResources();
     offline_renderer_->initSwapChainResources();
@@ -384,7 +361,7 @@ void VulkanViewport::render_frame(bool blocking_capture) {
             requestUpdate();
             return;
         }
-        check(ready, "wait frame fence");
+        check_vk(ready, "wait frame fence");
         point_renderer_->discard_if_unused();
         // 连续拖拽会不断发布新版本。只要旧版本持续完成，就没有等待停滞。
         if (completed_preview_revision_ != submitted_preview_revision_) {
@@ -412,14 +389,14 @@ void VulkanViewport::render_frame(bool blocking_capture) {
                 return;
             }
             if (acquired != VK_SUBOPTIMAL_KHR) {
-                check(acquired, "acquire swapchain image");
+                check_vk(acquired, "acquire swapchain image");
             }
         }
-        check(vkResetCommandBuffer(command_, 0), "reset command buffer");
+        check_vk(vkResetCommandBuffer(command_, 0), "reset command buffer");
         VkCommandBufferBeginInfo begin{};
         begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-        check(vkBeginCommandBuffer(command_, &begin), "begin frame");
+        check_vk(vkBeginCommandBuffer(command_, &begin), "begin frame");
         // 显示算法共享目标，选择和缓冲更新发生在上一帧 fence 完成后。
         if (sdf_visible_) {
             sdf_renderer_->startNextFrame();
@@ -455,8 +432,8 @@ void VulkanViewport::frameReady() {
         command_,
         capture_ ? VK_PIPELINE_STAGE_TRANSFER_BIT : VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &transition);
-    check(vkEndCommandBuffer(command_), "end frame");
-    check(vkResetFences(device_, 1, &frame_fence_), "reset frame fence");
+    check_vk(vkEndCommandBuffer(command_), "end frame");
+    check_vk(vkResetFences(device_, 1, &frame_fence_), "reset frame fence");
     const VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     VkSubmitInfo               submit{};
     submit.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -467,7 +444,7 @@ void VulkanViewport::frameReady() {
     submit.pCommandBuffers      = &command_;
     submit.signalSemaphoreCount = offscreen_ ? 0 : 1;
     submit.pSignalSemaphores    = offscreen_ ? nullptr : &rendered_[image_index_];
-    check(vkQueueSubmit(queue_, 1, &submit, frame_fence_), "submit frame");
+    check_vk(vkQueueSubmit(queue_, 1, &submit, frame_fence_), "submit frame");
     submitted_preview_revision_ = preview_revision_;
     frame_wait_reason_          = "Frame submitted";
     if (!offscreen_) {
@@ -484,7 +461,7 @@ void VulkanViewport::frameReady() {
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
             dirty_ = true;
         } else {
-            check(result, "present frame");
+            check_vk(result, "present frame");
         }
     }
     if (capture_) {
@@ -498,18 +475,18 @@ void VulkanViewport::record_readback() {
     buffer.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buffer.size  = bytes;
     buffer.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    check(vkCreateBuffer(device_, &buffer, nullptr, &readback_), "create readback buffer");
+    check_vk(vkCreateBuffer(device_, &buffer, nullptr, &readback_), "create readback buffer");
     VkMemoryRequirements requirements{};
     vkGetBufferMemoryRequirements(device_, readback_, &requirements);
     VkMemoryAllocateInfo allocation{};
-    allocation.sType          = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocation.allocationSize = requirements.size;
-    allocation.memoryTypeIndex =
-        memory_type(requirements.memoryTypeBits,
-                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    check(vkAllocateMemory(device_, &allocation, nullptr, &readback_memory_),
-          "allocate readback memory");
-    check(vkBindBufferMemory(device_, readback_, readback_memory_, 0), "bind readback memory");
+    allocation.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocation.allocationSize  = requirements.size;
+    allocation.memoryTypeIndex = find_memory_type(physical_, requirements.memoryTypeBits,
+                                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                      VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    check_vk(vkAllocateMemory(device_, &allocation, nullptr, &readback_memory_),
+             "allocate readback memory");
+    check_vk(vkBindBufferMemory(device_, readback_, readback_memory_, 0), "bind readback memory");
     VkImageMemoryBarrier transition{};
     transition.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     transition.srcAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
@@ -531,9 +508,10 @@ void VulkanViewport::record_readback() {
 }
 
 void VulkanViewport::finish_readback() {
-    check(vkWaitForFences(device_, 1, &frame_fence_, VK_TRUE, 2'000'000'000ULL), "wait readback");
+    check_vk(vkWaitForFences(device_, 1, &frame_fence_, VK_TRUE, 2'000'000'000ULL),
+             "wait readback");
     void* mapped = nullptr;
-    check(vkMapMemory(device_, readback_memory_, 0, VK_WHOLE_SIZE, 0, &mapped), "map readback");
+    check_vk(vkMapMemory(device_, readback_memory_, 0, VK_WHOLE_SIZE, 0, &mapped), "map readback");
     captured_ = QImage(static_cast<const uchar*>(mapped), static_cast<int>(extent_.width),
                        static_cast<int>(extent_.height), QImage::Format_RGBA8888)
                     .copy();
@@ -792,816 +770,6 @@ QString VulkanViewport::failure() const {
     return failure_;
 }
 
-void VulkanViewport::set_scene(std::shared_ptr<const minirender::SceneSnapshot> scene) {
-    if (scene && scene->directional_lights.size() > 8) {
-        throw std::invalid_argument("Realtime preview supports at most 8 directional lights");
-    }
-    if (static_cast<bool>(scene_) != static_cast<bool>(scene) && device_ != VK_NULL_HANDLE) {
-        release();
-    }
-    if (!scene_ || !scene || scene_->environment_texture != scene->environment_texture) {
-        ibl_maps_.reset();
-    }
-    if (prt_ && (!scene || !scene_ || !minirender::compatible_prt(*scene_, *scene, prt_kind_))) {
-        prt_.reset();
-    }
-    if (path_reference_ && scene != scene_) {
-        set_reference_image({});
-    }
-    scene_ = std::move(scene);
-    raster_meshes_.retain(scene_ ? std::span<const minirender::RenderInstance>(scene_->instances)
-                                 : std::span<const minirender::RenderInstance>{});
-    if (scene_) {
-        if (point_visible_ || sdf_visible_) {
-            scene_camera_before_tools_ = scene_->camera;
-        } else {
-            camera_ = scene_->camera;
-        }
-    }
-    rebuild_gizmo();
-    ++scene_revision_;
-    mark_preview_changed();
-    requestUpdate();
-}
-
-const std::shared_ptr<const minirender::SceneSnapshot>& VulkanViewport::scene() const noexcept {
-    return scene_;
-}
-
-std::uint64_t VulkanViewport::scene_revision() const noexcept {
-    return scene_revision_;
-}
-
-void VulkanViewport::supply_raster_mesh(
-    const std::shared_ptr<const minirender::MeshData>& mesh,
-    std::shared_ptr<const minirender::RasterMeshData>  prepared) {
-    raster_meshes_.supply(mesh, std::move(prepared));
-}
-
-std::shared_ptr<const minirender::RasterMeshData>
-VulkanViewport::raster_mesh(const std::shared_ptr<const minirender::MeshData>& mesh) {
-    return raster_meshes_.find(mesh);
-}
-
-const minirender::Camera& VulkanViewport::camera() const noexcept {
-    return camera_;
-}
-
-void VulkanViewport::set_camera(const minirender::Camera& camera) {
-    camera.validate();
-    finish_gizmo_drag(true);
-    if (path_reference_ &&
-        (camera.position != camera_.position || camera.target != camera_.target ||
-         camera.up != camera_.up || camera.vertical_fov_degrees != camera_.vertical_fov_degrees ||
-         camera.aperture_radius != camera_.aperture_radius ||
-         camera.focus_distance != camera_.focus_distance ||
-         camera.near_plane != camera_.near_plane || camera.far_plane != camera_.far_plane)) {
-        set_reference_image({});
-    }
-    camera_ = camera;
-    rebuild_gizmo();
-    mark_preview_changed();
-    if (on_camera_changed && !point_visible_ && !sdf_visible_) {
-        on_camera_changed(camera_);
-    }
-    requestUpdate();
-}
-
-void VulkanViewport::set_point_preview_data(
-    std::shared_ptr<const minirender::PointPreviewData> data) {
-    if (data && data->points.empty()) {
-        throw std::invalid_argument("Point preview data must contain points");
-    }
-    if (!data) {
-        set_point_preview_visible(false);
-    }
-    const bool first = !point_data_;
-    point_data_      = std::move(data);
-    if (first && point_data_) {
-        reset_point_camera();
-    }
-    mark_preview_changed();
-    requestUpdate();
-}
-
-const std::shared_ptr<const minirender::PointPreviewData>&
-VulkanViewport::point_preview_data() const noexcept {
-    return point_data_;
-}
-
-void VulkanViewport::set_point_preview_settings(minirender::PointPreviewSettings settings) {
-    settings.validate();
-    point_settings_ = settings;
-    mark_preview_changed();
-    requestUpdate();
-}
-
-const minirender::PointPreviewSettings& VulkanViewport::point_preview_settings() const noexcept {
-    return point_settings_;
-}
-
-void VulkanViewport::set_point_preview_visible(bool visible) {
-    if (point_visible_ == visible) {
-        return;
-    }
-    if (visible && !point_data_) {
-        throw std::logic_error("Load a point cloud before opening its preview");
-    }
-    finish_gizmo_drag(false);
-    if (visible) {
-        set_sdf_visible(false);
-        set_offline_visible(false);
-        scene_camera_before_tools_ = camera_;
-        camera_                    = point_camera_;
-    } else {
-        point_camera_ = camera_;
-        camera_       = scene_camera_before_tools_;
-    }
-    point_visible_   = visible;
-    pressed_buttons_ = Qt::NoButton;
-    dragged_         = false;
-    rebuild_gizmo();
-    mark_preview_changed();
-    if (on_point_preview_changed) {
-        on_point_preview_changed(visible);
-    }
-    requestUpdate();
-}
-
-bool VulkanViewport::point_preview_visible() const noexcept {
-    return point_visible_;
-}
-
-void VulkanViewport::reset_point_camera() {
-    minirender::Camera camera;
-    camera.position   = {3, 2, 3};
-    camera.target     = {0, 0, 0};
-    camera.near_plane = .01F;
-    camera.far_plane  = 100;
-    point_camera_     = camera;
-    if (point_visible_) {
-        set_camera(camera);
-    }
-}
-
-void VulkanViewport::report_point_upload() {
-    ++point_uploads_;
-}
-
-std::uint64_t VulkanViewport::point_uploads() const noexcept {
-    return point_uploads_;
-}
-
-void VulkanViewport::set_sdf_document(std::shared_ptr<const minirender::SdfDocument> document,
-                                      bool                                           reset_camera) {
-    if (document) {
-        document->validate();
-    } else {
-        set_sdf_visible(false);
-    }
-    if (document && (!sdf_document_ || reset_camera)) {
-        sdf_camera_ = document->camera;
-        if (sdf_visible_) {
-            set_camera(sdf_camera_);
-        }
-    }
-    sdf_document_ = std::move(document);
-    mark_preview_changed();
-    requestUpdate();
-}
-
-const std::shared_ptr<const minirender::SdfDocument>&
-VulkanViewport::sdf_document() const noexcept {
-    return sdf_document_;
-}
-
-void VulkanViewport::set_sdf_visible(bool visible) {
-    if (visible == sdf_visible_) {
-        return;
-    }
-    if (visible && !sdf_document_) {
-        throw std::logic_error("Load an SDF document before opening its view");
-    }
-    finish_gizmo_drag(false);
-    if (visible) {
-        set_point_preview_visible(false);
-        set_offline_visible(false);
-        scene_camera_before_tools_ = camera_;
-        camera_                    = sdf_camera_;
-    } else {
-        sdf_camera_ = camera_;
-        camera_     = scene_camera_before_tools_;
-    }
-    sdf_visible_     = visible;
-    pressed_buttons_ = Qt::NoButton;
-    dragged_         = false;
-    rebuild_gizmo();
-    mark_preview_changed();
-    if (on_sdf_visible_changed) {
-        on_sdf_visible_changed(visible);
-    }
-    requestUpdate();
-}
-
-bool VulkanViewport::sdf_visible() const noexcept {
-    return sdf_visible_;
-}
-
-void VulkanViewport::set_sdf_view(minirender::SdfView view) {
-    if (view != minirender::SdfView::surface && view != minirender::SdfView::normals &&
-        view != minirender::SdfView::depth && view != minirender::SdfView::steps) {
-        throw std::invalid_argument("Unknown SDF view");
-    }
-    sdf_view_ = view;
-    if (on_sdf_display_changed) {
-        on_sdf_display_changed();
-    }
-    mark_preview_changed();
-    requestUpdate();
-}
-
-minirender::SdfView VulkanViewport::sdf_view() const noexcept {
-    return sdf_view_;
-}
-
-void VulkanViewport::set_sdf_shadows(bool enabled) {
-    sdf_shadows_ = enabled;
-    if (on_sdf_display_changed) {
-        on_sdf_display_changed();
-    }
-    mark_preview_changed();
-    requestUpdate();
-}
-
-bool VulkanViewport::sdf_shadows() const noexcept {
-    return sdf_shadows_;
-}
-
-const minirender::Camera& VulkanViewport::sdf_camera() const noexcept {
-    return sdf_visible_ ? camera_ : sdf_camera_;
-}
-
-void VulkanViewport::report_sdf_upload() {
-    ++sdf_uploads_;
-}
-
-std::uint64_t VulkanViewport::sdf_uploads() const noexcept {
-    return sdf_uploads_;
-}
-
-void VulkanViewport::set_exposure(float value) {
-    exposure_ = value;
-    mark_preview_changed();
-    requestUpdate();
-}
-
-float VulkanViewport::exposure() const noexcept {
-    return exposure_;
-}
-
-void VulkanViewport::set_preview_outline(bool enabled) {
-    preview_outline_ = enabled;
-    mark_preview_changed();
-    requestUpdate();
-}
-
-bool VulkanViewport::preview_outline() const noexcept {
-    return preview_outline_;
-}
-
-void VulkanViewport::set_preview_outline_strength(float strength) {
-    if (!std::isfinite(strength) || strength < 0 || strength > 1) {
-        throw std::invalid_argument("Preview outline strength must be in [0, 1]");
-    }
-    preview_outline_strength_ = strength;
-    mark_preview_changed();
-    requestUpdate();
-}
-
-float VulkanViewport::preview_outline_strength() const noexcept {
-    return preview_outline_strength_;
-}
-
-void VulkanViewport::set_preview_occlusion(bool enabled) {
-    preview_occlusion_ = enabled;
-    mark_preview_changed();
-    requestUpdate();
-}
-
-bool VulkanViewport::preview_occlusion() const noexcept {
-    return preview_occlusion_;
-}
-
-void VulkanViewport::set_prt(std::shared_ptr<const minirender::PrtBake> bake,
-                             minirender::PrtMode                        mode) {
-    prt_      = std::move(bake);
-    prt_kind_ = mode;
-    mark_preview_changed();
-    requestUpdate();
-}
-
-void VulkanViewport::set_prt_lighting(const minirender::ShLight& lighting) {
-    prt_lighting_ = lighting;
-    mark_preview_changed();
-    requestUpdate();
-}
-
-void VulkanViewport::reset_history() {
-    ++history_epoch_;
-    mark_preview_changed();
-    requestUpdate();
-}
-
-void VulkanViewport::set_temporal_settings(glm::vec2 value) {
-    temporal_ = value;
-    reset_history();
-}
-
-void VulkanViewport::set_screen_trace(glm::vec4 settings, bool hiz) {
-    ++history_epoch_;
-    screen_trace_ = settings;
-    screen_hiz_   = hiz;
-    mark_preview_changed();
-    requestUpdate();
-}
-
-void VulkanViewport::set_teaching(glm::vec4 light, glm::vec3 surface) {
-    teaching_light_   = light;
-    teaching_surface_ = surface;
-    ++teaching_revision_;
-    requestUpdate();
-}
-
-void VulkanViewport::set_comparison_mode(int mode) {
-    comparison_mode_ = mode;
-    dragging_split_  = false;
-    requestUpdate();
-}
-
-void VulkanViewport::set_split_position(float value) {
-    split_ = std::clamp(value, 0.0F, 1.0F);
-    requestUpdate();
-}
-
-QImage VulkanViewport::grab_comparison_side(int side) {
-    QScopedValueRollback<int> restore(export_side_, side);
-    return grab();
-}
-
-minirender::Image VulkanViewport::grab_comparison_hdr(int side) {
-    if (side == 1 && comparison_mode_ == offline_reference_mode && path_reference_) {
-        return *path_reference_;
-    }
-    QScopedValueRollback<int> restore(export_side_, side);
-    return grab_hdr();
-}
-
-void VulkanViewport::set_view_mode(int mode) {
-    set_sdf_visible(false);
-    set_point_preview_visible(false);
-    if (view_mode_ == mode) {
-        return;
-    }
-    view_mode_ = mode;
-    if (comparison_mode_ < 0) {
-        mark_preview_changed();
-    }
-    requestUpdate();
-}
-
-int VulkanViewport::view_mode() const noexcept {
-    return view_mode_;
-}
-
-void VulkanViewport::set_ssao_settings(minirender::SsaoSettings settings) {
-    settings.validate();
-    ssao_ = settings;
-    mark_preview_changed();
-    requestUpdate();
-}
-
-const minirender::SsaoSettings& VulkanViewport::ssao_settings() const noexcept {
-    return ssao_;
-}
-
-void VulkanViewport::set_ibl_data(std::shared_ptr<const minirender::IblEnvironment> maps,
-                                  std::shared_ptr<const minirender::Image>          lut) {
-    if (maps == ibl_maps_ && lut == ibl_lut_) {
-        return;
-    }
-    ++history_epoch_;
-    ibl_maps_ = std::move(maps);
-    ibl_lut_  = std::move(lut);
-    mark_preview_changed();
-    requestUpdate();
-}
-
-const std::shared_ptr<const minirender::IblEnvironment>& VulkanViewport::ibl_maps() const noexcept {
-    return ibl_maps_;
-}
-
-const std::shared_ptr<const minirender::Image>& VulkanViewport::ibl_lut() const noexcept {
-    return ibl_lut_;
-}
-
-void VulkanViewport::set_environment_background(bool enabled) {
-    environment_background_ = enabled;
-    mark_preview_changed();
-    requestUpdate();
-}
-
-bool VulkanViewport::environment_background() const noexcept {
-    return environment_background_;
-}
-
-void VulkanViewport::report_ibl_update() {
-    ++ibl_texture_updates_;
-}
-
-std::uint64_t VulkanViewport::ibl_texture_updates() const noexcept {
-    return ibl_texture_updates_;
-}
-
-void VulkanViewport::set_offline_visible(bool visible) {
-    if (visible) {
-        set_sdf_visible(false);
-        set_point_preview_visible(false);
-    }
-    if (offline_visible_ == visible) {
-        return;
-    }
-    finish_gizmo_drag(true);
-    ++display_revision_;
-    offline_visible_ = visible;
-    rebuild_gizmo();
-    pressed_buttons_ = Qt::NoButton;
-    dragged_         = false;
-    mark_preview_changed();
-    if (on_display_changed) {
-        on_display_changed(visible);
-    }
-    requestUpdate();
-}
-
-bool VulkanViewport::offline_visible() const noexcept {
-    return offline_visible_;
-}
-
-OfflineImageSource VulkanViewport::offline_source() const noexcept {
-    return offline_source_;
-}
-
-void VulkanViewport::set_offline_image(std::shared_ptr<const minirender::Image> image,
-                                       OfflineImageSource                       source) {
-    if (source != offline_source_ || !image) {
-        ++display_revision_;
-    }
-    offline_source_ = source;
-    offline_image_  = std::move(image);
-    mark_preview_changed();
-    requestUpdate();
-}
-
-const std::shared_ptr<const minirender::Image>& VulkanViewport::offline_image() const noexcept {
-    return offline_image_;
-}
-
-void VulkanViewport::mousePressEvent(QMouseEvent* event) {
-    if (offline_visible_) {
-        event->accept();
-        return;
-    }
-    if (comparison_mode_ >= 0 && !point_visible_ && !sdf_visible_ &&
-        event->button() == Qt::LeftButton &&
-        std::abs(event->position().x() - split_ * static_cast<float>(width())) <= 7.0) {
-        dragging_split_ = true;
-        event->accept();
-        return;
-    }
-    // 嵌入窗口的焦点由 QWidget 容器管理，避免把子窗口当顶层窗口激活。
-    pressed_buttons_ = event->buttons();
-    mouse_origin_ = last_mouse_ = event->position();
-    dragged_                    = false;
-    if (event->button() == Qt::LeftButton && event->modifiers() == Qt::NoModifier &&
-        gizmo_target_) {
-        const glm::dvec2            pointer(event->position().x(), event->position().y());
-        const auto                  hit = gizmo_layout_.hit(pointer);
-        const minirender::GizmoView view{camera_, {width(), height()}};
-        auto drag = minirender::GizmoDrag::begin(view, *gizmo_target_, gizmo_layout_, hit, pointer);
-        if (drag && on_transform_begin && on_transform_begin()) {
-            gizmo_drag_  = std::move(drag);
-            gizmo_hover_ = hit.handle;
-            mark_preview_changed();
-            requestUpdate();
-        }
-    }
-    event->accept();
-}
-
-void VulkanViewport::mouseMoveEvent(QMouseEvent* event) {
-    if (dragging_split_) {
-        dragging_split_ = event->buttons().testFlag(Qt::LeftButton);
-        if (dragging_split_ && width() > 0) {
-            set_split_position(static_cast<float>(event->position().x() / width()));
-        }
-        event->accept();
-        return;
-    }
-    if (!scene_ || offline_visible_) {
-        return;
-    }
-    const glm::dvec2 pointer(event->position().x(), event->position().y());
-    if (gizmo_drag_) {
-        if (!event->buttons().testFlag(Qt::LeftButton)) {
-            finish_gizmo_drag(true);
-            return;
-        }
-        try {
-            const auto value = gizmo_drag_->update(pointer);
-            if (!on_transform_preview || !on_transform_preview(value)) {
-                finish_gizmo_drag(false);
-            }
-        } catch (const std::exception& error) {
-            finish_gizmo_drag(false);
-            if (on_interaction_error) {
-                on_interaction_error(error.what());
-            }
-        }
-        event->accept();
-        return;
-    }
-    const auto hovered = gizmo_layout_.hit(pointer).handle;
-    if (hovered != gizmo_hover_) {
-        gizmo_hover_ = hovered;
-        mark_preview_changed();
-        requestUpdate();
-    }
-    // 只响应从本视口开始的拖拽；释放或失焦后不继承外部窗口的按钮状态。
-    pressed_buttons_ &= event->buttons();
-    if (pressed_buttons_ == Qt::NoButton) {
-        last_mouse_ = event->position();
-        return;
-    }
-    const auto delta = event->position() - last_mouse_;
-    last_mouse_      = event->position();
-    if ((event->position() - mouse_origin_).manhattanLength() > 3.0) {
-        dragged_ = true;
-    }
-    const float dx       = static_cast<float>(delta.x());
-    const float dy       = static_cast<float>(delta.y());
-    const float distance = glm::length(camera_.target - camera_.position);
-    if (pressed_buttons_.testFlag(Qt::MiddleButton) ||
-        (pressed_buttons_.testFlag(Qt::LeftButton) &&
-         event->modifiers().testFlag(Qt::ShiftModifier))) {
-        set_camera(
-            minirender::pan_camera(camera_, {-dx * distance * 0.002F, dy * distance * 0.002F}));
-    } else if (pressed_buttons_.testFlag(Qt::RightButton)) {
-        set_camera(minirender::rotate_camera(camera_, -dx * 0.005F, -dy * 0.005F, false));
-    } else if (pressed_buttons_.testFlag(Qt::LeftButton) && dragged_) {
-        set_camera(minirender::rotate_camera(camera_, -dx * 0.005F, dy * 0.005F, true));
-    }
-    event->accept();
-}
-
-void VulkanViewport::mouseReleaseEvent(QMouseEvent* event) {
-    if (dragging_split_ && event->button() == Qt::LeftButton) {
-        dragging_split_ = false;
-        event->accept();
-        return;
-    }
-    if (gizmo_drag_ && event->button() == Qt::LeftButton) {
-        finish_gizmo_drag(true);
-        event->accept();
-        return;
-    }
-    const bool owned_press = pressed_buttons_.testFlag(event->button());
-    pressed_buttons_ &= ~Qt::MouseButtons(event->button());
-    if (owned_press && scene_ && !offline_visible_ && !point_visible_ && !sdf_visible_ &&
-        event->button() == Qt::LeftButton && !dragged_ && width() > 0 && height() > 0) {
-        const glm::vec2 uv{static_cast<float>(event->position().x()) / static_cast<float>(width()),
-                           static_cast<float>(event->position().y()) /
-                               static_cast<float>(height())};
-        const auto      selected = minirender::pick_object(
-            *scene_,
-            camera_.generate_ray(uv, static_cast<float>(width()) / static_cast<float>(height())));
-        if (on_object_picked) {
-            on_object_picked(selected.value_or(""));
-        }
-    }
-    event->accept();
-}
-
-void VulkanViewport::wheelEvent(QWheelEvent* event) {
-    finish_gizmo_drag(true);
-    if (scene_ && !offline_visible_) {
-        set_camera(minirender::dolly_camera(
-            camera_, std::exp(-static_cast<float>(event->angleDelta().y()) / 1200.0F)));
-    }
-    event->accept();
-}
-
-void VulkanViewport::keyPressEvent(QKeyEvent* event) {
-    if (!scene_ || offline_visible_) {
-        return;
-    }
-    if (event->key() == Qt::Key_Escape && gizmo_drag_) {
-        finish_gizmo_drag(false);
-        event->accept();
-        return;
-    }
-    if (event->modifiers() == Qt::NoModifier &&
-        (event->key() == Qt::Key_V || event->key() == Qt::Key_T || event->key() == Qt::Key_R)) {
-        set_gizmo_mode(event->key() == Qt::Key_T   ? minirender::GizmoMode::translate
-                       : event->key() == Qt::Key_R ? minirender::GizmoMode::rotate
-                                                   : minirender::GizmoMode::select);
-        event->accept();
-        return;
-    }
-    glm::vec3 move(0);
-    switch (event->key()) {
-    case Qt::Key_W:
-        move.z = 1;
-        break;
-    case Qt::Key_S:
-        move.z = -1;
-        break;
-    case Qt::Key_A:
-        move.x = -1;
-        break;
-    case Qt::Key_D:
-        move.x = 1;
-        break;
-    case Qt::Key_Q:
-        move.y = -1;
-        break;
-    case Qt::Key_E:
-        move.y = 1;
-        break;
-    default:
-        QWindow::keyPressEvent(event);
-        return;
-    }
-    const float speed = event->modifiers().testFlag(Qt::ShiftModifier) ? 0.3F : 0.1F;
-    set_camera(minirender::move_camera(camera_, move * speed));
-    event->accept();
-}
-
-void VulkanViewport::set_gizmo_mode(minirender::GizmoMode mode) {
-    if (mode == gizmo_mode_) {
-        return;
-    }
-    finish_gizmo_drag(true);
-    gizmo_mode_  = mode;
-    gizmo_hover_ = minirender::GizmoHandle::none;
-    rebuild_gizmo();
-    mark_preview_changed();
-    requestUpdate();
-    if (on_gizmo_mode_changed) {
-        on_gizmo_mode_changed(mode);
-    }
-}
-
-minirender::GizmoMode VulkanViewport::gizmo_mode() const noexcept {
-    return gizmo_mode_;
-}
-
-void VulkanViewport::set_gizmo_target(std::string                          object_id,
-                                      std::optional<minirender::Transform> transform) {
-    if (object_id != gizmo_target_id_) {
-        finish_gizmo_drag(false);
-    }
-    gizmo_target_id_ = std::move(object_id);
-    gizmo_target_    = std::move(transform);
-    rebuild_gizmo();
-    mark_preview_changed();
-    requestUpdate();
-}
-
-void VulkanViewport::rebuild_gizmo() {
-    gizmo_layout_ = {};
-    if (gizmo_target_ && scene_ && !offline_visible_ && !point_visible_ && !sdf_visible_ &&
-        width() > 0 && height() > 0) {
-        const minirender::GizmoView view{camera_, {width(), height()}};
-        gizmo_layout_ = minirender::make_gizmo_layout(view, *gizmo_target_, gizmo_mode_);
-    }
-}
-
-const minirender::GizmoLayout& VulkanViewport::gizmo_layout() const noexcept {
-    return gizmo_layout_;
-}
-
-minirender::GizmoHandle VulkanViewport::highlighted_gizmo_handle() const noexcept {
-    return gizmo_drag_ ? gizmo_drag_->handle() : gizmo_hover_;
-}
-
-bool VulkanViewport::gizmo_dragging() const noexcept {
-    return gizmo_drag_.has_value();
-}
-
-void VulkanViewport::finish_gizmo_drag(bool commit) {
-    if (!gizmo_drag_) {
-        return;
-    }
-    // 先清空手势，再回调文档更新，允许回调重建场景或改变目标。
-    gizmo_drag_.reset();
-    gizmo_hover_     = minirender::GizmoHandle::none;
-    pressed_buttons_ = Qt::NoButton;
-    dragged_         = true;
-    if (on_transform_end) {
-        on_transform_end(commit);
-    }
-    rebuild_gizmo();
-    mark_preview_changed();
-    requestUpdate();
-}
-
-void VulkanViewport::set_area_shadows(bool enabled) {
-    ++history_epoch_;
-    area_shadows_ = enabled;
-    mark_preview_changed();
-    requestUpdate();
-}
-
-void VulkanViewport::set_shadows_enabled(bool enabled) {
-    ++history_epoch_;
-    shadows_enabled_ = enabled;
-    mark_preview_changed();
-    requestUpdate();
-}
-
-bool VulkanViewport::shadows_enabled() const noexcept {
-    return shadows_enabled_;
-}
-
-void VulkanViewport::set_shadow_filter(ShadowFilter filter) {
-    ++history_epoch_;
-    shadow_filter_ = filter;
-    mark_preview_changed();
-    requestUpdate();
-}
-
-ShadowFilter VulkanViewport::shadow_filter() const noexcept {
-    return shadow_filter_;
-}
-
-void VulkanViewport::set_light_half_angle(float degrees) {
-    ++history_epoch_;
-    light_half_angle_ = std::clamp(degrees, 0.0F, 15.0F);
-    mark_preview_changed();
-    requestUpdate();
-}
-
-float VulkanViewport::light_half_angle() const noexcept {
-    return light_half_angle_;
-}
-
-void VulkanViewport::set_shadow_filter_radius(float texels) {
-    ++history_epoch_;
-    shadow_filter_radius_ = std::clamp(texels, 0.0F, 48.0F);
-    mark_preview_changed();
-    requestUpdate();
-}
-
-float VulkanViewport::shadow_filter_radius() const noexcept {
-    return shadow_filter_radius_;
-}
-
-void VulkanViewport::set_reference_image(std::shared_ptr<const minirender::Image> image) {
-    path_reference_ = std::move(image);
-    ++reference_revision_;
-    requestUpdate();
-}
-
-void VulkanViewport::set_reference_energy(int value) {
-    ++history_epoch_;
-    reference_energy_ = value;
-    ++reference_revision_;
-    requestUpdate();
-}
-
-void VulkanViewport::set_reference_shadow(int filter) {
-    ++history_epoch_;
-    reference_shadow_ = filter;
-    ++reference_revision_;
-    requestUpdate();
-}
-
-void VulkanViewport::set_shadow_debug_light(int light) {
-    shadow_debug_light_ = std::clamp(light, 0, 7);
-    mark_preview_changed();
-    requestUpdate();
-}
-
-void VulkanViewport::set_fxaa_enabled(bool enabled) {
-    fxaa_enabled_ = enabled;
-    mark_preview_changed();
-    requestUpdate();
-}
-
-bool VulkanViewport::fxaa_enabled() const noexcept {
-    return fxaa_enabled_;
-}
-
 minirender::Image VulkanViewport::grab_hdr() {
     if (point_visible_) {
         throw std::logic_error("Return to the scene before exporting HDR");
@@ -1620,7 +788,7 @@ minirender::Image VulkanViewport::grab_hdr() {
     if (!failure_.isEmpty() || frame_count_ == before) {
         throw std::runtime_error("HDR frame was not rendered");
     }
-    check(vkWaitForFences(device_, 1, &frame_fence_, VK_TRUE, 2'000'000'000ULL),
-          "wait HDR capture");
+    check_vk(vkWaitForFences(device_, 1, &frame_fence_, VK_TRUE, 2'000'000'000ULL),
+             "wait HDR capture");
     return active->read_hdr_capture();
 }

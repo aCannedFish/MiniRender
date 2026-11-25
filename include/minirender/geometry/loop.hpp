@@ -36,6 +36,7 @@ struct LoopProgress {
 
 using LoopProgressCallback = std::function<void(const LoopProgress&)>;
 
+// 细分后的网格与逐层拓扑统计，首项对应输入层。
 struct LoopResult {
     // 成功结果的共享只读网格，调用方可以直接保存或交给渲染器。
     std::shared_ptr<const MeshData> mesh;

@@ -27,6 +27,7 @@ struct SdfNode {
     std::uint32_t right = invalid_sdf_node;
 };
 
+// 控制命中容差、法线差分距离和射线的最大步进预算。
 struct SdfTraceSettings {
     double        epsilon          = 1e-4;
     double        relative_epsilon = 1e-5;
@@ -35,6 +36,7 @@ struct SdfTraceSettings {
     std::uint32_t maximum_steps    = 256;
     std::uint32_t shadow_steps     = 128;
     double        safety_factor    = .9;
+    // 检查命中与法线差分容差，以及最大距离和步数预算。
     void validate() const;
 };
 
@@ -47,9 +49,11 @@ struct SdfDocument {
     DirectionalLight     light;
     glm::vec3            ambient{.04F};
     SdfTraceSettings     trace;
+    // 检查 CSG 节点、引用与根节点，检查循环依赖。
     void validate(CancellationToken cancellation = {}) const;
 };
 
+// 表示距离场的世界包围范围，empty 标记空集合。
 struct SdfBounds {
     glm::dvec3 minimum{0};
     glm::dvec3 maximum{0};
@@ -69,6 +73,7 @@ struct CompiledSdfNode {
     SdfBounds     bounds;
 };
 
+// 一次距离查询返回有符号距离及决定着色属性的图元记录。
 struct SdfSample {
     double        distance = 0;
     std::uint32_t material = 0; // 编译记录索引；差集切面继承被减图元颜色。
@@ -77,11 +82,17 @@ struct SdfSample {
 // 图元返回精确距离；min/max CSG 保持 1-Lipschitz 距离界，供安全步进使用。
 class SdfField final {
   public:
+    // 编译并持有按求值顺序排列的节点，之后的距离查询复用该记录。
     explicit SdfField(const SdfDocument& document, CancellationToken cancellation = {});
+    // 返回世界空间点到组合表面的有符号距离及材质索引。
     SdfSample sample(glm::dvec3 point) const;
+    // 按给定差分步长估算表面的单位法线。
     glm::dvec3 normal(glm::dvec3 point, double step) const;
+    // 返回根节点的世界空间包围范围。
     const SdfBounds& bounds() const noexcept;
+    // 借用已编译的节点表，供 GPU 上传与诊断对照。
     std::span<const CompiledSdfNode> nodes() const noexcept;
+    // 返回组合根节点在编译表中的索引。
     std::uint32_t root() const noexcept;
 
   private:
@@ -91,6 +102,7 @@ class SdfField final {
 
 enum class SdfTraceState { hit, miss, step_limit };
 
+// 区分命中、未命中与步数耗尽，并保留终止处距离与残差。
 struct SdfTraceResult {
     SdfTraceState state    = SdfTraceState::miss;
     double        distance = 0;

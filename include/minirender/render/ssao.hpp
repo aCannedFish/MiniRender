@@ -16,6 +16,7 @@ struct SsaoSettings {
     float         bias     = 0.02F;
     float         strength = 1;
     std::uint32_t samples  = 32;
+    // 检查采样数、世界空间半径、深度偏移和遮蔽强度。
     void validate() const;
 };
 

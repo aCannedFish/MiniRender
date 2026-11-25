@@ -2,6 +2,7 @@
 // 本模块接口见 gpu_ibl.hpp。
 
 #include "gpu_ibl.hpp"
+#include "vulkan_utils.hpp"
 
 #include <glm/vec4.hpp>
 #include <stdexcept>

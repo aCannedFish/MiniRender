@@ -26,6 +26,7 @@ std::string render_state_name(RenderState state);
 // 判断任务是否已停止工作，可以进行结果处理或重新启动。
 bool render_terminal(RenderState state) noexcept;
 
+// 控制 CPU 工作线程数、图块大小和每次发布的采样批次。
 struct SessionSettings {
     std::uint32_t threads = 0; // 0 自动选择并保留一个 CPU 核，最多 32 个工作线程。
     // 方形工作块的边长，单位为像素。
@@ -36,6 +37,7 @@ struct SessionSettings {
     void validate() const;
 };
 
+// 一次读取返回同一任务的状态、采样计数、耗时与失败原因，供界面轮询。
 struct RenderProgress {
     // 当前任务状态；暂停请求与已停稳状态分别表示。
     RenderState state = RenderState::idle;
