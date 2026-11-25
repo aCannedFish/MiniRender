@@ -15,6 +15,7 @@ namespace minirender {
 struct RayInterval {
     double minimum = 1e-5;
     double maximum = std::numeric_limits<double>::infinity();
+    // 检查射线参数的端点顺序与数值范围，允许远端为正无穷。
     void validate() const;
 };
 
@@ -23,9 +24,13 @@ struct RayInterval {
 struct Bounds3 {
     glm::vec3 minimum{std::numeric_limits<float>::infinity()};
     glm::vec3 maximum{-std::numeric_limits<float>::infinity()};
+    // 判断任意轴的下界是否超过上界，初始空盒可参与后续合并。
     bool empty() const noexcept;
+    // 将一个点纳入包围盒，按分量更新上下界。
     void expand(glm::vec3 point);
+    // 合并另一包围盒所覆盖的范围。
     void expand(const Bounds3& bounds);
+    // 计算包围盒表面积，用于 BVH 的分割代价估计。
     double surface_area() const noexcept;
 };
 
@@ -39,12 +44,15 @@ struct TriangleHit {
 // 构造时拒绝非有限起点、非单位或零方向。对象无可变状态，可在查询中安全复用。
 class RayQuery {
   public:
+    // 固定射线并预计算包围盒测试的逆方向和三角形测试的轴置换。
     explicit RayQuery(const Ray& ray);
     // slab 法求盒的进入距离。显式处理零方向，避免 0 * infinity 生成 NaN。
+    // 返回允许区间内与包围盒相交的入口射线参数。
     std::optional<double> intersect(const Bounds3& bounds, RayInterval interval) const;
     // 射线坐标系中的二维边函数，双面求交，精确边界可归属于两侧三角形。
     // 采用 Woop/Benthin/Wald 2013 的置换与剪切形式，算术统一使用 double。
     // 排除数值误差范围内无法与零区分的起点命中。
+    // 测试三角形并返回射线参数及重心坐标，供着色属性插值。
     std::optional<TriangleHit> intersect(const std::array<glm::vec3, 3>& vertices,
                                          RayInterval                     interval) const;
 

@@ -25,6 +25,7 @@ class ClothMaterialPanel final : public QWidget {
         on_changed;
 
   private:
+    // 同一组纱线的颜色、反射参数与切线分布编辑控件。
     struct ThreadControls {
         std::array<QDoubleSpinBox*, 3> color{};
         QDoubleSpinBox *               kd = nullptr, *surface = nullptr, *volume = nullptr;

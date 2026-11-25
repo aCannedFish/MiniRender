@@ -67,6 +67,7 @@ class LightFieldWriter final {
     std::unique_ptr<Impl> impl_;
 };
 
+// 统计实际解码与命中缓存的次数，便于评估重聚焦 I/O。
 struct LightFieldCacheStatistics {
     // 从文件实际解码的子视图次数。
     std::uint64_t decoded_views = 0;

@@ -2,17 +2,11 @@
 // 本模块接口见 gpu_buffer.hpp。
 
 #include "gpu_buffer.hpp"
+#include "vulkan_utils.hpp"
 
 #include <cstring>
 #include <stdexcept>
-#include <string>
 #include <utility>
-
-void check_vk(VkResult result, const char* operation) {
-    if (result != VK_SUCCESS) {
-        throw std::runtime_error(std::string(operation) + ": " + std::to_string(result));
-    }
-}
 
 GpuBuffer::~GpuBuffer() {
     release();
@@ -45,23 +39,13 @@ void GpuBuffer::create(VkDevice device, VkPhysicalDevice physical, VkDeviceSize 
     check_vk(vkCreateBuffer(device_, &info, nullptr, &buffer_), "create buffer");
     VkMemoryRequirements requirements{};
     vkGetBufferMemoryRequirements(device_, buffer_, &requirements);
-    VkPhysicalDeviceMemoryProperties memory{};
-    vkGetPhysicalDeviceMemoryProperties(physical, &memory);
     const auto flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    for (std::uint32_t index = 0; index < memory.memoryTypeCount; ++index) {
-        if ((requirements.memoryTypeBits & (1U << index)) != 0 &&
-            (memory.memoryTypes[index].propertyFlags & flags) == flags) {
-            VkMemoryAllocateInfo allocate{};
-            allocate.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-            allocate.allocationSize  = requirements.size;
-            allocate.memoryTypeIndex = index;
-            check_vk(vkAllocateMemory(device_, &allocate, nullptr, &memory_),
-                     "allocate host buffer");
-            check_vk(vkBindBufferMemory(device_, buffer_, memory_, 0), "bind host buffer");
-            return;
-        }
-    }
-    throw std::runtime_error("No host-visible coherent memory type");
+    VkMemoryAllocateInfo allocate{};
+    allocate.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocate.allocationSize  = requirements.size;
+    allocate.memoryTypeIndex = find_memory_type(physical, requirements.memoryTypeBits, flags);
+    check_vk(vkAllocateMemory(device_, &allocate, nullptr, &memory_), "allocate host buffer");
+    check_vk(vkBindBufferMemory(device_, buffer_, memory_, 0), "bind host buffer");
 }
 
 void GpuBuffer::write(const void* data, std::size_t bytes) {

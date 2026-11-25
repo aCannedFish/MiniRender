@@ -48,6 +48,7 @@ class LoopHierarchy final {
         double        rho = 0;
     };
 
+    // 由边的两个端点及细分层数确定共享边样本。
     struct EdgeKey {
         MeshIndex     a;
         MeshIndex     b;
@@ -55,6 +56,7 @@ class LoopHierarchy final {
         bool operator==(const EdgeKey&) const = default;
     };
 
+    // 为层级边键生成哈希值，使邻面复用同一细分位置。
     struct EdgeHash {
         std::size_t operator()(const EdgeKey& key) const noexcept;
     };

@@ -29,10 +29,16 @@ def main() -> None:
                 file.write(f"f {a}//1 {c}//1 {b}//1\nf {b}//1 {c}//1 {d}//1\n")
     scene = json.loads((root / "scenes/studio.json").read_text(encoding="utf-8"))
     for mesh in scene["meshes"]:
-        source = output / "dense.obj" if mesh["id"] == "plane" else root / "scenes" / mesh["source"]
+        source = (
+            output / "dense.obj"
+            if mesh["id"] == "plane"
+            else root / "scenes" / mesh["source"]
+        )
         mesh["source"] = str(source)
     destination = output / "dense.json"
-    destination.write_text(json.dumps(scene, ensure_ascii=False, indent=2), encoding="utf-8")
+    destination.write_text(
+        json.dumps(scene, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     print(f"{destination}: {n * n * 2 + 24} triangles")
 
 

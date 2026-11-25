@@ -11,6 +11,7 @@ namespace minirender::detail {
 
 inline constexpr std::uint32_t no_point = std::numeric_limits<std::uint32_t>::max();
 
+// 半径或近邻查询命中的点索引与平方距离。
 struct PointNeighbor {
     std::uint32_t index;
     double        squared_distance;
@@ -28,6 +29,7 @@ class PointIndex final {
                                       std::size_t maximum_results) const;
 
   private:
+    // 保存点集子区间的 AABB，以到包围盒的距离下界剪枝。
     struct Node {
         glm::dvec3    low;
         glm::dvec3    high;

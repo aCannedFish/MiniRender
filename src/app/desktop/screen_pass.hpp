@@ -7,6 +7,7 @@
 
 #include <span>
 
+// 一个借用的输入图像视图和着色器读取它时要求的布局。
 struct ScreenInput {
     VkImageView   view;
     VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;

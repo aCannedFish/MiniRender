@@ -36,6 +36,7 @@ struct MeshCorner {
     glm::vec2     uv{0.0F};
 };
 
+// 按绕序保存三个面角，面角可分别引用同一位置上的不同 UV 和法线。
 struct MeshTriangle {
     std::array<MeshCorner, 3> corners;
 };
@@ -44,6 +45,7 @@ struct MeshTriangle {
 struct MeshData {
     std::vector<glm::vec3>    positions;
     std::vector<MeshTriangle> triangles;
+    // 检查坐标、面角索引、法线、UV 与三角形有效性。
     void validate(CancellationToken cancellation = {}) const;
 };
 
@@ -51,6 +53,7 @@ struct MeshData {
 // 缓存仅在所属编辑线程使用；新网格即使复用原始地址也会按新的所有权重新校验。
 class MeshValidationCache {
   public:
+    // 仅在此网格所有者首次出现时执行完整数据校验。
     void validate(const std::shared_ptr<const MeshData>& mesh, CancellationToken cancellation = {});
     void validate_cloth_uv(const std::shared_ptr<const MeshData>& mesh,
                            CancellationToken                      cancellation = {});
@@ -69,8 +72,11 @@ struct Transform {
     glm::vec3 translation{0.0F};
     glm::vec3 rotation_degrees{0.0F};
     glm::vec3 scale{1.0F};
+    // 生成局部到世界矩阵，物体与碰撞几何共用同一变换。
     glm::mat4 matrix() const;
+    // 返回线性变换的逆转置，保持非均匀缩放后的法线方向。
     glm::mat3 normal_matrix() const;
+    // 要求变换分量有限且缩放可逆，允许镜像缩放。
     void validate() const;
 };
 
@@ -85,16 +91,22 @@ struct Camera {
     float     far_plane            = 100.0F;
     float     aperture_radius      = 0;
     float     focus_distance       = 4;
+    // 检查视线、上方向、视场、裁剪面与透镜参数。
     void validate() const;
+    // 由世界空间位置、目标和上方向构建相机视图。
     glm::mat4 view_matrix() const;
+    // 按宽高比构建深度范围为 [0,1] 的 Vulkan 透视投影。
     glm::mat4 projection_matrix(float aspect) const;
+    // 从针孔相机穿过归一化像素坐标发射单位方向射线。
     Ray generate_ray(glm::dvec2 pixel_uv, double aspect) const;
     // focus_distance 沿相机 forward 测量。孔径为零时严格返回针孔射线。
     Ray generate_lens_ray(glm::dvec2 pixel_uv, double aspect, glm::dvec2 lens_u) const;
 };
 
 enum class MaterialKind { diffuse, conductor, mirror, dielectric, cloth, subsurface };
+// 生成场景 JSON 中持久化的材质类型名。
 std::string material_kind_name(MaterialKind kind);
+// 从持久化名称恢复枚举，未知名称报告为输入错误。
 MaterialKind parse_material_kind(const std::string& name);
 
 // base_color、emission 均为线性 RGB。底色纹理通过独立资产 ID 引用。
@@ -119,9 +131,11 @@ struct Material {
     std::string normal_texture{};
     float       normal_scale  = 1.F;
     bool        normal_flip_y = false;
+    // 校验颜色、粗糙度、折射率及材质类型对应的参数。
     void validate() const;
 };
 
+// 网格表条目。多个物体可引用同一 id 并共享不可变顶点数据。
 struct MeshAsset {
     std::string           id;
     std::filesystem::path source; // 相对于 asset_directory；导入时可为绝对路径，保存时转换。
@@ -130,6 +144,7 @@ struct MeshAsset {
     bool package_on_save = false;
 };
 
+// 纹理表条目。encoding 描述源文件通道，data 保存解码后的采样数据。
 struct TextureAsset {
     std::string                    id;
     std::filesystem::path          source;
@@ -139,6 +154,7 @@ struct TextureAsset {
     bool package_on_save = false;
 };
 
+// 可编辑物体通过 ID 引用网格与材质，变换和模拟组件由实例独立持有。
 struct SceneObject {
     std::string                           id;
     std::string                           name;
@@ -177,6 +193,7 @@ struct SceneDocument {
     std::vector<DirectionalLight> directional_lights;
     EnvironmentMap                environment_map;
     std::vector<MediumRegion>     media{};
+    // 检查相机、资产标识及引用关系，按需复用已经校验的网格。
     void validate(MeshValidationCache* cache = nullptr, CancellationToken cancellation = {}) const;
 };
 
@@ -199,6 +216,7 @@ struct RectangleLight {
     std::string              object_id;
 };
 
+// 一次渲染读取的不可变输入。实例已解析网格和材质引用，矩形光来自可见发光几何。
 struct SceneSnapshot {
     Camera                         camera;
     glm::vec3                      environment;
@@ -211,6 +229,7 @@ struct SceneSnapshot {
     std::vector<MediumRegion>      media{};
 };
 
+// 校验文档，解析可见实例与环境贴图，固定后续采样所需的数据。
 std::shared_ptr<const SceneSnapshot> make_snapshot(const SceneDocument& document,
                                                    MeshValidationCache* cache = nullptr);
 

@@ -3,6 +3,7 @@
 
 #include "point_preview_renderer.hpp"
 #include "gpu_shader.hpp"
+#include "vulkan_utils.hpp"
 #include "vulkan_viewport.hpp"
 
 #include <array>

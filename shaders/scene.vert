@@ -31,7 +31,7 @@ layout(location = 9) out vec3 previous_world;
 void main() {
     Instance instance = instances.values[draw_index.instance];
     prt_color         = vec3(0);
-    if (int(frame.display.y) == 12 && frame.prt_light[0].w > 0.5) {
+    if (int(frame.display.y) == VIEW_PRT && frame.prt_light[0].w > 0.5) {
         uint base = (instance.geometry.x + uint(gl_VertexIndex)) * 9;
         for (uint k = 0; k < 9; ++k) {
             prt_color += frame.prt_light[k].rgb * transfer.coefficients[base + k].rgb;

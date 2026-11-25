@@ -12,6 +12,7 @@ namespace minirender {
 // 米制误差在物体局部空间比较位置；像素误差使用任务启动时固定的投影视图。
 enum class AdaptiveMetric { local_distance, screen_pixels };
 
+// 固定本次误差评估的投影和视口，将局部几何误差换算成像素。
 struct AdaptiveProjection {
     // 从物体局部坐标到裁剪空间的固定变换。
     glm::dmat4 clip_from_object{1};
@@ -55,6 +56,7 @@ enum class AdaptiveStage {
     complete
 };
 
+// 跟踪自适应细分的当前阶段，以及该阶段的完成量与总量。
 struct AdaptiveProgress {
     // 当前执行阶段，completed 和 total 在阶段内解释。
     AdaptiveStage stage = AdaptiveStage::topology;

@@ -103,7 +103,9 @@ def require_stopped(bundles: list[Path]) -> None:
             / bundle_info(bundle, require_executable=False)["CFBundleExecutable"]
         )
         if str(executable) in processes or str(executable.resolve()) in processes:
-            raise RuntimeError(f"Save your scene and close {bundle.name} before updating")
+            raise RuntimeError(
+                f"Save your scene and close {bundle.name} before updating"
+            )
 
 
 def require_idle_builds(roots: list[Path]) -> None:
@@ -167,9 +169,7 @@ def main() -> int:
         "bundle",
         type=Path,
         nargs="?",
-        default=Path(
-            "build/macos-desktop-release/src/app/desktop/RenderBox.app"
-        ),
+        default=Path("build/macos-desktop-release/src/app/desktop/RenderBox.app"),
     )
     parser.add_argument(
         "--destination", type=Path, default=Path("/Applications/RenderBox.app")
@@ -212,12 +212,16 @@ def main() -> int:
         ).strip()
         resources = staged / "Contents/Resources"
         resources.mkdir(exist_ok=True)
-        build_info = {"commit": commit, "installed_at": datetime.now(timezone.utc).isoformat()}
+        build_info = {
+            "commit": commit,
+            "installed_at": datetime.now(timezone.utc).isoformat(),
+        }
         course_root = repository / "work" / "GAMES202"
         if (course_root / "resource_catalog.json").is_file():
             build_info["course_root"] = str(course_root)
         (resources / "renderbox-build.json").write_text(
-            json.dumps(build_info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            json.dumps(build_info, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
         )
         # 只部署 Widgets 使用的 Cocoa 和原生样式插件，避免混入其他 Qt 版本的插件。
         qtpaths = str(Path(deploy).with_name("qtpaths"))

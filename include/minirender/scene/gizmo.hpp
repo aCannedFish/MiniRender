@@ -17,6 +17,7 @@ struct GizmoView {
     Camera     camera;
     glm::dvec2 size{1};
     double     radius_pixels = 85;
+    // 验证相机投影与视口尺寸，供屏幕命中使用。
     void validate() const;
     std::optional<glm::dvec2> project(glm::dvec3 position) const;
     Ray ray(glm::dvec2 pointer) const;
@@ -32,12 +33,14 @@ struct GizmoSegment {
     double      depth  = 0;
 };
 
+// 命中的手柄、世界空间锚点及指针到手柄的屏幕距离。
 struct GizmoHit {
     GizmoHandle handle = GizmoHandle::none;
     glm::dvec3  anchor{0};
     double      distance_pixels = 0;
 };
 
+// 投影后的操纵器线段与中心，用于显示和屏幕空间命中测试。
 struct GizmoLayout {
     GizmoMode                 mode = GizmoMode::select;
     glm::dvec2                center{0};
@@ -45,9 +48,11 @@ struct GizmoLayout {
     double                    world_radius = 0;
     bool                      visible      = false;
     std::vector<GizmoSegment> segments;
+    // 在像素容差内查找靠近指针的手柄，并返回世界锚点。
     GizmoHit hit(glm::dvec2 pointer, double tolerance_pixels = 7) const;
 };
 
+// 由实例支点、当前模式和相机投影生成用于绘制和拾取的线段。
 GizmoLayout make_gizmo_layout(const GizmoView& view, const Transform& transform, GizmoMode mode);
 
 // 拖拽固定启动时的相机、物体和约束平面。update 返回完整变换，不修改场景或历史。

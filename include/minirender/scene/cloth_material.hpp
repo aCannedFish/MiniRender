@@ -29,12 +29,14 @@ struct ClothThread {
     ClothTangentCurve curve;
 };
 
+// 两组纱线各自的参数、覆盖率及切线采样预算。
 struct ClothAppearanceSettings {
     std::array<ClothThread, 2> threads;
     std::array<double, 2>      coverage{.33, .33};
     std::uint32_t              samples_per_thread        = 8;
     double                     rotation_degrees          = 0;
     double                     correlation_width_degrees = 20;
+    // 检查经纬覆盖率、纱线参数及切线采样配置。
     void validate() const;
 };
 
@@ -59,6 +61,7 @@ class ClothAppearance final {
     std::vector<ClothTangentSample> samples_;
 };
 
+// 命名的布料外观与对应的折射率，可直接用于构造材质。
 struct ClothPreset {
     std::string                            name;
     double                                 ior = 1.46;

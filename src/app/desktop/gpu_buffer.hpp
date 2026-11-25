@@ -42,6 +42,3 @@ class GpuBuffer {
     // 已分配的字节容量，读写时用于边界检查。
     VkDeviceSize size_ = 0;
 };
-
-// 将非成功 Vulkan 返回值转换为带操作名称的异常。
-void check_vk(VkResult result, const char* operation);

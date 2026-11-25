@@ -1,6 +1,7 @@
 // Vulkan 窗口生命周期、输入交互、渲染调度与图像读回。
 
 #pragma once
+#include "view_modes.h"
 
 #include "gpu_image.hpp"
 #include <minirender/core/image.hpp>
@@ -39,11 +40,13 @@ struct SceneUploadStatistics {
     double        last_update_ms       = 0;
 };
 
+// 方向光阴影过滤方法，依次对应硬阴影、固定核和接触硬化。
+enum class ShadowFilter { hard, pcf, pcss };
+
 // Qt 提供窗口与平台 surface，本类独占 Vulkan device、交换链和帧同步。
 // 首版仅允许一帧在 GPU 执行；呈现完成信号量按交换链图像分配，不能按 CPU 帧号复用。
 // 真正的提交延后到 Qt timer，避免在 macOS 的 CALayer expose/事务回调内等待 drawable。
-enum class ShadowFilter { hard, pcf, pcss };
-
+// 持有设备与帧同步资源，并将 Qt 导航事件转换为相机或场景编辑操作。
 class VulkanViewport final : public QWindow {
   public:
     VulkanViewport();
@@ -65,8 +68,8 @@ class VulkanViewport final : public QWindow {
     // 接收后台准备好的网格顶点数据，与原始不可变网格建立缓存关联。
     void supply_raster_mesh(const std::shared_ptr<const minirender::MeshData>& mesh,
                             std::shared_ptr<const minirender::RasterMeshData>  prepared);
-    std::shared_ptr<const minirender::RasterMeshData>
     // 取得指定网格的渲染展开数据，缺失时按当前缓存策略准备。
+    std::shared_ptr<const minirender::RasterMeshData>
     raster_mesh(const std::shared_ptr<const minirender::MeshData>& mesh);
     // 返回当前视图相机；引用和句柄由视口保有。
     const minirender::Camera& camera() const noexcept;
@@ -86,6 +89,7 @@ class VulkanViewport final : public QWindow {
     bool point_preview_visible() const noexcept;
     // 将点云相机恢复到能容纳当前预览数据的位置。
     void reset_point_camera();
+    // 点云渲染器每次上传新数据时计数，可据此核对仅调整显示参数时的缓存复用。
     void report_point_upload();
     std::uint64_t point_uploads() const noexcept;
     std::function<void(bool)> on_point_preview_changed;
@@ -110,6 +114,7 @@ class VulkanViewport final : public QWindow {
     const minirender::Camera& sdf_camera() const noexcept;
     std::function<void(bool)> on_sdf_visible_changed;
     std::function<void()>     on_sdf_display_changed;
+    // 记录已编译距离场上传次数，供界面回归区分文档修改与相机移动。
     void report_sdf_upload();
     std::uint64_t sdf_uploads() const noexcept;
     // 在 GUI 线程更新方向光阴影开关，并请求视口刷新。
@@ -117,7 +122,6 @@ class VulkanViewport final : public QWindow {
     // 固定核用纹素半径，PCSS 用方向光的角半径（度）。
     ShadowFilter shadow_filter() const noexcept;
     void set_shadow_filter(ShadowFilter filter);
-    // 右侧为 -1 时跟随相机面板的过滤器。
     // -1 使用材质自身的设置，0/1 在对照侧关闭或开启粗糙导体补偿。
     void set_reference_energy(int value);
 
@@ -125,6 +129,7 @@ class VulkanViewport final : public QWindow {
         return reference_energy_;
     }
 
+    // 右侧为 -1 时跟随相机面板的过滤器。
     void set_reference_shadow(int filter);
 
     ShadowFilter effective_shadow(bool reference) const noexcept {
@@ -177,10 +182,17 @@ class VulkanViewport final : public QWindow {
     void set_exposure(float value);
     // 查询光照显示曝光 EV。
     float exposure() const noexcept;
-    static constexpr int base_color_preview_mode = 6;
+    static constexpr int base_color_preview_mode = VIEW_BASE_COLOR;
 
+    // 只有间接光累积和历史掩码使用前帧图像。离线参考共用显示通道。
+    static bool uses_history(int mode) noexcept {
+        return mode == VIEW_TEMPORAL || mode == VIEW_HISTORY_MASK;
+    }
+
+    // 判断当前视图是否需要执行光照合成，包括依赖直接光照的屏幕空间效果。
     static bool uses_lighting(int mode) noexcept {
-        return mode == 0 || (mode >= 13 && mode <= 16) || mode == 19 || mode == 20;
+        return mode == VIEW_LIGHTING || (mode >= VIEW_MIRROR && mode <= VIEW_COMBINED) ||
+               uses_history(mode);
     }
 
     // x、y 使用视空间米，z、w 为每条射线的步数上限与每像素的方向数。
@@ -200,6 +212,7 @@ class VulkanViewport final : public QWindow {
         return history_epoch_;
     }
 
+    // 更新历史混合与限幅参数。reset_history 递增历史版本，两侧随后重新累积。
     void set_temporal_settings(glm::vec2 value);
     void reset_history();
 
@@ -212,7 +225,7 @@ class VulkanViewport final : public QWindow {
     }
 
     void set_screen_trace(glm::vec4 settings, bool hiz);
-    static constexpr int offline_reference_mode = 21;
+    static constexpr int offline_reference_mode = VIEW_REFERENCE;
     // 同一视口相机生成的离线参考。场景几何、相机或纵横比变化使其失效。
     void set_reference_image(std::shared_ptr<const minirender::Image> image);
 
@@ -220,7 +233,7 @@ class VulkanViewport final : public QWindow {
         return path_reference_;
     }
 
-    static constexpr int prt_mode = 12;
+    static constexpr int prt_mode = VIEW_PRT;
     void set_prt(std::shared_ptr<const minirender::PrtBake> bake, minirender::PrtMode mode);
     void set_prt_lighting(const minirender::ShLight& lighting);
 
@@ -232,7 +245,7 @@ class VulkanViewport final : public QWindow {
         return prt_lighting_;
     }
 
-    static constexpr int blinn_phong_mode = 7;
+    static constexpr int blinn_phong_mode = VIEW_BLINN_PHONG;
 
     // 右侧模式为 -1 时使用普通视口；分界位置是窗口宽度的比例。
     int comparison_mode() const noexcept {
@@ -295,9 +308,9 @@ class VulkanViewport final : public QWindow {
     void set_view_mode(int mode);
     // 查询实时视口的显示模式编号。
     int view_mode() const noexcept;
-    // 在 GUI 线程更新SSAO 采样与合成参数，并请求视口刷新。
+    // 在 GUI 线程更新 SSAO 采样与合成参数，并请求视口刷新。
     void set_ssao_settings(minirender::SsaoSettings settings);
-    // 返回SSAO 采样与合成参数；引用和句柄由视口保有。
+    // 返回 SSAO 采样与合成参数；引用和句柄由视口保有。
     const minirender::SsaoSettings& ssao_settings() const noexcept;
     // 接收共享只读环境预处理图和 BRDF LUT，触发 GPU 资源更新。
     void set_ibl_data(std::shared_ptr<const minirender::IblEnvironment> maps,
@@ -310,11 +323,12 @@ class VulkanViewport final : public QWindow {
     void set_environment_background(bool enabled);
     // 查询环境图背景开关。
     bool environment_background() const noexcept;
+    // 记录一次 GPU 环境纹理更新，供导入、旋转和切换场景时核对缓存。
     void report_ibl_update();
     std::uint64_t ibl_texture_updates() const noexcept;
-    // 在 GUI 线程更新CPU 结果是否占据当前视口，并请求视口刷新。
+    // 在 GUI 线程更新 CPU 结果是否占据当前视口，并请求视口刷新。
     void set_offline_visible(bool visible);
-    // 查询CPU 结果是否占据当前视口。
+    // 查询 CPU 结果是否占据当前视口。
     bool offline_visible() const noexcept;
     // 在 GUI 线程更新当前 CPU 线性预览图像，并请求视口刷新。
     void set_offline_image(std::shared_ptr<const minirender::Image> image,
@@ -353,6 +367,7 @@ class VulkanViewport final : public QWindow {
     std::function<void(minirender::GizmoMode)>        on_gizmo_mode_changed;
     std::function<void(const std::string&)>           on_interaction_error;
 
+    // 检查渲染通道已就绪且视口尚未记录错误。下面的设备、通道和命令缓冲句柄由视口持有。
     bool isValid() const noexcept;
     VkDevice device() const noexcept;
     VkPhysicalDevice physicalDevice() const noexcept;
@@ -360,16 +375,20 @@ class VulkanViewport final : public QWindow {
     VkRenderPass defaultRenderPass() const noexcept;
     VkCommandBuffer currentCommandBuffer() const noexcept;
     VkFramebuffer currentFramebuffer() const;
+    // 返回当前渲染目标的物理像素尺寸，供着色器和离屏读回分配图像。
     QSize swapChainImageSize() const noexcept;
+    // 检查当前目标是否支持读回已绘制的颜色。
     bool supportsGrab() const noexcept;
     // 完成必要绘制后读取当前显示图像，包含显示变换和叠加效果。
     QImage grab();
     // 实时读回 HDR 附件；离线返回当前 CPU 预览，全尺寸导出由 OfflinePanel 处理。
-    // 读取当前显示来源的线性浮点图像。
     minirender::Image grab_hdr();
 
+    // 结束当前帧的录制并提交，在需要截图时先记录读回命令。
     void frameReady();
+    // 将连续刷新请求合并到同一个 Qt 定时回调。
     void requestUpdate();
+    // 帧完成和尺寸资源重建分别累加 rendered_frames 与 resource_generations。
     void report_frame();
     void report_swapchain();
     // 返回已完成的渲染帧计数。
@@ -378,6 +397,7 @@ class VulkanViewport final : public QWindow {
     int resource_generations() const noexcept;
     // 返回资源上传和缓存复用计数，供诊断与回归使用。
     const SceneUploadStatistics& upload_statistics() const noexcept;
+    // 分别记录上传、分配、重用和纹理绑定重建次数，以及最近上传场景的 CPU 耗时。
     void report_mesh_upload();
     void report_mesh_allocation();
     void report_vertex_buffer_reuse();
@@ -387,6 +407,7 @@ class VulkanViewport final : public QWindow {
     qint64 preview_wait_ms() const noexcept;
     // 返回当前未能提交或显示下一帧的状态说明。
     QString frame_wait_reason() const;
+    // 保存驱动或渲染器错误供界面显示，并停止后续帧调度。
     void report_failure(const QString& error);
     // 返回渲染器记录的失败信息。
     QString failure() const;
@@ -395,6 +416,7 @@ class VulkanViewport final : public QWindow {
     bool event(QEvent* event) override;
     void exposeEvent(QExposeEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
+    // 按下、移动、释放组成一次手势。滚轮调整相机距离，按键处理当前工具的快捷操作。
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
@@ -420,8 +442,6 @@ class VulkanViewport final : public QWindow {
     void mark_preview_changed();
     // 根据当前相机、对象和模式重新计算操纵器布局。
     void rebuild_gizmo();
-    // 查找满足内存类型掩码和属性要求的设备内存索引。
-    std::uint32_t memory_type(std::uint32_t bits, VkMemoryPropertyFlags flags) const;
 
     std::unique_ptr<ViewportRenderer>                   renderer_;
     std::unique_ptr<ViewportRenderer>                   offline_renderer_;

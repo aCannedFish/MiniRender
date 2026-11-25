@@ -51,6 +51,7 @@ glm::dvec3 sample_triangle(glm::dvec2 u);
 // 计算局部方向的余弦立体角密度，背向半球密度为零。
 double cosine_hemisphere_pdf(glm::dvec3 direction);
 
+// 离散采样结果，索引与该项的概率质量一起返回给估计器。
 struct DiscreteSample {
     // 选中的离散项索引。
     std::size_t index = 0;

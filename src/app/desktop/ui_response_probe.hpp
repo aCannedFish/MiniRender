@@ -64,6 +64,7 @@ class UiResponseProbe final : public QObject {
     }
 
   private:
+    // 携带投递时刻的事件，用接收时间测量 GUI 队列延迟。
     struct Event final : QEvent {
         explicit Event(int type) : QEvent(static_cast<QEvent::Type>(type)) {}
 

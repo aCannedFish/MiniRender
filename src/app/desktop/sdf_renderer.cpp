@@ -3,6 +3,7 @@
 
 #include "sdf_renderer.hpp"
 #include "gpu_shader.hpp"
+#include "vulkan_utils.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 

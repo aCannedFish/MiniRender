@@ -17,6 +17,7 @@ struct ClothCollider {
     double            radius   = 1;
     double            friction = .3;
     bool              enabled  = true;
+    // 检查碰撞形状和相应的尺寸与摩擦参数。
     void validate() const;
 };
 

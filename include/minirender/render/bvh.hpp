@@ -25,6 +25,7 @@ struct SurfaceHit {
     glm::dvec3    position_error{0}; // 重心插值运算的逐轴绝对误差界，用于偏移后续射线。
 };
 
+// 记录建树后的图元、节点和叶节点数，供构建诊断使用。
 struct BvhBuildStatistics {
     std::size_t triangles     = 0;
     std::size_t nodes         = 0;
@@ -45,7 +46,9 @@ class SceneBvh {
   public:
     explicit SceneBvh(std::shared_ptr<const SceneSnapshot> scene,
                       CancellationToken                    cancellation = {});
+    // 借用加速结构所持有的原始快照，以实例编号回查材质与几何。
     const SceneSnapshot& scene() const noexcept;
+    // 读取构建阶段统计；光线查询计数由每次查询的调用方提供。
     const BvhBuildStatistics& statistics() const noexcept;
     // 返回闭区间内最近命中；等距命中按原场景图元次序选择，避免遍历顺序影响结果。
     std::optional<SurfaceHit> intersect(const Ray& ray, RayInterval interval = {},
@@ -61,6 +64,7 @@ class SceneBvh {
                                                  const CancellationToken& cancellation = {}) const;
 
   private:
+    // BVH 内按世界空间求交的三角形，保留原实例与三角形编号供着色回查。
     struct Primitive {
         std::array<glm::vec3, 3> vertices;
         std::uint32_t            instance;
@@ -81,6 +85,7 @@ class SceneBvh {
         std::uint32_t count = 0;
     };
 
+    // 遍历阶段只记录最近图元与重心坐标，确定命中后再插值着色属性。
     struct PrimitiveHit {
         std::uint32_t primitive;
         TriangleHit   hit;

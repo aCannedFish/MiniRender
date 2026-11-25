@@ -66,6 +66,7 @@ class SceneEditor {
     // 已通过校验的不可变网格所有权缓存。
     MeshValidationCache validated_meshes_;
 
+    // 一次操纵手势的起始文档和目标，只有提交时才形成撤销记录。
     struct TransformEdit {
         std::string   object_id;
         SceneDocument initial;

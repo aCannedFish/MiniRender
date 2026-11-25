@@ -18,11 +18,13 @@ struct PointNormalSettings {
     bool        orient                                = true;
     bool        flip                                  = false;
     bool operator==(const PointNormalSettings&) const = default;
+    // 检查邻域规模、距离范围及法线定向参数。
     void validate() const;
 };
 
 enum class PointNormalStage { validation, duplicates, index, estimation, orientation, complete };
 
+// 标识点云邻域构建、法线估计或定向过程中的进度。
 struct PointNormalProgress {
     PointNormalStage stage;
     std::size_t      completed;

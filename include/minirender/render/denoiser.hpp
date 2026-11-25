@@ -12,6 +12,7 @@ struct GuidePixel {
     int       object = -1;
 };
 
+// 逐像素记录可见表面，并保存同帧的物体与相机变换供重投影查询。
 struct DenoiseGuides {
     std::size_t             width = 0, height = 0;
     std::vector<GuidePixel> pixels;            // 行主序，坐标原点在左上角。
@@ -22,6 +23,7 @@ struct DenoiseGuides {
 
 enum class SpatialFilter { bilateral, atrous };
 
+// 空间滤波使用前景几何和颜色权重，时间累积使用同对象邻域的限幅与历史权重。
 struct DenoiseSettings {
     SpatialFilter filter         = SpatialFilter::atrous;
     int           radius         = 2;    // 联合双边滤波半径，单位为像素。

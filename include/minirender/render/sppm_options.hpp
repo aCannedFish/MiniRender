@@ -13,6 +13,7 @@ struct SppmOptions {
     double        initial_radius        = .1;
     double        alpha                 = .7;
     std::uint64_t memory_budget_bytes   = 512ULL * 1024 * 1024;
+    // 检查光子预算、初始合并半径及通量更新参数。
     void validate() const;
 };
 

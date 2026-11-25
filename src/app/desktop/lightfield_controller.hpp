@@ -94,12 +94,14 @@ class LightFieldController final : public QObject {
     using FilePtr   = std::shared_ptr<const minirender::LightFieldFile>;
     using ReaderPtr = std::shared_ptr<minirender::LightFieldReader>;
 
+    // 固定本次焦距、孔径和可选子视图编号。
     struct Request {
         double                     focus;
         double                     aperture;
         std::optional<std::size_t> view;
     };
 
+    // 保存工作线程生成的文件、读取器或图像，完成后由 GUI 接收。
     struct Result {
         FilePtr     file;
         ReaderPtr   reader;
@@ -110,6 +112,7 @@ class LightFieldController final : public QObject {
         bool        cancelled = false;
     };
 
+    // 工作线程用原子计数更新完成量，面板按定时器间隔采样。
     struct Progress {
         std::atomic<std::uint64_t> done{0}, total{0};
     };

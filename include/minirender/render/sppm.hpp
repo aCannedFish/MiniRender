@@ -25,6 +25,7 @@ SppmPixel update_sppm_pixel(SppmPixel previous, std::uint64_t photons, glm::dvec
 enum class SppmPhase { camera, grid, photons, update };
 std::string_view sppm_phase_name(SppmPhase phase);
 
+// 报告当前 SPPM 阶段内的已完成与总工作量。
 struct SppmProgress {
     SppmPhase     phase     = SppmPhase::camera;
     std::uint64_t completed = 0;
@@ -33,6 +34,7 @@ struct SppmProgress {
 
 using SppmCallback = std::function<void(SppmProgress)>;
 
+// 累计有效光子、命中与迭代等计数，供估计收敛与耗时。
 struct SppmStatistics {
     std::uint64_t iterations             = 0;
     std::uint64_t emitted_photons        = 0;

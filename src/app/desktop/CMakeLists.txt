@@ -12,7 +12,7 @@ foreach(shader gi_spatial.frag gi_copy.frag gi_temporal.frag depth_reduce.frag s
     set(output "${CMAKE_CURRENT_BINARY_DIR}/${shader}.spv")
     add_custom_command(OUTPUT "${output}"
         COMMAND Vulkan::glslangValidator --target-env vulkan1.2 -I${PROJECT_SOURCE_DIR}/shaders -V "${source}" -o "${output}"
-        DEPENDS "${source}" "${PROJECT_SOURCE_DIR}/shaders/scene_frame.glsl"
+        DEPENDS "${source}" "${PROJECT_SOURCE_DIR}/shaders/view_modes.h" "${PROJECT_SOURCE_DIR}/shaders/scene_frame.glsl"
                 "${PROJECT_SOURCE_DIR}/shaders/scene_instance.glsl"
                 "${PROJECT_SOURCE_DIR}/shaders/shadow_filter.glsl"
                 "${PROJECT_SOURCE_DIR}/shaders/rectangle_light.glsl"
@@ -25,6 +25,7 @@ endforeach()
 
 qt_add_executable(minirender_desktop
     preview_smoke.cpp preview_smoke.hpp outline_smoke.cpp outline_smoke.hpp
+    vulkan_utils.cpp vulkan_utils.hpp
     main.cpp vulkan_viewport.cpp vulkan_viewport.hpp
     editor_theme.cpp editor_theme.hpp workbench_panels.cpp workbench_panels.hpp theme_smoke.cpp theme_smoke.hpp
     builtin_scenes.cpp builtin_scenes.hpp quick_import_menu.cpp quick_import_menu.hpp
@@ -90,10 +91,13 @@ qt_add_executable(minirender_desktop
     ssao_smoke.cpp ssao_smoke.hpp
     gpu_image.cpp gpu_image.hpp gpu_shader.cpp gpu_shader.hpp
     hdr_targets.cpp hdr_targets.hpp post_process.cpp post_process.hpp
+    scene_gpu_layout.hpp scene_pipeline.cpp scene_upload.cpp scene_frame.cpp
+    viewport_state.cpp viewport_navigation.cpp
     scene_renderer.cpp scene_renderer.hpp shadow_map.cpp shadow_map.hpp workbench.cpp workbench.hpp
     workbench_internal.hpp workbench_widgets.cpp workbench_properties.cpp workbench_assets.cpp workbench_geometry.cpp
     scene_smoke.cpp scene_smoke.hpp texture_smoke.cpp texture_smoke.hpp interaction_smoke.cpp interaction_smoke.hpp
     parameter_smoke.cpp parameter_smoke.hpp wire_smoke.cpp wire_smoke.hpp)
+target_include_directories(minirender_desktop PRIVATE "${PROJECT_SOURCE_DIR}/shaders")
 set_target_properties(minirender_desktop PROPERTIES OUTPUT_NAME "${PROJECT_NAME}")
 if(WIN32)
     enable_language(RC)

@@ -17,7 +17,10 @@ spec.loader.exec_module(installer)
 
 
 def make_bundle(
-    path: Path, identifier: str = installer.BUNDLE_ID, content: bytes = b"old", executable: str = "RenderBox"
+    path: Path,
+    identifier: str = installer.BUNDLE_ID,
+    content: bytes = b"old",
+    executable: str = "RenderBox",
 ) -> Path:
     """构造最小应用包；不同二进制内容用于检查替换与恢复。"""
     (path / "Contents/MacOS").mkdir(parents=True)
@@ -150,7 +153,9 @@ class InstallerTests(unittest.TestCase):
     def test_running_application_prevents_update(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            bundle = make_bundle(root / "MiniRender.app", executable="minirender_desktop")
+            bundle = make_bundle(
+                root / "MiniRender.app", executable="minirender_desktop"
+            )
             current = make_bundle(root / "RenderBox.app")
             self.assertCountEqual(installer.old_bundles([], [root]), [bundle, current])
             executable = bundle / "Contents/MacOS/minirender_desktop"

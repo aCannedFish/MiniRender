@@ -54,7 +54,7 @@ python3 scripts/verify_gpu.py \
 
 1. `scene.hpp` 与 `scene_io.cpp`：材质字段、默认值和文件格式。
 2. `bvh.cpp`、`editor.cpp`、`light.cpp`：CPU 朝向、拾取与面积光。
-3. `scene_renderer.cpp`：正面定义、镜像管线与 draw 选择。
+3. `scene_pipeline.cpp` 建立普通与镜像剔除管线，`scene_renderer.cpp` 在绘制时按变换绕序选择管线。
 4. `raster_mesh.cpp`、`wire.vert`、`wire.frag`：线框所属面的朝向。
 5. `workbench.cpp`、`sided_tests.cpp`、`sides_smoke.cpp`：编辑和验证链路。
 

@@ -17,6 +17,7 @@ std::string sampling_mode_name(SamplingMode mode);
 // 把名称转换为采样策略；未知名称抛出参数异常。
 SamplingMode parse_sampling_mode(const std::string& name);
 
+// 控制光路深度、直接光的采样方式，以及所选积分器的专用参数。
 struct IntegratorSettings {
     // 直接光采用 BSDF、光源或 MIS 采样。
     SamplingMode  mode          = SamplingMode::mis;
@@ -33,6 +34,7 @@ struct IntegratorSettings {
     void validate() const;
 };
 
+// 固定输出画幅、每像素样本数与种子，供离线任务及确定性回归共用。
 struct RenderSettings {
     // 输出图像宽度，单位为像素。
     std::size_t width = 256;
@@ -46,6 +48,7 @@ struct RenderSettings {
     void validate() const;
 };
 
+// 累计一条或一批光路的求交与散射计数，用于比较采样策略。
 struct PathStatistics {
     // BVH 包围盒及三角形求交计数。
     TraceStatistics geometry;

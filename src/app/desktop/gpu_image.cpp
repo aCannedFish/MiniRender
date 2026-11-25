@@ -2,7 +2,7 @@
 // 本模块接口见 gpu_image.hpp。
 
 #include "gpu_image.hpp"
-#include "gpu_buffer.hpp"
+#include "vulkan_utils.hpp"
 
 #include <stdexcept>
 
@@ -43,23 +43,11 @@ void GpuImage::create(VkDevice device, VkPhysicalDevice physical, VkExtent2D ext
     check_vk(vkCreateImage(device_, &info, nullptr, &image_), "create offscreen image");
     VkMemoryRequirements requirements{};
     vkGetImageMemoryRequirements(device_, image_, &requirements);
-    VkPhysicalDeviceMemoryProperties memory{};
-    vkGetPhysicalDeviceMemoryProperties(physical, &memory);
-    std::uint32_t type = memory.memoryTypeCount;
-    for (std::uint32_t index = 0; index < memory.memoryTypeCount; ++index) {
-        if ((requirements.memoryTypeBits & (1U << index)) != 0 &&
-            (memory.memoryTypes[index].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0) {
-            type = index;
-            break;
-        }
-    }
-    if (type == memory.memoryTypeCount) {
-        throw std::runtime_error("No offscreen memory type");
-    }
     VkMemoryAllocateInfo allocation{};
     allocation.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocation.allocationSize  = requirements.size;
-    allocation.memoryTypeIndex = type;
+    allocation.memoryTypeIndex = find_memory_type(physical, requirements.memoryTypeBits,
+                                                  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     check_vk(vkAllocateMemory(device_, &allocation, nullptr, &memory_), "allocate offscreen image");
     check_vk(vkBindImageMemory(device_, image_, memory_, 0), "bind offscreen image");
     VkImageViewCreateInfo view{};

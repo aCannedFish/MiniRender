@@ -728,7 +728,11 @@ src/app/desktop/
 ├── point_preview_renderer.hpp  # 接口：点云、法线与边界的独立 Vulkan 预览
 ├── post_process.cpp  # 线性图像到屏幕显示的转换、FXAA 和预览轮廓
 ├── post_process.hpp  # 接口：线性图像到屏幕显示的转换、FXAA 和预览轮廓
-├── scene_renderer.cpp  # 三角网格实时渲染、资源缓存、阴影与显示管线连接
+├── scene_renderer.cpp  # 单帧调度、阴影与几何绘制、A/B 合成与读回
+├── scene_pipeline.cpp  # 设备资源、交换链附件、图形管线的建立与释放
+├── scene_upload.cpp  # 网格缓冲复用、实例与 PRT 上传、材质描述符更新
+├── scene_frame.cpp  # 相机与灯光常量、前帧重投影和帧内 UBO 同步
+├── scene_gpu_layout.hpp  # CPU 到 GLSL 的实例、帧常量与 push constant 布局
 ├── scene_renderer.hpp  # 接口：三角网格实时渲染、资源缓存、阴影与显示管线连接
 ├── screen_pass.cpp  # 可复用的全屏 Vulkan 渲染附件、描述符与命令录制
 ├── screen_pass.hpp  # 接口：可复用的全屏 Vulkan 渲染附件、描述符与命令录制
@@ -761,16 +765,22 @@ src/app/desktop/
 ├── ssao_pass.cpp  # 屏幕空间遮蔽、双边滤波和环境漫反射合成的 Vulkan pass
 ├── ssao_pass.hpp  # 接口：屏幕空间遮蔽、双边滤波和环境漫反射合成的 Vulkan pass
 ├── viewport_renderer.hpp  # 各类视口渲染器共用的资源创建、缩放、绘制与读回接口
-├── vulkan_viewport.cpp  # Vulkan 窗口生命周期、输入交互、渲染调度与图像读回
+├── vulkan_viewport.cpp  # 设备与窗口生命周期、交换链、提交及图像读回
+├── viewport_state.cpp  # 场景发布、相机与预览参数、缓存失效和离线结果切换
+├── viewport_navigation.cpp  # 键鼠导航、拾取、分屏拖动与操纵器编辑事务
 └── vulkan_viewport.hpp  # 接口：Vulkan 窗口生命周期、输入交互、渲染调度与图像读回
 ```
 
 `VulkanViewport` 管理设备、交换链、帧同步、输入事件和读回；渲染器遵守 `ViewportRenderer` 的资源与帧生命周期。`scene_renderer` 处理三角网格，依次连接阴影、HDR 附件、SSAO 与后处理。离线图、点云和 SDF 使用各自的渲染器。`gizmo_renderer` 叠加操纵器，`screen_pass` 为全屏处理复用附件和描述符管理。
 
+一次实时绘制从 [scene_renderer.cpp](src/app/desktop/scene_renderer.cpp) 的 `startNextFrame` 开始。设备和附件的生命周期集中在 [scene_pipeline.cpp](src/app/desktop/scene_pipeline.cpp)。场景修订号变化时，[scene_upload.cpp](src/app/desktop/scene_upload.cpp) 更新网格、实例和材质绑定。每次绘制前，[scene_frame.cpp](src/app/desktop/scene_frame.cpp) 为当前相机和对照侧写入参数，随后阴影、几何与屏幕空间通道按顺序录制命令。
+
 #### GPU 资源
 
 ```text
 src/app/desktop/
+├── vulkan_utils.hpp  # Vulkan 结果检查与显存类型查询接口
+├── vulkan_utils.cpp  # 根据资源位掩码和属性选择设备内存类型
 ├── gpu_buffer.cpp  # Vulkan 缓冲区与内存的独占生命周期及主机读写
 ├── gpu_buffer.hpp  # 接口：Vulkan 缓冲区与内存的独占生命周期及主机读写
 ├── gpu_cloth.cpp  # 布料材质参数与 CPU/GPU 布局一致的数据打包
@@ -903,6 +913,7 @@ shaders/
 ├── preview_outline.frag  # 依据深度、切平面距离和法线差生成原色预览的细轮廓与折角线
 ├── scene.frag  # 三角表面的原色、GGX 光照、阴影、织物与 IBL 着色，输出颜色和辅助附件
 ├── scene.vert  # 将实例顶点、法线、UV 与切向变换到实时着色所需空间
+├── view_modes.h  # 主机与着色器共用的显示模式编号
 ├── scene_frame.glsl  # CPU 与 GPU 共用的帧 uniform 布局及原色模式判定
 ├── scene_instance.glsl  # 实例 SSBO 数据布局及当前绘制实例索引
 ├── screen.vert  # 全屏渲染 pass 的程序化三角形顶点生成
@@ -924,7 +935,7 @@ shaders/
 └── wire.vert  # 对三角网格线框顶点应用实例与相机变换
 ```
 
-`scene_frame.glsl` 对应 CPU 帧 uniform，`scene_instance.glsl` 对应实例 SSBO；修改布局时须同步 `scene_renderer.cpp` 等打包代码。`cloth.glsl` 和 `ibl_sampling.glsl` 提供材质与环境采样函数，`screen_position.glsl` 重建相机空间位置。
+`scene_frame.glsl` 对应 CPU 帧 uniform，`scene_instance.glsl` 对应实例 SSBO；字段顺序与 [scene_gpu_layout.hpp](src/app/desktop/scene_gpu_layout.hpp) 的偏移断言一致。帧常量由 `scene_frame.cpp` 填写，实例数据由 `scene_upload.cpp` 打包。`cloth.glsl` 和 `ibl_sampling.glsl` 提供材质与环境采样函数，`screen_position.glsl` 重建相机空间位置。
 
 主场景使用 `scene.vert/frag`，方向光深度使用 `shadow.vert`；`ssao.frag → ao_filter.frag → ao_composite.frag` 生成环境遮蔽结果。`preview_outline.frag` 添加显示轮廓，`post.vert/frag` 完成最终显示。其余程序分别服务于线框、离线图像、点云、SDF、操纵器和基础诊断。
 
@@ -1181,7 +1192,11 @@ scripts/
 ├── check_source_names.py  # 检查自有源码文件名，拒绝带空格的副本名称
 ├── course_gltf.py  # 离线解包 HW3 模型、变换和纹理
 ├── course_cubemap.py  # 将课程六面环境转为场景使用的经纬图
-├── prepare_course_catalog.py  # 生成目录缩略图、转换课程模型、建立 EXR 帧索引
+├── prepare_course_catalog.py  # 命令行入口，校验依赖、计算版本与原子发布
+├── builtin_catalog.py  # 项目内置场景、经典模型和自建帧序列
+├── course_catalog.py  # 按课程作业转换本地模型、环境与降噪序列
+├── catalog_assets.py  # 两类目录共用的场景构造、缩略图与校验记录
+├── check_architecture.py  # 核对本节文件树与仓库源码，报告差异
 ├── generate_builtin_scenes.py  # 生成内置 JSON 场景及球体、透光孔、光场棋盘资产
 ├── install_macos.py  # 部署 Qt/Vulkan 运行库、验证签名与隐藏渲染、替换正式应用并清理旧包
 ├── prepare_parameter_probe.py  # 生成大网格场景，供参数响应和资源复用检查使用

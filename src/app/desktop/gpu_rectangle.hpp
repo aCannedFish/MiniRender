@@ -3,6 +3,7 @@
 #include "gpu_ibl.hpp"
 #include <minirender/render/rectangle_light.hpp>
 
+// 持有设备侧 LTC 查找表与矩形灯实例缓冲，描述符借用这些资源。
 class GpuRectangleLights {
   public:
     // 创建共用的拟合表，灯具实例缓冲按首次场景上传的实际数量分配。

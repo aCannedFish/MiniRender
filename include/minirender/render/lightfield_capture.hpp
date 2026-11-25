@@ -7,6 +7,7 @@
 
 namespace minirender {
 
+// 固定单张渲染预算与瞳孔阵列，整次采集中各子视图共享这些参数。
 struct LightFieldCaptureSettings {
     // 单张子视图的图像尺寸、样本数和随机种子。
     RenderSettings render{128, 128, 32, 101};
@@ -27,6 +28,7 @@ struct LightFieldCaptureSettings {
 };
 enum class LightFieldPhase { preparing, rendering, writing, finalizing };
 
+// 采集任务某一版本的进度快照，区分渲染、写入和整理阶段。
 struct LightFieldCaptureProgress {
     // 采集会话的生命周期状态。
     RenderState state = RenderState::idle;
@@ -62,6 +64,7 @@ struct LightFieldCaptureProgress {
     std::string error;
 };
 
+// 标记预览图所属的任务和子视图，防止旧任务刷新当前面板。
 struct LightFieldCapturePreview {
     // 采集任务代号，用于排除旧任务更新。
     std::uint64_t job_id = 0;

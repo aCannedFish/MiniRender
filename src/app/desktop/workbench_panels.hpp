@@ -31,6 +31,7 @@ class WorkbenchPanels final : public QObject {
     std::function<void(int)> on_current_changed;
 
   private:
+    // 将页面标题、控件与所属标签栏关联，供分类和恢复导航。
     struct Page {
         QWidget*    widget;
         QString     title;

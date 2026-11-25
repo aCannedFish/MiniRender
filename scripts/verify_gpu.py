@@ -97,13 +97,37 @@ def main() -> int:
         action="store_true",
         help="Verify single and double sided surfaces",
     )
-    checks.add_argument("--integration-check",action="store_true",help="Verify Cornell real-time and offline comparison")
-    checks.add_argument("--denoise-check",action="store_true",help="Verify frame, offline and live denoising")
-    checks.add_argument("--transport-check",action="store_true",help="Verify screen-space ray and indirect light")
-    checks.add_argument("--prt-check",action="store_true",help="Verify static SH transport")
-    checks.add_argument("--rectangle-check",action="store_true",help="Verify editable rectangle lights and LTC")
-    checks.add_argument("--shadow-check",action="store_true",help="Measure PCF and PCSS penumbrae")
-    checks.add_argument("--catalog-check", action="store_true", help="Verify resource import and frame playback")
+    checks.add_argument(
+        "--integration-check",
+        action="store_true",
+        help="Verify Cornell real-time and offline comparison",
+    )
+    checks.add_argument(
+        "--denoise-check",
+        action="store_true",
+        help="Verify frame, offline and live denoising",
+    )
+    checks.add_argument(
+        "--transport-check",
+        action="store_true",
+        help="Verify screen-space ray and indirect light",
+    )
+    checks.add_argument(
+        "--prt-check", action="store_true", help="Verify static SH transport"
+    )
+    checks.add_argument(
+        "--rectangle-check",
+        action="store_true",
+        help="Verify editable rectangle lights and LTC",
+    )
+    checks.add_argument(
+        "--shadow-check", action="store_true", help="Measure PCF and PCSS penumbrae"
+    )
+    checks.add_argument(
+        "--catalog-check",
+        action="store_true",
+        help="Verify resource import and frame playback",
+    )
     checks.add_argument(
         "--presets-check",
         action="store_true",
@@ -215,13 +239,13 @@ def main() -> int:
         (args.sdf_check, "SDF"),
         (args.points_check, "Points"),
         (args.adaptive_check, "Adaptive"),
-        (args.integration_check,"Integration"),
-        (args.denoise_check,"Denoise"),
-        (args.transport_check,"Transport"),
-        (args.prt_check,"Prt"),
-        (args.rectangle_check,"Rectangle"),
-        (args.shadow_check,"Shadow"),
-        (args.catalog_check,"Catalog"),
+        (args.integration_check, "Integration"),
+        (args.denoise_check, "Denoise"),
+        (args.transport_check, "Transport"),
+        (args.prt_check, "Prt"),
+        (args.rectangle_check, "Rectangle"),
+        (args.shadow_check, "Shadow"),
+        (args.catalog_check, "Catalog"),
         (args.presets_check, "Presets"),
         (args.sides_check, "Sides"),
         (args.gizmo_check, "Gizmo"),

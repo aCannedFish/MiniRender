@@ -13,12 +13,14 @@ struct AdaptiveCorner {
     glm::dvec3 barycentric;
 };
 
+// 自适应树中的三角形，保留根面编号和细分层数。
 struct AdaptiveFace {
     std::array<AdaptiveCorner, 3> corners;
     MeshIndex                     root  = 0;
     std::uint32_t                 level = 0;
 };
 
+// 细分层级上评估得到的局部位置与法线。
 struct AdaptiveSample {
     glm::dvec3 position;
     glm::dvec3 normal;

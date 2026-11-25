@@ -22,6 +22,7 @@ class GizmoRenderer {
     void release();
 
   private:
+    // 操纵器覆盖层的二维顶点位置与 RGBA 颜色。
     struct Vertex {
         glm::vec2 position{0};
         glm::vec4 color{1};

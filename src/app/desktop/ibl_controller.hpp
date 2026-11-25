@@ -9,6 +9,7 @@
 
 enum class IblTaskState { idle, preparing, ready, cancelling, cancelled, failed };
 
+// 记录环境烘焙的任务状态、处理阶段与可显示的错误。
 struct IblTaskStatus {
     IblTaskState            state = IblTaskState::idle;
     minirender::IblProgress progress{minirender::IblStage::source};
@@ -30,11 +31,13 @@ class IblController final : public QObject {
     IblTaskStatus status() const;
 
   private:
+    // 由工作线程写入的阶段进度，在 GUI 线程读取时加锁。
     struct Progress {
         std::mutex              mutex;
         minirender::IblProgress value{minirender::IblStage::source};
     };
 
+    // 将源图与对应的环境卷积和 BRDF 表一起返回，供控制器判定版本。
     struct Result {
         std::shared_ptr<const minirender::Texture>        source;
         std::shared_ptr<const minirender::IblEnvironment> maps;
@@ -43,6 +46,7 @@ class IblController final : public QObject {
         bool                                              cancelled = false;
     };
 
+    // 缓存不再使用的源纹理仅保留弱引用，逻辑时钟用于选择淘汰项。
     struct CacheEntry {
         std::weak_ptr<const minirender::Texture>          source;
         std::shared_ptr<const minirender::IblEnvironment> maps;

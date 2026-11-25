@@ -24,6 +24,7 @@ void save_obj(const MeshData& mesh, const std::filesystem::path& path,
 
 enum class SceneSaveStage { validation, mesh, hash, compare, copy, metadata, commit };
 
+// 同时标记保存阶段、资产序号和阶段内进度，供 UI 显示写盘过程。
 struct SceneSaveProgress {
     SceneSaveStage stage       = SceneSaveStage::validation;
     std::size_t    asset_index = 0;

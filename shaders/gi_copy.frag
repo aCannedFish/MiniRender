@@ -2,6 +2,7 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "scene_frame.glsl"
+#include "screen_position.glsl"
 layout(binding = 1) uniform sampler2D source_a;
 layout(binding = 2) uniform sampler2D source_b;
 layout(binding = 3) uniform sampler2D source_c;
@@ -17,8 +18,7 @@ void main() {
     ivec2 p = ivec2(gl_FragCoord.xy);
     if (selection.mode == 3) {
         float z     = texelFetch(source_b, p, 0).r;
-        float depth = frame.viewport.z * frame.viewport.w /
-                      (frame.viewport.w - z * (frame.viewport.w - frame.viewport.z));
+        float depth = view_depth(z);
         result      = vec4(texelFetch(source_a, p, 0).xyz, depth);
     } else if (selection.mode == 1) {
         result = texelFetch(source_b, p, 0);

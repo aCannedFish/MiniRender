@@ -13,6 +13,7 @@ namespace minirender {
 struct PointCloud {
     std::vector<glm::vec3> positions;
     std::vector<glm::vec3> normals;
+    // 核对逐点属性数量与数值的有效性；长点集允许取消。
     void validate(CancellationToken cancellation = {}) const;
 };
 

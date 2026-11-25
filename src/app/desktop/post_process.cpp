@@ -3,6 +3,7 @@
 
 #include "post_process.hpp"
 #include "gpu_shader.hpp"
+#include "vulkan_utils.hpp"
 
 #include <array>
 

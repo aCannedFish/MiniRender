@@ -6,6 +6,7 @@
 
 namespace minirender::detail {
 
+// 一个粒子的接触次数，以及步内是否已达到碰撞次数上限。
 struct ClothContacts {
     std::size_t count   = 0;
     bool        limited = false;

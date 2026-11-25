@@ -3,6 +3,7 @@
 #include <QString>
 #include <minirender/render/prt.hpp>
 
+// 烘焙结果及磁盘缓存命中标记，供界面解释准备耗时。
 struct CachedPrt {
     std::shared_ptr<const minirender::PrtBake> data;
     bool                                       reused = false;

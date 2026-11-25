@@ -21,10 +21,13 @@ struct MeshClosestPoint {
 // 与渲染场景/BVH 独立，用于几何误差评估及重网格后的表面投影。
 class MeshSurface {
   public:
+    // 校验三角形并建立局部空间 AABB 树，持有输入网格的共享引用。
     explicit MeshSurface(std::shared_ptr<const MeshData> mesh, CancellationToken cancellation = {});
+    // 返回距离查询点最近的表面点、三角形编号与重心坐标。
     MeshClosestPoint closest(glm::dvec3 point, CancellationToken cancellation = {}) const;
 
   private:
+    // 子树在局部空间的包围盒；叶节点在 order_ 中占据连续三角形区间。
     struct Node {
         glm::dvec3 low{0};
         glm::dvec3 high{0};
@@ -37,12 +40,14 @@ class MeshSurface {
     std::vector<Node>               nodes_;
 };
 
+// 从一个网格向另一个网格表面查询的单向误差统计。
 struct SurfaceDistance {
     std::size_t samples = 0;
     double      rms     = 0; // 采样点到另一网格三角形表面的 RMS，单位 m。
     double      maximum = 0; // 相同采样集合中的最大距离，单位 m。
 };
 
+// 保留两个方向的独立统计，再按样本数合并对称距离指标。
 struct SurfaceComparison {
     SurfaceDistance original_to_result, result_to_original;
     double          symmetric_rms   = 0;

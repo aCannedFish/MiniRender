@@ -16,6 +16,7 @@ class SubsurfacePreviewCache final {
     void end_scene();
 
   private:
+    // 按光学参数与折射率复用实时表面近似颜色。
     struct Entry {
         std::shared_ptr<const minirender::SubsurfaceParameters> source;
         float                                                   ior = 0;

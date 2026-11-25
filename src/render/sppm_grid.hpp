@@ -12,6 +12,7 @@
 #include <vector>
 
 namespace minirender::detail {
+// 一个可见点的位置、合并半径和在外部可见点表中的索引。
 struct SppmGridPoint {
     glm::dvec3  position{0};
     double      radius = 0;
@@ -50,6 +51,7 @@ class SppmGrid final {
   private:
     using Cell = std::array<std::int64_t, 3>;
 
+    // 哈希桶中的单元格、可见点索引与下一条记录。
     struct Entry {
         Cell        cell;
         std::size_t point;
