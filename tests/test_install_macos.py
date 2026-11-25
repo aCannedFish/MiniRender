@@ -143,12 +143,37 @@ class InstallerTests(unittest.TestCase):
             destination = make_bundle(root / "MiniRender.app")
             staged = make_bundle(root / "new.app", content=b"new")
             backup = root / "previous.app"
-            installer.publish_bundle(staged, destination, backup)
+
+            def check_staged(path):
+                # 注销时路径必须仍指向通过验证的新包，正式版本仍可启动。
+                self.assertEqual(path, staged)
+                self.assertTrue(staged.is_dir())
+                self.assertTrue(destination.is_dir())
+
+            with patch.object(
+                installer, "unregister_bundle", side_effect=check_staged
+            ) as unregister:
+                installer.publish_bundle(staged, destination, backup)
+            unregister.assert_called_once_with(staged)
             self.assertEqual(
                 (destination / "Contents/MacOS/RenderBox").read_bytes(), b"new"
             )
             self.assertFalse(backup.exists())
             self.assertFalse(staged.exists())
+
+    def test_failed_validation_unregisters_temporary_copy(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = make_bundle(root / "build/RenderBox.app")
+            staging = root / "install.noindex"
+            staging.mkdir()
+            with patch.object(installer, "unregister_bundle") as unregister:
+                with self.assertRaisesRegex(RuntimeError, "Validation failed"):
+                    with installer.staged_copy(source, staging) as staged:
+                        self.assertTrue(staged.is_dir())
+                        raise RuntimeError("Validation failed")
+                unregister.assert_called_once_with(staged)
+            self.assertTrue(source.is_dir())
 
     def test_running_application_prevents_update(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -196,7 +221,10 @@ class InstallerTests(unittest.TestCase):
                     raise OSError("Simulated publication failure")
                 return rename(path, target)
 
-            with patch.object(Path, "rename", fail_staged):
+            with (
+                patch.object(Path, "rename", fail_staged),
+                patch.object(installer, "unregister_bundle"),
+            ):
                 with self.assertRaises(OSError):
                     installer.publish_bundle(staged, destination, backup)
             self.assertEqual(

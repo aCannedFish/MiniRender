@@ -6,6 +6,8 @@
 """
 
 import argparse
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -76,9 +78,23 @@ def unregister_bundle(bundle: Path) -> None:
         result.check_returncode()
 
 
+@contextmanager
+def staged_copy(source: Path, directory: Path) -> Iterator[Path]:
+    """复制待验证版本。验证失败时，在临时目录删除前注销该副本。"""
+    staged = directory / "RenderBox.app"
+    shutil.copytree(source, staged, symlinks=True)
+    try:
+        yield staged
+    finally:
+        if staged.exists():
+            unregister_bundle(staged)
+
+
 def publish_bundle(staged: Path, destination: Path, backup: Path) -> None:
     """在同一文件系统内更名替换；替换失败时恢复原应用。"""
     bundle_info(staged)
+    # 隐藏窗口验证会向 Launch Services 注册临时路径，须在移动包前注销。
+    unregister_bundle(staged)
     had_previous = destination.exists() or destination.is_symlink()
     if had_previous:
         bundle_info(destination)
@@ -201,12 +217,12 @@ def main() -> int:
     require_idle_builds(roots)
     require_stopped(previous)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(
-        prefix=".renderbox-update-", dir=destination.parent
-    ) as temporary:
-        staging = Path(temporary)
-        staged = staging / "RenderBox.app"
-        shutil.copytree(source, staged, symlinks=True)
+    with (
+        tempfile.TemporaryDirectory(
+            prefix=".renderbox-update-", suffix=".noindex", dir=destination.parent
+        ) as temporary,
+        staged_copy(source, Path(temporary)) as staged,
+    ):
         commit = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=repository, text=True
         ).strip()
@@ -306,7 +322,8 @@ def main() -> int:
         )
         require_idle_builds(roots)
         require_stopped(previous)
-        publish_bundle(staged, destination, staging / "previous.app")
+        # 使用普通目录名保存回滚副本，避免应用列表将备份视为可启动程序。
+        publish_bundle(staged, destination, Path(temporary) / "previous")
         print(f"Installed: {destination} ({commit[:12]})", flush=True)
     for bundle in previous:
         if bundle == destination or not bundle.exists():

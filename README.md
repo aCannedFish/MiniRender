@@ -124,7 +124,7 @@ python3 scripts/install_macos.py
 open /Applications/RenderBox.app
 ```
 
-安装器打包 Qt 和 Vulkan 运行库及内置场景，通过隐藏窗口检查后更新 `/Applications/RenderBox.app`，并清理同应用标识的旧安装包和工作树构建包。后续更新重复上述配置、构建和安装命令。
+安装器打包 Qt 和 Vulkan 运行库及内置场景，通过隐藏窗口检查后更新 `/Applications/RenderBox.app`，并清理同应用标识的旧安装包和工作树构建包。安装器在移动或删除验证副本前注销其临时路径，Dock 的「App」列表使用正式安装路径。后续更新重复上述配置、构建和安装命令。
 
 只使用 CPU 命令行时，选择 core preset：
 
